@@ -29,28 +29,28 @@ public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSql
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L69-L70",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs", 69, 70,
         Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_round_works_correctly_in_projection(bool async)
         => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L72-L73",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs", 72, 73,
         Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_round_works_correctly_in_projection_2(bool async)
         => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection_2(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L75-L76",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs", 75, 76,
         Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_truncate_works_correctly_in_projection(bool async)
         => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L78-L79",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs", 78, 79,
         Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_truncate_works_correctly_in_projection_2(bool async)
         => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection_2(async));

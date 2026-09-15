@@ -79,6 +79,7 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///     cause, which is why it read as an unrelated defect.
     /// </remarks>
     [InfoCarrierDesign(
+        Decisions.SecurityReview,
         Decisions.RawSqlGrant,
         Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
     public override Task Multiple_different_entity_type_from_different_namespaces(bool async)
@@ -101,9 +102,12 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///     2026-09-15 without the skip: the count is 0 where the base expects 1.
     /// </remarks>
     [InfoCarrierDesign(
-        "ADR-006",
+        6,
         Justification = CommandCacheIsTheServers,
-        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L11-L12",
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs",
+        UpstreamFirstLine = 11,
+        UpstreamLastLine = 12,
         Skip = true)]
     public override Task Explicitly_compiled_query_does_not_add_cache_entry()
         => Task.CompletedTask;
@@ -119,10 +123,13 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///     settled, because the harness keeps even a context that ran a plain query alive.
     /// </remarks>
     [InfoCarrierDesign(
-        "ADR-010",
+        10,
         Justification = "The client projection that calls the DbContext's method runs in the residual against the "
             + "executing context, so there is no cached shaper holding a context for EF's refusal to prevent.",
-        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L14-L15",
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs",
+        UpstreamFirstLine = 14,
+        UpstreamLastLine = 15,
         Skip = true)]
     public override Task Inlined_dbcontext_is_not_leaking()
         => Task.CompletedTask;
@@ -130,9 +137,12 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     /// <inheritdoc />
     /// <remarks>EF's InMemory class's, for the same reason as the first. Measured: 1 where the base expects 2.</remarks>
     [InfoCarrierDesign(
-        "ADR-006",
+        6,
         Justification = CommandCacheIsTheServers,
-        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L17-L18",
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs",
+        UpstreamFirstLine = 17,
+        UpstreamLastLine = 18,
         Skip = true)]
     public override Task Relational_command_cache_creates_new_entry_when_parameter_nullability_changes()
         => Task.CompletedTask;
@@ -140,9 +150,12 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     /// <inheritdoc />
     /// <remarks>EF's InMemory class's, for the same reason as the first. Measured: 1 where the base expects 2.</remarks>
     [InfoCarrierDesign(
-        "ADR-006",
+        6,
         Justification = CommandCacheIsTheServers,
-        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L20-L21",
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs",
+        UpstreamFirstLine = 20,
+        UpstreamLastLine = 21,
         Skip = true)]
     public override Task Variable_from_closure_is_parametrized()
         => Task.CompletedTask;

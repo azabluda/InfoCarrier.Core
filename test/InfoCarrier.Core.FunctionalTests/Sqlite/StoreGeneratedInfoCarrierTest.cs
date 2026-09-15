@@ -42,7 +42,7 @@ public class StoreGeneratedInfoCarrierTest(StoreGeneratedInfoCarrierTest.StoreGe
     ///     columns — and the reason is the backing store's, so it is ours too.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/StoreGeneratedSqliteTest.cs#L11-L13",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/StoreGeneratedSqliteTest.cs", 11, 13,
         Justification = "Computed columns not supported",
         Skip = true)]
     public override Task Fields_used_correctly_for_store_generated_values()

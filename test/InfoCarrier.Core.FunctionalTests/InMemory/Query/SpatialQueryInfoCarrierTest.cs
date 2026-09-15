@@ -39,7 +39,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     /// </remarks>
     [StoreDefect(
         "1.11",
-        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs#L8-L9",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 8, 9,
         Justification = Upstream.GaveNoReason)]
     public override Task Intersects_equal_to_null(bool async)
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Intersects_equal_to_null(async));
@@ -48,7 +48,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     /// <remarks>As <see cref="Intersects_equal_to_null" />.</remarks>
     [StoreDefect(
         "1.11",
-        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs#L11-L12",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 11, 12,
         Justification = Upstream.GaveNoReason)]
     public override Task Intersects_not_equal_to_null(bool async)
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Intersects_not_equal_to_null(async));
@@ -61,7 +61,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     ///     anything reaches the wire. A Tier A store limitation.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs#L14-L15",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 14, 15,
         Justification = Upstream.GaveNoReason,
         Skip = true)]
     public override Task Distance_constant_lhs(bool async)
@@ -74,7 +74,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     /// </remarks>
     [StoreDefect(
         "1.11",
-        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs#L18-L19",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 18, 19,
         Justification = "Sequence contains no elements",
         Skip = true)]
     public override Task GetGeometryN_with_null_argument(bool async)

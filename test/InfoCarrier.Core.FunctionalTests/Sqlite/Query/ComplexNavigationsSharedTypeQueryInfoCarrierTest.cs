@@ -36,42 +36,42 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L20-L24",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 20, 24,
         Justification = Upstream.GaveNoReason)]
     public override Task Nested_SelectMany_correlated_with_join_table_correctly_translated_to_apply(bool async)
         => AssertApplyNotSupported(() => base.Nested_SelectMany_correlated_with_join_table_correctly_translated_to_apply(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L32-L35",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 32, 35,
         Justification = Upstream.GaveNoReason)]
     public override Task Let_let_contains_from_outer_let(bool async)
         => AssertApplyNotSupported(() => base.Let_let_contains_from_outer_let(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L37-L40",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 37, 40,
         Justification = Upstream.GaveNoReason)]
     public override Task Prune_does_not_throw_null_ref(bool async)
         => AssertApplyNotSupported(() => base.Prune_does_not_throw_null_ref(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L42-L45",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 42, 45,
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_projection_with_first(bool async)
         => AssertApplyNotSupported(() => base.Correlated_projection_with_first(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L47-L50",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 47, 50,
         Justification = Upstream.GaveNoReason)]
     public override Task Multiple_select_many_in_projection(bool async)
         => AssertApplyNotSupported(() => base.Multiple_select_many_in_projection(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L52-L55",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 52, 55,
         Justification = Upstream.GaveNoReason)]
     public override Task Single_select_many_in_projection_with_take(bool async)
         => AssertApplyNotSupported(() => base.Single_select_many_in_projection_with_take(async));
@@ -86,7 +86,7 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     ///     there.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs#L13-L18",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsSharedTypeQuerySqliteTest.cs", 13, 18,
         Justification = Upstream.GaveNoReason)]
     public override Task GroupJoin_client_method_in_OrderBy(bool async)
         => AssertTranslationFailedWithDetails(
@@ -105,9 +105,10 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     ///     for, and the projection split raises it before the request crosses the wire.
     /// </remarks>
     [InfoCarrierDesign(
-        "ADR-010",
+        10,
         Justification = ComplexNavigationsQueryInfoCarrierTest.QueryableElementRefused,
-        Deviation = ComplexNavigationsQueryInfoCarrierTest.RefusedBeforeApply)]
+        Deviation = DeviationKind.RefusedEarlier,
+        DeviationNote = ComplexNavigationsQueryInfoCarrierTest.RefusedBeforeApply)]
     public override Task Join_with_result_selector_returning_queryable_throws_validation_error(bool async)
         => AssertInvalidMaterializationType(
             () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async),
@@ -142,7 +143,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L13-L18",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 13, 18,
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_let_collection_projection_FirstOrDefault_with_ToList_on_inner_and_outer(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -150,7 +151,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L20-L24",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 20, 24,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_after_different_filtered_include_different_level(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -158,7 +159,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L26-L30",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 26, 30,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -166,7 +167,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L32-L36",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 32, 36,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_complex_three_level_with_middle_having_filter1(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -174,7 +175,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L38-L45",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 38, 45,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(
         bool async)
@@ -184,7 +185,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L47-L51",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 47, 51,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_same_filter_set_on_same_navigation_twice_followed_by_ThenIncludes(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -192,7 +193,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L53-L57",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 53, 57,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_complex_three_level_with_middle_having_filter2(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -200,7 +201,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L59-L63",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 59, 63,
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_let_collection_projection_FirstOrDefault(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -208,7 +209,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L65-L68",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 65, 68,
         Justification = Upstream.GaveNoReason)]
     public override Task Take_Select_collection_Take(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -216,7 +217,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L70-L73",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 70, 73,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_Select_collection_Skip_Take(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -224,7 +225,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L75-L79",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 75, 79,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_Take_with_another_Take_on_top_level(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -232,7 +233,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L81-L85",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 81, 85,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_Skip_Take_with_another_Skip_Take_on_top_level(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -240,7 +241,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L87-L90",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 87, 90,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_Distinct_on_grouping_element(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -248,7 +249,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L92-L96",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 92, 96,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_on_grouping_element_inside_collection_projection(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -256,7 +257,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L98-L102",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 98, 102,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_on_grouping_element_with_collection_include(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -264,7 +265,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L104-L108",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 104, 108,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_on_grouping_element_with_reference_include(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -272,7 +273,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L110-L116",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 110, 116,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_FirstOrDefault_on_top_level(
         bool async)
@@ -282,7 +283,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L118-L124",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 118, 124,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_unordered_Take_on_top_level(
         bool async)
@@ -292,7 +293,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L126-L132",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 126, 132,
         Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_with_predicate_and_DefaultIfEmpty_projecting_root_collection_element_and_another_collection(
         bool async)
@@ -302,7 +303,7 @@ public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs#L140-L144",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 140, 144,
         Justification = Upstream.GaveNoReason)]
     public override Task Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -325,7 +326,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L41-L45",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 41, 45,
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_let_collection_projection_FirstOrDefault(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -333,7 +334,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L13-L18",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 13, 18,
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_let_collection_projection_FirstOrDefault_with_ToList_on_inner_and_outer(
         bool async)
@@ -343,7 +344,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L63-L67",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 63, 67,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_Skip_Take_with_another_Skip_Take_on_top_level(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -351,7 +352,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L57-L61",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 57, 61,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_Take_with_another_Take_on_top_level(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -359,7 +360,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L20-L24",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 20, 24,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -367,7 +368,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L26-L33",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 26, 33,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(
         bool async)
@@ -377,7 +378,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L35-L39",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 35, 39,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_same_filter_set_on_same_navigation_twice_followed_by_ThenIncludes(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -385,7 +386,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L86-L92",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 86, 92,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_FirstOrDefault_on_top_level(
         bool async)
@@ -395,7 +396,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L94-L100",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 94, 100,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_Take_without_order_by_followed_by_ThenInclude_and_unordered_Take_on_top_level(
         bool async)
@@ -405,7 +406,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L116-L120",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 116, 120,
         Justification = Upstream.GaveNoReason)]
     public override Task Projecting_collection_with_group_by_after_optional_reference_correlated_with_parent(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -413,7 +414,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L102-L108",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 102, 108,
         Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_with_predicate_and_DefaultIfEmpty_projecting_root_collection_element_and_another_collection(
         bool async)
@@ -423,7 +424,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L69-L72",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 69, 72,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_Distinct_on_grouping_element(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -431,7 +432,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L52-L55",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 52, 55,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_Select_collection_Skip_Take(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -439,7 +440,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L74-L78",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 74, 78,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_on_grouping_element_inside_collection_projection(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -447,7 +448,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L80-L84",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 80, 84,
         Justification = Upstream.GaveNoReason)]
     public override Task Skip_Take_on_grouping_element_with_reference_include(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -455,7 +456,7 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs#L47-L50",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 47, 50,
         Justification = Upstream.GaveNoReason)]
     public override Task Take_Select_collection_Take(bool async)
         => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(

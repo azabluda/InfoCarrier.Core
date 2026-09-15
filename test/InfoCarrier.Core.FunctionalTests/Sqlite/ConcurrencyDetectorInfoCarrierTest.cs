@@ -65,6 +65,7 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
     ///     </para>
     /// </remarks>
     [InfoCarrierDesign(
+        Decisions.SecurityReview,
         Decisions.RawSqlGrant,
         Justification = "Raw SQL is refused unless the server grants it, and this fixture does not. The refusal comes "
             + "while the query is compiled, before the concurrency detector is reached.")]
@@ -112,6 +113,7 @@ public class ConcurrencyDetectorDisabledInfoCarrierTest(
     ///     resulting table scan raised nothing. R75 refuses it, and the refusal is what is pinned.
     /// </remarks>
     [InfoCarrierDesign(
+        Decisions.SecurityReview,
         Decisions.RawSqlGrant,
         Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
     public override Task FromSql(bool async)

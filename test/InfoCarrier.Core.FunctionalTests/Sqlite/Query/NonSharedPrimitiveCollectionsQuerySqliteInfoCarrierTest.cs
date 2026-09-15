@@ -57,11 +57,11 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
     ///     reading the row the store actually holds; this records it the way EF does.
     /// </remarks>
     [StoreIssue(
-        "dotnet/efcore#30730",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NonSharedPrimitiveCollectionsQuerySqliteTest.cs#L184-L199",
+        IssueTracker.EfCore, 30730,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NonSharedPrimitiveCollectionsQuerySqliteTest.cs", 184, 199,
         Justification = "Issue #30730: TODO: SQLite is not matching elements here.",
         Skip = true,
-        Deviation = Deviations.SqlNotAsserted)]
+        Deviation = DeviationKind.SqlNotAsserted)]
     [ConditionalFact(Skip = "Issue #30730: TODO: SQLite is not matching elements here.")]
     public override Task Array_of_TimeOnly()
         => base.Array_of_TimeOnly();

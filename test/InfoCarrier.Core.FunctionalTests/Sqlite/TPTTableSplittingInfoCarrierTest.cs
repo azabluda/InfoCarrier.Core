@@ -47,7 +47,7 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
     ///     reason: the scenario is not valid for TPT. Adopted rather than invented.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/TPTTableSplittingSqliteTest.cs#L11-L13",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/TPTTableSplittingSqliteTest.cs", 11, 13,
         Justification = "This scenario is not valid for TPT",
         Skip = true)]
     public override Task Can_insert_dependent_with_just_one_parent()

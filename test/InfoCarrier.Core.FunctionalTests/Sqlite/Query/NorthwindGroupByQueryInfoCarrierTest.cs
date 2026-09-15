@@ -41,51 +41,53 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L23-L24",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 23, 24,
         Justification = Upstream.GaveNoReason,
-        Deviation = "EF's override calls base.Select_uncorrelated_collection_with_groupby_multiple_collections_work, a different test; this one refuses its own.")]
+        Deviation = DeviationKind.UpstreamCallsAnotherTest,
+        DeviationNote = "EF's override calls base.Select_uncorrelated_collection_with_groupby_multiple_collections_work.")]
     public override Task Select_uncorrelated_collection_with_groupby_works(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_works(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L20-L21",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 20, 21,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_uncorrelated_collection_with_groupby_multiple_collections_work(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_multiple_collections_work(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L26-L27",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 26, 27,
         Justification = Upstream.GaveNoReason,
-        Deviation = "EF's override calls base.Select_uncorrelated_collection_with_groupby_works, a different test; this one refuses its own.")]
+        Deviation = DeviationKind.UpstreamCallsAnotherTest,
+        DeviationNote = "EF's override calls base.Select_uncorrelated_collection_with_groupby_works.")]
     public override Task Select_uncorrelated_collection_with_groupby_when_outer_is_distinct(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_when_outer_is_distinct(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L29-L30",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 29, 30,
         Justification = Upstream.GaveNoReason)]
     public override Task AsEnumerable_in_subquery_for_GroupBy(bool async)
         => AssertApplyNotSupported(() => base.AsEnumerable_in_subquery_for_GroupBy(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L44-L45",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 44, 45,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_nested_collection_with_groupby(bool async)
         => AssertApplyNotSupported(() => base.Select_nested_collection_with_groupby(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L47-L48",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 47, 48,
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_group_by_in_subquery5(bool async)
         => AssertApplyNotSupported(() => base.Complex_query_with_group_by_in_subquery5(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L53-L55",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 53, 55,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(bool async)
         => AssertApplyNotSupported(
@@ -101,7 +103,7 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
     ///     move to Tier B.
     /// </remarks>
     [InfoCarrierDesign(
-        "ADR-010",
+        10,
         Justification = "The grouping key is RandomClass, a client-only class without value equality. The server "
             + "cannot construct it, and grouping by it on the client would give one group per row, so the query is "
             + "refused with EF's TranslationFailed.")]

@@ -46,7 +46,7 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs#L114-L118",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 114, 118,
         Justification = Upstream.GaveNoReason)]
     public override async Task Multiple_collection_navigation_with_FirstOrDefault_chained(bool async)
         => Assert.Equal(
@@ -56,7 +56,7 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs#L123-L124",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 123, 124,
         Justification = Upstream.GaveNoReason)]
     public override Task Contains_with_local_tuple_array_closure(bool async)
         => AssertTranslationFailed(() => base.Contains_with_local_tuple_array_closure(async));

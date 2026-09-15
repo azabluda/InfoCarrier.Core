@@ -187,7 +187,7 @@ public class DirectProjectionTest(OwnedNavigationsDirectStoreFixture fixture)
     ///     one; <see cref="ClientEvaluatedProjectionTest" /> measures both and rules out the
     ///     owned-reference hop. <c>docs/upstream-defects.md</c> §1.10.
     /// </remarks>
-    [StoreIssue("EF-250")]
+    [StoreIssue(IssueTracker.MongoEfCore, 250)]
     public override Task Select_untranslatable_method_on_associate_scalar_property(
         QueryTrackingBehavior queryTrackingBehavior)
         => StoreBehaviour.Refuses(
@@ -339,7 +339,7 @@ public class DirectStructuralEqualityTest(OwnedNavigationsDirectStoreFixture fix
     /// <summary>
     ///     EF's base expects a refusal (<c>dotnet/efcore#36400</c>). This store ANSWERS, correctly.
     /// </summary>
-    [StoreIssue("dotnet/efcore#36400", Deviation = WrittenOut)]
+    [StoreIssue(IssueTracker.EfCore, 36400, Deviation = DeviationKind.QueryWrittenOut, DeviationNote = WrittenOut)]
     public override async Task Nested_associate_with_inline()
     {
         using DbContext context = Fixture.CreateContext();
@@ -363,7 +363,7 @@ public class DirectStructuralEqualityTest(OwnedNavigationsDirectStoreFixture fix
     }
 
     /// <inheritdoc cref="Nested_associate_with_inline" />
-    [StoreIssue("dotnet/efcore#36400", Deviation = WrittenOut)]
+    [StoreIssue(IssueTracker.EfCore, 36400, Deviation = DeviationKind.QueryWrittenOut, DeviationNote = WrittenOut)]
     public override async Task Nested_associate_with_parameter()
     {
         using DbContext context = Fixture.CreateContext();

@@ -108,16 +108,18 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
     ///     of them with two tests red in each.
     /// </remarks>
     [StoreLimit(
-        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonRequiredFirstOrDefault,
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 26, 29,
         Case = nameof(QueryTrackingBehavior.TrackAll),
         Justification = OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonTrackAllReason,
         Skip = true,
-        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     [StoreLimit(
-        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonRequiredFirstOrDefault,
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 26, 29,
         Case = nameof(QueryTrackingBehavior.NoTracking),
         Justification = Upstream.GaveNoReason,
-        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -126,16 +128,18 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
     [StoreLimit(
-        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonOptionalFirstOrDefault,
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 31, 34,
         Case = nameof(QueryTrackingBehavior.TrackAll),
         Justification = OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonTrackAllReason,
         Skip = true,
-        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     [StoreLimit(
-        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonOptionalFirstOrDefault,
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 31, 34,
         Case = nameof(QueryTrackingBehavior.NoTracking),
         Justification = Upstream.GaveNoReason,
-        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask

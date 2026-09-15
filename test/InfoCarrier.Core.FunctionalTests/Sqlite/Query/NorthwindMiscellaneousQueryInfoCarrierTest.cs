@@ -51,7 +51,7 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L395-L400",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 395, 400,
         Justification = Upstream.GaveNoReason)]
     public override Task Client_code_unknown_method(bool async)
         => AssertTranslationFailedWithDetails(
@@ -64,14 +64,14 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L438-L439",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 438, 439,
         Justification = Upstream.GaveNoReason)]
     public override Task Max_on_empty_sequence_throws(bool async)
         => Assert.ThrowsAsync<InvalidOperationException>(() => base.Max_on_empty_sequence_throws(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L402-L406",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 402, 406,
         Justification = Upstream.GaveNoReason)]
     public override async Task Entity_equality_through_subquery_composite_key(bool async)
         => Assert.Equal(
@@ -89,22 +89,23 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L408-L412",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 408, 412,
         Justification = Upstream.GaveNoReason)]
     public override Task DefaultIfEmpty_in_subquery_nested_filter_order_comparison(bool async)
         => AssertApplyNotSupported(() => base.DefaultIfEmpty_in_subquery_nested_filter_order_comparison(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L321-L322",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 321, 322,
         Justification = Upstream.GaveNoReason,
-        Deviation = "EF's override returns null, which xUnit runs as a pass that asserts nothing. This one asserts the APPLY refusal SQLite raises for it.")]
+        Deviation = DeviationKind.UpstreamAssertsNothing,
+        DeviationNote = "EF's override returns null, which xUnit runs as a pass.")]
     public override Task SelectMany_correlated_subquery_hard(bool async)
         => AssertApplyNotSupported(() => base.SelectMany_correlated_subquery_hard(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L324-L327",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 324, 327,
         Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_correlated_with_Select_value_type_and_DefaultIfEmpty_in_selector(bool async)
         => AssertApplyNotSupported(
@@ -112,14 +113,14 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L419-L422",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 419, 422,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_correlated_subquery_ordered(bool async)
         => AssertApplyNotSupported(() => base.Select_correlated_subquery_ordered(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L414-L417",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 414, 417,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_recursive_trivial(bool async)
         => AssertApplyNotSupported(() => base.Select_subquery_recursive_trivial(async));
@@ -136,10 +137,10 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     ///     comparison is a bounded difference rather than an equality.
     /// </remarks>
     [StoreIssue(
-        "dotnet/efcore#25851",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L96-L128",
+        IssueTracker.EfCore, 25851,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 96, 128,
         Justification = "difference between how Sqlite and everyone else add months e.g. when adding 1 month to Jan 31st, we get March 2/3 on Sqlite and Feb 28th/29ths for everyone else see notes on issue #25851 for more details",
-        Deviation = Deviations.SqlNotAsserted)]
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Select_expression_datetime_add_month(bool async)
         => AssertQuery(
             async,
@@ -168,9 +169,9 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     ///     seconds rather than ticks.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L166-L181",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 166, 181,
         Justification = "modifying the original scenario - Sqlite gives inaccurate results for values of granularity less than 1 second",
-        Deviation = Deviations.SqlNotAsserted)]
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Select_expression_datetime_add_ticks(bool async)
         => AssertQuery(
             async,
@@ -180,7 +181,7 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs#L441-L442",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 441, 442,
         Justification = Upstream.GaveNoReason)]
     public override Task Where_nanosecond_and_microsecond_component(bool async)
         => AssertTranslationFailed(() => base.Where_nanosecond_and_microsecond_component(async));

@@ -219,8 +219,8 @@ public class OwnedNavigationsSetOperationsInfoCarrierTest(OwnedNavigationsSetOpe
         "1.9",
         typeof(DirectSetOperationsTest),
         nameof(DirectSetOperationsTest.Over_different_collection_properties),
-        Deviation = "Over the wire the store's MongoCommandException arrives wrapped as InfoCarrierServerException, "
-            + "so the store's own text is asserted as well, because that type wraps every server failure.")]
+        Deviation = DeviationKind.StoreExceptionAsData,
+        DeviationNote = "The store's own text is asserted as well, because InfoCarrierServerException wraps every server failure.")]
     public override Task Over_different_collection_properties()
         => StoreBehaviour.Refuses(
             base.Over_different_collection_properties,
@@ -263,10 +263,10 @@ public class OwnedNavigationsStructuralEqualityInfoCarrierTest(OwnedNavigationsS
     ///     EF's base expects a refusal (<c>dotnet/efcore#36400</c>). This store ANSWERS, correctly.
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36400",
+        IssueTracker.EfCore, 36400,
         typeof(DirectStructuralEqualityTest),
         nameof(DirectStructuralEqualityTest.Nested_associate_with_inline),
-        Deviation = DirectStructuralEqualityTest.WrittenOut)]
+        Deviation = DeviationKind.QueryWrittenOut, DeviationNote = DirectStructuralEqualityTest.WrittenOut)]
     public override async Task Nested_associate_with_inline()
     {
         using DbContext context = Fixture.CreateContext();
@@ -291,10 +291,10 @@ public class OwnedNavigationsStructuralEqualityInfoCarrierTest(OwnedNavigationsS
 
     /// <inheritdoc cref="Nested_associate_with_inline" />
     [StoreIssue(
-        "dotnet/efcore#36400",
+        IssueTracker.EfCore, 36400,
         typeof(DirectStructuralEqualityTest),
         nameof(DirectStructuralEqualityTest.Nested_associate_with_parameter),
-        Deviation = DirectStructuralEqualityTest.WrittenOut)]
+        Deviation = DeviationKind.QueryWrittenOut, DeviationNote = DirectStructuralEqualityTest.WrittenOut)]
     public override async Task Nested_associate_with_parameter()
     {
         using DbContext context = Fixture.CreateContext();

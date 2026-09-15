@@ -36,10 +36,10 @@ public class NorthwindKeylessEntitiesQueryInfoCarrierTest(NorthwindQueryInfoCarr
     ///     type name and message.
     /// </remarks>
     [StoreIssue(
-        "dotnet/efcore#21627",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindKeylessEntitiesQuerySqliteTest.cs#L22-L24",
+        IssueTracker.EfCore, 21627,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindKeylessEntitiesQuerySqliteTest.cs", 22, 24,
         Justification = "FromSql mapping. Issue #21627.",
-        Deviation = Deviations.StoreExceptionCrossesAsData)]
+        Deviation = DeviationKind.StoreExceptionAsData)]
     public override async Task KeylessEntity_with_nav_defining_query(bool async)
     {
         var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(

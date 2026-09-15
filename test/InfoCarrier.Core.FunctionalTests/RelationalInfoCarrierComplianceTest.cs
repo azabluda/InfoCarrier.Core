@@ -99,7 +99,7 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     ///     </para>
     /// </remarks>
     [InfoCarrierDesign(
-        "ADR-013",
+        13,
         Justification = "Since R136 one test assembly holds every tier, and Tier A's fixtures run over EF's InMemory "
             + "provider, which emits no SQL. The scan is narrowed to the relational tiers' namespaces, and every "
             + "fixture in them is still checked.")]

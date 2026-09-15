@@ -82,8 +82,8 @@ repository.
 2026-09-15, when Tiers A, B and C were converted). A client that refuses a filter it cannot send, or
 answers a projection EF's relational providers refuse, fails EF's test on the same store; the store
 is not the reason and nothing is broken. `[InfoCarrierDesign(decision)]` names the decision that
-causes it: an `ADR-nnn` of `docs/decisions.md`, or `docs/file.md#anchor` for a decision recorded
-where it was made, such as the raw-SQL grant in `docs/security-review.md`. Its `Justification` says
+causes it: an ADR number of `docs/decisions.md`, or a document and a heading anchor for a decision
+recorded where it was made, such as the raw-SQL grant in `docs/security-review.md`. Its `Justification` says
 which part of the decision applies, and a skip still needs an upstream reference.
 
 **A skip still carries a label.** The label describes the store, and the skip describes the form of
@@ -136,33 +136,36 @@ uses the same ones.
 // self-hosted reference: the control test that shows it
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_required_related_FirstOrDefault))]
 
-// upstream reference: the store's own test at the tagged commit, with upstream's words
+// upstream reference: repository, path and line range at the pinned commit, with upstream's words
 [StoreLimit(
-    "https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>",
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/<path>.cs", <first>, <last>,
     Justification = "<upstream's comment, copied verbatim>")]
 
 // a skip copied from upstream: Skip = true, and the upstream reference is mandatory
 [StoreLimit(
-    "https://github.com/dotnet/efcore/blob/a6217e3438ca1fb430079f2626056c1a11581927/test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs#L13",
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs", <first>, <last>,
     Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"",
     Skip = true)]
 
 // a crash or a wrong answer, with its section in docs/upstream-defects.md
 [StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_optional_nested_on_optional_associate))]
 
-// a tracker entry covers it
-[StoreIssue("EF-250", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property))]
+// a tracker entry covers it: the tracker and the number
+[StoreIssue(IssueTracker.MongoEfCore, 250, typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property))]
 
-// ours, when no fix is possible now
-[InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
+// ours, when no fix is possible now: the issue number in this repository
+[InfoCarrierDefect(<n>)]
 
-// ours, on purpose: the decision, which part of it applies, and upstream only if it skips
-[InfoCarrierDesign("ADR-010", Justification = "A filter the server cannot run is refused ...")]
-[InfoCarrierDesign(Decisions.RawSqlGrant, Justification = "Raw SQL is refused unless the server grants it ...")]
+// ours, on purpose: the ADR number, or a document and heading, and which part of it applies
+[InfoCarrierDesign(10, Justification = "A filter the server cannot run is refused ...")]
+[InfoCarrierDesign(Decisions.SecurityReview, Decisions.RawSqlGrant, Justification = "Raw SQL is refused unless the server grants it ...")]
 
-// the upstream link base and the recurring deviations are constants
-[StoreLimit(Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/<path>#L<from>-L<to>",
-    Justification = Upstream.GaveNoReason, Deviation = Deviations.SqlNotAsserted)]
+// a body that differs from upstream's: the kinds, and a note where a kind needs one
+[StoreLimit(
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/<path>.cs", <first>, <last>,
+    Justification = Upstream.GaveNoReason,
+    Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.UpstreamCallsAnotherTest,
+    DeviationNote = "EF's override calls base.<other test>.")]
 
 // two behaviours in one theory: each reason names its case
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.TrackAll))]
@@ -172,14 +175,23 @@ uses the same ones.
 [StoreDefect("1.6", Case = nameof(QueryTrackingBehavior.NoTracking))]
 ```
 
-**Four properties exist for the audit.**
+**Five properties exist for the audit.**
 
 | Property | Meaning |
 |---|---|
 | `Justification` | upstream's comment, copied verbatim. When upstream gives no reason, the constant `Upstream.GaveNoReason`, so the gap is visible rather than blank. |
 | `Skip` | the override asserts nothing. Requires an upstream reference. |
-| `Deviation` | why this override's body differs from upstream's, when it does. Empty means it is the same. |
+| `Deviation` | how this override's body differs from upstream's, as `DeviationKind` flags. `None` means it is the same. |
+| `DeviationNote` | what a kind cannot say. Required with `Other` and with `UpstreamCallsAnotherTest`. |
 | `Case` | the theory case the reason covers, such as `TrackAll`. Empty means every case of the method. |
+
+**Every value that recurs is typed rather than text** (the owner's decision, 2026-09-15): an upstream
+reference is a repository, a path and a line range; an issue is a tracker and a number; a decision is
+an ADR number; a deviation is a set of kinds. Text is left only where it is somebody's words. The
+gain is that a typed value can be counted and checked: the audit reports the deviations by kind, and
+it opens `subrepos/efcore` and checks that each reference's lines declare the overriding test, by
+name, at the pinned commit. **A CI runner has no `subrepos/`**, so there the audit counts the
+references it could not check rather than checking them; a local run checks all 446.
 
 **`Case` exists because one test method can hold two store behaviours** (added during the Tier D
 trial). `Select_required_associate_via_optional_navigation` refuses in its tracked arm and crashes
@@ -192,8 +204,8 @@ that skips documents nothing, and they may not carry `InfoCarrierDefect`, since 
 InfoCarrier in them. A self-hosted reference on a wire override must name a method of such a class.
 
 **One reflection test enforces it.** It fails when an override of a specification test carries no
-reason, or several without distinct `Case` values; when an upstream link lacks a 40-character commit
-and a line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
+reason, or several without distinct `Case` values; when an upstream reference's lines do not declare the
+overriding test in the checkout it names; when an upstream reference has no `Justification`; when `Skip` is set without an
 upstream reference; when a `StoreDefect` names a section that `docs/upstream-defects.md` does not
 have; when a control override names a reference or skips; and when a wire override's control test
 documents a different label, or a different section or key, for the same case; and when a `DESIGN`

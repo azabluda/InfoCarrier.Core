@@ -158,7 +158,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L601-L604",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 601, 604,
         Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_cross_apply(bool async)
         => Assert.Equal(
@@ -167,7 +167,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L606-L609",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 606, 609,
         Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_outer_apply(bool async)
         => Assert.Equal(
@@ -176,7 +176,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1397-L1400",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1397, 1400,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_apply_set_constant(bool async)
         => Assert.Equal(
@@ -186,7 +186,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1402-L1405",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1402, 1405,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_outer_apply_set_constant(bool async)
         => Assert.Equal(
@@ -196,7 +196,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1430-L1434",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1430, 1434,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_cross_apply_set_constant(bool async)
         => Assert.Equal(
@@ -206,7 +206,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1436-L1440",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1436, 1440,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_outer_apply_set_constant(bool async)
         => Assert.Equal(
@@ -228,22 +228,22 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreIssue(
-        "dotnet/efcore#28886",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1407-L1428",
+        IssueTracker.EfCore, 28886,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1407, 1428,
         Justification = "Issue#28886",
         Skip = true,
-        Deviation = Deviations.SqlNotAsserted)]
+        Deviation = DeviationKind.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_cross_join_left_join_set_constant(bool async)
         => base.Update_with_cross_join_left_join_set_constant(async);
 
     /// <inheritdoc />
     [StoreIssue(
-        "dotnet/efcore#28886",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1522-L1531",
+        IssueTracker.EfCore, 28886,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1522, 1531,
         Justification = "Issue#28886",
         Skip = true,
-        Deviation = Deviations.SqlNotAsserted)]
+        Deviation = DeviationKind.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_two_inner_joins(bool async)
         => base.Update_with_two_inner_joins(async);

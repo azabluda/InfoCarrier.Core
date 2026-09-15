@@ -143,7 +143,7 @@ public class ProxyGraphUpdatesInfoCarrierTest
         /// <inheritdoc />
         /// <remarks>Needs lazy loading, which this flavour does not have. EF skips it too.</remarks>
         [StoreLimit(
-            Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/ProxyGraphUpdatesSqliteTest.cs#L53-L54",
+            UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/ProxyGraphUpdatesSqliteTest.cs", 53, 54,
             Justification = "Needs lazy loading",
             Skip = true)]
         public override Task Save_two_entity_cycle_with_lazy_loading()

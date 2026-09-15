@@ -38,7 +38,7 @@ public class InheritanceQueryInfoCarrierTest(InheritanceQueryInfoCarrierFixture 
     ///     reference provider rather than a gap of ours.
     /// </remarks>
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/IncompleteMappingInheritanceQueryInMemoryTest.cs#L9-L20",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/IncompleteMappingInheritanceQueryInMemoryTest.cs", 9, 20,
         Justification = Upstream.GaveNoReason)]
     public override async Task Can_query_all_animal_views(bool async)
     {

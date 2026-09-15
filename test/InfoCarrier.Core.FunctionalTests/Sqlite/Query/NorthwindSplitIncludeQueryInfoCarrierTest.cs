@@ -34,28 +34,28 @@ public class NorthwindSplitIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrier
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs#L13-L17",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs", 13, 17,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_cross_apply_with_filter(bool async)
         => AssertApplyNotSupported(() => base.Include_collection_with_cross_apply_with_filter(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs#L19-L23",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs", 19, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter(bool async)
         => AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs#L30-L34",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs", 30, 34,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter_non_equality(bool async)
         => AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter_non_equality(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs#L25-L28",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeQuerySqliteTest.cs", 25, 28,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_multiple_ordering(bool async)
         => AssertApplyNotSupported(() => base.Filtered_include_with_multiple_ordering(async));
@@ -85,7 +85,7 @@ public class NorthwindSplitIncludeNoTrackingQueryInfoCarrierTest(
 {
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs#L13-L17",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs", 13, 17,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_cross_apply_with_filter(bool async)
         => NorthwindSplitIncludeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -93,7 +93,7 @@ public class NorthwindSplitIncludeNoTrackingQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs#L19-L23",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs", 19, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter(bool async)
         => NorthwindSplitIncludeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -101,7 +101,7 @@ public class NorthwindSplitIncludeNoTrackingQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs#L30-L34",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs", 30, 34,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter_non_equality(bool async)
         => NorthwindSplitIncludeQueryInfoCarrierTest.AssertApplyNotSupported(
@@ -109,7 +109,7 @@ public class NorthwindSplitIncludeNoTrackingQueryInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs#L25-L28",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSplitIncludeNoTrackingQuerySqliteTest.cs", 25, 28,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_multiple_ordering(bool async)
         => NorthwindSplitIncludeQueryInfoCarrierTest.AssertApplyNotSupported(

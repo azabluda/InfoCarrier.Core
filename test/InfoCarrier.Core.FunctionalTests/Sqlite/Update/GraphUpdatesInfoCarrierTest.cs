@@ -77,7 +77,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L27-L29",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 27, 29,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]
@@ -86,7 +86,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L15-L17",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 15, 17,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]
@@ -95,7 +95,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L23-L25",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 23, 25,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]
@@ -104,7 +104,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L11-L13",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 11, 13,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]
@@ -113,7 +113,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L31-L33",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 31, 33,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]
@@ -122,7 +122,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs#L19-L21",
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 19, 21,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
     [ConditionalTheory(Skip = OwnedCollectionSkip)]

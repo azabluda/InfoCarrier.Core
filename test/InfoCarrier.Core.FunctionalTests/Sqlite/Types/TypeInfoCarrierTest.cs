@@ -117,8 +117,8 @@ public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrier
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -142,8 +142,8 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36749",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L53-L54",
+        IssueTracker.EfCore, 36749,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
         Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
@@ -153,8 +153,8 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -257,8 +257,8 @@ public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTyp
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -283,8 +283,8 @@ public class DateTimeOffsetTypeInfoCarrierTest(
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -308,8 +308,8 @@ public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTyp
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -333,8 +333,8 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36749",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L53-L54",
+        IssueTracker.EfCore, 36749,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
         Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
@@ -344,8 +344,8 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
@@ -369,8 +369,8 @@ public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTyp
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
     [StoreIssue(
-        "dotnet/efcore#36688",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs#L33-L38",
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(

@@ -74,8 +74,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L44-L46",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 44, 46,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -83,8 +83,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L48-L50",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 48, 50,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -92,8 +92,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L52-L54",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 52, 54,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -101,8 +101,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L56-L58",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 56, 58,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -110,8 +110,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L60-L62",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 60, 62,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -119,8 +119,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L64-L66",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 64, 66,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -128,8 +128,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L68-L71",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 68, 71,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -138,8 +138,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L73-L76",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 73, 76,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -148,8 +148,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L78-L80",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 78, 80,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -157,8 +157,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L82-L84",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 82, 84,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
@@ -166,8 +166,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         => Task.CompletedTask;
 
     [StoreIssue(
-        "dotnet/efcore#2195",
-        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs#L86-L88",
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 86, 88,
         Justification = "Optimistic Offline Lock #2195",
         Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
