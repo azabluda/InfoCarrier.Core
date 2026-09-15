@@ -91,6 +91,9 @@ public class OwnedJsonCollectionQueryInfoCarrierTest(
     ///     and EF's reason for it: <i>"Base test expects 'can't track owned entities' exception,
     ///     but with SQLite we get 'no CROSS APPLY'"</i>. Both arms measured that way in R29.
     /// </summary>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs#L11-L14",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -125,6 +128,9 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
     ///     <c>AssertOwnedTrackingQuery</c> and gets the APPLY message where a tracking message was
     ///     expected, which is EF's stated reason for short-circuiting that arm.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L11-L14",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task SelectMany_associate_collection(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -132,6 +138,9 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
                 () => base.SelectMany_associate_collection(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L16-L19",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task SelectMany_nested_collection_on_required_associate(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -139,6 +148,9 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
                 () => base.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L21-L24",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task SelectMany_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -146,6 +158,9 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
                 () => base.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L26-L29",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -153,6 +168,9 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
                 () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L31-L34",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask

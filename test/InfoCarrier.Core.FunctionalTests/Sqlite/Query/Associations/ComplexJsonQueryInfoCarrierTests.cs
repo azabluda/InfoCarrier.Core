@@ -122,26 +122,41 @@ public class ComplexJsonProjectionQueryInfoCarrierTest(
     ///     <c>ApplyNotSupported</c> directly. EF's class is written the same way, and R30 measured
     ///     all ten arms that way rather than inferring it from the shape.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs#L11-L12",
+        Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_associate_collection(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.SelectMany_associate_collection(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs#L14-L15",
+        Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_nested_collection_on_required_associate(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs#L17-L18",
+        Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs#L20-L21",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs#L23-L24",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));

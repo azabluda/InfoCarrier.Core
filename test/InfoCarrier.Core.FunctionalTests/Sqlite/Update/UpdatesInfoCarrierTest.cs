@@ -45,6 +45,10 @@ public class UpdatesInfoCarrierTest(UpdatesInfoCarrierTest.UpdatesInfoCarrierFix
     /// <summary>
     ///     <c>UpdatesSqliteTest</c>'s: store-generated GUIDs are not supported on SQLite.
     /// </summary>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Update/UpdatesSqliteTest.cs#L13-L15",
+        Justification = "Store-generated guids are not supported",
+        Skip = true)]
     public override Task Save_with_shared_foreign_key()
         => Task.CompletedTask;
 

@@ -44,6 +44,10 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///     "the InMemory store is case-sensitive" and it is now the reference provider's own
     ///     override for the same test.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs#L15-L16",
+        Justification = "Disabled: SQLite database is case-sensitive",
+        Skip = true)]
     public override Task Can_insert_and_read_back_with_case_insensitive_string_key()
         => Task.CompletedTask;
 
@@ -70,6 +74,9 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///         it, and it goes green.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs#L131-L134",
+        Justification = Upstream.GaveNoReason)]
     public override void Value_conversion_on_enum_collection_contains()
         => Assert.Contains(
             CoreStrings.TranslationFailed("")[47..],

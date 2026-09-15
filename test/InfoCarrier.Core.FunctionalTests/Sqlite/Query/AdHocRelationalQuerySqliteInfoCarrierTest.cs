@@ -215,6 +215,10 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
     // character. EF's third such override is not adopted: see the class remarks.
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs#L15-L23",
+        Justification = Upstream.GaveNoReason,
+        Deviation = Deviations.SqlNotAsserted)]
     public override async Task Projection_with_multiple_includes_and_subquery_with_set_operation()
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -222,6 +226,10 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
                 base.Projection_with_multiple_includes_and_subquery_with_set_operation)).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs#L25-L32",
+        Justification = Upstream.GaveNoReason,
+        Deviation = Deviations.SqlNotAsserted)]
     public override async Task Let_multiple_references_with_reference_to_outer()
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

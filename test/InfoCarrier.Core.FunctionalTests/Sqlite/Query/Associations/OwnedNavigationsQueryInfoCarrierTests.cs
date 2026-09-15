@@ -89,6 +89,9 @@ public class OwnedNavigationsCollectionQueryInfoCarrierTest(
     ///     <i>"Base test expects 'can't track owned entities' exception, but with SQLite we get
     ///     'no CROSS APPLY'"</i>. Reason matched before the override was taken (A63).
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsCollectionSqliteTest.cs#L12-L15",
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -162,6 +165,9 @@ public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(
     ///     the divergence in a paragraph. On the relational base EF's one line means here exactly
     ///     what it means upstream, and the paragraph is no longer needed.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsSetOperationsSqliteTest.cs#L12-L13",
+        Justification = "SQL APPLY not supported in SQLite - different exception message from the one expected in the base class")]
     public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
         => Assert.ThrowsAsync<EqualException>(() => base.Over_associate_collection_projected(queryTrackingBehavior));
 }

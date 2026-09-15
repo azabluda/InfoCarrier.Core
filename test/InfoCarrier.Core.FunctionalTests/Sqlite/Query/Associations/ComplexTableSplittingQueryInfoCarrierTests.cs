@@ -108,11 +108,17 @@ public class ComplexTableSplittingProjectionQueryInfoCarrierTest(
     ///     stands in the way and both arms raise <c>ApplyNotSupported</c> directly — measured in
     ///     R28, not assumed from the shape.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs#L11-L12",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs#L14-L15",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
