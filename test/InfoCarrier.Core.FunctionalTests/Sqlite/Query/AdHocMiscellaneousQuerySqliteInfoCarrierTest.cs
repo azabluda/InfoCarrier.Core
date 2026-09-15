@@ -27,21 +27,18 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     </para>
 ///     <para>
 ///         <b>The four <c>Task.CompletedTask</c> overrides move across unchanged, and they are not
-///         a tier artefact.</b> They are EF's own <c>AdHocMiscellaneousQueryInMemoryTest</c>'s, for
-///         tests that assert the size of EF's <b>relational command cache</b> — and it is the
-///         <em>client's</em> cache they read. This client is not a relational provider on either
-///         tier, so the reason those overrides exist is untouched by the backing store; EF's SQLite
-///         class does not carry them because a real relational client has that cache.
-///         <b>Dropping them here would have turned four passing tests red and looked like a
-///         regression of the move.</b>
+///         a tier artefact.</b> They are EF's own <c>AdHocMiscellaneousQueryInMemoryTest</c>'s. Three
+///         assert the size of EF's <b>relational command cache</b>, and it is the <em>client's</em>
+///         cache they read, which this client never fills because it stops at
+///         <c>IDatabase.CompileQuery</c> (ADR-006). <b>This said the client "is not a relational
+///         provider on either tier" until 2026-09-15</b>, which R135 had made false; the reason
+///         survives on ADR-006 instead. The fourth is not a cache test; its own remark says what it
+///         is.
 ///     </para>
 ///     <para>
-///         <b>The two reds are R71's <c>FromSql</c> defect and nothing else.</b>
-///         <c>Multiple_different_entity_type_from_different_namespaces</c> is a
-///         <c>FromSqlRaw("SELECT cast(null as int) AS MyValue")</c>, and this provider discards the
-///         query root rather than running or refusing it, so the exception the test exists to
-///         provoke never arrives. Left red on purpose: it is the cheapest standing witness to that
-///         defect anywhere in the suite.
+///         <b>Until 2026-09-15 this paragraph called <c>Multiple_different_entity_type_from_different_namespaces</c>
+///         a red left on purpose</b>, a witness to R71's discarded <c>FromSql</c> root. R75 made that
+///         a refusal, the override below pins it, and the class has no red.
 ///     </para>
 ///     <para>
 ///         EF's <c>AdHocMiscellaneousQuerySqliteTest</c> also overrides <c>Average_with_cast</c>
@@ -81,6 +78,9 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///     provider's own materializer — the discarded query root surfacing three layers from its
     ///     cause, which is why it read as an unrelated defect.
     /// </remarks>
+    [InfoCarrierDesign(
+        Decisions.RawSqlGrant,
+        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
     public override Task Multiple_different_entity_type_from_different_namespaces(bool async)
         => FromSqlAssertions.NotSupportedAsync(
             () => base.Multiple_different_entity_type_from_different_namespaces(async));
@@ -97,25 +97,59 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     /// <inheritdoc />
     /// <remarks>
     ///     EF's <c>AdHocMiscellaneousQueryInMemoryTest</c>'s: it asserts the count of EF's
-    ///     relational command cache, which the <em>client</em> here does not have.
+    ///     relational command cache, which the <em>client</em> here does not have. Measured
+    ///     2026-09-15 without the skip: the count is 0 where the base expects 1.
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-006",
+        Justification = CommandCacheIsTheServers,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L11-L12",
+        Skip = true)]
     public override Task Explicitly_compiled_query_does_not_add_cache_entry()
         => Task.CompletedTask;
 
     /// <inheritdoc />
-    /// <remarks>EF's InMemory class's, for the same reason.</remarks>
+    /// <remarks>
+    ///     <b>Not a command-cache test, whatever this remark said before 2026-09-15.</b> EF refuses a
+    ///     client projection that calls an instance method of the <c>DbContext</c>, because its
+    ///     cached shaper would hold that context, and the base asserts the refusal. This client does
+    ///     not refuse: the call runs in the residual. Measured the same day with a context whose
+    ///     method returns a per-instance value: two contexts in turn each got their own value, so the
+    ///     answer is right. Whether a context stays reachable from a cache afterwards was not
+    ///     settled, because the harness keeps even a context that ran a plain query alive.
+    /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = "The client projection that calls the DbContext's method runs in the residual against the "
+            + "executing context, so there is no cached shaper holding a context for EF's refusal to prevent.",
+        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L14-L15",
+        Skip = true)]
     public override Task Inlined_dbcontext_is_not_leaking()
         => Task.CompletedTask;
 
     /// <inheritdoc />
-    /// <remarks>EF's InMemory class's, for the same reason.</remarks>
+    /// <remarks>EF's InMemory class's, for the same reason as the first. Measured: 1 where the base expects 2.</remarks>
+    [InfoCarrierDesign(
+        "ADR-006",
+        Justification = CommandCacheIsTheServers,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L17-L18",
+        Skip = true)]
     public override Task Relational_command_cache_creates_new_entry_when_parameter_nullability_changes()
         => Task.CompletedTask;
 
     /// <inheritdoc />
-    /// <remarks>EF's InMemory class's, for the same reason.</remarks>
+    /// <remarks>EF's InMemory class's, for the same reason as the first. Measured: 1 where the base expects 2.</remarks>
+    [InfoCarrierDesign(
+        "ADR-006",
+        Justification = CommandCacheIsTheServers,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/AdHocMiscellaneousQueryInMemoryTest.cs#L20-L21",
+        Skip = true)]
     public override Task Variable_from_closure_is_parametrized()
         => Task.CompletedTask;
+
+    private const string CommandCacheIsTheServers =
+        "The client captures the query at IDatabase.CompileQuery and never compiles past it, so EF's relational "
+        + "command cache, which these tests count, belongs to the server's provider.";
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

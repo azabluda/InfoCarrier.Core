@@ -133,6 +133,17 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
     ///         that #26708 is fixed, and nothing here depends on which it is.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        OwnedJsonRequiredFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = BorrowedFromOwnedJson)]
+    [StoreLimit(
+        OwnedJsonRequiredFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = BorrowedFromOwnedJson)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -140,11 +151,41 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
                 () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        OwnedJsonOptionalFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = BorrowedFromOwnedJson)]
+    [StoreLimit(
+        OwnedJsonOptionalFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = BorrowedFromOwnedJson)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
                 () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <summary>EF's nearest override of the required-associate test, in the owned JSON family.</summary>
+    internal const string OwnedJsonRequiredFirstOrDefault =
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L26-L29";
+
+    /// <summary>EF's nearest override of the optional-associate test, in the owned JSON family.</summary>
+    internal const string OwnedJsonOptionalFirstOrDefault =
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs#L31-L34";
+
+    /// <summary>EF's comment on the TrackAll arm, verbatim.</summary>
+    internal const string OwnedJsonTrackAllReason =
+        "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"";
+
+    /// <summary>Why the reference is another family's override.</summary>
+    internal const string BorrowedFromOwnedJson =
+        "EF's SQLite class for this base is commented out for its issue #26708, so there is no override to follow. "
+        + "The body is OwnedJsonProjectionSqliteTest's: its owned entities meet the same APPLY refusal. Measured "
+        + "2026-09-15 on OwnedNavigationsProjection's required-associate test, the TrackAll arm fails the base's "
+        + "owned-tracking message with the APPLY message, as EF's comment says.";
 }
 
 public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(

@@ -107,6 +107,17 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
     ///     is worth stating once: #26708 costs EF two SQLite classes, and this provider runs both
     ///     of them with two tests red in each.
     /// </remarks>
+    [StoreLimit(
+        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonRequiredFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+    [StoreLimit(
+        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonRequiredFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -114,6 +125,17 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
                 () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonOptionalFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+    [StoreLimit(
+        OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonOptionalFirstOrDefault,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask

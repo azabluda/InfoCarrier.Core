@@ -104,6 +104,10 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
     ///     states the refusal on the query's result element type, which is what the test name asks
     ///     for, and the projection split raises it before the request crosses the wire.
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = ComplexNavigationsQueryInfoCarrierTest.QueryableElementRefused,
+        Deviation = ComplexNavigationsQueryInfoCarrierTest.RefusedBeforeApply)]
     public override Task Join_with_result_selector_returning_queryable_throws_validation_error(bool async)
         => AssertInvalidMaterializationType(
             () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async),

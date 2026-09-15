@@ -108,6 +108,10 @@ public class ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoC
     ///     states the refusal on the query's result element type, which is what the test name asks
     ///     for, and the projection split raises it before the request crosses the wire.
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = ComplexNavigationsQueryInfoCarrierTest.QueryableElementRefused,
+        Deviation = ComplexNavigationsQueryInfoCarrierTest.RefusedBeforeApply)]
     public override Task Join_with_result_selector_returning_queryable_throws_validation_error(bool async)
         => AssertInvalidMaterializationType(
             () => base.Join_with_result_selector_returning_queryable_throws_validation_error(async),
@@ -118,6 +122,16 @@ public class ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoC
     ///     use of this is a test EF's own <c>ComplexNavigations*QuerySqliteTest</c> overrides the
     ///     same way, so each one is convergence with the reference provider and not a workaround.
     /// </summary>
+    /// <summary>Why <c>Join_with_result_selector_returning_queryable_throws_validation_error</c> is refused here.</summary>
+    internal const string QueryableElementRefused =
+        "The result element is IQueryable<Level3>, which cannot be materialized, and the projection split refuses it "
+        + "before the wire with EF's own invalid-materialization-type message.";
+
+    /// <summary>How that override differs from EF's SQLite one.</summary>
+    internal const string RefusedBeforeApply =
+        "EF's SQLite override expects the APPLY refusal, which SQLite raises because the query reaches its translator "
+        + "first. Here the query never reaches a translator.";
+
     internal static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

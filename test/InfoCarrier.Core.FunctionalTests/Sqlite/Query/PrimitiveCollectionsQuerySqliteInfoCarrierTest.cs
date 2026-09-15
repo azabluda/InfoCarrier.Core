@@ -193,8 +193,9 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         a subquery. <b>EF's own comment on the second says so outright</b> — <i>"We should
     ///         apply the default type mapping to the parameter, but need to figure out the exact
     ///         rules when to do this"</i> — which makes it unfinished work on EF's side rather than
-    ///         a limitation this provider ought to reproduce. This client builds no SQL, so the
-    ///         question never arises.
+    ///         a limitation this provider ought to reproduce. This said <i>"This client builds no SQL,
+    ///         so the question never arises"</i> until 2026-09-15; the server does build SQL for these,
+    ///         so why it does not meet the gap is open. <c>docs/upstream-defects.md</c> §1.12.
     ///     </para>
     ///     <para>
     ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
@@ -208,6 +209,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         <c>docs/plans/v10/implementation-plan.md</c> V12.
     ///     </para>
     /// </remarks>
+    [StoreDefect(
+        "1.12",
+        Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs#L22-L23",
+        Justification = Upstream.GaveNoReason,
+        Deviation = AnsweredNotRefused)]
     public override Task Column_collection_equality_inline_collection_with_parameters()
     {
         (int i, int j) = (1, 10);
@@ -217,7 +223,19 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
             ss => ss.Set<PrimitiveCollectionsEntity>().Where(c => c.Ints.SequenceEqual(new[] { i, j })));
     }
 
+    private const string AnsweredNotRefused =
+        "EF's relational base asserts the refusal. This provider answers, so the override is the core base's query "
+        + "and asserts the rows.";
+
     /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    [StoreDefect(
+        "1.12",
+        Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs#L25-L36",
+        Justification = "The array indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a "
+            + "CAST over that, the type mapping inference from the other side (p.String) doesn't propagate inside to the "
+            + "subquery. In this case, the CAST operand gets the default CLR type mapping, but that's object in this case. "
+            + "We should apply the default type mapping to the parameter, but need to figure out the exact rules when to do this.",
+        Deviation = AnsweredNotRefused)]
     public override void Parameter_collection_in_subquery_and_Convert_as_compiled_query()
     {
         var query = EF.CompileQuery(
@@ -232,6 +250,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     }
 
     /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    [StoreDefect(
+        "1.12",
+        Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs#L38-L44",
+        Justification = Upstream.GaveNoReason,
+        Deviation = AnsweredNotRefused)]
     public override async Task Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query()
     {
         var compiledQuery = EF.CompileQuery(

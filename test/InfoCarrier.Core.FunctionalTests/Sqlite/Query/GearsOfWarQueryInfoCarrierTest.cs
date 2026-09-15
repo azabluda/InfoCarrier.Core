@@ -219,6 +219,11 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///         <c>docs/upstream-defects.md</c> §1.4 and <c>implementation-plan.md</c> V12.
     ///     </para>
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs#L23-L30",
+        Deviation = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
         bool async)
         => AssertQuery(
@@ -248,6 +253,11 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
             });
 
     /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs#L152-L156",
+        Deviation = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
         => AssertQuery(
             async,
@@ -442,6 +452,11 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     ///     EF's relational base asserts a refusal, this provider answers, and the assertion is
     ///     replaced by EF's own row-by-row one rather than removed.
     /// </summary>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs#L23-L30",
+        Deviation = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
         bool async)
         => AssertQuery(
@@ -471,6 +486,11 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
             });
 
     /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs#L152-L156",
+        Deviation = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
         => AssertQuery(
             async,
@@ -533,6 +553,16 @@ internal static class GearsOfWarSqliteAssertions
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
+
+    /// <summary>Why the two correlated-collection overrides answer what EF's relational base refuses.</summary>
+    internal const string AnsweredWithoutCollectionJoin =
+        "The server returns rows and the client reassembles the projected collection, so no collection join needs "
+        + "the identifying columns Distinct drops, and the query is answered.";
+
+    /// <summary>How those two overrides differ from the upstream test they replace.</summary>
+    internal const string CoreBodyNotRelationalRefusal =
+        "EF's relational base asserts InsufficientInformationToIdentifyElementOfCollectionJoin. This override is the "
+        + "core base's query with its row-by-row assertion, copied because C# cannot call a grandparent.";
 
     internal static async Task StoreRefuses(Func<Task> query)
     {

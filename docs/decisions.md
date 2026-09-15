@@ -689,6 +689,24 @@ payload of requirements §3.3 (wire-protocol W1).
 mechanism — execute the entity-typed portion, apply the projection locally, no tree surgery, no
 new wire vocabulary — is retained.
 
+**Amended 2026-09-15 — the remainder is a projection's, and anything else is refused. Not a
+reversal: this records a guard that has been in the code, and in CLAUDE.md's guardrails, without
+being written here.** *"Evaluates the remainder locally"* above was never unbounded.
+`QuerySplitter.RejectClientEvaluation` runs between the boundary analysis and the split, and raises
+EF's own `TranslationFailed` or `TranslationFailedWithDetails` for client-side work that is not the
+reassembly of a rewritten projection — a `Where` over a client method is the plain case. EF's
+contract is that client evaluation is legal only in the final projection, so a query this client
+cannot send behaves as it does on every EF provider, instead of fetching the whole source and
+filtering it here. `InMemorySmokeTest.A_filter_the_server_cannot_run_throws_rather_than_fetching_everything`
+pins it.
+
+**Written down because the test overhaul needed a decision to cite**
+([`test-overhaul.md`](plans/v10/test-overhaul.md)). Two kinds of specification override follow from
+this ADR and carry `[InfoCarrierDesign("ADR-010")]`: a test EF's InMemory provider answers by
+evaluating in .NET, which is refused here as EF's relational providers refuse it; and a test a
+relational provider refuses to translate, which is answered here because the part it cannot
+translate is a projection this client reassembles, or runs after one on the rows it returned.
+
 ## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
 
 **Context.** `from c in cs from o in c.Orders … select c` contains no anonymous type that the

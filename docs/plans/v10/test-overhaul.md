@@ -78,6 +78,14 @@ a query that EF's base expects it to refuse, and the answer is correct. That is 
 **An InfoCarrier defect has no store label.** It is fixed, or it carries a GitHub issue of this
 repository.
 
+**A fifth label, `DESIGN`, for where this provider differs from the store on purpose** (added
+2026-09-15, when Tiers A, B and C were converted). A client that refuses a filter it cannot send, or
+answers a projection EF's relational providers refuse, fails EF's test on the same store; the store
+is not the reason and nothing is broken. `[InfoCarrierDesign(decision)]` names the decision that
+causes it: an `ADR-nnn` of `docs/decisions.md`, or `docs/file.md#anchor` for a decision recorded
+where it was made, such as the raw-SQL grant in `docs/security-review.md`. Its `Justification` says
+which part of the decision applies, and a skip still needs an upstream reference.
+
 **A skip still carries a label.** The label describes the store, and the skip describes the form of
 the override. Upstream's *"with SQLite we get "no CROSS APPLY""* is a `LIMIT`, whether the override
 asserts that or skips.
@@ -148,6 +156,14 @@ uses the same ones.
 // ours, when no fix is possible now
 [InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
 
+// ours, on purpose: the decision, which part of it applies, and upstream only if it skips
+[InfoCarrierDesign("ADR-010", Justification = "A filter the server cannot run is refused ...")]
+[InfoCarrierDesign(Decisions.RawSqlGrant, Justification = "Raw SQL is refused unless the server grants it ...")]
+
+// the upstream link base and the recurring deviations are constants
+[StoreLimit(Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/<path>#L<from>-L<to>",
+    Justification = Upstream.GaveNoReason, Deviation = Deviations.SqlNotAsserted)]
+
 // two behaviours in one theory: each reason names its case
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.TrackAll))]
 [StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.NoTracking))]
@@ -180,7 +196,9 @@ reason, or several without distinct `Case` values; when an upstream link lacks a
 and a line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
 upstream reference; when a `StoreDefect` names a section that `docs/upstream-defects.md` does not
 have; when a control override names a reference or skips; and when a wire override's control test
-documents a different label, or a different section or key, for the same case. That is Microsoft's
+documents a different label, or a different section or key, for the same case; and when a `DESIGN`
+names a decision heading that does not exist, or gives no `Justification`. **An override of an
+abstract test is not audited**, because the base has no expectation to change. That is Microsoft's
 `Check_all_tests_overridden` made stricter: theirs proves somebody looked at a test, ours proves what
 the store did and where that is shown.
 
@@ -235,6 +253,42 @@ were planned:
    already makes any red fail CI.
 6. Amend ADR-009, and correct CLAUDE.md where it describes the Tier D gate and the three evidence
    classes.
+
+## Tiers A, B and C
+
+**Converted 2026-09-15.** `OverrideAuditTest` in the spec project lists 453 reasons over 449
+overrides: `LIMIT` 344, `DEFECT` 23, `ISSUE` 69, `DESIGN` 17, no InfoCarrier defect. 57 skip, 92
+deviate, and upstream gave no reason for 310. Tier C has no override. The rules added for `DESIGN`
+were shown to fail on a deliberate mistake before they were trusted.
+
+**425 of them were mechanical.** A Roslyn parse of this repository and of `subrepos/efcore` at
+`v10.0.1` matched each override to EF's override of the same test in the SQLite or InMemory
+functional tests, and compared the bodies with comments and `AssertSql` removed. Where they differed
+only by a helper that asserts the same thing, or by `!` and `var`, the body counts as the same. The
+label came from EF's own words: an issue number in EF's comment is an `ISSUE`, a crash EF pins is a
+`DEFECT`, and the rest are `LIMIT`. Two deviations recur and are constants: EF also asserts SQL,
+which this client does not emit (tracked as #111), and a store exception crosses the wire as
+`InfoCarrierServerException`.
+
+**The other 24 were read one by one**, and four findings came out of them.
+
+- **Twenty Tier A overrides pin crashes of EF's InMemory provider**, so they are `DEFECT` and not
+  `LIMIT`: `docs/upstream-defects.md` §1.11.
+- **Three primitive-collection overrides answer where EF's relational base asserts a refusal** that
+  EF's own comment calls unfinished type-mapping inference: §1.12.
+- **The client-evaluation guard was a decision recorded nowhere but CLAUDE.md.** ADR-010 now carries
+  it as a dated amendment, because ten `DESIGN` references cite it.
+- **Two overrides did not meet the rules and were changed.** `ConcurrencyDetectorEnabled.FromSql`
+  skipped with nothing upstream to cite, and now asserts the refusal inside xUnit's failure.
+  `Identifiers_are_generated_correctly` asserted a table name where EF asserts four names; EF's
+  whole body passes, so it is EF's body.
+
+**One question is open.** `Inlined_dbcontext_is_not_leaking` expects EF's refusal of a client
+projection that calls a `DbContext` instance method, which EF refuses so that a cached shaper does
+not hold the context. This client answers, and a probe measured the answer right for two contexts in
+turn. Whether a context stays reachable from a cache was not settled, because the harness keeps even
+a context that ran a plain query alive. It is labelled `DESIGN ADR-010` and skipped as EF's InMemory
+suite skips it.
 
 ## Extending to the other tiers
 

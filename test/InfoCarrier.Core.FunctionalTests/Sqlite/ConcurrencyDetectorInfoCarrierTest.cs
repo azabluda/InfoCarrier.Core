@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -51,23 +52,28 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
     ///         sixteen tests in this class still assert the detector.
     ///     </para>
     ///     <para>
-    ///         <b>Wrapping <c>base</c> in an assertion cannot work here, and this is A63's shape
-    ///         for the third time</b> (R70 recorded it for <c>JsonQuery</c>'s four APPLY tests).
     ///         <c>ConcurrencyDetectorEnabledTestBase.ConcurrencyDetectorTest</c> catches the
     ///         <see cref="InvalidOperationException" /> <em>itself</em> and compares its message,
-    ///         so what escapes <c>base</c> is an <c>Xunit.Sdk.EqualException</c> and any
-    ///         <c>Assert.Throws&lt;InvalidOperationException&gt;</c> around it fails with
-    ///         "Exception type was not an exact match". EF's own <c>Task.CompletedTask</c> form is
-    ///         taken instead, rather than re-writing the query outside the base and pinning this
-    ///         file to EF's SQL text.
+    ///         so what escapes <c>base</c> is xUnit's <c>EqualException</c>, with the refusal's text
+    ///         as the actual value. That is what is asserted. xUnit shortens both strings in its
+    ///         message, so the assertion is on the start of the refusal.
     ///     </para>
     ///     <para>
-    ///         <b>The refusal itself is not left unasserted</b> — the disabled sibling below pins
-    ///         it on the same query, where the base adds no assertion of its own to collide with.
+    ///         <b>Until 2026-09-15 this skipped</b>, and read <i>"EF's own <c>Task.CompletedTask</c>
+    ///         form is taken instead"</i>. No EF suite skips this test, so the skip had nothing
+    ///         upstream to cite. The disabled sibling below still pins the refusal by node name.
     ///     </para>
     /// </remarks>
-    public override Task FromSql(bool async)
-        => Task.CompletedTask;
+    [InfoCarrierDesign(
+        Decisions.RawSqlGrant,
+        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not. The refusal comes "
+            + "while the query is compiled, before the concurrency detector is reached.")]
+    public override async Task FromSql(bool async)
+    {
+        var failure = await Assert.ThrowsAsync<Xunit.Sdk.EqualException>(() => base.FromSql(async));
+
+        Assert.Contains("No part of the query can be executed on t", failure.Message, StringComparison.Ordinal);
+    }
 
     public class ConcurrencyDetectorInfoCarrierFixture : ConcurrencyDetectorFixtureBase
     {
@@ -105,6 +111,9 @@ public class ConcurrencyDetectorDisabledInfoCarrierTest(
     ///     <b>used to pass by accident</b>: the <c>FromSqlRaw</c> was silently discarded and the
     ///     resulting table scan raised nothing. R75 refuses it, and the refusal is what is pinned.
     /// </remarks>
+    [InfoCarrierDesign(
+        Decisions.RawSqlGrant,
+        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
     public override Task FromSql(bool async)
         => FromSqlAssertions.NotSupportedAsync(() => base.FromSql(async));
 

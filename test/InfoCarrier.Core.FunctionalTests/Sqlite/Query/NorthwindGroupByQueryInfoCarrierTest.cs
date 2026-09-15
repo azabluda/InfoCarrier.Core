@@ -100,6 +100,11 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
     ///     Tier A siblings this reason does not depend on the backend, so the override survives the
     ///     move to Tier B.
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = "The grouping key is RandomClass, a client-only class without value equality. The server "
+            + "cannot construct it, and grouping by it on the client would give one group per row, so the query is "
+            + "refused with EF's TranslationFailed.")]
     public override Task Final_GroupBy_nominal_type_entity(bool async)
         => AssertTranslationFailed(() => base.Final_GroupBy_nominal_type_entity(async));
 

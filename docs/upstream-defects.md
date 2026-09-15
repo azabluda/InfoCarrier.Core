@@ -351,6 +351,34 @@ the wire as the store's answer and cross it unchanged. **It bounds what Tier A c
 does for Tier D: where the store crashes, the tier cannot tell whether the wire would have carried
 the correct answer.
 
+### 1.12 EF's relational pipeline leaves a primitive-collection parameter without a type mapping
+
+**Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
+overrides three core tests to assert that the query is refused. **This provider answers all three**,
+and its overrides assert the rows, so each carries `[StoreDefect("1.12", …)]` with the link to EF's
+refusal.
+
+**Site.** Named by EF itself, on one of the three, in a comment at the `v10.0.1` tag: *"The array
+indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a CAST over
+that, the type mapping inference from the other side (p.String) doesn't propagate inside to the
+subquery. In this case, the CAST operand gets the default CLR type mapping, but that's object in this
+case. We should apply the default type mapping to the parameter, but need to figure out the exact
+rules when to do this."*
+
+**Symptom.**
+
+| Test | EF asserts |
+|---|---|
+| `Parameter_collection_in_subquery_and_Convert_as_compiled_query` | `InvalidOperationException` containing *"in the SQL tree does not have a type mapping assigned"*, with the comment above |
+| `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query` | `RelationalStrings.SetOperationsRequireAtLeastOneSideWithValidTypeMapping("Union")` |
+| `Column_collection_equality_inline_collection_with_parameters` | a translation failure |
+
+**Only the first is EF's attribution.** R31 read the other two as the same missing inference, from
+their messages; EF says nothing about them, and nobody has read a fix, because none exists.
+
+**What it blocks.** Nothing. **Why this provider does not reach that state is not established**; the
+overrides measure that the rows are right, which is the claim that matters to a caller.
+
 ## 2. Already reported
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a

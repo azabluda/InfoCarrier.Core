@@ -33,6 +33,11 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
     ///     also every relational provider's. EF overrides this on
     ///     `GearsOfWarQueryRelationalTestBase` (A27).
     /// </remarks>
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = "A filter the server cannot run is refused with EF's TranslationFailed rather than "
+            + "evaluated on the client, as EF's relational providers refuse it. EF's InMemory provider evaluates it in .NET.",
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs#L58-L59")]
     public override Task Client_side_equality_with_parameter_works_with_optional_navigations(bool async)
         => AssertTranslationFailed(
             () => base.Client_side_equality_with_parameter_works_with_optional_navigations(async));

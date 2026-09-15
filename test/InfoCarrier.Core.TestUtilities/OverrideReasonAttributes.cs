@@ -190,15 +190,16 @@ public sealed class InfoCarrierDefectAttribute(string issue) : OverrideReasonAtt
 ///         test on the same store. The store is not the reason, and nothing is broken.
 ///     </para>
 ///     <para>
-///         <b>The reference is the decision</b>, as <c>ADR-nnn</c>, and <see cref="OverrideAudit" />
-///         checks that <c>docs/decisions.md</c> has that heading. <see cref="Justification" /> says
-///         which part of the decision applies. A skip still needs <see cref="UpstreamTest" />, for the
+///         <b>The reference is the decision</b>, as <c>ADR-nnn</c>, or as <c>docs/file.md#anchor</c>
+///         for a decision recorded where it was made (the raw-SQL grant is in
+///         <c>docs/security-review.md</c>), and <see cref="OverrideAudit" /> checks that the heading
+///         exists. <see cref="Justification" /> says which part of the decision applies. A skip still needs <see cref="UpstreamTest" />, for the
 ///         same reason as a store label: only upstream's own choice justifies asserting nothing.
 ///     </para>
 /// </remarks>
 public sealed class InfoCarrierDesignAttribute(string decision) : OverrideReasonAttribute
 {
-    /// <summary>The recorded decision, such as <c>"ADR-010"</c>.</summary>
+    /// <summary>The recorded decision, such as <c>"ADR-010"</c> or <c>"docs/security-review.md#anchor"</c>.</summary>
     public string Decision { get; } = decision;
 
     /// <summary>Which part of the decision makes this test behave differently. Required.</summary>
@@ -209,6 +210,17 @@ public sealed class InfoCarrierDesignAttribute(string decision) : OverrideReason
 
     /// <summary>The override asserts nothing. Requires <see cref="UpstreamTest" />.</summary>
     public bool Skip { get; set; }
+}
+
+/// <summary>Values for <see cref="InfoCarrierDesignAttribute.Decision" /> that are not an ADR.</summary>
+public static class Decisions
+{
+    /// <summary>
+    ///     Raw SQL crosses only when the server grants it with <c>AddInfoCarrierArbitrarySqlExecution</c>
+    ///     (#60, R95).
+    /// </summary>
+    public const string RawSqlGrant =
+        "docs/security-review.md#5a-amendment-raw-sql-60-r95-and-why-it-is-a-change-of-posture-rather-than-a-wider-list";
 }
 
 /// <summary>Values for <see cref="OverrideReasonAttribute.Deviation" /> that recur across many overrides.</summary>

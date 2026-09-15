@@ -42,6 +42,14 @@ public static class OverrideAudit
 
     private static readonly Regex DecisionId = new(@"^ADR-\d{3}$", RegexOptions.Compiled);
 
+    private static readonly Regex DocumentHeading = new(
+        @"^(?<path>[\w\-./]+\.md)#(?<anchor>[\w\-]+)$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex MarkdownHeading = new(@"^#{1,6}\s+(.*?)\s*$", RegexOptions.Compiled | RegexOptions.Multiline);
+
+    private static readonly Regex MarkdownFence = new(@"^```.*?^```", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.Multiline);
+
     /// <summary>Audits every override of a specification test in <paramref name="testAssembly" />.</summary>
     /// <param name="testAssembly">The test project's assembly.</param>
     /// <param name="upstreamDefectsPath">The path of <c>docs/upstream-defects.md</c>, whose sections a DEFECT names.</param>
@@ -114,13 +122,61 @@ public static class OverrideAudit
         throw new FileNotFoundException($"'{relativePath}' is not above '{AppContext.BaseDirectory}'.");
     }
 
+    /// <remarks>
+    ///     <b>An abstract test is not an override of an expectation</b>, because the base has none:
+    ///     every provider must write the body, as <c>UpdatesRelationalTestBase.Identifiers_are_generated_correctly</c>
+    ///     requires. There is nothing to change and so nothing to give a reason for.
+    /// </remarks>
     private static bool IsSpecificationTestOverride(MethodInfo method)
     {
         MethodInfo definition = method.GetBaseDefinition();
 
         return definition.DeclaringType != method.DeclaringType
+            && !definition.IsAbstract
             && definition.DeclaringType?.Assembly.GetName().Name?.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) == true
             && definition.IsDefined(typeof(FactAttribute), inherit: true);
+    }
+
+    /// <summary>
+    ///     A decision is an <c>ADR-nnn</c> heading of <c>docs/decisions.md</c>, or a
+    ///     <c>path.md#anchor</c> naming a heading of another document, for a decision recorded
+    ///     where it was made rather than in the ADR log.
+    /// </summary>
+    private static bool DecisionExists(string decision, string decisions)
+    {
+        if (DecisionId.IsMatch(decision))
+        {
+            return decisions.Contains($"\n## {decision} ", StringComparison.Ordinal);
+        }
+
+        Match heading = DocumentHeading.Match(decision);
+        if (!heading.Success)
+        {
+            return false;
+        }
+
+        string document;
+        try
+        {
+            document = File.ReadAllText(FindRepositoryFile(heading.Groups["path"].Value));
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+
+        return MarkdownHeading.Matches(MarkdownFence.Replace(document, string.Empty))
+            .Any(m => Slug(m.Groups[1].Value) == heading.Groups["anchor"].Value);
+    }
+
+    /// <summary>The anchor Python-Markdown gives a heading, as <c>eng/doc-links.py</c> computes it.</summary>
+    private static string Slug(string heading)
+    {
+        string text = Regex.Replace(heading, "`([^`]*)`", "$1");
+        text = Regex.Replace(text, @"\[([^\]]*)\]\([^)]*\)", "$1");
+        text = Regex.Replace(text, "[*_]{1,3}", string.Empty);
+        text = Regex.Replace(text, @"[^\w\- ]", string.Empty).Trim().ToLowerInvariant();
+        return Regex.Replace(text, @"\s+", "-");
     }
 
     private static void Check(
@@ -152,10 +208,10 @@ public static class OverrideAudit
                     violations.Add($"{at}: a wire-free control has no InfoCarrier in it, so it has no InfoCarrier design.");
                 }
 
-                if (!DecisionId.IsMatch(design.Decision)
-                    || !decisions.Contains($"\n## {design.Decision} ", StringComparison.Ordinal))
+                if (!DecisionExists(design.Decision, decisions))
                 {
-                    violations.Add($"{at}: docs/decisions.md has no decision '{design.Decision}'.");
+                    violations.Add(
+                        $"{at}: '{design.Decision}' is neither an ADR heading of docs/decisions.md nor a heading of a repository document.");
                 }
 
                 if (string.IsNullOrWhiteSpace(design.Justification))
@@ -323,7 +379,8 @@ public static class OverrideAudit
         {
             InfoCarrierDefectAttribute own => own.Issue,
             InfoCarrierDesignAttribute { UpstreamTest: { } link } => link,
-            InfoCarrierDesignAttribute d => $"docs/decisions.md {d.Decision}",
+            InfoCarrierDesignAttribute d when DecisionId.IsMatch(d.Decision) => $"docs/decisions.md {d.Decision}",
+            InfoCarrierDesignAttribute d => d.Decision,
             StoreBehaviourAttribute { UpstreamTest: { } link } => link,
             StoreBehaviourAttribute { ControlType: { } type } store => $"{type.Name}.{store.ControlTest}",
             _ => "(this control)",

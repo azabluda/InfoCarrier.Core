@@ -236,6 +236,13 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // Restored to the core assertion — the answer is checked, and it is right. Same category as
     // limitations.md's "queries this provider answers that other EF providers refuse".
     // -------------------------------------------------------------------------------------
+    [InfoCarrierDesign(
+        "ADR-010",
+        Justification = "The ordering follows a projection of a closure value, so it runs on the client over the rows "
+            + "the server returned, and the query is answered where EF's relational providers refuse to translate it.",
+        UpstreamTest = Upstream.EfCore + "test/EFCore.Relational.Specification.Tests/Query/NorthwindSelectQueryRelationalTestBase.cs#L11-L12",
+        Deviation = "EF's relational base asserts the translation failure. This override is the core base's body, "
+            + "which asserts the ordered rows.")]
     public override async Task Select_bool_closure_with_order_by_property_with_cast_to_nullable(bool async)
     {
         var boolean = false;
