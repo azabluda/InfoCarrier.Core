@@ -345,7 +345,8 @@ public class InfoCarrierDatabase(
         // Restricted to JSON-mapped types on purpose. Every owned type has an owner, and widening
         // this to all of them would put table-splitting dependents' owners on the wire for no
         // reason — `SaveChanges` payload changes are the ones this provider has paid most for
-        // (C37, C42).
+        // (C37, C42). "For no reason" was wrong for one case, a row-mate with a concurrency token,
+        // and that case has its own clause below since 2026-09-15.
         // …and, once the owner is going, the rest of its JSON document (C95).
         //
         // C87 sent the owner and stopped there, which was enough for an *edit* and wrong for an
@@ -404,6 +405,31 @@ public class InfoCarrierDatabase(
                     }
                 }
             }
+
+            // A ROW'S CONCURRENCY TOKENS BELONG TO EVERY ENTRY IN IT, AND THE UNCHANGED ONES NEVER
+            // TRAVELLED (2026-09-15). EF checks the tokens of each tracked entry that shares the
+            // row being written, so an owned reference in its owner's table puts its tokens into
+            // the owner's `UPDATE` even when nothing in it changed. The client sent only what
+            // changed, the server tracked no owned entry, and its `UPDATE` checked the key alone:
+            // a row someone else had changed was overwritten without a `DbUpdateConcurrencyException`,
+            // where EF's own client refuses the write. Found by comparing the server's SQL with EF's
+            // `OptimisticConcurrencySqliteTest.Property_entry_original_value_is_set`; pinned by
+            // `ConcurrencyTokenTest.A_stale_write_is_refused_when_the_token_is_in_an_owned_reference`.
+            //
+            // The row-mates go as `Unchanged`, which is what they are, and only those that carry a
+            // token, because a row-mate without one adds nothing to the `WHERE` and C37 and C42
+            // priced every entry that travels. Relational only: a document store sends the whole
+            // document above.
+            if (_serverStoreIsRelational && entry.EntityState is EntityState.Modified or EntityState.Deleted)
+            {
+                foreach (IUpdateEntry rowMate in RowMatesWithConcurrencyTokens(entry))
+                {
+                    if (!sent.Contains(rowMate) && seen.Add(rowMate))
+                    {
+                        yield return rowMate;
+                    }
+                }
+            }
         }
 
         foreach (IUpdateEntry entry in entries)
@@ -411,6 +437,70 @@ public class InfoCarrierDatabase(
             yield return entry;
         }
     }
+
+    /// <summary>
+    ///     The other tracked entries that share <paramref name="entry" />'s row through ownership
+    ///     and carry a concurrency token.
+    /// </summary>
+    /// <remarks>
+    ///     Walks up to the entry that owns the row, then down through every owned reference mapped
+    ///     to the same table, reading the client's change tracker. A JSON-mapped type is not a
+    ///     row-mate here: its owner and document already travel, above.
+    /// </remarks>
+    private IEnumerable<IUpdateEntry> RowMatesWithConcurrencyTokens(IUpdateEntry entry)
+    {
+        if (entry is not InternalEntityEntry start)
+        {
+            yield break;
+        }
+
+        InternalEntityEntry root = start;
+        while (root.EntityType.FindOwnership() is { } ownership
+            && SharesRow(root.EntityType, ownership.PrincipalEntityType)
+            && root.StateManager.FindPrincipal(root, ownership) is { } owner)
+        {
+            root = owner;
+        }
+
+        var pending = new Stack<InternalEntityEntry>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            InternalEntityEntry member = pending.Pop();
+            if (!ReferenceEquals(member, start) && member.EntityType.GetProperties().Any(p => p.IsConcurrencyToken))
+            {
+                yield return member;
+            }
+
+            foreach (Microsoft.EntityFrameworkCore.Metadata.INavigation navigation in member.EntityType.GetNavigations())
+            {
+                if (!navigation.ForeignKey.IsOwnership
+                    || navigation.IsOnDependent
+                    || navigation.IsCollection
+                    || !SharesRow(navigation.TargetEntityType, member.EntityType))
+                {
+                    continue;
+                }
+
+                foreach (IUpdateEntry dependent in member.StateManager.GetDependents(member, navigation.ForeignKey))
+                {
+                    if (dependent is InternalEntityEntry dependentEntry)
+                    {
+                        pending.Push(dependentEntry);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Whether an owned type is stored as columns of its owner's row.</summary>
+    private bool SharesRow(
+        Microsoft.EntityFrameworkCore.Metadata.IEntityType dependent,
+        Microsoft.EntityFrameworkCore.Metadata.IEntityType principal)
+        => !PartOfOneDocument(dependent)
+            && dependent.GetTableName() is { } table
+            && table == principal.GetTableName()
+            && dependent.GetSchema() == principal.GetSchema();
 
     /// <summary>
     ///     Every tracked JSON-mapped entry that lives in <paramref name="owner" />'s document.
