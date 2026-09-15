@@ -1,9 +1,10 @@
 # Test overhaul: every override points to evidence
 
-**Status: proposed, 2026-09-15.** This replaces the first version of this file from the same day,
-which kept the ratchet and classified overrides with the labels `LIMIT`, `DEFECT` and `ISSUE`. The
-owner chose a stricter rule instead. It is tried on ADR-009 Tier D first and extended to the other
-tiers after that.
+**Status: proposed, 2026-09-15.** This replaces the first version of this file from the same day.
+That version kept the ratchet; this one drops it and adds a reference to every skip. **The labels
+`LIMIT`, `DEFECT` and `ISSUE` from the first version stay**, at the owner's request, because they
+answer a different question from the reference. It is tried on ADR-009 Tier D first and extended to
+the other tiers after that.
 
 ## The decision
 
@@ -28,6 +29,28 @@ different product.
 
 **A GitHub issue is filed only when the owner asks.** Tier D has no InfoCarrier defect today, so
 the trial needs no issue.
+
+## Labels and references are two questions
+
+**The label says WHAT the store does. The reference says WHERE that is shown.** Every skip of a
+store behaviour carries exactly one of each.
+
+| Label | What the store does | Also recorded in |
+|---|---|---|
+| `LIMIT` | refuses by design | nothing else |
+| `DEFECT` | crashes, or answers wrongly | a section of `docs/upstream-defects.md` |
+| `ISSUE <key>` | behaves in a way a tracker entry already covers | that tracker |
+
+**A crash or a wrong answer is never `LIMIT`.** A store that means "no" says so. A
+`NullReferenceException` is a `DEFECT` even when the store would refuse the same query on a better
+day, because the label records what happened and not what was intended.
+
+**`ISSUE` names any tracker, not only the store's.** Two Tier D tests fail because the store answers
+a query that EF's base expects it to refuse, and the answer is correct. That is EF Core issue
+`#36400`, so the label is `ISSUE dotnet/efcore#36400`.
+
+**An InfoCarrier defect has no store label.** It is fixed, or it carries a GitHub issue of this
+repository.
 
 ## Why stricter than Microsoft
 
@@ -66,18 +89,31 @@ failure of the rule: MongoDB's suite has not tested queries over nested document
 
 ## Where the reference lives
 
-Proposed: an attribute on each override, not a comment.
+Proposed: an attribute on each override, not a comment. **The attribute's name is the label and its
+arguments are the reference.** Each label attribute takes either form of reference.
 
-| Attribute | Kind |
-|---|---|
-| `[UpstreamTest("https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>")]` | upstream |
-| `[StoreControl(typeof(DirectProjectionTest), nameof(DirectProjectionTest.GroupBy))]` | self-hosted |
-| `[InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]` | InfoCarrier defect |
+```csharp
+// self-hosted reference: the control test that shows it
+[StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_required_related_FirstOrDefault))]
 
-**One reflection test enforces it.** It fails when an override of a specification test carries no
-attribute, or carries an upstream link without a 40-character commit and a line anchor. That is
+// upstream reference: the store's own test at the tagged commit
+[StoreLimit("https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>")]
+
+// a crash or a wrong answer, with its section in docs/upstream-defects.md
+[StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_optional_nested_on_optional_associate))]
+
+// a tracker entry covers it
+[StoreIssue("EF-250", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property))]
+
+// ours, when no fix is possible now
+[InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
+```
+
+**One reflection test enforces it.** It fails when an override of a specification test carries none
+of these or more than one, when an upstream link lacks a 40-character commit and a line anchor, and
+when a `StoreDefect` names a section that `docs/upstream-defects.md` does not have. That is
 Microsoft's `Check_all_tests_overridden` made stricter: theirs proves somebody looked at a test,
-ours proves why it is skipped.
+ours proves what the store did and where that is shown.
 
 **Open question: the form of a self-hosted reference.** The owner asked for one unified form. A
 commit link to this repository has two defects: a commit cannot contain its own hash, so the
@@ -105,12 +141,15 @@ canary for the control's wiring.
 
 ## Trial on Tier D
 
-1. Add the three attributes and the reflection test.
+1. Add the four attributes — `StoreLimit`, `StoreDefect`, `StoreIssue`, `InfoCarrierDefect` — and
+   the reflection test.
 2. Give each of the 15 control tests that still fail a real assertion. Each needs its query written
    out, because the failure happens inside the base's own assertion.
 3. Override the 14 Tier D failures, each with a reference.
 4. Replace every citation comment with an attribute, and check each against "the same". All seven
-   upstream citations become self-hosted, as measured above.
+   upstream citations become self-hosted, as measured above. Choose each label again as well: the
+   first classification called `GroupBy` an issue on the strength of `EF-149`, which is about
+   grouping a root set and not a collection inside a document.
 5. Delete `test/tier-d-overrides.txt`, `test/tier-d-control-pending.txt` and
    `eng/tier-d-control.py`. Tier D stays in the ratchet with zero failures during the trial, which
    already makes any red fail CI.
