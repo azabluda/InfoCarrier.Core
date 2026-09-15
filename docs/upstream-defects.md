@@ -356,9 +356,10 @@ the correct answer.
 ### 1.12 EF's relational pipeline leaves a primitive-collection parameter without a type mapping
 
 **Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
-overrides three core tests to assert that the query is refused. **This provider answers all three**,
-and its overrides assert the rows, so each carries `[StoreDefect("1.12", …)]` with the link to EF's
-refusal.
+overrides three core tests to assert that the query is refused. **This provider answered all three
+until 2026-09-15 and answers two now**, and its overrides assert the rows, so each carries
+`[StoreDefect("1.12", …)]` with the link to EF's refusal, and `[InfoCarrierDesign(6)]` for why this
+provider does not reach the defect.
 
 **Site.** Named by EF itself, on one of the three, in a comment at the `v10.0.1` tag: *"The array
 indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a CAST over
@@ -378,8 +379,15 @@ rules when to do this."*
 **Only the first is EF's attribution.** R31 read the other two as the same missing inference, from
 their messages; EF says nothing about them, and nobody has read a fix, because none exists.
 
-**What it blocks.** Nothing. **Why this provider does not reach that state is not established**; the
-overrides measure that the rows are right, which is the claim that matters to a caller.
+**What it blocks.** Nothing. **Why this provider does not reach that state was established on
+2026-09-15**, from the server's SQL log, and it read *"not established"* until then. The two compiled
+queries reach the server with their parameters as values (ADR-006), so the server's EF evaluates
+`(string)parameters[0]` and `ints1.Skip(1).Union(ints2).Count() == 3` before translation and runs
+`WHERE "p"."String" = @p` and `WHERE @p`. The subquery EF cannot type is never built.
+**`Column_collection_equality_inline_collection_with_parameters` answered for a worse reason**: its
+two parameters reached SQLite as the literal `'[1,10]'`. That was a defect of this provider's, and the
+same rule sent `new[] { i, j }.Contains(p.Id)` as `IN (2, 999)`. It is fixed, and that test now
+passes with EF's own refusal.
 
 ## 2. Already reported
 

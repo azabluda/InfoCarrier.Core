@@ -294,7 +294,8 @@ which this client does not emit (tracked as #111), and a store exception crosses
 - **Twenty Tier A overrides pin crashes of EF's InMemory provider**, so they are `DEFECT` and not
   `LIMIT`: `docs/upstream-defects.md` §1.11.
 - **Three primitive-collection overrides answer where EF's relational base asserts a refusal** that
-  EF's own comment calls unfinished type-mapping inference: §1.12.
+  EF's own comment calls unfinished type-mapping inference: §1.12. Two since the same evening, and
+  why is measured: see the next section.
 - **The client-evaluation guard was a decision recorded nowhere but CLAUDE.md.** ADR-010 now carries
   it as a dated amendment, because ten `DESIGN` references cite it.
 - **Two overrides did not meet the rules and were changed.** `ConcurrencyDetectorEnabled.FromSql`
@@ -322,6 +323,62 @@ built, and a real client context inserts, updates and reads a split owned refere
 was confirmed as described: the client ships an unmapped member and the server refuses it, which is
 correct while client and server share one model.
 
+## Two sides, EF parity, and a literal that was a defect
+
+**Decided by the owner on 2026-09-15, after the conversion.**
+
+- **An override can carry a reason from each side.** A store reason says what EF's own provider
+  test does and links it; an InfoCarrier reason says why this test differs from that one. At most
+  one store reason covers a case, and InfoCarrier reasons can be several, each naming a different
+  decision or issue. `AnswerNotRefusal` and `RefusedEarlier` are legal only on an InfoCarrier
+  reason, so that a difference of this provider's is never counted as the store's. Four overrides
+  carry both: the two `Join_with_result_selector_returning_queryable_throws_validation_error`, whose
+  one `DESIGN` reason had lost the link to EF's `ApplyNotSupported` override, and the two
+  primitive-collection compiled queries below. Each of the three new rules was shown to fail on a
+  deliberate mistake.
+- **`StoreExceptionAsData` stays a mechanical deviation.** The store refuses at the same place with
+  the same message, and only the exception's type differs. One decision covers every server error:
+  `InfoCarrierFaultMapper` rebuilds a type only through an ordinary constructor, and
+  `docs/security-review.md` §7 records why. Labelling it per test would count only the tests whose
+  upstream assertion happens to name the exact type.
+- **Remapping store exceptions to a type derived from `DbException` was considered and declined.**
+  A caller could then catch `DbException` as with plain EF, but code written against the 10.1
+  errors guide would stop matching, and no deviation would go, because EF's assertions name the
+  exact driver type.
+- **The README badge shows EF parity**, which `eng/spec-parity.py` computes from the TRX and the
+  reasons `OverrideAudit` writes. The base is every test case that ran through InfoCarrier: a
+  wire-free control and an xUnit skip are left out. A case counts against parity when an
+  InfoCarrier reason covers it, and for it otherwise, so only a difference of this provider's lowers
+  the figure, and relabelling a defect as a design lowers it just the same. It is rounded down. The
+  colour is red when a test step fails, yellow while an `[InfoCarrierDefect]` override exists, and
+  green otherwise. `passed / total passing` had become a constant when the suite went green. The
+  first run on the older TRX read 99.81%, 54 of 29,445 cases.
+- **SQL assertions (#111) are deferred.** The proposal for when they come: an `[UpstreamOverride]`
+  marker for an override copied from EF without change, whose body the audit can compare with
+  upstream's lines, and a `SqlDiffers` deviation on an InfoCarrier reason where the server's SQL
+  differs from EF's. **The owner's rule for the comparison**: parameter names do not matter; a
+  structural difference that can change the store's execution plan is a red flag; and a parameter
+  replaced by its literal values is a defect.
+
+**That last rule found a defect the same evening.** Measuring why the §1.12 overrides answer, with
+the server's SQL log, showed `WHERE "p"."Ints" = '[1,10]'` for
+`Column_collection_equality_inline_collection_with_parameters`: two query parameters, sent as one
+literal. The cause was the one exception `Substitute` made to #59's rule, which kept a scalar inside
+`new[] { i, j }` a plain constant so that this query could answer, and which sent
+`new[] { i, j }.Contains(p.Id)` as `IN (2, 999)` where EF's own client sends `IN (@i, @j)`. The
+exception is gone. The elements stay parameters, `IN (@Value, @Value0)`, and the equality query is
+refused with EF's own message, so its override is deleted and EF's relational base holds.
+`ServerParameterizationTest.An_inline_collection_of_parameters_matches_the_direct_query` pins it,
+and fails on the old code with `IN (1, 3)`.
+
+**The other two answer for a reason that is ADR-006 and not a defect.** The client sends a compiled
+query's parameters as values, so the server's EF evaluates the expressions built on them before
+translation: it ran `WHERE "p"."String" = @p` and `WHERE @p`, each value still a parameter. They
+carry `[StoreDefect("1.12")]` and `[InfoCarrierDesign(6)]`.
+
+**The audit after all of it**: 469 reasons, `LIMIT` 347, `DEFECT` 23, `ISSUE` 69, `DESIGN` 28,
+`INFOCARRIER DEFECT` 2, and 4 overrides with a reason from each side.
+
 ## Extending to the other tiers
 
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
@@ -337,7 +394,7 @@ correct while client and server share one model.
   specification tests at 10.0.1, tag `v10.0.1`, commit `a6217e34`; Tier D uses them at 10.0.11.
 - **Decide first what an override that calls the base unchanged and only ADDS assertions needs.** It
   changes no expected behaviour, so it is not what a label describes. Tier D has none, so the trial
-  does not need the answer.
+  does not need the answer. The proposal is `[UpstreamOverride]`, deferred with #111 (above).
 - **Then remove the ratchet**: `eng/ratchet.sh`, both baseline files, and the direction gate in CI.
   Done 2026-09-15, and the job is `Spec tests` in the workflow and the `main` ruleset alike.
 

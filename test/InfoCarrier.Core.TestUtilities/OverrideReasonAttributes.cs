@@ -33,8 +33,16 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     <para>
 ///         <b><see cref="Case" /> exists because one test method can hold two different store
 ///         behaviours.</b> A theory's tracking arm can refuse where its untracked arm crashes, and a
-///         crash is never a limit. A method may therefore carry several of these, each naming a
+///         crash is never a limit. A method may therefore carry several store reasons, each naming a
 ///         distinct case.
+///     </para>
+///     <para>
+///         <b>And a method can carry a reason from each side for the same case</b> (the owner,
+///         2026-09-15). A store reason says what EF's own provider test does and where; an InfoCarrier
+///         reason says why this test differs from that one. SQLite refuses a query with
+///         <c>ApplyNotSupported</c>, so EF's SQLite test expects that, and this provider refuses the
+///         same query earlier by ADR-010: <c>[StoreLimit]</c> and <c>[InfoCarrierDesign(10)]</c>
+///         together. One reason alone would lose either the link to EF's test or the decision.
 ///     </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
@@ -90,6 +98,14 @@ public enum DeviationKind
     ///     Upstream asserts the store's exception type. Over the wire it arrives as
     ///     <c>InfoCarrierServerException</c> carrying that type's name and message, which are asserted.
     /// </summary>
+    /// <remarks>
+    ///     <b>Mechanical, and not an InfoCarrier difference</b> (the owner, 2026-09-15). The store
+    ///     refuses at the same place with the same message; only the exception's type differs, and
+    ///     one decision covers every server error: <c>InfoCarrierFaultMapper</c> rebuilds a type only
+    ///     through a <c>(string)</c> or <c>(string, Exception)</c> constructor, and
+    ///     <c>docs/security-review.md</c> §7 records why. Labelling it per test would count only the
+    ///     tests whose upstream assertion names the exact type.
+    /// </remarks>
     StoreExceptionAsData = 1 << 1,
 
     /// <summary>Upstream's override calls a different base test. The note names it.</summary>
@@ -98,10 +114,16 @@ public enum DeviationKind
     /// <summary>Upstream skips the test, or asserts nothing. This override asserts.</summary>
     UpstreamAssertsNothing = 1 << 3,
 
-    /// <summary>Upstream expects a refusal and this provider answers, so the override asserts the answer.</summary>
+    /// <summary>
+    ///     Upstream expects a refusal and this provider answers, so the override asserts the answer.
+    ///     This provider's behaviour, so legal only on an InfoCarrier reason.
+    /// </summary>
     AnswerNotRefusal = 1 << 4,
 
-    /// <summary>This provider refuses earlier than the store does, with a different refusal.</summary>
+    /// <summary>
+    ///     This provider refuses earlier than the store does, with a different refusal. This provider's
+    ///     behaviour, so legal only on an InfoCarrier reason.
+    /// </summary>
     RefusedEarlier = 1 << 5,
 
     /// <summary>Upstream has no override for this base, so the reference is its override of the same test in another family.</summary>

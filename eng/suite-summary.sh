@@ -15,8 +15,14 @@
 # this repository allows on them. Each figure is read out of a run's own <Counters> element; `passed`
 # is never derived from `total` and `failed`, which is the derivation that has cost three commits.
 #
+# THE BADGE SHOWS EF PARITY SINCE 2026-09-15, AND NOT THE COUNTERS. A green suite made "passed / total"
+# a constant. eng/spec-parity.py joins every result with the reasons OverrideAudit wrote, and needs
+# those files beside the TRX: the test steps set INFOCARRIER_OVERRIDE_REASONS to the TRX directory,
+# and a run without them is an error rather than a badge that quietly stops meaning anything.
+#
 # Usage: eng/suite-summary.sh <results.trx> [more.trx ...]
-#        Writes counters.env and failures.txt beside the first TRX.
+#        Writes counters.env and failures.txt beside the first TRX, and reads every
+#        *.override-reasons.tsv there.
 
 set -euo pipefail
 
@@ -86,6 +92,18 @@ fi
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 "$python" "$here/trx-failures.py" "${trx_files[@]}" > "$results_dir/failures.txt"
 
+shopt -s nullglob
+reason_files=("$results_dir"/*.override-reasons.tsv)
+shopt -u nullglob
+if [ ${#reason_files[@]} -eq 0 ]; then
+    echo "suite-summary: no *.override-reasons.tsv in '$results_dir'. The test steps must set INFOCARRIER_OVERRIDE_REASONS to that directory." >&2
+    exit 1
+fi
+
+"$python" "$here/spec-parity.py" "${reason_files[@]}" -- "${trx_files[@]}" \
+    >> "$results_dir/counters.env" 2> "$results_dir/parity.md"
+cat "$results_dir/parity.md"
+
 if [ -s "$results_dir/failures.txt" ]; then
     echo
     echo "FAILED:"
@@ -99,6 +117,8 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         echo "| Passed | Failed | Total |"
         echo "|--:|--:|--:|"
         echo "| ${passed} | ${failed} | ${total} |"
+        echo
+        cat "$results_dir/parity.md"
         echo
         if [ -s "$results_dir/failures.txt" ]; then
             echo "<details open><summary><b>Failed</b> (${failed})</summary>"

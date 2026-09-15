@@ -10,7 +10,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <summary>What <see cref="OverrideAudit.Run" /> found.</summary>
 /// <param name="Violations">Every rule an override breaks. Empty when the assembly is sound.</param>
 /// <param name="Report">Every override with its label, reference, skip and deviation, as a table.</param>
-public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, string Report);
+/// <param name="Reasons">
+///     The same reasons for every concrete test class that runs them, tab-separated, for
+///     <c>eng/spec-parity.py</c>. See <see cref="OverrideAudit.ReasonsDirectoryVariable" />.
+/// </param>
+public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, string Report, string Reasons);
 
 /// <summary>
 ///     Checks that every override of a specification test says what the store does and where that is
@@ -35,9 +39,33 @@ public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, strin
 ///         is git-ignored, so a CI runner has no checkout and the report says how many references it
 ///         could not check; a local run checks all of them.
 ///     </para>
+///     <para>
+///         <b>A test can carry a reason from each side</b> (the owner, 2026-09-15). A store reason
+///         says what EF's own provider test does and links it; an InfoCarrier reason says why this
+///         test differs from that one. At most one store reason covers a case, and any number of
+///         InfoCarrier reasons can, each naming a different decision or issue. A deviation that is
+///         this provider's behaviour, <see cref="DeviationKind.AnswerNotRefusal" /> or
+///         <see cref="DeviationKind.RefusedEarlier" />, is legal only on an InfoCarrier reason, so
+///         that such a difference is never counted as the store's.
+///     </para>
 /// </remarks>
 public static class OverrideAudit
 {
+    /// <summary>
+    ///     The environment variable that names a directory for <see cref="OverrideAuditResult.Reasons" />.
+    ///     When it is set, <see cref="Run" /> writes <c>&lt;assembly&gt;.override-reasons.tsv</c> there.
+    /// </summary>
+    /// <remarks>
+    ///     CI sets it to the TRX directory, so that <c>eng/suite-summary.sh</c> can join every test
+    ///     result with its reasons for the README badge. A switch and a file, like
+    ///     <c>INFOCARRIER_SERVER_SQL</c>, because the test report is for people and the join needs
+    ///     the concrete class of every inherited override, which the report does not list.
+    /// </remarks>
+    public const string ReasonsDirectoryVariable = "INFOCARRIER_OVERRIDE_REASONS";
+
+    /// <summary>The deviations that are this provider's behaviour, legal only on an InfoCarrier reason.</summary>
+    private const DeviationKind InfoCarrierBehaviour = DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier;
+
     private static readonly Regex MarkdownHeading = new(@"^#{1,6}\s+(.*?)\s*$", RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly Regex MarkdownFence = new(@"^```.*?^```", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.Multiline);
@@ -71,7 +99,61 @@ public static class OverrideAudit
             }
         }
 
-        return new OverrideAuditResult(audit.Violations, audit.Report());
+        var result = new OverrideAuditResult(audit.Violations, audit.Report(), Reasons(testAssembly));
+
+        if (Environment.GetEnvironmentVariable(ReasonsDirectoryVariable) is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(
+                Path.Combine(directory, $"{testAssembly.GetName().Name}.override-reasons.tsv"),
+                result.Reasons);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     One tab-separated line for each wire-free control class (<c>control</c> and the class), and
+    ///     one for each reason a concrete test class runs (<c>reason</c>, the class, the method, the
+    ///     case, the side and the label).
+    /// </summary>
+    /// <remarks>
+    ///     A class is named as a TRX names it, <see cref="Type.FullName" /> with <c>+</c> for a nested
+    ///     class, and an inherited override is listed under every concrete class that runs it. The
+    ///     side is <c>store</c> or <c>infocarrier</c>.
+    /// </remarks>
+    private static string Reasons(Assembly testAssembly)
+    {
+        var text = new StringBuilder();
+
+        IEnumerable<Type> concrete = testAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && !t.ContainsGenericParameters)
+            .OrderBy(t => t.FullName, StringComparer.Ordinal);
+
+        foreach (Type type in concrete)
+        {
+            if (type.IsDefined(typeof(WireFreeControlAttribute), inherit: false))
+            {
+                text.Append("control\t").Append(type.FullName).Append('\n');
+            }
+
+            IEnumerable<MethodInfo> methods = type
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(m => m.DeclaringType?.Assembly == testAssembly && IsSpecificationTestOverride(m))
+                .OrderBy(m => m.Name, StringComparer.Ordinal);
+
+            foreach (MethodInfo method in methods)
+            {
+                foreach (OverrideReasonAttribute reason in method.GetCustomAttributes<OverrideReasonAttribute>(inherit: false))
+                {
+                    string side = reason is StoreBehaviourAttribute ? "store" : "infocarrier";
+                    text.Append("reason\t").Append(type.FullName).Append('\t').Append(method.Name).Append('\t')
+                        .Append(reason.Case).Append('\t').Append(side).Append('\t').Append(Label(reason)).Append('\n');
+                }
+            }
+        }
+
+        return text.ToString();
     }
 
     /// <summary>
@@ -111,6 +193,17 @@ public static class OverrideAudit
             && definition.IsDefined(typeof(FactAttribute), inherit: true);
     }
 
+    private static string Label(OverrideReasonAttribute reason)
+        => reason switch
+        {
+            StoreLimitAttribute => "LIMIT",
+            StoreDefectAttribute d => $"DEFECT {d.Section}",
+            StoreIssueAttribute i => $"ISSUE {i.Key}",
+            InfoCarrierDefectAttribute d => $"INFOCARRIER DEFECT #{d.Issue}",
+            InfoCarrierDesignAttribute d => $"DESIGN {d.Decision}",
+            _ => "?",
+        };
+
     /// <summary>The anchor Python-Markdown gives a heading, as <c>eng/doc-links.py</c> computes it.</summary>
     private static string Slug(string heading)
     {
@@ -131,6 +224,8 @@ public static class OverrideAudit
 
         private int _uncheckedReferences;
 
+        private int _bothSides;
+
         public List<string> Violations { get; } = [];
 
         public void Method(Type type, MethodInfo method, bool isControl)
@@ -144,11 +239,25 @@ public static class OverrideAudit
                 return;
             }
 
-            if (reasons.Length > 1
-                && (reasons.Any(r => r.Case is null)
-                    || reasons.Select(r => r.Case).Distinct(StringComparer.Ordinal).Count() != reasons.Length))
+            StoreBehaviourAttribute[] store = [.. reasons.OfType<StoreBehaviourAttribute>()];
+            if (store.Length > 1
+                && (store.Any(r => r.Case is null)
+                    || store.Select(r => r.Case).Distinct(StringComparer.Ordinal).Count() != store.Length))
             {
-                Violations.Add($"{where}: carries {reasons.Length} reasons, so each must name a distinct Case.");
+                Violations.Add($"{where}: carries {store.Length} store reasons, so each must name a distinct Case.");
+            }
+
+            foreach (IGrouping<string, OverrideReasonAttribute> repeated in reasons
+                .Where(r => r is not StoreBehaviourAttribute)
+                .GroupBy(r => $"{r.Case}\n{Label(r)}", StringComparer.Ordinal)
+                .Where(g => g.Count() > 1))
+            {
+                Violations.Add($"{where}: gives {Label(repeated.First())} twice for the same case.");
+            }
+
+            if (store.Length > 0 && store.Length < reasons.Length)
+            {
+                _bothSides++;
             }
 
             foreach (OverrideReasonAttribute reason in reasons)
@@ -175,7 +284,8 @@ public static class OverrideAudit
                 $"Override audit: {_audited.Count} reasons. LIMIT {limits}, DEFECT {storeDefects}, ISSUE {issues}, "
                 + $"INFOCARRIER DEFECT {own}, DESIGN {designs}. Skips {skips}. Deviations {deviations}. "
                 + $"Upstream gave no reason {silent}. Upstream references checked against a checkout {_checkedReferences}, "
-                + $"not checked for want of one {_uncheckedReferences}.");
+                + $"not checked for want of one {_uncheckedReferences}. "
+                + $"Overrides with a store reason and an InfoCarrier reason {_bothSides}.");
 
             IEnumerable<string> kinds = Enum.GetValues<DeviationKind>()
                 .Where(k => k != DeviationKind.None)
@@ -206,6 +316,13 @@ public static class OverrideAudit
             if (reason.Deviation.HasFlag(DeviationKind.UpstreamCallsAnotherTest) && string.IsNullOrWhiteSpace(reason.DeviationNote))
             {
                 Violations.Add($"{at}: says upstream calls another test and does not name it in the note.");
+            }
+
+            if (reason is StoreBehaviourAttribute && (reason.Deviation & InfoCarrierBehaviour) != DeviationKind.None)
+            {
+                Violations.Add(
+                    $"{at}: {reason.Deviation & InfoCarrierBehaviour} is this provider's behaviour, not the store's, "
+                    + "so it belongs on an InfoCarrier reason beside the store one.");
             }
 
             switch (reason)
@@ -430,17 +547,6 @@ public static class OverrideAudit
                 (StoreDefectAttribute x, StoreDefectAttribute y) => x.Section == y.Section,
                 (StoreIssueAttribute x, StoreIssueAttribute y) => x.Tracker == y.Tracker && x.Number == y.Number,
                 _ => true,
-            };
-
-        private static string Label(OverrideReasonAttribute reason)
-            => reason switch
-            {
-                StoreLimitAttribute => "LIMIT",
-                StoreDefectAttribute d => $"DEFECT {d.Section}",
-                StoreIssueAttribute i => $"ISSUE {i.Key}",
-                InfoCarrierDefectAttribute d => $"INFOCARRIER DEFECT #{d.Issue}",
-                InfoCarrierDesignAttribute d => $"DESIGN {d.Decision}",
-                _ => "?",
             };
 
         private static string Reference(OverrideReasonAttribute reason)
