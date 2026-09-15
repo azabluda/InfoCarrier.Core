@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.BulkUpdates;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.Northwind;
@@ -153,6 +154,36 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
         fixture,
         testOutputHelper)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The core base's query, refused by the client with EF's own message. The details clause
+    ///     prints the selector as the query wrote it, <c>e => e.MaybeScalar(…)</c>, over two lines;
+    ///     EF's relational base expects the <c>o => o.MaybeScalar(…)</c> its own pipeline prints.
+    ///     Measured 2026-09-15.
+    /// </remarks>
+    [InfoCarrierDesign(
+        6,
+        Justification = "The client refuses the invalid SetProperty selector before the wire and prints it as the query "
+            + "wrote it. EF prints it after its own pipeline, which runs on the server, has renamed the parameter.",
+        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
+        DeviationNote = "The relational base wraps the core query, so the core query is written out and the refusal "
+            + "asserted with the selector as printed here.")]
+    public override async Task Update_with_invalid_lambda_in_set_property_throws(bool async)
+    {
+        string message = (await Assert.ThrowsAsync<InvalidOperationException>(() => AssertUpdate(
+                async,
+                ss => ss.Set<OrderDetail>().Where(od => od.OrderID < 10250),
+                e => e,
+                s => s.SetProperty(e => e.MaybeScalar(e => e.OrderID), 10300),
+                rowsAffectedCount: 0)))
+            .Message.Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+        Assert.Contains(
+            CoreStrings.NonQueryTranslationFailedWithDetails(
+                string.Empty, RelationalStrings.InvalidPropertyInSetProperty("e => e    .MaybeScalar(e => e.OrderID)"))[21..],
+            message);
+    }
+
     // --- SQLite has no APPLY. Stated in EF's own SQLite suite, and the message this provider
     // surfaces is `SqliteStrings.ApplyNotSupported` character for character.
 

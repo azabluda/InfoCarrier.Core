@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -131,6 +132,54 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The base's body. Its first two blocks pass unchanged; the third is refused with EF's
+    ///     own <c>TranslationFailed</c>, naming the <c>Cast</c> where EF names the filter behind
+    ///     it. Measured 2026-09-15.
+    /// </remarks>
+    [InfoCarrierDesign(
+        6,
+        Justification = "EF removes the redundant cast in its own pipeline, which runs on the server, and then names the "
+            + "filter it cannot translate. The client does not run that pipeline, so it refuses at the Cast it cannot send.",
+        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
+        DeviationNote = "Only the third block's expected message differs; the base asserts all three in one method.")]
+    public override async Task Casts_are_removed_from_expression_tree_when_redundant()
+    {
+        var contextFactory = await InitializeAsync<Context18087>(seed: c => c.SeedAsync());
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var id = 1;
+            var query = queryBase.Cast<Context18087.IDomainEntity>().FirstOrDefault(x => x.Id == id);
+
+            Assert.Equal(1, query!.Id);
+        }
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var query = queryBase.Cast<object>().Count();
+
+            Assert.Equal(3, query);
+        }
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var id = 1;
+
+            string message = Assert
+                .Throws<InvalidOperationException>(() => queryBase.Cast<Context18087.IDummyEntity>().FirstOrDefault(x => x.Id == id))
+                .Message;
+
+            Assert.Equal(
+                CoreStrings.TranslationFailed("DbSet<MockEntity>()    .Cast<IDummyEntity>()"),
+                message.Replace("\r", string.Empty).Replace("\n", string.Empty));
+        }
+    }
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

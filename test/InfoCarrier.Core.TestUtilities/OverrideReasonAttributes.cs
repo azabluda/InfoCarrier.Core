@@ -350,6 +350,34 @@ public static class Decisions
     /// </summary>
     public const string RawSqlGrant =
         "5a-amendment-raw-sql-60-r95-and-why-it-is-a-change-of-posture-rather-than-a-wider-list";
+
+    /// <summary><c>docs/architecture.md</c>, where the client's service and convention set is decided.</summary>
+    public const string Architecture = "docs/architecture.md";
+
+    /// <summary>
+    ///     D7: which of EF's relational services and conventions the client runs. Everything past the
+    ///     capture point is the server's, and a convention or validator that decides store layout is
+    ///     not run on the client.
+    /// </summary>
+    public const string ClientServices =
+        "d7-the-client-gets-efs-core-services-and-nobody-had-listed-what-the-relational-set-adds";
+
+    /// <summary><c>docs/plans/v10/findings.md</c>, where findings and the scope decisions they led to are recorded.</summary>
+    public const string Findings = "docs/plans/v10/findings.md";
+
+    /// <summary>
+    ///     R138: the boundary analyzer does not ask the client model whether a member is mapped. The
+    ///     fix is written and priced, and not shipped, because the owner removed split models from the
+    ///     scope on 2026-09-04.
+    /// </summary>
+    public const string UnmappedMembers =
+        "the-boundary-analyzer-does-not-consult-the-client-model-for-member-mappability-r138-2026-09-03";
+
+    /// <summary><c>website/docs/limitations.md</c>, which tells a consumer what is not supported.</summary>
+    public const string Limitations = "website/docs/limitations.md";
+
+    /// <summary>The one unsupported scenario, a property-bag complex collection holding a primitive collection.</summary>
+    public const string NotSupported = "not-supported";
 }
 
 /// <summary>

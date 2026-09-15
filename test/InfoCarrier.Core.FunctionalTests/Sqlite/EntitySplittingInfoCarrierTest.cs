@@ -2,8 +2,10 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -18,13 +20,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         nothing else in the suite does.
 ///     </para>
 ///     <para>
-///         <b>Its second test is unreachable, and the reason is ADR-013.</b>
-///         <c>ExecuteDelete_throws_for_entity_splitting</c> calls
+///         <b>Its second test reaches its operation only because it is written out, and the reason
+///         is ADR-013.</b> <c>ExecuteDelete_throws_for_entity_splitting</c> calls
 ///         <c>TestHelpers.ExecuteWithStrategyInTransactionAsync</c> inline, passing the base's
 ///         <c>public void UseTransaction</c>, which calls <c>GetDbTransaction()</c>. There is no
-///         virtual hook between the test and that member, so unlike
-///         <c>NonSharedModelUpdatesTestBase</c> there is nothing to override. It is left failing
-///         rather than suppressed, and classified in <c>known-failures.txt</c>.
+///         virtual hook between the test and that member. Until 2026-09-15 it was left failing on
+///         that call and never reached <c>ExecuteDelete</c> at all.
 ///     </para>
 /// </remarks>
 public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutputHelper testOutputHelper)
@@ -35,6 +36,40 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The base's body, with this provider's transaction in place of the base's non-virtual
+    ///     <c>UseTransaction</c>. The assertion is EF's own.
+    /// </remarks>
+    [InfoCarrierDesign(
+        13,
+        Justification = "The client has no DbTransaction, and the base's own UseTransaction helper is not virtual and asks "
+            + "for one, so the test never reaches the operation it is named for.",
+        Deviation = DeviationKind.QueryWrittenOut,
+        DeviationNote = "The body is the base's, with InfoCarrier's transaction passed to ExecuteWithStrategyInTransactionAsync.")]
+    public override async Task ExecuteDelete_throws_for_entity_splitting(bool async)
+    {
+        await InitializeAsync(OnModelCreating, sensitiveLogEnabled: true);
+
+        await TestHelpers.ExecuteWithStrategyInTransactionAsync(
+            CreateContext,
+            (facade, transaction) => facade.UseInfoCarrierTransaction(transaction),
+            async context => Assert.Contains(
+                CoreStrings.NonQueryTranslationFailedWithDetails(
+                    "", RelationalStrings.ExecuteOperationOnEntitySplitting("ExecuteDelete", "MeterReading"))[21..],
+                (await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    if (async)
+                    {
+                        await context.MeterReadings.ExecuteDeleteAsync();
+                    }
+                    else
+                    {
+                        context.MeterReadings.ExecuteDelete();
+                    }
+                })).Message));
+    }
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

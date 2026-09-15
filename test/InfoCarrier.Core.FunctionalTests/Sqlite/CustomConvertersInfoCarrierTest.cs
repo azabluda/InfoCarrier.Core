@@ -83,8 +83,8 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
             Assert.Throws<InvalidOperationException>(() => base.Value_conversion_on_enum_collection_contains()).Message);
 
     /// <summary>
-    ///     Runs the query of <see cref="Composition_over_collection_of_complex_mapped_as_scalar" />
-    ///     against seeded data and asserts the <em>answer</em>, which that test never could.
+    ///     Runs the base's query against seeded data and asserts the <em>answer</em>, which the
+    ///     base, an assertion of EF's refusal, never could.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -111,9 +111,20 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///         the query — ordering is applied to the materialized result — so what crosses the
     ///         wire is exactly the tree the base builds.
     ///     </para>
+    ///     <para>
+    ///         <b>Until 2026-09-15 this was a companion test,
+    ///         <c>Composition_over_collection_of_complex_mapped_as_scalar_returns_the_right_answer</c>,
+    ///         beside a spec test left red</b>, because a companion kept the spec test reporting. With
+    ///         a green suite the override is the place for the answer, so the companion became it.
+    ///     </para>
     /// </remarks>
-    [ConditionalFact]
-    public virtual void Composition_over_collection_of_complex_mapped_as_scalar_returns_the_right_answer()
+    [InfoCarrierDesign(
+        10,
+        Justification = "The nested Select over Layouts builds an anonymous type, so the client reassembles it from the "
+            + "Layouts value the server returns. EF's providers try to translate it and refuse.",
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = "The rows are asserted over two seeded dashboards with no two values alike.")]
+    public override void Composition_over_collection_of_complex_mapped_as_scalar()
     {
         using DbContext context = CreateContext();
 

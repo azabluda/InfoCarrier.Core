@@ -3,8 +3,10 @@
 using System.Data.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -123,4 +125,51 @@ public class FromSqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<
         Skip = true)]
     public override Task Bad_data_error_handling_invalid_cast_no_tracking(bool async)
         => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The test is about the state of the client's connection, and the client has none. The
+    ///     base cannot say so: its first line asks the test store to close its connection, and
+    ///     <see cref="RelationalInfoCarrierTestStore.Connection" /> refuses. So the override asks
+    ///     the client, which is the question the test is about. Measured 2026-09-15.
+    /// </remarks>
+    [InfoCarrierDesign(
+        Decisions.Architecture,
+        Decisions.ClientServices,
+        Justification = ClientHasNoConnection,
+        Deviation = DeviationKind.QueryWrittenOut,
+        DeviationNote = NoConnectionToObserve)]
+    public override Task Include_closed_connection_opened_by_it_when_buffering(bool async)
+        => AssertClientHasNoConnection();
+
+    /// <inheritdoc cref="Include_closed_connection_opened_by_it_when_buffering" />
+    [InfoCarrierDesign(
+        Decisions.Architecture,
+        Decisions.ClientServices,
+        Justification = ClientHasNoConnection,
+        Deviation = DeviationKind.QueryWrittenOut,
+        DeviationNote = NoConnectionToObserve)]
+    public override Task Include_does_not_close_user_opened_connection_for_empty_result(bool async)
+        => AssertClientHasNoConnection();
+
+    private const string ClientHasNoConnection =
+        "The client has no database, so it has no DbConnection to open or close. The connection is the server "
+        + "provider's, past the capture point.";
+
+    private const string NoConnectionToObserve =
+        "The base's connection-state assertions have nothing to observe, so the override asserts the client's refusal "
+        + "to give out a connection.";
+
+    private Task AssertClientHasNoConnection()
+    {
+        using var context = CreateContext();
+
+        InvalidOperationException refusal = Assert.Throws<InvalidOperationException>(() => context.Database.GetDbConnection());
+        Assert.StartsWith(
+            "The InfoCarrier client has no database of its own, so 'RelationalConnection' has no value here.",
+            refusal.Message,
+            StringComparison.Ordinal);
+
+        return Task.CompletedTask;
+    }
 }

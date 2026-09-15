@@ -112,18 +112,54 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
     // have is a workaround, and the coverage is the point (ADR-004).
     //
     // `Correlated_collection_with_distinct_3_levels` belongs to that list too, and carrying EF's
-    // override for it was the A39 mistake in the one place A39 did not look (C64). It is left
-    // **unoverridden and red**, and the red is not a wrong answer: the query runs and this
-    // provider's rows agree with the expected ones squad for squad, member for member, weapon
-    // count for weapon count. What fails is the base's own assertion, and it fails for a reason
-    // that has nothing to do with any provider — the projection is an anonymous type whose
-    // `Members` member is a lazily-evaluated `IEnumerable<>`, which the compiler-generated
-    // `Equals` compares with `EqualityComparer<T>.Default`, i.e. by reference. Running the base's
-    // *expected* query twice over the same in-memory data, with the same `Squad` instance in both
-    // results, fails the same assertion. **No correct answer can satisfy it**, which is why every
-    // EF provider refuses the query before reaching it: InMemory with
-    // `DistinctOnSubqueryNotSupported`, and every relational one with
+    // override for it was the A39 mistake in the one place A39 did not look (C64). The red was not
+    // a wrong answer: the query runs and this provider's rows agree with the expected ones squad
+    // for squad, member for member, weapon count for weapon count. What fails is the base's own
+    // assertion, and it fails for a reason that has nothing to do with any provider — the
+    // projection is an anonymous type whose `Members` member is a lazily-evaluated `IEnumerable<>`,
+    // which the compiler-generated `Equals` compares with `EqualityComparer<T>.Default`, i.e. by
+    // reference. Running the base's *expected* query twice over the same in-memory data, with the
+    // same `Squad` instance in both results, fails the same assertion. **No correct answer can
+    // satisfy it**, which is why every EF provider refuses the query before reaching it: InMemory
+    // with `DistinctOnSubqueryNotSupported`, and every relational one with
     // `DistinctOnCollectionNotSupported` on `GearsOfWarQueryRelationalTestBase`.
+    //
+    // **This read "left unoverridden and red" until 2026-09-15.** With a green suite the override
+    // below runs the base's query and compares `Members` as a sequence, which is the assertion the
+    // base meant (docs/upstream-defects.md 1.4).
+
+    /// <inheritdoc />
+    [StoreDefect(
+        "1.4",
+        UpstreamRepository.EfCore, "test/EFCore.Specification.Tests/Query/GearsOfWarQueryTestBase.cs", 6457, 6468,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.Other,
+        DeviationNote = "The base's query, with an element asserter that compares Members as a sequence. The base compares "
+            + "two lazily evaluated iterators by reference, which no answer can satisfy.")]
+    public override Task Correlated_collection_with_distinct_3_levels(bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Squad>()
+                .Select(s => new
+                {
+                    s,
+                    Members = s.Members.Select(m => new { m, Weapons = m.Weapons.Where(w => w.OwnerFullName == m.FullName).ToList() })
+                        .Distinct()
+                }).Distinct(),
+            elementSorter: e => e.s.Id,
+            elementAsserter: (e, a) =>
+            {
+                AssertEqual(e.s, a.s);
+                AssertCollection(
+                    e.Members,
+                    a.Members,
+                    elementSorter: m => m.m.FullName,
+                    elementAsserter: (em, am) =>
+                    {
+                        AssertEqual(em.m, am.m);
+                        AssertCollection(em.Weapons, am.Weapons, elementSorter: w => w.Id);
+                    });
+            });
 
     [StoreIssue(
         IssueTracker.EfCore, 24325,

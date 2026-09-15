@@ -50,8 +50,10 @@ public static class OverrideAudit
     {
         var audit = new Audit(File.ReadAllText(upstreamDefectsPath), File.ReadAllText(decisionsPath));
 
+        // Abstract classes too: an override declared in an intermediate abstract class is inherited
+        // by every concrete one and declared by none, so scanning concrete classes alone missed it.
         IEnumerable<Type> types = testAssembly.GetTypes()
-            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => t.IsClass)
             .OrderBy(t => t.FullName, StringComparer.Ordinal);
 
         foreach (Type type in types)

@@ -1,8 +1,10 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -64,4 +66,40 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     </list>
 /// </remarks>
 public class QueryNoClientEvalInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : QueryNoClientEvalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture);
+    : QueryNoClientEvalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+{
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The base's query, refused with EF's own details clause, naming the method the client
+    ///     refuses rather than the member the server would. See the class remarks.
+    /// </remarks>
+    [InfoCarrierDesign(
+        Decisions.Findings,
+        Decisions.UnmappedMembers,
+        Justification = "The client does not ask its model whether IsLondon is mapped, and leaves that refusal to the server. "
+            + "It refuses ThenBy(ClientMethod) itself first, so the query never reaches the server, and the message names "
+            + "ClientMethod. The guard is priced and not shipped, since the owner removed split models from the scope.",
+        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
+        DeviationNote = "The details clause names ClientMethod instead of Customer.IsLondon. The query is written out with "
+            + "this class's ClientMethod, because the base's and its assertion helper are private.")]
+    public override void Throws_when_orderby_multiple()
+    {
+        using var context = CreateContext();
+
+        string message = Assert.Throws<InvalidOperationException>(
+            () => context.Customers
+                .OrderBy(c => c.IsLondon)
+                .ThenBy(c => ClientMethod(c))
+                .ToList()).Message;
+
+        Assert.Contains(
+            CoreStrings.TranslationFailedWithDetails(
+                string.Empty,
+                CoreStrings.QueryUnableToTranslateMethod(typeof(QueryNoClientEvalInfoCarrierTest).FullName, nameof(ClientMethod)))[21..],
+            message);
+    }
+
+    // The base's own, which is private.
+    private static object ClientMethod(object o)
+        => o.GetHashCode();
+}

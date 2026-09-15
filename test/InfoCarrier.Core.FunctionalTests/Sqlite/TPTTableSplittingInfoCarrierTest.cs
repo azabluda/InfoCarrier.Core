@@ -2,8 +2,10 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.TestModels.TransportationModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -52,6 +54,44 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
         Skip = true)]
     public override Task Can_insert_dependent_with_just_one_parent()
         => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The base's body, with this provider's transaction in place of the base's non-virtual
+    ///     <c>UseTransaction</c>. The assertion is EF's own. Until 2026-09-15 this failed on that
+    ///     helper and never reached <c>ExecuteUpdate</c>.
+    /// </remarks>
+    [InfoCarrierDesign(
+        13,
+        Justification = "The client has no DbTransaction, and the base's own UseTransaction helper is not virtual and asks "
+            + "for one, so the test never reaches the operation it is named for.",
+        Deviation = DeviationKind.QueryWrittenOut,
+        DeviationNote = "The body is the base's, with InfoCarrier's transaction passed to ExecuteWithStrategyInTransactionAsync.")]
+    public override async Task ExecuteUpdate_works_for_table_sharing(bool async)
+    {
+        await InitializeAsync(OnModelCreating);
+
+        await TestHelpers.ExecuteWithStrategyInTransactionAsync(
+            CreateContext,
+            (facade, transaction) => facade.UseInfoCarrierTransaction(transaction),
+            async context =>
+            {
+                if (async)
+                {
+                    await context.Set<Vehicle>().ExecuteUpdateAsync(s => s.SetProperty(e => e.SeatingCapacity, 1));
+                }
+                else
+                {
+                    context.Set<Vehicle>().ExecuteUpdate(s => s.SetProperty(e => e.SeatingCapacity, 1));
+                }
+            }, async context =>
+            {
+                Assert.True(
+                    async
+                        ? await context.Set<Vehicle>().AllAsync(e => e.SeatingCapacity == 1)
+                        : context.Set<Vehicle>().All(e => e.SeatingCapacity == 1));
+            });
+    }
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(
