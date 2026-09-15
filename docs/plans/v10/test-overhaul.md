@@ -119,8 +119,10 @@ failure of the rule: MongoDB's suite has not tested queries over nested document
 
 ## Where the reference lives
 
-Proposed: an attribute on each override, not a comment. **The attribute's name is the label and its
-arguments are the reference.** Each label attribute takes either form of reference.
+**An attribute on each override, not a comment** (accepted by the owner, 2026-09-15). **The attribute's
+name is the label and its arguments are the reference.** Each label attribute takes either form of
+reference. The attributes and the audit live in `test/InfoCarrier.Core.TestUtilities`, so every tier
+uses the same ones.
 
 ```csharp
 // self-hosted reference: the control test that shows it
@@ -145,22 +147,42 @@ arguments are the reference.** Each label attribute takes either form of referen
 
 // ours, when no fix is possible now
 [InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
+
+// two behaviours in one theory: each reason names its case
+[StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.TrackAll))]
+[StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.NoTracking))]
+
+// inside a [WireFreeControl] class: the label, and no reference, because this IS the evidence
+[StoreDefect("1.6", Case = nameof(QueryTrackingBehavior.NoTracking))]
 ```
 
-**Three properties exist for the audit.**
+**Four properties exist for the audit.**
 
 | Property | Meaning |
 |---|---|
 | `Justification` | upstream's comment, copied verbatim. When upstream gives no reason, the constant `Upstream.GaveNoReason`, so the gap is visible rather than blank. |
 | `Skip` | the override asserts nothing. Requires an upstream reference. |
 | `Deviation` | why this override's body differs from upstream's, when it does. Empty means it is the same. |
+| `Case` | the theory case the reason covers, such as `TrackAll`. Empty means every case of the method. |
 
-**One reflection test enforces it.** It fails when an override of a specification test carries none
-of the label attributes or more than one; when an upstream link lacks a 40-character commit and a
-line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
-upstream reference; and when a `StoreDefect` names a section that `docs/upstream-defects.md` does
-not have. That is Microsoft's `Check_all_tests_overridden` made stricter: theirs proves somebody
-looked at a test, ours proves what the store did and where that is shown.
+**`Case` exists because one test method can hold two store behaviours** (added during the Tier D
+trial). `Select_required_associate_via_optional_navigation` refuses in its tracked arm and crashes
+with `NullReferenceException` in its untracked arm, and a crash is never a `LIMIT`. One attribute per
+method could not say both, so a method may carry several reasons when each names a distinct case.
+
+**A control class is marked `[WireFreeControl]`** (added during the Tier D trial). Its overrides carry
+a label and NO reference, because the control is the evidence. They may not skip, since a control
+that skips documents nothing, and they may not carry `InfoCarrierDefect`, since there is no
+InfoCarrier in them. A self-hosted reference on a wire override must name a method of such a class.
+
+**One reflection test enforces it.** It fails when an override of a specification test carries no
+reason, or several without distinct `Case` values; when an upstream link lacks a 40-character commit
+and a line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
+upstream reference; when a `StoreDefect` names a section that `docs/upstream-defects.md` does not
+have; when a control override names a reference or skips; and when a wire override's control test
+documents a different label, or a different section or key, for the same case. That is Microsoft's
+`Check_all_tests_overridden` made stricter: theirs proves somebody looked at a test, ours proves what
+the store did and where that is shown.
 
 **The same test writes the audit.** Its output lists every override with its label, its reference,
 whether it skips, its deviation, and every upstream reference that gave no reason. The counts are
