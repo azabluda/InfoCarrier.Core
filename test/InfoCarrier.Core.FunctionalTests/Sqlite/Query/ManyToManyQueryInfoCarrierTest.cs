@@ -47,11 +47,17 @@ public class TPTManyToManyQueryInfoCarrierTest(TPTManyToManyQueryInfoCarrierFixt
     : TPTManyToManyQueryRelationalTestBase<TPTManyToManyQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyQuerySqliteTest.cs#L13-L17",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => AssertApplyNotSupported(() => base
             .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyQuerySqliteTest.cs#L19-L25",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
         => AssertApplyNotSupported(() => base
@@ -68,11 +74,17 @@ public class TPTManyToManyNoTrackingQueryInfoCarrierTest(TPTManyToManyQueryInfoC
     : TPTManyToManyNoTrackingQueryRelationalTestBase<TPTManyToManyQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyNoTrackingQuerySqliteTest.cs#L13-L17",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
             .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyNoTrackingQuerySqliteTest.cs#L19-L25",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -84,11 +96,17 @@ public class TPCManyToManyQueryInfoCarrierTest(TPCManyToManyQueryInfoCarrierFixt
     : TPCManyToManyQueryRelationalTestBase<TPCManyToManyQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyQuerySqliteTest.cs#L13-L17",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
             .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyQuerySqliteTest.cs#L19-L25",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -100,11 +118,17 @@ public class TPCManyToManyNoTrackingQueryInfoCarrierTest(TPCManyToManyQueryInfoC
     : TPCManyToManyNoTrackingQueryRelationalTestBase<TPCManyToManyQueryInfoCarrierFixture>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyNoTrackingQuerySqliteTest.cs#L13-L17",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
             .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyNoTrackingQuerySqliteTest.cs#L19-L25",
+        Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base

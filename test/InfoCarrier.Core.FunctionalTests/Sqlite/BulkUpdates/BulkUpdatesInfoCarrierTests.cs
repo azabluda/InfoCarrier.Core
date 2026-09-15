@@ -157,18 +157,27 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
     // surfaces is `SqliteStrings.ApplyNotSupported` character for character.
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L601-L604",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_cross_apply(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Delete_with_cross_apply(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L606-L609",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_outer_apply(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Delete_with_outer_apply(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1397-L1400",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -176,6 +185,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_cross_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1402-L1405",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_outer_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -183,6 +195,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_outer_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1430-L1434",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_cross_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -190,6 +205,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_cross_join_cross_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1436-L1440",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_outer_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -209,11 +227,23 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
     // documented reason.
 
     /// <inheritdoc />
+    [StoreIssue(
+        "dotnet/efcore#28886",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1407-L1428",
+        Justification = "Issue#28886",
+        Skip = true,
+        Deviation = Deviations.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_cross_join_left_join_set_constant(bool async)
         => base.Update_with_cross_join_left_join_set_constant(async);
 
     /// <inheritdoc />
+    [StoreIssue(
+        "dotnet/efcore#28886",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs#L1522-L1531",
+        Justification = "Issue#28886",
+        Skip = true,
+        Deviation = Deviations.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_two_inner_joins(bool async)
         => base.Update_with_two_inner_joins(async);
