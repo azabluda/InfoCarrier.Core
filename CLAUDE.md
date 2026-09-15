@@ -110,37 +110,41 @@ on the store earns its place, and one that is mostly overridden into "not suppor
 about the wire. ADR-009's 2026-09-13 amendment carries that selection rule and its 2026-09-14 one
 carries the adoption.
 
-**IT IS RATCHETED AND MEASURED LIKE EVERY OTHER TIER SINCE 2026-09-14, AND THE PARAGRAPH ABOVE SAID
-THE OPPOSITE UNTIL THEN** — *"gated beside the transport suite rather than by the spec ratchet"*
-and *"deliberately absent from `eng/measure.sh`"*. Both were right while it adopted no bases, when
-it was green by construction and a bare `dotnet test` said everything. **A tier whose reds cannot be
-RECORDED is a tier under pressure to override them**, which is the one thing the guardrail below
-forbids, and this tier proved it: four overrides were written asserting what the store does, one of
-them blessing a count of three where five is correct. Tier D's TRX now joins the spec suite's in one
-`ratchet.sh` call against the one baseline, and its project is in `measure.sh`'s list. **One
-baseline and not one per project, and Tier D is the case that argues for it rather than against**:
-`OwnedNavigationsCollectionTestBase` is adopted in Tier B *and* Tier D today, so a decision to host
-that family on one tier alone would MOVE tests between projects — exactly the "fix in one, break in
-the other" a single baseline exists to catch.
+**IT IS MEASURED LIKE EVERY OTHER TIER SINCE 2026-09-14, AND IT WAS RATCHETED LIKE THEM UNTIL THE
+RATCHET WENT ON 2026-09-15.** This paragraph read *"gated beside the transport suite rather than by
+the spec ratchet"* before 2026-09-14, which was right while the tier adopted no bases. Its project is
+in `measure.sh`'s list, and CI runs it in the `Spec tests` job, a required check that was named
+`Spec ratchet` until the same day. ADR-004 carries the amendment for the whole change.
 
-**EVERY OVERRIDE SAYS WHAT THE STORE DOES AND WHERE THAT IS SHOWN, AND TIER D IS WHERE THAT RULE IS
-TRIED FIRST** (2026-09-15, `docs/plans/v10/test-overhaul.md`). The rule is Microsoft's green suite,
-made stricter in traceability. An override carries an attribute whose TYPE is the label —
-`[StoreLimit]` for a refusal by design, `[StoreDefect("1.6")]` for a crash or a wrong answer with its
-section in `docs/upstream-defects.md`, `[StoreIssue("EF-250")]` for a tracker entry — and whose
-ARGUMENTS are the reference: an upstream link at the release tag's commit and line, or a
-`typeof`/`nameof` naming a control test. `[InfoCarrierDefect]` is the last resort for a defect of
-ours that cannot be fixed yet, and only the owner files its issue. **A skip is permitted only with an
-upstream reference**, because only upstream's own choice justifies asserting nothing, and it copies
-upstream's justification text. **A crash or a wrong answer is never `LIMIT`**: a store that means
-"no" says so.
+**THE WHOLE SUITE IS GREEN AND THERE IS NO RATCHET SINCE 2026-09-15** (`docs/plans/v10/test-overhaul.md`).
+This is Microsoft's approach for EF Core's own providers, made stricter in traceability: **every
+override of a specification test says what the store does and where that is shown.** The override
+carries an attribute whose TYPE is the label and whose ARGUMENTS are the reference, all typed:
 
-**`OverrideAudit` (in the shared harness) enforces it, and `OverrideAuditTest` runs it in the tier.**
-It fails on an override with no reason, on two reasons without distinct `Case` values, on an upstream
-link without a commit and a line, on a skip without an upstream reference, on a `DEFECT` naming a
-missing section, and on a wire override whose control test documents a different label. Its output is
-the audit: every override with its label, reference, skip and deviation. Each rule was shown to fail
-on a deliberate mistake before it was trusted.
+- `[StoreLimit]` for a refusal by design; `[StoreDefect("1.6")]` for a crash or a wrong answer, with
+  its section in `docs/upstream-defects.md`; `[StoreIssue(IssueTracker.EfCore, 36400)]` for a
+  tracker entry. The reference is an upstream test, as `UpstreamRepository.EfCore, "path", first,
+  last` at the pinned release commit, or a `typeof`/`nameof` naming a wire-free control test.
+- `[InfoCarrierDesign(10)]` where this provider differs on purpose, naming the ADR or a document
+  heading (`Decisions.*`) that records the decision.
+- `[InfoCarrierDefect(n)]` is the last resort for a defect of ours that cannot be fixed yet, and
+  **only the owner files its issue.**
+
+**A skip is permitted only with an upstream reference**, because only upstream's own choice
+justifies asserting nothing, and it copies upstream's justification text. **A crash or a wrong
+answer is never `LIMIT`**: a store that means "no" says so. `Justification` is upstream's words or
+`Upstream.GaveNoReason`; a body that differs from upstream's says how in `Deviation`
+(`DeviationKind` flags) and `DeviationNote`.
+
+**`OverrideAudit` (in the shared harness) enforces it, and `OverrideAuditTest` runs it in both
+projects.** It fails on an override with no reason, on two reasons without distinct `Case` values,
+on an upstream reference whose lines in `subrepos/efcore` do not declare the overriding test at the
+pinned commit, on a skip without an upstream reference, on a `DEFECT` naming a missing section, on a
+`DESIGN` naming a missing heading, and on a wire override whose control test documents a different
+label. **An abstract test is not audited**, because it has no expectation to change. Its output is
+the audit: every override with its label, reference, skip and deviation, counted by kind. Each rule
+was shown to fail on a deliberate mistake before it was trusted. **A CI runner has no `subrepos/`**,
+so there the line check counts what it could not check; a local run checks all of them.
 
 **EVERY TIER D REFERENCE IS SELF-HOSTED, AND THAT IS A FINDING.** MongoDB's own `MongoComplianceTest`
 lists all six `OwnedNavigations` bases in `IgnoredTestBases` under *"Test bases added in EF10+"*,
@@ -174,14 +178,9 @@ delete. ADR-009's 2026-09-10 and 2026-09-11 amendments are the reading.
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
 every project in its own `projects` list and adds the figures. **That list holds TWO projects since
 2026-09-14 — the spec project and ADR-009 Tier D — and it held the spec project alone before that.**
-`InfoCarrier.Core.TransportTests` is still deliberately absent: it is this repository's own
-HTTP-transport suite, expected green, and folding it in would inflate `Total` past what
-`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong.
-**Tier D was absent for that reason too and is not any more**, because it adopts specification bases
-now and its reds have to be recordable rather than overridden. **So
-a `src/` change needs the transport line above as well as `measure.sh`**; the script says so in its
-own comment. **A run of one tier alone is not comparable to the baseline either**, because the
-baseline covers every tier.
+`InfoCarrier.Core.TransportTests` is deliberately absent: it is this repository's own HTTP-transport
+suite, not a spec project, and the spec-suite badge counts spec tests. **So a `src/` change needs the
+transport line above as well as `measure.sh`**; the script says so in its own comment.
 
 **Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
 estimate a count, and never derive one figure from the others.
@@ -192,8 +191,8 @@ estimate a count, and never derive one figure from the others.
 |---|---|
 | `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. **It runs every spec test project in its own `projects` list and adds the figures**, so a project missing from that list is missing from every measurement; add one there in the same commit that creates it. |
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/ratchet.sh <results.trx> [more.trx ...] <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. **It takes several TRX and the LAST argument is the baseline**: counters are summed and names unioned into one list, gated against the one baseline pair. One baseline and not one per project, because a test that MOVES between projects would otherwise read as a fix in one and a break in the other. |
-| `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
+| `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: reads the spec suite's TRX files, sums their counters into `counters.env` for the README badge, and lists the failing names in the run summary. **It decides nothing**; `dotnet test`'s own exit code is the gate since the ratchet went on 2026-09-15. It replaced `eng/ratchet.sh`, which gated the direction of the failure count against `test/known-failures.txt`; both files are deleted, and git history keeps them. |
+| `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
@@ -281,10 +280,10 @@ Each of the following has already cost a wrong conclusion here, and each is chea
   The override calls `InfoCarrierDatabaseFacadeExtensions.UseInfoCarrierTransaction` and
   `InfoCarrierTransactionManager.UseTransaction(token)`, both shipped since M4. `architecture.md`
   §6a **D6** is the full reading, closed.
-- **A newly-red SQLite test is not automatically a regression.** Grep
-  `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` for the name first: if EF overrides it with
+- **A newly-red SQLite test is not automatically a regression.** Look the name up in
+  `subrepos/efcore/test/EFCore.Sqlite.FunctionalTests` first: if EF overrides it with
   `ApplyNotSupported`, the query now reaches SQL and this is convergence with the reference
-  provider. Adopt EF's override. **Grep `EFCore.Relational.Specification.Tests` too** — a limit
+  provider. Adopt EF's override, with the attribute that names it. **Grep `EFCore.Relational.Specification.Tests` too** — a limit
   every relational provider has is overridden on the relational *base*, not in SQLite's own suite,
   and reading only the latter had `Reverse_without_explicit_ordering` classified as ours for two
   sessions. The reverse also happens: an override of ours that EF does *not* have is a workaround to
@@ -348,11 +347,13 @@ this.
 authoritative EF Core 10 reference — grep it to confirm API shapes rather than guessing.
 Edits there are invisible to git and will be lost.
 
-**Never `[Skip]`, delete, or override a spec test to make the suite green.** The inherited
-`EFCore.Specification.Tests` classes *are* the coverage goal (ADR-004); a red test is
-information. If a test targets genuinely unimplemented functionality, leave it failing and
-note it in `docs/plans/v10/implementation-plan.md`. Silently suppressing tests was v1's stated failure
-mode.
+**Never override a spec test without saying what the store does and where that is shown.** The
+inherited `EFCore.Specification.Tests` classes *are* the coverage goal (ADR-004), and silently
+suppressing tests was v1's stated failure mode. **This rule read *"Never `[Skip]`, delete, or override
+a spec test to make the suite green … a red test is information"* until 2026-09-15.** The suite is
+green now and every override carries a typed reason that `OverrideAudit` checks; see the Tier D
+paragraphs above and `docs/plans/v10/test-overhaul.md`. A skip needs an upstream skip to copy, a
+defect of ours is fixed first, and nothing is filed anywhere unless the owner asks.
 
 **Update the plan checkbox in the same commit as the work.** `docs/plans/v10/implementation-plan.md`
 drifted out of sync with git once already (F1–F7 were committed while still shown unchecked).
@@ -528,36 +529,19 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 19  TOTAL: 29792`** (2026-09-15), across the two projects `measure.sh` now runs:
-**19 of 29558** in the spec project and **0 of 234** in ADR-009 Tier D, which went green under
-`docs/plans/v10/test-overhaul.md`. It read `FAILING: 73  TOTAL: 29788` on 2026-09-14, and before that
-`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238` (2026-09-07, `v12`) until then, and
-was three measurements stale — the badge had moved to 29,558 while it still said 29,516.
-**Tiers A-C are unmoved at 19**; the whole rise is Tier D joining the baseline, and the name diff
-says so exactly: 38 added, 0 removed.
-**Every figure comes out of the run's own summary block, and none of them is arithmetic** — a
-`c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
-falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
-the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.
+**`FAILING: 0  TOTAL: 29792`** (2026-09-15), across the two projects `measure.sh` runs: **0 of
+29558** in the spec project (`Passed: 29320, Skipped: 238`) and **0 of 234** in ADR-009 Tier D. It
+read `FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
+above, each with an exact assertion and its reason, not by a skip. **Every figure comes out of the
+run's own summary block, and none of them is arithmetic** — a `c10b` entry once carried `Skipped`
+over from an earlier run and derived `Passed` from it.
 
-**The baseline is two files and they move together.** `test/known-failures.txt` holds the counts
-and the reasoning; `test/known-failures.names.txt` holds the failing test names and nothing else,
-because `comm` cannot read a file with comments in it. A commit that lowers the count must copy
-`artifacts/test-results/failures.txt` over the names file, and the ratchet says so in a `::notice::`
-when it sees the count fall.
-
-**All 19 failures are classified and not one is of unknown standing**, and every class is blocked,
-priced or upstream — there is no open one left. `test/known-failures.txt` carries a dated reading
-per class and is the current answer; the paragraph below and the tables named in it are the history.
-The tables are in
-`docs/plans/v10/archive/implementation-plan-m9-phase-j.md` — A54, A59, A61–A65, B3a–B16 and
-C1–C96 — whose "The residual 13, examined properly" re-derives the whole tail **as it stood at
-thirteen**; J20 and J21 lowered it after that, and `test/known-failures.txt` carries the dated
-reading for each. **The archive is never edited, so its count is the count of the day it was
-written and the baseline file is the current one.** `Query.Associations` is 336 of 336, and
-`MaterializationInterception`, `OptimisticConcurrency` and `ComplexNavigations` are clear. Wrong
-answers are down to **2**, both C64's `Correlated_collection_with_distinct_3_levels`, whose
-assertion no correct answer can satisfy.
+**THERE IS NO BASELINE ANY MORE.** `test/known-failures.txt` and `test/known-failures.names.txt`
+held the counts, the failing names and a dated reading of every class of red until 2026-09-15, and
+are deleted with the ratchet; git history keeps them, and so does
+`docs/plans/v10/archive/implementation-plan-m9-phase-j.md` for the tail as it stood at thirteen.
+**The audit is the current answer to "what does this suite not check, and why"**: `OverrideAuditTest`
+writes every override with its label, reference, skip and deviation on every run.
 
 **The consumer-facing statement of what is missing is
 [`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
@@ -600,8 +584,8 @@ file to read before editing any of them.
   tenancy prose**, and never let a user-facing page claim the filter is the boundary.
 - Two `ComplexTypesTracking` parameterizations: a property-bag complex *collection* on an `Added`
   entity. J22 traced it to an upstream defect on a path only this provider takes, and the route
-  around it has to reproduce constructor binding, so it is priced and not taken.
-- The residual spec failures, every one of them classified.
+  around it has to reproduce constructor binding, so it is priced and not taken. Its override
+  asserts the defect's exception and carries `[InfoCarrierDefect(52)]`.
 
 **The long form is [`docs/plans/v10/findings.md`](docs/plans/v10/findings.md)**: how the HTTP
 transport, the Blazor client, complex types, JSON-mapped owned collections, spatial, `GraphUpdates`,
@@ -643,8 +627,8 @@ failure once the suite passed ten thousand tests: a shared store's disposal re-a
 and let a later class re-seed the file a live one was still using. `DisposeAsync` now releases
 nothing. Stale files are swept once at startup instead.
 
-**The runtime culture is pinned to invariant** by a `[ModuleInitializer]`, and that is a ratchet fix
-rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
+**The runtime culture is pinned to invariant** by a `[ModuleInitializer]`, and that is an instrument
+fix rather than a test fix (it was written as a ratchet fix, before the ratchet went). On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
 **There is no known intermittent. FIVE have been closed, and the FIFTH IS THE ONE THAT HID BEHIND

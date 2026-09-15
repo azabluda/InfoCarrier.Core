@@ -116,6 +116,10 @@ public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrier
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -137,6 +141,10 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
     ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36749,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
+        Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
 
@@ -144,6 +152,10 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -244,6 +256,10 @@ public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTyp
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -266,6 +282,10 @@ public class DateTimeOffsetTypeInfoCarrierTest(
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -287,6 +307,10 @@ public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTyp
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -308,6 +332,10 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
     ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36749,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
+        Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
 
@@ -315,6 +343,10 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
@@ -336,6 +368,10 @@ public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTyp
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
     ///     non-JSON column for a SQLite type other than string, numeric or bool (EF issue #36688).
     /// </summary>
+    [StoreIssue(
+        IssueTracker.EfCore, 36688,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,

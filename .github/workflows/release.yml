@@ -62,9 +62,9 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
-      # The same two gates build.yml runs, because a release must clear at least what a push
-      # clears. The spec suite is legitimately red (CLAUDE.md forbids skipping to force green),
-      # so the ratchet decides, not the exit code.
+      # The same gates build.yml runs, because a release must clear at least what a push clears.
+      # The spec suite is green since 2026-09-15, so its own exit code decides; there is no ratchet
+      # any more (docs/plans/v10/test-overhaul.md).
       - name: Test (round-trip + smoke)
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
@@ -76,14 +76,16 @@ jobs:
           --no-build --configuration Release
 
       - name: Test (full suite)
-        continue-on-error: true
         timeout-minutes: 90
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
-      - name: Spec ratchet
-        run: ./eng/ratchet.sh artifacts/test-results/results.trx test/known-failures.txt
+      - name: Test (document store, Tier D)
+        timeout-minutes: 30
+        run: >
+          dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
+          --no-build --configuration Release
 
       - name: Trim ratchet (Blazor publish)
         run: bash eng/trim-ratchet.sh

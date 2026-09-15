@@ -29,7 +29,15 @@ public abstract class QueryExpressionInterceptionInfoCarrierTestBase(
     : QueryExpressionInterceptionTestBase(fixture)
 {
     /// <inheritdoc />
-    /// <remarks>EF's own InMemory suite does not run this either.</remarks>
+    /// <remarks>
+    ///     EF's own InMemory suite does not run this either. It was the one override the audit did
+    ///     not see until 2026-09-15, because it is declared in this abstract class and the audit
+    ///     scanned concrete classes only.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/QueryExpressionInterceptionInMemoryTestBase.cs", 10, 11,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Interceptor_does_not_leak_across_contexts(bool async)
         => Task.CompletedTask;
 

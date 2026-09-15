@@ -63,11 +63,22 @@ public class TPTInheritanceBulkUpdatesInfoCarrierTest(
     ///     assertion is on the wrapped type name and the engine's own message, which is stronger
     ///     than asserting the wrapper alone. The base test still runs and still fails in SQLite.
     /// </remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 31402,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/TPTInheritanceBulkUpdatesSqliteTest.cs", 113, 114,
+        Justification = "#31402",
+        Deviation = DeviationKind.StoreExceptionAsData)]
     public override Task Update_base_property_on_derived_type(bool async)
         => AssertStoreRefuses(() => base.Update_base_property_on_derived_type(async));
 
     /// <inheritdoc />
     /// <remarks>EF issue <b>#31402</b>, the same defect reached by a different query.</remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 31402,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/TPTInheritanceBulkUpdatesSqliteTest.cs", 102, 103,
+        Justification = "#31402",
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.UpstreamCallsAnotherTest,
+        DeviationNote = "EF's override calls base.Update_base_property_on_derived_type.")]
     public override Task Update_base_type_with_OfType(bool async)
         => AssertStoreRefuses(() => base.Update_base_type_with_OfType(async));
 
@@ -121,12 +132,23 @@ public class TPTFiltersInheritanceBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     /// <remarks>EF issue <b>#31402</b>, as on the unfiltered TPT class.</remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 31402,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/TPTFiltersInheritanceBulkUpdatesSqliteTest.cs", 128, 129,
+        Justification = "#31402",
+        Deviation = DeviationKind.StoreExceptionAsData)]
     public override Task Update_base_property_on_derived_type(bool async)
         => TPTInheritanceBulkUpdatesInfoCarrierTest.AssertStoreRefuses(
             () => base.Update_base_property_on_derived_type(async));
 
     /// <inheritdoc />
     /// <remarks>EF issue <b>#31402</b>, as on the unfiltered TPT class.</remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 31402,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/TPTFiltersInheritanceBulkUpdatesSqliteTest.cs", 117, 118,
+        Justification = "#31402",
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.UpstreamCallsAnotherTest,
+        DeviationNote = "EF's override calls base.Update_base_property_on_derived_type.")]
     public override Task Update_base_type_with_OfType(bool async)
         => TPTInheritanceBulkUpdatesInfoCarrierTest.AssertStoreRefuses(
             () => base.Update_base_type_with_OfType(async));

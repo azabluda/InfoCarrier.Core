@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -43,6 +44,37 @@ public class ComplexTypesTrackingInfoCarrierTest(
     /// <inheritdoc />
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
         => facade.UseInfoCarrierTransaction(transaction);
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Only the <c>Added</c> cases differ: inserting such an entity raises the
+    ///     <see cref="ArgumentException" /> of EF's materializer defect,
+    ///     <c>docs/upstream-defects.md</c> 1.1, which is reached on a path only this provider takes.
+    ///     Every other state runs the base unchanged. Measured 2026-09-15.
+    ///     <para>
+    ///         <b>An InfoCarrier defect, tracked as #52</b>: a model EF supports cannot be inserted
+    ///         through this provider. It carried <c>[InfoCarrierDesign]</c> naming the limitations
+    ///         page for a few hours on 2026-09-15, which described the page and not the failure.
+    ///     </para>
+    /// </remarks>
+    [InfoCarrierDefect(
+        52,
+        Deviation = DeviationKind.Other,
+        DeviationNote = "The Added cases assert the defect's exception; the other states call the base.")]
+    public override Task Can_track_entity_with_complex_property_bag_collections(EntityState state, bool async)
+        => state is EntityState.Added
+            ? AssertMaterializerDefect(() => base.Can_track_entity_with_complex_property_bag_collections(state, async))
+            : base.Can_track_entity_with_complex_property_bag_collections(state, async);
+
+    private static async Task AssertMaterializerDefect(Func<Task> test)
+    {
+        ArgumentException defect = await Assert.ThrowsAsync<ArgumentException>(test);
+
+        Assert.StartsWith(
+            "Incorrect number of arguments supplied for call to method 'System.Object get_Item(System.String)'",
+            defect.Message,
+            StringComparison.Ordinal);
+    }
 
     /// <summary>
     ///     The complex-types fixture, wired to a SQLite backend behind the wire.

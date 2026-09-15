@@ -99,6 +99,9 @@ public class NavigationsCollectionQueryInfoCarrierTest(
     ///     <c>NavigationsCollectionSqliteTest</c>'s: the query reaches SQL and asks SQLite for
     ///     <c>APPLY</c>, which it does not have.
     /// </summary>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/Navigations/NavigationsCollectionSqliteTest.cs", 11, 12,
+        Justification = Upstream.GaveNoReason)]
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
         => AssertApplyNotSupported(() => base.Distinct_projected(queryTrackingBehavior));
 
@@ -131,11 +134,17 @@ public class NavigationsProjectionQueryInfoCarrierTest(
     /// <summary>
     ///     <c>NavigationsProjectionSqliteTest</c>'s two, both <c>APPLY</c>.
     /// </summary>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/Navigations/NavigationsProjectionSqliteTest.cs", 11, 12,
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/Navigations/NavigationsProjectionSqliteTest.cs", 14, 15,
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));

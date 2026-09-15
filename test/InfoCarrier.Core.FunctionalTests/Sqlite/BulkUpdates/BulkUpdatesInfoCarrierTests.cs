@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.BulkUpdates;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.Northwind;
@@ -139,11 +140,11 @@ public class FiltersInheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUp
 ///         by hand, each matched by reason against a measured failure first (A63).
 ///     </para>
 ///     <para>
-///         Four failures are deliberately left red: two are EF issue #28886, which EF's own
-///         SQLite suite carries as a <c>[ConditionalTheory(Skip = …)]</c> and which reproduces
-///         here exactly (<c>SQLite Error 1: 'no such column'</c>) — recorded rather than skipped,
-///         as `PrimitiveCollectionsQuery`'s EF issue #30730 already is. The other two are
-///         <c>Update_with_invalid_lambda_in_set_property_throws</c>; see C20.
+///         <b>This said "four failures are deliberately left red" until 2026-09-15</b>, two of
+///         them EF issue #28886 and two <c>Update_with_invalid_lambda_in_set_property_throws</c>.
+///         There is no red left: the #28886 pair carries EF's own skip with its reference, and the
+///         other pair asserts this provider's refusal, each with the reason on its attribute
+///         (<c>docs/plans/v10/test-overhaul.md</c>).
 ///     </para>
 /// </remarks>
 public class NorthwindBulkUpdatesInfoCarrierTest(
@@ -153,22 +154,61 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
         fixture,
         testOutputHelper)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The core base's query, refused by the client with EF's own message. The details clause
+    ///     prints the selector as the query wrote it, <c>e => e.MaybeScalar(…)</c>, over two lines;
+    ///     EF's relational base expects the <c>o => o.MaybeScalar(…)</c> its own pipeline prints.
+    ///     Measured 2026-09-15.
+    /// </remarks>
+    [InfoCarrierDesign(
+        6,
+        Justification = "The client refuses the invalid SetProperty selector before the wire and prints it as the query "
+            + "wrote it. EF prints it after its own pipeline, which runs on the server, has renamed the parameter.",
+        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
+        DeviationNote = "The relational base wraps the core query, so the core query is written out and the refusal "
+            + "asserted with the selector as printed here.")]
+    public override async Task Update_with_invalid_lambda_in_set_property_throws(bool async)
+    {
+        string message = (await Assert.ThrowsAsync<InvalidOperationException>(() => AssertUpdate(
+                async,
+                ss => ss.Set<OrderDetail>().Where(od => od.OrderID < 10250),
+                e => e,
+                s => s.SetProperty(e => e.MaybeScalar(e => e.OrderID), 10300),
+                rowsAffectedCount: 0)))
+            .Message.Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+        Assert.Contains(
+            CoreStrings.NonQueryTranslationFailedWithDetails(
+                string.Empty, RelationalStrings.InvalidPropertyInSetProperty("e => e    .MaybeScalar(e => e.OrderID)"))[21..],
+            message);
+    }
+
     // --- SQLite has no APPLY. Stated in EF's own SQLite suite, and the message this provider
     // surfaces is `SqliteStrings.ApplyNotSupported` character for character.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 601, 604,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_cross_apply(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Delete_with_cross_apply(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 606, 609,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_outer_apply(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Delete_with_outer_apply(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1397, 1400,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -176,6 +216,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_cross_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1402, 1405,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_outer_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -183,6 +226,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_outer_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1430, 1434,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_cross_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -190,6 +236,9 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_cross_join_cross_apply_set_constant(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1436, 1440,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_outer_apply_set_constant(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -209,11 +258,23 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
     // documented reason.
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 28886,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1407, 1428,
+        Justification = "Issue#28886",
+        Skip = true,
+        Deviation = DeviationKind.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_cross_join_left_join_set_constant(bool async)
         => base.Update_with_cross_join_left_join_set_constant(async);
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 28886,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1522, 1531,
+        Justification = "Issue#28886",
+        Skip = true,
+        Deviation = DeviationKind.SqlNotAsserted)]
     [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_two_inner_joins(bool async)
         => base.Update_with_two_inner_joins(async);

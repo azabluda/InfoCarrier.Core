@@ -33,15 +33,30 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
     ///     also every relational provider's. EF overrides this on
     ///     `GearsOfWarQueryRelationalTestBase` (A27).
     /// </remarks>
+    [InfoCarrierDesign(
+        10,
+        Justification = "A filter the server cannot run is refused with EF's TranslationFailed rather than "
+            + "evaluated on the client, as EF's relational providers refuse it. EF's InMemory provider evaluates it in .NET.",
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
+        UpstreamFirstLine = 58,
+        UpstreamLastLine = 59)]
     public override Task Client_side_equality_with_parameter_works_with_optional_navigations(bool async)
         => AssertTranslationFailed(
             () => base.Client_side_equality_with_parameter_works_with_optional_navigations(async));
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 12, 15,
+        Justification = Upstream.GaveNoReason)]
     public override Task Client_member_and_unsupported_string_Equals_in_the_same_query(bool async)
         => AssertTranslationFailedWithDetails(
             () => base.Client_member_and_unsupported_string_Equals_in_the_same_query(async),
             CoreStrings.QueryUnableToTranslateMember(nameof(Gear.IsMarcus), nameof(Gear)));
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 17, 23,
+        Justification = Upstream.GaveNoReason)]
     public override async Task
         Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation_complex(bool async)
         => Assert.Equal(
@@ -50,24 +65,40 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
                 .Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation_complex(
                     async))).Message);
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 25, 29,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Group_by_on_StartsWith_with_null_parameter_as_argument(bool async)
         => Assert.Equal(
             "Value cannot be null. (Parameter 'value')",
             (await Assert.ThrowsAsync<ArgumentNullException>(() => base.Group_by_on_StartsWith_with_null_parameter_as_argument(async)))
             .Message);
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 31, 35,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Group_by_with_having_StartsWith_with_null_parameter_as_argument(bool async)
         => Assert.Equal(
             "Value cannot be null. (Parameter 'value')",
             (await Assert.ThrowsAsync<ArgumentNullException>(()
                 => base.Group_by_with_having_StartsWith_with_null_parameter_as_argument(async))).Message);
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 37, 41,
+        Justification = Upstream.GaveNoReason)]
     public override async Task OrderBy_StartsWith_with_null_parameter_as_argument(bool async)
         => Assert.Equal(
             "Value cannot be null. (Parameter 'value')",
             (await Assert.ThrowsAsync<ArgumentNullException>(() => base.OrderBy_StartsWith_with_null_parameter_as_argument(async)))
             .Message);
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 43, 46,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Select_StartsWith_with_null_parameter_as_argument(bool async)
         => Assert.Equal(
             "Value cannot be null. (Parameter 'value')",
@@ -81,19 +112,59 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
     // have is a workaround, and the coverage is the point (ADR-004).
     //
     // `Correlated_collection_with_distinct_3_levels` belongs to that list too, and carrying EF's
-    // override for it was the A39 mistake in the one place A39 did not look (C64). It is left
-    // **unoverridden and red**, and the red is not a wrong answer: the query runs and this
-    // provider's rows agree with the expected ones squad for squad, member for member, weapon
-    // count for weapon count. What fails is the base's own assertion, and it fails for a reason
-    // that has nothing to do with any provider — the projection is an anonymous type whose
-    // `Members` member is a lazily-evaluated `IEnumerable<>`, which the compiler-generated
-    // `Equals` compares with `EqualityComparer<T>.Default`, i.e. by reference. Running the base's
-    // *expected* query twice over the same in-memory data, with the same `Squad` instance in both
-    // results, fails the same assertion. **No correct answer can satisfy it**, which is why every
-    // EF provider refuses the query before reaching it: InMemory with
-    // `DistinctOnSubqueryNotSupported`, and every relational one with
+    // override for it was the A39 mistake in the one place A39 did not look (C64). The red was not
+    // a wrong answer: the query runs and this provider's rows agree with the expected ones squad
+    // for squad, member for member, weapon count for weapon count. What fails is the base's own
+    // assertion, and it fails for a reason that has nothing to do with any provider — the
+    // projection is an anonymous type whose `Members` member is a lazily-evaluated `IEnumerable<>`,
+    // which the compiler-generated `Equals` compares with `EqualityComparer<T>.Default`, i.e. by
+    // reference. Running the base's *expected* query twice over the same in-memory data, with the
+    // same `Squad` instance in both results, fails the same assertion. **No correct answer can
+    // satisfy it**, which is why every EF provider refuses the query before reaching it: InMemory
+    // with `DistinctOnSubqueryNotSupported`, and every relational one with
     // `DistinctOnCollectionNotSupported` on `GearsOfWarQueryRelationalTestBase`.
+    //
+    // **This read "left unoverridden and red" until 2026-09-15.** With a green suite the override
+    // below runs the base's query and compares `Members` as a sequence, which is the assertion the
+    // base meant (docs/upstream-defects.md 1.4).
 
+    /// <inheritdoc />
+    [StoreDefect(
+        "1.4",
+        UpstreamRepository.EfCore, "test/EFCore.Specification.Tests/Query/GearsOfWarQueryTestBase.cs", 6457, 6468,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.Other,
+        DeviationNote = "The base's query, with an element asserter that compares Members as a sequence. The base compares "
+            + "two lazily evaluated iterators by reference, which no answer can satisfy.")]
+    public override Task Correlated_collection_with_distinct_3_levels(bool async)
+        => AssertQuery(
+            async,
+            ss => ss.Set<Squad>()
+                .Select(s => new
+                {
+                    s,
+                    Members = s.Members.Select(m => new { m, Weapons = m.Weapons.Where(w => w.OwnerFullName == m.FullName).ToList() })
+                        .Distinct()
+                }).Distinct(),
+            elementSorter: e => e.s.Id,
+            elementAsserter: (e, a) =>
+            {
+                AssertEqual(e.s, a.s);
+                AssertCollection(
+                    e.Members,
+                    a.Members,
+                    elementSorter: m => m.m.FullName,
+                    elementAsserter: (em, am) =>
+                    {
+                        AssertEqual(em.m, am.m);
+                        AssertCollection(em.Weapons, am.Weapons, elementSorter: w => w.Id);
+                    });
+            });
+
+    [StoreIssue(
+        IssueTracker.EfCore, 24325,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 75, 80,
+        Justification = "Distinct. Issue #24325.")]
     public override async Task Projecting_correlated_collection_followed_by_Distinct(bool async)
         // Distinct. Issue #24325.
         => Assert.Equal(
@@ -101,44 +172,92 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Projecting_correlated_collection_followed_by_Distinct(async)))
             .Message);
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 89, 90,
+        Justification = Upstream.GaveNoReason)]
     public override Task Include_after_SelectMany_throws(bool async)
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Include_after_SelectMany_throws(async));
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 92, 94,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_coalesce_result4(bool async)
         => await Assert.ThrowsAsync<TargetInvocationException>(()
             => base.Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_coalesce_result4(async));
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 96, 98,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_complex_projection_result(bool async)
         => await Assert.ThrowsAsync<TargetInvocationException>(()
             => base.Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_complex_projection_result(async));
 
+    [StoreIssue(
+        IssueTracker.EfCore, 13721,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 100, 104,
+        Justification = "Null protection. Issue #13721.")]
     public override Task Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation(
             bool async)
         // Null protection. Issue #13721.
         => Assert.ThrowsAsync<InvalidOperationException>(()
             => base.Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation(async));
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 106, 107,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task ElementAt_basic_with_OrderBy(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 109, 110,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task ElementAtOrDefault_basic_with_OrderBy(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 112, 113,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task ElementAtOrDefault_basic_with_OrderBy_parameter(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 115, 116,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Where_subquery_with_ElementAtOrDefault_equality_to_null_with_composite_key(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 118, 119,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 121, 122,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Where_compare_anonymous_types(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 124, 125,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Subquery_inside_Take_argument(bool async)
         => Task.CompletedTask;
 
+    [StoreDefect(
+        "1.11",
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 127, 132,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Find_underlying_property_after_GroupJoin_DefaultIfEmpty(bool async)
         => Assert.Equal(
             "Nullable object must have a value.",
@@ -146,16 +265,31 @@ public class GearsOfWarQueryInfoCarrierTest(GearsOfWarQueryInfoCarrierFixture fi
                 .Find_underlying_property_after_GroupJoin_DefaultIfEmpty(
                     async))).Message);
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 134, 135,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Join_include_coalesce_simple(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 137, 138,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Join_include_coalesce_nested(bool async)
         => Task.CompletedTask;
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 140, 141,
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Join_include_conditional(bool async)
         => Task.CompletedTask;
 
     // Right join not supported in InMemory
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/GearsOfWarQueryInMemoryTest.cs", 144, 145,
+        Justification = "Right join not supported in InMemory")]
     public override Task Correlated_collections_on_RightJoin_with_predicate(bool async)
         => AssertTranslationFailed(() => base.Correlated_collections_on_RightJoin_with_predicate(async));
 

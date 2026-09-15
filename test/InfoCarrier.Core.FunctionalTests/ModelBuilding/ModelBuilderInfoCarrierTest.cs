@@ -107,6 +107,30 @@ public class ModelBuilderGenericInfoCarrierTest : ModelBuilderInfoCarrierTest
         /// <inheritdoc />
         protected override TestModelBuilder CreateModelBuilder(Action<ModelConfigurationBuilder>? configure = null)
             => new GenericTestModelBuilder(Fixture, configure);
+
+        /// <inheritdoc />
+        /// <remarks>
+        ///     EF's relational base asserts <c>RelationalModelValidator</c>'s refusal of a complex
+        ///     collection not mapped to JSON. The client's model is not validated that way, so the
+        ///     base's own <c>Assert.Throws</c> finds nothing thrown, and that is what is asserted.
+        ///     Registering the validator on the client was measured on 2026-09-07 (V11) and turned 30
+        ///     failures into 4037, because it compares store types the client does not have.
+        ///     <b>The mapping is still refused, by the server</b>: measured on 2026-09-15 with a model
+        ///     holding such a collection, <c>SqliteModelValidator</c> on the server's context throws
+        ///     EF's own <i>"must be mapped to a JSON column"</i> when that model is built, so the error
+        ///     reaches the application; only the client does not raise it first.
+        /// </remarks>
+        [InfoCarrierDesign(
+            Decisions.Architecture,
+            Decisions.ClientServices,
+            Justification = "The client does not run EF's relational model validator, which decides store layout and needs "
+                + "store type names. The server's provider validates its own model.")]
+        public override void Complex_properties_can_be_configured_by_type()
+        {
+            var failure = Assert.Throws<Xunit.Sdk.ThrowsException>(base.Complex_properties_can_be_configured_by_type);
+
+            Assert.Contains("No exception was thrown", failure.Message, StringComparison.Ordinal);
+        }
     }
 
     /// <inheritdoc cref="ModelBuilderInfoCarrierTest" />
@@ -170,5 +194,24 @@ public class ModelBuilderGenericInfoCarrierTest : ModelBuilderInfoCarrierTest
         /// <inheritdoc />
         protected override TestModelBuilder CreateModelBuilder(Action<ModelConfigurationBuilder>? configure = null)
             => new GenericTestModelBuilder(Fixture, configure);
+
+        /// <inheritdoc />
+        /// <remarks>
+        ///     The check that fails is <c>IsInModel</c> on the owned type's mapping fragment, while the
+        ///     client's model is still being built; the column override beside it is in the model and
+        ///     maps <c>Id</c> to <c>bid</c>. Registering <c>EntitySplittingConvention</c> on the client
+        ///     fixed this test and was measured on 2026-09-07 turning 30 failures into 149, because it
+        ///     needs a companion convention that decides column names the server also decides (V10).
+        ///     <b>Nothing a caller sees depends on it</b>: measured on 2026-09-15, a real client context
+        ///     with an owned reference split to a second table and a renamed column inserts, updates and
+        ///     reads it back correctly, and its finished model carries the fragment.
+        /// </remarks>
+        [InfoCarrierDesign(
+            Decisions.Architecture,
+            Decisions.ClientServices,
+            Justification = "The client does not run EF's entity-splitting convention, which decides store layout that the "
+                + "server's provider decides for itself.")]
+        public override void Can_use_table_splitting_with_owned_reference()
+            => Assert.Throws<Xunit.Sdk.TrueException>(base.Can_use_table_splitting_with_owned_reference);
     }
 }

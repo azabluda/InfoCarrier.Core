@@ -59,6 +59,9 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
 
     /// <inheritdoc />
     /// <remarks>SQLite does not enforce a column length.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 155, 160,
+        Justification = "Sqlite does not support length")]
     public override Task MaxLengthAttribute_throws_while_inserting_value_longer_than_max_length()
     {
         using DbContext context = CreateContext();
@@ -68,6 +71,9 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
 
     /// <inheritdoc />
     /// <remarks>SQLite does not enforce a column length.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 163, 168,
+        Justification = "Sqlite does not support length")]
     public override Task StringLengthAttribute_throws_while_inserting_value_longer_than_max_length()
     {
         using DbContext context = CreateContext();
@@ -78,6 +84,10 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
     /// <inheritdoc />
     /// <remarks>SQLite has no <c>rowversion</c>. EF issue #2195, the same one this repo's
     ///     <c>OptimisticConcurrencyInfoCarrierTest</c> skips eleven tests for.</remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 171, 176,
+        Justification = "Sqlite does not support rowversion. See issue #2195")]
     public override Task TimestampAttribute_throws_if_value_in_database_changed()
     {
         using DbContext context = CreateContext();

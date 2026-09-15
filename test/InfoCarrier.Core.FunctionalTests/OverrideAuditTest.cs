@@ -4,15 +4,15 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace InfoCarrier.Core.DocumentStoreTests;
+namespace InfoCarrier.Core.FunctionalTests;
 
 /// <summary>
-///     Every override of a specification test in this tier says what the store does and where that
-///     is shown.
+///     Every override of a specification test in Tiers A, B and C says what the store does and where
+///     that is shown.
 /// </summary>
 /// <remarks>
 ///     <b>The report is the audit.</b> It lists every override with its label, its reference, whether
-///     it skips, and why it deviates from upstream, so "how much does this tier not check, and why"
+///     it skips, and why it deviates from upstream, so "how much does this suite not check, and why"
 ///     has a written answer on every run. <c>docs/plans/v10/test-overhaul.md</c> is the reading.
 /// </remarks>
 public class OverrideAuditTest(ITestOutputHelper output)

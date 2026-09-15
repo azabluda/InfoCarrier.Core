@@ -45,10 +45,18 @@ public class ByteArrayTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixt
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 16428,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 32, 33,
+        Justification = "Array access. Issue #16428.")]
     public override Task First()
         => AssertTranslationFailed(() => base.First());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 16428,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 28, 29,
+        Justification = "Array access. Issue #16428.")]
     public override Task Index()
         => AssertTranslationFailed(() => base.Index());
 }
@@ -67,6 +75,9 @@ public class GuidTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/GuidTranslationsSqliteTest.cs", 52, 53,
+        Justification = Upstream.GaveNoReason)]
     public override Task NewGuid()
         => AssertTranslationFailed(() => base.NewGuid());
 }
@@ -81,22 +92,37 @@ public class MathTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 15, 16,
+        Justification = "SQLite decimal support")]
     public override Task Abs_decimal()
         => AssertTranslationFailed(() => base.Abs_decimal());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 78, 79,
+        Justification = "SQLite decimal support")]
     public override Task Floor_decimal()
         => AssertTranslationFailed(() => base.Floor_decimal());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 129, 130,
+        Justification = "SQLite decimal support")]
     public override Task Round_decimal()
         => AssertTranslationFailed(() => base.Round_decimal());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 166, 167,
+        Justification = "SQLite decimal support")]
     public override Task Round_with_digits_decimal()
         => AssertTranslationFailed(() => base.Round_with_digits_decimal());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 193, 194,
+        Justification = "SQLite decimal support")]
     public override Task Truncate_decimal()
         => AssertTranslationFailed(() => base.Truncate_decimal());
 }
@@ -120,34 +146,58 @@ public class MiscellaneousTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrier
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 75, 76,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToBoolean()
         => AssertTranslationFailed(() => base.Convert_ToBoolean());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 78, 79,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToByte()
         => AssertTranslationFailed(() => base.Convert_ToByte());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 81, 82,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToDecimal()
         => AssertTranslationFailed(() => base.Convert_ToDecimal());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 84, 85,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToDouble()
         => AssertTranslationFailed(() => base.Convert_ToDouble());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 87, 88,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToInt16()
         => AssertTranslationFailed(() => base.Convert_ToInt16());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 90, 91,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToInt32()
         => AssertTranslationFailed(() => base.Convert_ToInt32());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 93, 94,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToInt64()
         => AssertTranslationFailed(() => base.Convert_ToInt64());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 96, 97,
+        Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToString()
         => AssertTranslationFailed(() => base.Convert_ToString());
 }
@@ -170,6 +220,9 @@ public class StringTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/StringTranslationsSqliteTest.cs", 1411, 1412,
+        Justification = Upstream.GaveNoReason)]
     public override Task Join_non_aggregate()
         => AssertTranslationFailed(() => base.Join_non_aggregate());
 }
@@ -188,18 +241,34 @@ public class BitwiseOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCarri
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 175, 176,
+        Justification = Upstream.GaveNoReason)]
     public override Task Left_shift()
         => AssertTranslationFailed(() => base.Left_shift());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 178, 179,
+        Justification = Upstream.GaveNoReason)]
     public override Task Right_shift()
         => AssertTranslationFailed(() => base.Right_shift());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 16645,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 95, 97,
+        Justification = "Issue #16645 bitwise xor support",
+        Deviation = DeviationKind.UpstreamAssertsNothing)]
     public override Task Xor()
         => AssertTranslationFailed(() => base.Xor());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 16645,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 99, 101,
+        Justification = "Issue #16645 bitwise xor support",
+        Deviation = DeviationKind.UpstreamAssertsNothing)]
     public override Task Xor_over_boolean()
         => AssertTranslationFailed(() => base.Xor_over_boolean());
 }
@@ -226,22 +295,42 @@ public class DateOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateOnlyTranslationsSqliteTest.cs", 217, 222,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task ToDateTime_constant_DateTime_with_property_TimeOnly()
         => AssertTranslationFailed(() => base.ToDateTime_constant_DateTime_with_property_TimeOnly());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateOnlyTranslationsSqliteTest.cs", 203, 208,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task ToDateTime_property_with_constant_TimeOnly()
         => AssertTranslationFailed(() => base.ToDateTime_property_with_constant_TimeOnly());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateOnlyTranslationsSqliteTest.cs", 210, 215,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task ToDateTime_property_with_property_TimeOnly()
         => AssertTranslationFailed(() => base.ToDateTime_property_with_property_TimeOnly());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateOnlyTranslationsSqliteTest.cs", 224, 229,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task ToDateTime_with_complex_DateTime()
         => AssertTranslationFailed(() => base.ToDateTime_with_complex_DateTime());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateOnlyTranslationsSqliteTest.cs", 231, 236,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task ToDateTime_with_complex_TimeOnly()
         => AssertTranslationFailed(() => base.ToDateTime_with_complex_TimeOnly());
 }
@@ -256,6 +345,9 @@ public class DateTimeTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeTranslationsSqliteTest.cs", 189, 190,
+        Justification = Upstream.GaveNoReason)]
     public override Task subtract_and_TotalDays()
         => AssertTranslationFailed(() => base.subtract_and_TotalDays());
 }
@@ -270,62 +362,120 @@ public class DateTimeOffsetTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrie
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 29, 34,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Date()
         => AssertTranslationFailed(() => base.Date());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 57, 62,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Day()
         => AssertTranslationFailed(() => base.Day());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 50, 55,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task DayOfYear()
         => AssertTranslationFailed(() => base.DayOfYear());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 64, 69,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Hour()
         => AssertTranslationFailed(() => base.Hour());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 92, 97,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Microsecond()
         => AssertTranslationFailed(() => base.Microsecond());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 85, 90,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Millisecond()
         => AssertTranslationFailed(() => base.Millisecond());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 71, 76,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Minute()
         => AssertTranslationFailed(() => base.Minute());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 43, 48,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Month()
         => AssertTranslationFailed(() => base.Month());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 99, 104,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Nanosecond()
         => AssertTranslationFailed(() => base.Nanosecond());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 15, 20,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Now()
         => AssertTranslationFailed(() => base.Now());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 78, 83,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Second()
         => AssertTranslationFailed(() => base.Second());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 194, 195,
+        Justification = Upstream.GaveNoReason)]
     public override Task ToUnixTimeMilliseconds()
         => AssertTranslationFailed(() => base.ToUnixTimeMilliseconds());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 197, 198,
+        Justification = Upstream.GaveNoReason)]
     public override Task ToUnixTimeSecond()
         => AssertTranslationFailed(() => base.ToUnixTimeSecond());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 22, 27,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task UtcNow()
         => AssertTranslationFailed(() => base.UtcNow());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 36, 41,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Year()
         => AssertTranslationFailed(() => base.Year());
 }
@@ -340,70 +490,155 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 63, 69,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task AddHours()
         => AssertTranslationFailed(() => base.AddHours());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 71, 77,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task AddMinutes()
         => AssertTranslationFailed(() => base.AddMinutes());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 79, 85,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Add_TimeSpan()
         => AssertTranslationFailed(() => base.Add_TimeSpan());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 119, 125,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_constant()
         => AssertTranslationFailed(() => base.FromDateTime_compared_to_constant());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 111, 117,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_parameter()
         => AssertTranslationFailed(() => base.FromDateTime_compared_to_parameter());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 103, 109,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_property()
         => AssertTranslationFailed(() => base.FromDateTime_compared_to_property());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 135, 141,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromTimeSpan_compared_to_parameter()
         => AssertTranslationFailed(() => base.FromTimeSpan_compared_to_parameter());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 127, 133,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromTimeSpan_compared_to_property()
         => AssertTranslationFailed(() => base.FromTimeSpan_compared_to_property());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 15, 21,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Hour()
         => AssertTranslationFailed(() => base.Hour());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 87, 93,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task IsBetween()
         => AssertTranslationFailed(() => base.IsBetween());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 47, 53,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Microsecond()
         => AssertTranslationFailed(() => base.Microsecond());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 39, 45,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Millisecond()
         => AssertTranslationFailed(() => base.Millisecond());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 23, 29,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Minute()
         => AssertTranslationFailed(() => base.Minute());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 55, 61,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Nanosecond()
         => AssertTranslationFailed(() => base.Nanosecond());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 25103,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 143, 149,
+        Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Order_by_FromTimeSpan()
         => AssertTranslationFailed(() => base.Order_by_FromTimeSpan());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 31, 37,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Second()
         => AssertTranslationFailed(() => base.Second());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 95, 101,
+        Justification = "TimeSpan. Issue #18844.",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Subtract()
         => AssertTranslationFailed(() => base.Subtract());
 }
@@ -418,26 +653,55 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     // class, most of them only to assert golden SQL over a base call that passes.
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 16, 21,
+        Justification = "Translate TimeSpan members, #18844",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Hours()
         => AssertTranslationFailed(() => base.Hours());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 47, 52,
+        Justification = "Translate TimeSpan members, #18844",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Microseconds()
         => AssertTranslationFailed(() => base.Microseconds());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 39, 44,
+        Justification = "Translate TimeSpan members, #18844",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Milliseconds()
         => AssertTranslationFailed(() => base.Milliseconds());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 24, 29,
+        Justification = "Translate TimeSpan members, #18844",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Minutes()
         => AssertTranslationFailed(() => base.Minutes());
 
     /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 18844,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 55, 60,
+        Justification = "Translate TimeSpan members, #18844",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Nanoseconds()
         => AssertTranslationFailed(() => base.Nanoseconds());
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 31, 36,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Seconds()
         => AssertTranslationFailed(() => base.Seconds());
 }

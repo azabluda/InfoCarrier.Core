@@ -1,6 +1,11 @@
 # Test overhaul: every override points to evidence
 
-**Status: proposed, 2026-09-15.** This replaces the first version of this file from the same day.
+**Status: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
+29792`), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are deleted, and
+`eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
+and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
+
+This replaces the first version of this file from the same day.
 That version kept the ratchet; this one drops it and adds a reference to every override. **The labels
 `LIMIT`, `DEFECT` and `ISSUE` from the first version stay**, at the owner's request, because they
 answer a different question from the reference. It is tried on ADR-009 Tier D first and extended to
@@ -78,6 +83,14 @@ a query that EF's base expects it to refuse, and the answer is correct. That is 
 **An InfoCarrier defect has no store label.** It is fixed, or it carries a GitHub issue of this
 repository.
 
+**A fifth label, `DESIGN`, for where this provider differs from the store on purpose** (added
+2026-09-15, when Tiers A, B and C were converted). A client that refuses a filter it cannot send, or
+answers a projection EF's relational providers refuse, fails EF's test on the same store; the store
+is not the reason and nothing is broken. `[InfoCarrierDesign(decision)]` names the decision that
+causes it: an ADR number of `docs/decisions.md`, or a document and a heading anchor for a decision
+recorded where it was made, such as the raw-SQL grant in `docs/security-review.md`. Its `Justification` says
+which part of the decision applies, and a skip still needs an upstream reference.
+
 **A skip still carries a label.** The label describes the store, and the skip describes the form of
 the override. Upstream's *"with SQLite we get "no CROSS APPLY""* is a `LIMIT`, whether the override
 asserts that or skips.
@@ -128,25 +141,36 @@ uses the same ones.
 // self-hosted reference: the control test that shows it
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_required_related_FirstOrDefault))]
 
-// upstream reference: the store's own test at the tagged commit, with upstream's words
+// upstream reference: repository, path and line range at the pinned commit, with upstream's words
 [StoreLimit(
-    "https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>",
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/<path>.cs", <first>, <last>,
     Justification = "<upstream's comment, copied verbatim>")]
 
 // a skip copied from upstream: Skip = true, and the upstream reference is mandatory
 [StoreLimit(
-    "https://github.com/dotnet/efcore/blob/a6217e3438ca1fb430079f2626056c1a11581927/test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs#L13",
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs", <first>, <last>,
     Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"",
     Skip = true)]
 
 // a crash or a wrong answer, with its section in docs/upstream-defects.md
 [StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_optional_nested_on_optional_associate))]
 
-// a tracker entry covers it
-[StoreIssue("EF-250", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property))]
+// a tracker entry covers it: the tracker and the number
+[StoreIssue(IssueTracker.MongoEfCore, 250, typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_untranslatable_method_on_associate_scalar_property))]
 
-// ours, when no fix is possible now
-[InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
+// ours, when no fix is possible now: the issue number in this repository
+[InfoCarrierDefect(<n>)]
+
+// ours, on purpose: the ADR number, or a document and heading, and which part of it applies
+[InfoCarrierDesign(10, Justification = "A filter the server cannot run is refused ...")]
+[InfoCarrierDesign(Decisions.SecurityReview, Decisions.RawSqlGrant, Justification = "Raw SQL is refused unless the server grants it ...")]
+
+// a body that differs from upstream's: the kinds, and a note where a kind needs one
+[StoreLimit(
+    UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/<path>.cs", <first>, <last>,
+    Justification = Upstream.GaveNoReason,
+    Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.UpstreamCallsAnotherTest,
+    DeviationNote = "EF's override calls base.<other test>.")]
 
 // two behaviours in one theory: each reason names its case
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation), Case = nameof(QueryTrackingBehavior.TrackAll))]
@@ -156,14 +180,23 @@ uses the same ones.
 [StoreDefect("1.6", Case = nameof(QueryTrackingBehavior.NoTracking))]
 ```
 
-**Four properties exist for the audit.**
+**Five properties exist for the audit.**
 
 | Property | Meaning |
 |---|---|
 | `Justification` | upstream's comment, copied verbatim. When upstream gives no reason, the constant `Upstream.GaveNoReason`, so the gap is visible rather than blank. |
 | `Skip` | the override asserts nothing. Requires an upstream reference. |
-| `Deviation` | why this override's body differs from upstream's, when it does. Empty means it is the same. |
+| `Deviation` | how this override's body differs from upstream's, as `DeviationKind` flags. `None` means it is the same. |
+| `DeviationNote` | what a kind cannot say. Required with `Other` and with `UpstreamCallsAnotherTest`. |
 | `Case` | the theory case the reason covers, such as `TrackAll`. Empty means every case of the method. |
+
+**Every value that recurs is typed rather than text** (the owner's decision, 2026-09-15): an upstream
+reference is a repository, a path and a line range; an issue is a tracker and a number; a decision is
+an ADR number; a deviation is a set of kinds. Text is left only where it is somebody's words. The
+gain is that a typed value can be counted and checked: the audit reports the deviations by kind, and
+it opens `subrepos/efcore` and checks that each reference's lines declare the overriding test, by
+name, at the pinned commit. **A CI runner has no `subrepos/`**, so there the audit counts the
+references it could not check rather than checking them; a local run checks all 446.
 
 **`Case` exists because one test method can hold two store behaviours** (added during the Tier D
 trial). `Select_required_associate_via_optional_navigation` refuses in its tracked arm and crashes
@@ -176,11 +209,13 @@ that skips documents nothing, and they may not carry `InfoCarrierDefect`, since 
 InfoCarrier in them. A self-hosted reference on a wire override must name a method of such a class.
 
 **One reflection test enforces it.** It fails when an override of a specification test carries no
-reason, or several without distinct `Case` values; when an upstream link lacks a 40-character commit
-and a line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
+reason, or several without distinct `Case` values; when an upstream reference's lines do not declare the
+overriding test in the checkout it names; when an upstream reference has no `Justification`; when `Skip` is set without an
 upstream reference; when a `StoreDefect` names a section that `docs/upstream-defects.md` does not
 have; when a control override names a reference or skips; and when a wire override's control test
-documents a different label, or a different section or key, for the same case. That is Microsoft's
+documents a different label, or a different section or key, for the same case; and when a `DESIGN`
+names a decision heading that does not exist, or gives no `Justification`. **An override of an
+abstract test is not audited**, because the base has no expectation to change. That is Microsoft's
 `Check_all_tests_overridden` made stricter: theirs proves somebody looked at a test, ours proves what
 the store did and where that is shown.
 
@@ -236,6 +271,57 @@ were planned:
 6. Amend ADR-009, and correct CLAUDE.md where it describes the Tier D gate and the three evidence
    classes.
 
+## Tiers A, B and C
+
+**Converted 2026-09-15.** `OverrideAuditTest` in the spec project lists 453 reasons over 449
+overrides: `LIMIT` 344, `DEFECT` 23, `ISSUE` 69, `DESIGN` 17, no InfoCarrier defect. 57 skip, 92
+deviate, and upstream gave no reason for 310. **Those were the figures when the conversion was
+committed; after the reds and the defect review the same day they are 466 reasons: `LIMIT` 345,
+`DEFECT` 24, `ISSUE` 69, `DESIGN` 26, `INFOCARRIER DEFECT` 2.** Tier C has no override. The rules added for `DESIGN`
+were shown to fail on a deliberate mistake before they were trusted.
+
+**425 of them were mechanical.** A Roslyn parse of this repository and of `subrepos/efcore` at
+`v10.0.1` matched each override to EF's override of the same test in the SQLite or InMemory
+functional tests, and compared the bodies with comments and `AssertSql` removed. Where they differed
+only by a helper that asserts the same thing, or by `!` and `var`, the body counts as the same. The
+label came from EF's own words: an issue number in EF's comment is an `ISSUE`, a crash EF pins is a
+`DEFECT`, and the rest are `LIMIT`. Two deviations recur and are constants: EF also asserts SQL,
+which this client does not emit (tracked as #111), and a store exception crosses the wire as
+`InfoCarrierServerException`.
+
+**The other 24 were read one by one**, and four findings came out of them.
+
+- **Twenty Tier A overrides pin crashes of EF's InMemory provider**, so they are `DEFECT` and not
+  `LIMIT`: `docs/upstream-defects.md` §1.11.
+- **Three primitive-collection overrides answer where EF's relational base asserts a refusal** that
+  EF's own comment calls unfinished type-mapping inference: §1.12.
+- **The client-evaluation guard was a decision recorded nowhere but CLAUDE.md.** ADR-010 now carries
+  it as a dated amendment, because ten `DESIGN` references cite it.
+- **Two overrides did not meet the rules and were changed.** `ConcurrencyDetectorEnabled.FromSql`
+  skipped with nothing upstream to cite, and now asserts the refusal inside xUnit's failure.
+  `Identifiers_are_generated_correctly` asserted a table name where EF asserts four names; EF's
+  whole body passes, so it is EF's body.
+
+**Two InfoCarrier defects came out of it, both measured and both tracked** (the owner's request,
+2026-09-15, to confirm every suspected defect).
+
+- **#52, the property-bag insert.** It was labelled `DESIGN` naming the limitations page, which
+  described the page and not the failure; an issue already tracked it.
+- **#113, a context leak.** `Inlined_dbcontext_is_not_leaking` expects EF's refusal of a client
+  projection that calls a `DbContext` instance method. This client answers, correctly, and a context
+  that ran that query stays reachable after disposal until EF's memory cache is compacted, while a
+  context that ran a plain query is collected. The first probe could not see it because pooled
+  contexts outlive every test; contexts built directly could. It had been labelled `DESIGN ADR-010`
+  and skipped, with a justification the measurement disproved.
+
+**Three suspected defects were measured and are not defects.** `AsSplitQuery` is honoured: the
+server runs two statements where a single query runs one, so R47's "silently ignored" was wrong. A
+complex collection not mapped to JSON is refused by the server's `SqliteModelValidator` with EF's
+message. The table-splitting check that fails is an `IsInModel` mark while the client's model is
+built, and a real client context inserts, updates and reads a split owned reference correctly. R138
+was confirmed as described: the client ships an unmapped member and the server refuses it, which is
+correct while client and server share one model.
+
 ## Extending to the other tiers
 
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
@@ -253,8 +339,9 @@ were planned:
   changes no expected behaviour, so it is not what a label describes. Tier D has none, so the trial
   does not need the answer.
 - **Then remove the ratchet**: `eng/ratchet.sh`, both baseline files, and the direction gate in CI.
+  Done 2026-09-15, and the job is `Spec tests` in the workflow and the `main` ruleset alike.
 
-**This reverses a LOCKED guardrail.** CLAUDE.md says *"Never `[Skip]`, delete, or override a spec
-test to make the suite green"*, and ADR-004 says a red test is information. The reversal needs a
-dated supersession of ADR-004, and the same commit must sweep every comment that argued for the
-ratchet.
+**This reverses a LOCKED guardrail.** CLAUDE.md said *"Never `[Skip]`, delete, or override a spec
+test to make the suite green"*, and the rule behind ADR-004 was that a red test is information. ADR-004
+carries the dated amendment since 2026-09-15, and the comments that argued for the ratchet were swept
+in the commit that removed it.

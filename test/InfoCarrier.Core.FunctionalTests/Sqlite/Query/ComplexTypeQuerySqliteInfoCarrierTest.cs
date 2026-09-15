@@ -51,6 +51,9 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
     ///     <c>ComplexTypeQuerySqliteTest</c>'s two: the query reaches SQL and asks SQLite for
     ///     <c>APPLY</c>, which it does not have.
     /// </summary>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1014, 1018,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -59,6 +62,9 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
             .Message);
 
     /// <inheritdoc cref="Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1020, 1024,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Same_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

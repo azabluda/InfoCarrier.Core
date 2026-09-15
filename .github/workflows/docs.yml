@@ -1,9 +1,9 @@
 # The documentation site: build it on every push, publish it to GitHub Pages.
 #
 # SEPARATE FROM build.yml ON PURPOSE. That workflow's `CI: true` makes compiler warnings fatal and
-# its spec-ratchet job takes up to ninety minutes; neither has anything to say about Markdown, and
-# a documentation typo must not queue behind a 22,000-test suite. Nothing here touches the
-# solution, the ratchets or the baselines.
+# its spec-suite job takes up to ninety minutes; neither has anything to say about Markdown, and
+# a documentation typo must not queue behind a 29,000-test suite. Nothing here touches the
+# solution, the trim ratchet or its baseline.
 #
 # ONE-TIME SETUP, and this workflow cannot do it for you. TWO settings, and the second is the one
 # that is easy to miss because it only bites once the site stops publishing from the default

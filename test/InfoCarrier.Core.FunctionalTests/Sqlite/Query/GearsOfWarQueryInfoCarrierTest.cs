@@ -64,71 +64,113 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 23, 24,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffsetNow_minus_timespan(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffsetNow_minus_timespan(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 20, 21,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffset_Contains_Less_than_Greater_than(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffset_Contains_Less_than_Greater_than(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 26, 27,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffset_Date_returns_datetime(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffset_Date_returns_datetime(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 146, 151,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 29, 33,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collections_inner_subquery_predicate_references_outer_qsre(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_predicate_references_outer_qsre(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 158, 161,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collections_with_Distinct(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_with_Distinct(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 53, 57,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_group_join_with_DefaultIfEmpty(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_group_join_with_DefaultIfEmpty(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 59, 62,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_join_key(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 64, 67,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_join_key_inner_and_outer(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key_inner_and_outer(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 97, 101,
+        Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 81, 87,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 89, 95,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 69, 73,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 75, 79,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(async));
 
@@ -138,6 +180,10 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///     <c>SQLite Error 1: 'no such column: s.Id'</c>; the measured message here is identical,
     ///     wrapped by the wire, so the assertion keeps the engine's own type name and text.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 183, 201,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
 
@@ -167,12 +213,21 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///     </para>
     ///     <para>
     ///         <b>Note what this does NOT do.</b> The sibling
-    ///         <c>Correlated_collection_with_distinct_3_levels</c> stays red, and deliberately: C64
-    ///         proved its assertion cannot be satisfied by <em>any</em> answer, so an override there
-    ///         would be green because the assertion is broken. See
-    ///         <c>docs/upstream-defects.md</c> §1.4 and <c>implementation-plan.md</c> V12.
+    ///         <c>Correlated_collection_with_distinct_3_levels</c> was left red here until 2026-09-15:
+    ///         C64 proved its assertion cannot be satisfied by <em>any</em> answer. Its Tier A
+    ///         override now compares the collection as a sequence instead, which is the assertion
+    ///         the base meant. See <c>docs/upstream-defects.md</c> §1.4.
     ///     </para>
     /// </remarks>
+    [InfoCarrierDesign(
+        10,
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
+        UpstreamFirstLine = 23,
+        UpstreamLastLine = 30,
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
         bool async)
         => AssertQuery(
@@ -202,6 +257,15 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
             });
 
     /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    [InfoCarrierDesign(
+        10,
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
+        UpstreamFirstLine = 152,
+        UpstreamLastLine = 156,
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
         => AssertQuery(
             async,
@@ -268,71 +332,113 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 23, 24,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffsetNow_minus_timespan(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffsetNow_minus_timespan(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 20, 21,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffset_Contains_Less_than_Greater_than(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffset_Contains_Less_than_Greater_than(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 26, 27,
+        Justification = Upstream.GaveNoReason)]
     public override Task DateTimeOffset_Date_returns_datetime(bool async)
         => AssertTranslationFailed(() => base.DateTimeOffset_Date_returns_datetime(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 146, 151,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 29, 33,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collections_inner_subquery_predicate_references_outer_qsre(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_predicate_references_outer_qsre(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 158, 161,
+        Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collections_with_Distinct(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_with_Distinct(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 53, 57,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_group_join_with_DefaultIfEmpty(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_group_join_with_DefaultIfEmpty(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 59, 62,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_join_key(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 64, 67,
+        Justification = Upstream.GaveNoReason)]
     public override Task Outer_parameter_in_join_key_inner_and_outer(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key_inner_and_outer(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 97, 101,
+        Justification = Upstream.GaveNoReason)]
     public override Task SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 81, 87,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 89, 95,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 69, 73,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(async));
 
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 75, 79,
+        Justification = Upstream.GaveNoReason)]
     public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(async));
 
@@ -342,6 +448,10 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     ///     <c>SQLite Error 1: 'no such column: s.Id'</c>; the measured message here is identical,
     ///     wrapped by the wire, so the assertion keeps the engine's own type name and text.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 183, 207,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
 
@@ -350,6 +460,15 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     ///     EF's relational base asserts a refusal, this provider answers, and the assertion is
     ///     replaced by EF's own row-by-row one rather than removed.
     /// </summary>
+    [InfoCarrierDesign(
+        10,
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
+        UpstreamFirstLine = 23,
+        UpstreamLastLine = 30,
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
         bool async)
         => AssertQuery(
@@ -379,6 +498,15 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
             });
 
     /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
+    [InfoCarrierDesign(
+        10,
+        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
+        Repository = UpstreamRepository.EfCore,
+        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
+        UpstreamFirstLine = 152,
+        UpstreamLastLine = 156,
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
     public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
         => AssertQuery(
             async,
@@ -441,6 +569,16 @@ internal static class GearsOfWarSqliteAssertions
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
+
+    /// <summary>Why the two correlated-collection overrides answer what EF's relational base refuses.</summary>
+    internal const string AnsweredWithoutCollectionJoin =
+        "The server returns rows and the client reassembles the projected collection, so no collection join needs "
+        + "the identifying columns Distinct drops, and the query is answered.";
+
+    /// <summary>How those two overrides differ from the upstream test they replace.</summary>
+    internal const string CoreBodyNotRelationalRefusal =
+        "EF's relational base asserts InsufficientInformationToIdentifyElementOfCollectionJoin. This override is the "
+        + "core base's query with its row-by-row assertion, copied because C# cannot call a grandparent.";
 
     internal static async Task StoreRefuses(Func<Task> query)
     {

@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -113,14 +114,14 @@ public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixtur
 ///         answers the query without throwing. It does not say TPT or TPC is correct.
 ///     </para>
 ///     <para>
-///         <b>Two more use <c>AsSplitQuery()</c>, and they pass because the marker is silently
-///         ignored rather than because splitting works.</b> Established, not assumed:
-///         <c>INFOCARRIER_SERVER_SQL=1</c> on
-///         <c>Two_similar_complex_properties_projected_with_split_query1</c> shows the server
-///         executing <em>one</em> <c>SELECT</c> with a <c>LEFT JOIN</c>, where a split query is
-///         two. A single query gives the same answers, so the assertion holds. <b>This is a finding
-///         for #60 rather than a reason not to adopt</b>: nothing is red, and a consumer calling
-///         <c>AsSplitQuery</c> here gets correct results from an unsplit query and no diagnostic.
+///         <b>Two more use <c>AsSplitQuery()</c>, and splitting works.</b> This paragraph said until
+///         2026-09-15 that <i>"they pass because the marker is silently ignored"</i>, from R47's
+///         reading of <c>INFOCARRIER_SERVER_SQL=1</c>: one <c>SELECT</c> with a <c>LEFT JOIN</c>. Measured
+///         again that day on <c>Two_similar_complex_properties_projected_with_split_query1</c> alone,
+///         the server runs two statements, <c>Offers</c> and then the variations joined to their
+///         nested rows, which is EF's split shape; a Northwind <c>Include</c> runs one statement with
+///         <c>AsSingleQuery</c> and two with <c>AsSplitQuery</c>. Whether R47 misread the log or a later
+///         change fixed it is not known.
 ///     </para>
 /// </remarks>
 public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
@@ -131,6 +132,54 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The base's body. Its first two blocks pass unchanged; the third is refused with EF's
+    ///     own <c>TranslationFailed</c>, naming the <c>Cast</c> where EF names the filter behind
+    ///     it. Measured 2026-09-15.
+    /// </remarks>
+    [InfoCarrierDesign(
+        6,
+        Justification = "EF removes the redundant cast in its own pipeline, which runs on the server, and then names the "
+            + "filter it cannot translate. The client does not run that pipeline, so it refuses at the Cast it cannot send.",
+        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
+        DeviationNote = "Only the third block's expected message differs; the base asserts all three in one method.")]
+    public override async Task Casts_are_removed_from_expression_tree_when_redundant()
+    {
+        var contextFactory = await InitializeAsync<Context18087>(seed: c => c.SeedAsync());
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var id = 1;
+            var query = queryBase.Cast<Context18087.IDomainEntity>().FirstOrDefault(x => x.Id == id);
+
+            Assert.Equal(1, query!.Id);
+        }
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var query = queryBase.Cast<object>().Count();
+
+            Assert.Equal(3, query);
+        }
+
+        using (var context = contextFactory.CreateContext())
+        {
+            var queryBase = (IQueryable)context.MockEntities;
+            var id = 1;
+
+            string message = Assert
+                .Throws<InvalidOperationException>(() => queryBase.Cast<Context18087.IDummyEntity>().FirstOrDefault(x => x.Id == id))
+                .Message;
+
+            Assert.Equal(
+                CoreStrings.TranslationFailed("DbSet<MockEntity>()    .Cast<IDummyEntity>()"),
+                message.Replace("\r", string.Empty).Replace("\n", string.Empty));
+        }
+    }
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(
@@ -163,9 +212,9 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 ///         <c>+4</c> new tests all green and <c>2</c> newly-red <em>core</em> tests.
 ///     </para>
 ///     <para>
-///         Two of the four use <c>AsSplitQuery()</c>. As R47 established with
-///         <c>INFOCARRIER_SERVER_SQL=1</c>, that marker is silently ignored here — the server
-///         issues one query — so these pass on correct answers from an unsplit query.
+///         Two of the four use <c>AsSplitQuery()</c>, and the server splits them: see the same
+///         paragraph on <c>AdHocAdvancedMappingsQuerySqliteInfoCarrierTest</c>, which said until
+///         2026-09-15 that the marker was silently ignored.
 ///     </para>
 ///     <para>
 ///         <b>The two newly-red tests are convergence, not regression, and the check that says so
@@ -215,6 +264,10 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
     // character. EF's third such override is not adopted: see the class remarks.
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 15, 23,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task Projection_with_multiple_includes_and_subquery_with_set_operation()
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -222,6 +275,10 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
                 base.Projection_with_multiple_includes_and_subquery_with_set_operation)).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 25, 32,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task Let_multiple_references_with_reference_to_outer()
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,

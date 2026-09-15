@@ -231,8 +231,8 @@ far end resolves it, so `Assembly.GetType(string)` and `MakeGenericMethod` are w
 made of, and `[DynamicallyAccessedMembers]` cannot describe them. The warnings mean the trimmer
 cannot *prove* the reflection safe for an arbitrary model, not that it broke this one.
 
-`eng/trim-ratchet.sh` gates the direction of that count against `eng/trim-baseline.txt`, exactly as
-`eng/ratchet.sh` gates the spec suite. Everyone else's warnings are reported but not gated — EF Core
+`eng/trim-ratchet.sh` gates the direction of that count against `eng/trim-baseline.txt`. Everyone
+else's warnings are reported but not gated — EF Core
 alone contributes 585 of the 853 total.
 
 Both numbers have moved since they were first measured, in opposite directions and for unrelated

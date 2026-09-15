@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """Print the names of the failing tests in one or more TRX files, one per line, sorted.
 
-This is the second of the three levels eng/measure.sh prints locally, brought to CI. The count
-alone cannot tell "fixed 4, broke 4" from "changed nothing", and eng/ratchet.sh gated on the count
-alone until this existed. Its output is what test/known-failures.names.txt holds and what
-eng/ratchet.sh diffs against.
+This is the second of the three levels eng/measure.sh prints locally, brought to CI, where
+eng/suite-summary.sh lists the names in the run summary. Until 2026-09-15 it also fed
+test/known-failures.names.txt and eng/ratchet.sh's name gate; both are gone with the ratchet.
 
-SEVERAL TRX, ONE SORTED LIST, AND ONE BASELINE. The spec suite is split across test projects, one
-per backend store, and each produces its own TRX. The names are UNIONED and sorted together rather
-than compared per project, because a single baseline is what keeps "fixed here, broken there"
-detectable: with one list per project, a test that moves between projects reads as a fix in one and
-a break in the other, and the name diff that makes "fixed 4, broke 4" fail the gate stops working
-across the boundary.
+SEVERAL TRX, ONE SORTED LIST. The spec suite is split across test projects, and each produces its
+own TRX. The names are UNIONED and sorted together, so that eng/measure.sh can compare two snapshots
+across the whole suite: with one list per project, a test that moves between projects would read as
+a fix in one and a break in the other.
 
 A name appearing in two TRX files is one entry. That is a set union and not a bug: a fully
 qualified xUnit test name already carries its class, so two projects cannot legitimately produce
@@ -56,9 +53,9 @@ def failing(paths):
 
 def main(argv):
     # LF, on Windows too. Python's text stdout translates the newline to the platform ending, and
-    # eng/ratchet.sh feeds this output to `comm` against a baseline that .gitattributes keeps at LF
-    # on every platform. A trailing carriage return makes every line differ, so `comm` reports the
-    # whole baseline fixed and the whole run broken -- which is what it did before this line existed.
+    # eng/measure.sh feeds snapshots to `comm`, as eng/ratchet.sh fed this output against its LF
+    # baseline until 2026-09-15. A trailing carriage return makes every line differ, so `comm`
+    # reports everything fixed and everything broken -- which is what it did before this line existed.
     sys.stdout.reconfigure(newline="\n")
 
     if len(argv) < 2:

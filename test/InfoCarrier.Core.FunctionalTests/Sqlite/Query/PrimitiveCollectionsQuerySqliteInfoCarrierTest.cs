@@ -49,55 +49,94 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///     rule CLAUDE.md states for a newly-red SQLite test. EF overrides a fourteenth,
     ///     <c>Project_collection_of_nullable_ints_with_distinct</c>, which is skipped here.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1398, 1401,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1403, 1406,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany_with_filter()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany_with_filter());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1408, 1412,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany_with_Select_to_anonymous_type()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany_with_Select_to_anonymous_type());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1802, 1805,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_datetimes_filtered()
         => await AssertApplyNotSupported(() => base.Project_collection_of_datetimes_filtered());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1797, 1800,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_ordered()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_ordered());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1832, 1836,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_with_ToList_and_FirstOrDefault()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_with_ToList_and_FirstOrDefault());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1822, 1825,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_with_distinct()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_with_distinct());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1807, 1810,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1812, 1815,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging2()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging2());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1817, 1820,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging3()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging3());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1879, 1883,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_empty_collection_of_nullables_and_collection_only_containing_nulls()
         => await AssertApplyNotSupported(
             () => base.Project_empty_collection_of_nullables_and_collection_only_containing_nulls());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1867, 1870,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_inline_collection_with_Union()
         => await AssertApplyNotSupported(() => base.Project_inline_collection_with_Union());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1838, 1841,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_multiple_collections()
         => await AssertApplyNotSupported(() => base.Project_multiple_collections());
 
@@ -119,14 +158,26 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         reason of ours (B14), so they stay red.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1040, 1055,
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
     public override Task Inline_collection_index_Column()
         => AssertStoreRefuses(base.Inline_collection_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1069, 1084,
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
     public override Task Inline_collection_value_index_Column()
         => AssertStoreRefuses(base.Inline_collection_value_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1086, 1101,
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
     public override Task Inline_collection_List_value_index_Column()
         => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
 
@@ -142,8 +193,9 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         a subquery. <b>EF's own comment on the second says so outright</b> — <i>"We should
     ///         apply the default type mapping to the parameter, but need to figure out the exact
     ///         rules when to do this"</i> — which makes it unfinished work on EF's side rather than
-    ///         a limitation this provider ought to reproduce. This client builds no SQL, so the
-    ///         question never arises.
+    ///         a limitation this provider ought to reproduce. This said <i>"This client builds no SQL,
+    ///         so the question never arises"</i> until 2026-09-15; the server does build SQL for these,
+    ///         so why it does not meet the gap is open. <c>docs/upstream-defects.md</c> §1.12.
     ///     </para>
     ///     <para>
     ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
@@ -157,6 +209,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         <c>docs/plans/v10/implementation-plan.md</c> V12.
     ///     </para>
     /// </remarks>
+    [StoreDefect(
+        "1.12",
+        UpstreamRepository.EfCore, "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs", 22, 23,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.AnswerNotRefusal)]
     public override Task Column_collection_equality_inline_collection_with_parameters()
     {
         (int i, int j) = (1, 10);
@@ -167,6 +224,14 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     }
 
     /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    [StoreDefect(
+        "1.12",
+        UpstreamRepository.EfCore, "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs", 25, 36,
+        Justification = "The array indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a "
+            + "CAST over that, the type mapping inference from the other side (p.String) doesn't propagate inside to the "
+            + "subquery. In this case, the CAST operand gets the default CLR type mapping, but that's object in this case. "
+            + "We should apply the default type mapping to the parameter, but need to figure out the exact rules when to do this.",
+        Deviation = DeviationKind.AnswerNotRefusal)]
     public override void Parameter_collection_in_subquery_and_Convert_as_compiled_query()
     {
         var query = EF.CompileQuery(
@@ -181,6 +246,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     }
 
     /// <inheritdoc cref="Column_collection_equality_inline_collection_with_parameters" />
+    [StoreDefect(
+        "1.12",
+        UpstreamRepository.EfCore, "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs", 38, 44,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.AnswerNotRefusal)]
     public override async Task Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query()
     {
         var compiledQuery = EF.CompileQuery(
@@ -240,6 +310,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///     than the result. Ours mismatches identically — an <see cref="EqualException" /> out of
     ///     the same assertion — so the override transfers.
     /// </remarks>
+    [StoreIssue(
+        IssueTracker.EfCore, 32561,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1459, 1484,
+        Justification = "Issue #32561",
+        Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task Parameter_collection_Concat_column_collection()
         => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
 
@@ -248,8 +323,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // specification assembly, and the re-parent now inherits them verbatim -- along with three
     // more of that base's that this file never carried.
     //
-    // THOSE THREE ARE LEFT FAILING, AND THEY FAIL BECAUSE THEY PASS. Each asserts that translation
-    // must fail, and here it does not: "Assert.Throws() Failure: No exception was thrown".
+    // THOSE THREE WERE LEFT FAILING, AND THEY FAILED BECAUSE THEY PASS. Each asserts that translation
+    // must fail, and here it does not: "Assert.Throws() Failure: No exception was thrown". They are
+    // overridden since V12 to assert the rows, and carry docs/upstream-defects.md 1.12 since
+    // 2026-09-15.
     //
     //   Parameter_collection_in_subquery_and_Convert_as_compiled_query
     //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
@@ -263,9 +340,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // provider does not reach that state, and the base tests' own result assertions hold, so the
     // answers are right rather than merely un-thrown (measured in R31, not inferred).
     //
-    // Not overridden. There is no grandparent to call -- an override here could only re-state the
-    // core test's body -- and asserting the correct behaviour to turn the red green would be
-    // overriding a spec test to make the suite green, which CLAUDE.md forbids. This is the R29
+    // "Not overridden", this said at R31: there is no grandparent to call, and asserting the correct
+    // behaviour to turn the red green would be overriding a spec test to make the suite green, which
+    // CLAUDE.md then forbade. V12 overrode them with the core body on the owner's decision, and the
+    // rule itself was replaced on 2026-09-15 by an override that says why. This is the R29
     // category (`OwnedJson.Associate_with_parameter_null`) three more times: a query this provider
     // answers that other EF providers refuse, which is `website/docs/limitations.md`'s territory.
 

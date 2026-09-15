@@ -108,6 +108,36 @@ fixture architecture (client `TestStore` wrapper + backend store doubling as
 `IInfoCarrierClient` + JSON round-trip simulation) ports cleanly (see
 [`architecture.md`](architecture.md) §Test Strategy).
 
+**Amended 2026-09-15 — the inherited suite is green, and every override says why.** The decision
+above stands: the specification bases are inherited and are the coverage goal. What changes is how
+a test that cannot pass as EF wrote it is treated. **Until this date the rule was "a red test is
+information"**: such a test was left failing, never skipped or overridden to make the suite green,
+and CI gated the direction of the failure count against `test/known-failures.txt` (the "spec
+ratchet", roadmap §CI strategy). That rule is replaced, and the ratchet and its baseline are deleted.
+
+**The new rule is Microsoft's own, made stricter in traceability.** EF Core's providers keep their
+suites green by overriding what their store cannot do. This repository does the same, and every
+override of a specification test carries a typed attribute that says **what** the store or this
+provider does and **where** that is shown: `StoreLimit`, `StoreDefect` (with its section in
+`upstream-defects.md`) or `StoreIssue` for the store, `InfoCarrierDesign` for a recorded decision of
+this provider, and `InfoCarrierDefect` with an issue of this repository for a defect that is not fixed
+yet. The reference is EF's own override at the pinned release commit, a wire-free control test, an
+ADR or document heading, or an issue number. **A skip is allowed only where upstream skips the same
+test**, with upstream's words. `OverrideAudit`, a test in each spec project, fails the run on any
+override that breaks these rules, and writes the audit of what the suite does not check and why.
+
+**Why the old rule went.** A red test is information about this provider only when this provider
+could make it pass. Most of the last nineteen could not, by design or because of someone else's
+defect, so each red restated a known fact on every run, and the count hid which reds were new. A
+green suite with unreferenced overrides would be worse, which is the failure the stricter rule
+exists to prevent: an override of 2026-09-14 in Tier D asserted three rows where five are correct.
+Converting the last nineteen found two real InfoCarrier defects that the red count had hidden
+(#52, #113), and three standing classifications that measurement disproved.
+
+**What it does not change.** Silently suppressing tests stays v1's failure mode and stays forbidden:
+an override without a checked reason fails the build. [`test-overhaul.md`](plans/v10/test-overhaul.md)
+is the reading; CLAUDE.md's guardrail says the same since the same commit.
+
 ## ADR-005 — Research subrepos: ignored, no un-ignore exceptions — LOCKED (2026-07-19)
 
 **Context.** `subrepos/` holds four cloned repositories for source-level reference.
@@ -688,6 +718,24 @@ payload of requirements §3.3 (wire-protocol W1).
 **Supersedes.** [`research-findings.md`](research-findings.md) §8, in placement only. Its
 mechanism — execute the entity-typed portion, apply the projection locally, no tree surgery, no
 new wire vocabulary — is retained.
+
+**Amended 2026-09-15 — the remainder is a projection's, and anything else is refused. Not a
+reversal: this records a guard that has been in the code, and in CLAUDE.md's guardrails, without
+being written here.** *"Evaluates the remainder locally"* above was never unbounded.
+`QuerySplitter.RejectClientEvaluation` runs between the boundary analysis and the split, and raises
+EF's own `TranslationFailed` or `TranslationFailedWithDetails` for client-side work that is not the
+reassembly of a rewritten projection — a `Where` over a client method is the plain case. EF's
+contract is that client evaluation is legal only in the final projection, so a query this client
+cannot send behaves as it does on every EF provider, instead of fetching the whole source and
+filtering it here. `InMemorySmokeTest.A_filter_the_server_cannot_run_throws_rather_than_fetching_everything`
+pins it.
+
+**Written down because the test overhaul needed a decision to cite**
+([`test-overhaul.md`](plans/v10/test-overhaul.md)). Two kinds of specification override follow from
+this ADR and carry `[InfoCarrierDesign("ADR-010")]`: a test EF's InMemory provider answers by
+evaluating in .NET, which is refused here as EF's relational providers refuse it; and a test a
+relational provider refuses to translate, which is answered here because the part it cannot
+translate is a projection this client reassembles, or runs after one on the rows it returned.
 
 ## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
 

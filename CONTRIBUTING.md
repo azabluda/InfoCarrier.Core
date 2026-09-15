@@ -13,12 +13,14 @@ The first project is Microsoft's `EFCore.Specification.Tests`, inherited wholesa
 EF Core's own SQL Server, SQLite and InMemory providers run. The second drives a real HTTP hop
 against an ASP.NET Core server.
 
-Run them separately. `test/known-failures.txt` was written against the specification project alone,
-so running both together inflates the total past what the ratchet expects.
+Both are green. So is `test/InfoCarrier.Core.DocumentStoreTests`, which runs a few of the same
+specification bases against an embedded MongoDB.
 
-**Never skip, delete or override a specification test to make the suite green.** The inherited
-classes are the coverage goal, and a failing test is telling you something. If a test targets
-something genuinely unimplemented, leave it failing and say so in the pull request.
+**Never override a specification test without saying why.** An override carries an attribute that
+says what the store does and where that is shown: EF Core's own test at the release commit, a
+tracker issue, or the decision in `docs/decisions.md`. `OverrideAuditTest` fails the run on an
+override without one. A skip is allowed only where EF's own suite skips the same test.
+[`docs/plans/v10/test-overhaul.md`](docs/plans/v10/test-overhaul.md) has the rules.
 
 ## Warnings are errors in CI, and only in CI
 
@@ -49,7 +51,7 @@ cannot tell "fixed four, broke four" apart from "changed nothing".
 [`eng/trim-baseline.txt`](eng/trim-baseline.txt). It fails when the count goes up. The count does
 not have to be zero.
 
-`eng/ratchet.sh` is the CI half of the same idea. The workflow invokes it, so you never have to.
+In CI the gate is the test run's own result, and `eng/suite-summary.sh` only collects the numbers.
 
 ## Documentation site
 

@@ -305,14 +305,14 @@ Both procedures below end at the same place, so the shared tail is written once.
 2. Make the fix. **Confirm the pack baseline is the version you are patching**, not the one before
    it: `grep PackageValidationBaselineVersion Directory.Build.props` must read `10.1.0` on the
    `10.1` line. The trap is in `Directory.Build.props`'s own comment and in the list below.
-3. Gates. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, both
-   ratchets green, `dotnet pack` clean.
+3. Gates. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, the spec suite
+   and the trim ratchet green, `dotnet pack` clean.
 4. Push. **CI runs on release lines since 2026-09-09**, so the branch is gated exactly like the
    trunk, and `packages.yml` puts `10.1.1-alpha.0.N` on the internal feed. Install that and try it:
    it is the last point before a version becomes permanent.
 5. Tag on **this branch**: `git tag -a v10.1.1 -m "InfoCarrier.Core 10.1.1"` then
    `git push origin v10.1.1`. `release.yml` triggers on `v*` from any branch and carries its own
-   build, tests and both ratchets, so it does not depend on `build.yml` having run.
+   build, tests and trim ratchet, so it does not depend on `build.yml` having run.
 6. Continue at **After either**.
 
 ### A minor from `main`
@@ -406,7 +406,8 @@ something to know.
 Everything except the irreversible step, which stopped by itself. Budget about **twelve minutes**
 from pushing the tag to the approval gate; the real `v10.1.0` release took eleven.
 
-- CI on the release line: all four jobs green (docs gates, fast gate, spec suite, spec ratchet).
+- CI on the release line: all four checks green (docs gates, fast gate, spec suite, spec tests; the
+  last was named spec ratchet until 2026-09-15).
 - `packages.yml` did NOT publish a candidate, and reported success anyway. That is the defect
   above, found only by reading the push step's own output rather than the job's conclusion.
   **Rehearsed a second time after the fix, against this document rather than from memory.** The

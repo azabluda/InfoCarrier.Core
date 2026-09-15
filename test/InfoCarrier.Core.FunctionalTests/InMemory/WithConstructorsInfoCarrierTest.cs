@@ -24,6 +24,9 @@ public class WithConstructorsInfoCarrierTest(WithConstructorsInfoCarrierTest.Inf
     /// <remarks>
     ///     Mirrors <c>WithConstructorsInMemoryTest</c>: the update dirties the shared store.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/WithConstructorsInMemoryTest.cs", 9, 14,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Query_and_update_using_constructors_with_property_parameters()
     {
         await base.Query_and_update_using_constructors_with_property_parameters();

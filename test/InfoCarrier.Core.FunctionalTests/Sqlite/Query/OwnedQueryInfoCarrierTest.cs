@@ -47,7 +47,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         event itself.
 ///     </para>
 ///     <para>
-///         <b>What stays red: the two <c>FromSql</c> parameterizations</b> of
+///         <b>What stayed red, and is not red on 2026-09-15: the two <c>FromSql</c> parameterizations</b> of
 ///         <c>Using_from_sql_on_owner_generates_join_with_table_for_owned_shared_dependents</c>,
 ///         which is #60. They die on <c>RelationalOwnedQueryFixture</c>'s
 ///         <c>public new RelationalTestStore TestStore</c> cast, reached through

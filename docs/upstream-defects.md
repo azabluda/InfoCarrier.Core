@@ -38,9 +38,10 @@ do, because the entity reaches the server as values. The server's own stack was 
 `Dictionary<string, object>` CLR type and holds a primitive collection. This is the **single entry
 under "Not supported"** on [`website/docs/limitations.md`](../website/docs/limitations.md). Two
 spec tests, both parameterizations of
-`ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`.
-The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor binding, which
-was priced in M9 and declined.
+`ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`,
+red until 2026-09-15 and overridden since to assert this exception, as `[InfoCarrierDefect(52)]`:
+for a user it is this provider's failure, whoever's line causes it. The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor
+binding, which was priced in M9 and declined.
 
 **`dotnet/efcore#36175` does not track this, and the corroboration this repository claimed for it
 does not exist either.** That issue is *"Support notification change tracking for complex types"* —
@@ -121,9 +122,10 @@ EXPECTED-vs-ITSELF: EqualException
 same Squad instance both times: True
 ```
 
-**What it blocks here.** Two spec tests, permanently red on the InMemory tier —
+**What it blocks here.** Two spec tests on the InMemory tier —
 `GearsOfWarQueryInfoCarrierTest.Correlated_collection_with_distinct_3_levels`, both async values.
-They are the whole of this suite's "wrong answer" class, and the answers are right: a side-by-side
+They were red until 2026-09-15 and carry `[StoreDefect("1.4", …)]` since, comparing the collection as
+a sequence. They were the whole of this suite's "wrong answer" class, and the answers are right: a side-by-side
 dump matched squad for squad, member for member, weapon count for weapon count.
 
 **Why no other provider notices.** Every one of them refuses the query before the assertion runs —
@@ -324,6 +326,60 @@ crash or a wrong answer is never overridden here.
 **The matches above are CLOSEST, not CONFIRMED.** None was verified by reading their fix or
 reproducing their exact shape, so no entry has moved to §2. Doing that verification is the work that
 would turn any of these into a report, and it is the owner's call whether it is worth it.
+
+### 1.11 EF's InMemory provider crashes where its own suite pins the crash
+
+**Recorded 2026-09-15, when ADR-009 Tier A's overrides were given reasons, and not found by this
+repository.** EF's own `EFCore.InMemory.FunctionalTests` overrides each test below to assert the
+crash, so EF knows. None carries an issue number, and a crash is never a store limit here, so each
+Tier A override that copies one carries `[StoreDefect("1.11", …)]` with the link to EF's override.
+
+**Site.** Not located, and not looked for. The evidence is EF's own assertion at the `v10.0.1` tag.
+
+**Symptom.**
+
+| Tests | Raised |
+|---|---|
+| `JsonTypesTestBase.Can_read_write_point`, `…_with_M`, `…_with_Z`, `…_with_Z_and_M`, `Can_read_write_line_string`, `Can_read_write_multi_line_string`, `Can_read_write_polygon`, `Can_read_write_polygon_typed_as_geometry` | `NullReferenceException`; EF's comment: *"No built-in JSON support for spatial types in the in-memory provider"* |
+| `SpatialQueryTestBase.Intersects_equal_to_null`, `Intersects_not_equal_to_null` | `NullReferenceException` |
+| `SpatialQueryTestBase.GetGeometryN_with_null_argument` | skipped by EF, whose comment is *"Sequence contains no elements"* |
+| `GearsOfWarQueryTestBase.Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation_complex`, `Find_underlying_property_after_GroupJoin_DefaultIfEmpty` | `InvalidOperationException: Nullable object must have a value.` EF's sibling override on the non-complex test cites its issue #13721, *"Null protection"* |
+| `GearsOfWarQueryTestBase.Select_StartsWith_with_null_parameter_as_argument`, `OrderBy_…`, `Group_by_on_…`, `Group_by_with_having_…` | `ArgumentNullException: Value cannot be null. (Parameter 'value')`: `string.StartsWith(null)` evaluated in .NET rather than with database null semantics |
+| `GearsOfWarQueryTestBase.Include_after_SelectMany_throws` | `NullReferenceException` where the base expects EF's own refusal |
+| `GearsOfWarQueryTestBase.Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_coalesce_result4`, `…_with_complex_projection_result` | `TargetInvocationException` |
+
+**What it blocks.** Nothing in InfoCarrier. Tier A's store is EF's InMemory provider, so these reach
+the wire as the store's answer and cross it unchanged. **It bounds what Tier A can prove**, as 1.6
+does for Tier D: where the store crashes, the tier cannot tell whether the wire would have carried
+the correct answer.
+
+### 1.12 EF's relational pipeline leaves a primitive-collection parameter without a type mapping
+
+**Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
+overrides three core tests to assert that the query is refused. **This provider answers all three**,
+and its overrides assert the rows, so each carries `[StoreDefect("1.12", …)]` with the link to EF's
+refusal.
+
+**Site.** Named by EF itself, on one of the three, in a comment at the `v10.0.1` tag: *"The array
+indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a CAST over
+that, the type mapping inference from the other side (p.String) doesn't propagate inside to the
+subquery. In this case, the CAST operand gets the default CLR type mapping, but that's object in this
+case. We should apply the default type mapping to the parameter, but need to figure out the exact
+rules when to do this."*
+
+**Symptom.**
+
+| Test | EF asserts |
+|---|---|
+| `Parameter_collection_in_subquery_and_Convert_as_compiled_query` | `InvalidOperationException` containing *"in the SQL tree does not have a type mapping assigned"*, with the comment above |
+| `Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query` | `RelationalStrings.SetOperationsRequireAtLeastOneSideWithValidTypeMapping("Union")` |
+| `Column_collection_equality_inline_collection_with_parameters` | a translation failure |
+
+**Only the first is EF's attribution.** R31 read the other two as the same missing inference, from
+their messages; EF says nothing about them, and nobody has read a fix, because none exists.
+
+**What it blocks.** Nothing. **Why this provider does not reach that state is not established**; the
+overrides measure that the rows are right, which is the claim that matters to a caller.
 
 ## 2. Already reported
 

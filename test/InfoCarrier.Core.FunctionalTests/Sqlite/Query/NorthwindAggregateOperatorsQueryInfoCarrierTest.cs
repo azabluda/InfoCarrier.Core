@@ -32,19 +32,24 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         translation. Both are convergence with EF's own <c>NorthwindAggregateOperatorsQuerySqliteTest</c>.
 ///     </para>
 ///     <para>
-///         <b>Three members are left failing and tracked, not overridden.</b>
+///         <b>NONE OF THE THREE BELOW IS RED ON 2026-09-15</b>, and this paragraph said they were
+///         left failing until then. It is kept as the account of the divergence they showed.
+///         <b>Three members were left failing and tracked, not overridden.</b>
 ///         <c>Average_over_max_subquery</c>, <c>Average_over_nested_subquery</c> and
 ///         <c>Type_casting_inside_sum</c> return an aggregate that differs from EF's expected value
 ///         in the trailing digits: the <c>(decimal)</c> cast over an <c>int</c>/<c>float</c>
 ///         aggregate resolves to a different translation on the two sides of the wire (the B4
-///         family in CLAUDE.md — a type mapping computed twice). Per ADR-004 a red spec test is
-///         information; the divergence is recorded in <c>test/known-failures.txt</c> under R20.
+///         family in CLAUDE.md — a type mapping computed twice). The divergence was recorded under
+///         R20 in <c>test/known-failures.txt</c>, which was deleted with the ratchet on 2026-09-15.
 ///     </para>
 /// </remarks>
 public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
     : NorthwindAggregateOperatorsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 114, 118,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Multiple_collection_navigation_with_FirstOrDefault_chained(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -52,6 +57,9 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
                 () => base.Multiple_collection_navigation_with_FirstOrDefault_chained(async))).Message);
 
     /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 123, 124,
+        Justification = Upstream.GaveNoReason)]
     public override Task Contains_with_local_tuple_array_closure(bool async)
         => AssertTranslationFailed(() => base.Contains_with_local_tuple_array_closure(async));
 }

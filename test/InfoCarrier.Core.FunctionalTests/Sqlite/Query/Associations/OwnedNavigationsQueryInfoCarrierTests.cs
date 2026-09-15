@@ -89,6 +89,9 @@ public class OwnedNavigationsCollectionQueryInfoCarrierTest(
     ///     <i>"Base test expects 'can't track owned entities' exception, but with SQLite we get
     ///     'no CROSS APPLY'"</i>. Reason matched before the override was taken (A63).
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsCollectionSqliteTest.cs", 12, 15,
+        Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -130,6 +133,19 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
     ///         that #26708 is fixed, and nothing here depends on which it is.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 26, 29,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 26, 29,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
@@ -137,11 +153,39 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
                 () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 31, 34,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 31, 34,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
                 () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <summary>EF's nearest overrides of these two tests, in the owned JSON family: required at 26-29, optional at 31-34.</summary>
+    internal const string OwnedJsonProjectionSqlite =
+        "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonProjectionSqliteTest.cs";
+
+    /// <summary>EF's comment on the TrackAll arm, verbatim.</summary>
+    internal const string OwnedJsonTrackAllReason =
+        "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"";
+
+    /// <summary>Why the reference is another family's override.</summary>
+    internal const string BorrowedFromOwnedJson =
+        "EF's SQLite class for this base is commented out for its issue #26708, so there is no override to follow. "
+        + "The body is OwnedJsonProjectionSqliteTest's: its owned entities meet the same APPLY refusal. Measured "
+        + "2026-09-15 on OwnedNavigationsProjection's required-associate test, the TrackAll arm fails the base's "
+        + "owned-tracking message with the APPLY message, as EF's comment says.";
 }
 
 public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(
@@ -162,6 +206,9 @@ public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(
     ///     the divergence in a paragraph. On the relational base EF's one line means here exactly
     ///     what it means upstream, and the paragraph is no longer needed.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsSetOperationsSqliteTest.cs", 12, 13,
+        Justification = "SQL APPLY not supported in SQLite - different exception message from the one expected in the base class")]
     public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
         => Assert.ThrowsAsync<EqualException>(() => base.Over_associate_collection_projected(queryTrackingBehavior));
 }

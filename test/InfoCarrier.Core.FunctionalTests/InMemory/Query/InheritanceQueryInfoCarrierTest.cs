@@ -37,6 +37,9 @@ public class InheritanceQueryInfoCarrierTest(InheritanceQueryInfoCarrierFixture 
     ///     whole and the server's InMemory provider refuses it, which is convergence with the
     ///     reference provider rather than a gap of ours.
     /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/IncompleteMappingInheritanceQueryInMemoryTest.cs", 9, 20,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Can_query_all_animal_views(bool async)
     {
         string message = (await Assert.ThrowsAsync<InvalidOperationException>(

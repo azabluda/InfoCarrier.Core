@@ -73,48 +73,103 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
     public Task DisposeAsync()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 44, 46,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Simple_concurrency_exception_can_be_resolved_with_store_values()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 48, 50,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Simple_concurrency_exception_can_be_resolved_with_client_values()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 52, 54,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Simple_concurrency_exception_can_be_resolved_with_new_values()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 56, 58,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Simple_concurrency_exception_can_be_resolved_with_store_values_using_equivalent_of_accept_changes()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 60, 62,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Simple_concurrency_exception_can_be_resolved_with_store_values_using_Reload()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 64, 66,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Updating_then_deleting_the_same_entity_results_in_DbUpdateConcurrencyException()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 68, 71,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task
         Updating_then_deleting_the_same_entity_results_in_DbUpdateConcurrencyException_which_can_be_resolved_with_store_values()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 73, 76,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task
         Change_in_independent_association_after_change_in_different_concurrency_token_results_in_independent_association_exception()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 78, 80,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Change_in_independent_association_results_in_independent_association_exception()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 82, 84,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Two_concurrency_issues_in_one_to_many_related_entities_can_be_handled_by_dealing_with_dependent_first()
         => Task.CompletedTask;
 
+    [StoreIssue(
+        IssueTracker.EfCore, 2195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/OptimisticConcurrencySqliteTest.cs", 86, 88,
+        Justification = "Optimistic Offline Lock #2195",
+        Skip = true)]
     [ConditionalFact(Skip = "Optimistic Offline Lock #2195")]
     public override Task Two_concurrency_issues_in_one_to_one_related_entities_can_be_handled_by_dealing_with_dependent_first()
         => Task.CompletedTask;

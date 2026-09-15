@@ -1,6 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
+using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Query;
@@ -97,6 +98,11 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     ///         unchecked.
     ///     </para>
     /// </remarks>
+    [InfoCarrierDesign(
+        13,
+        Justification = "Since R136 one test assembly holds every tier, and Tier A's fixtures run over EF's InMemory "
+            + "provider, which emits no SQL. The scan is narrowed to the relational tiers' namespaces, and every "
+            + "fixture in them is still checked.")]
     public override void All_query_test_fixtures_must_implement_ITestSqlLoggerFactory()
     {
         string[] relationalTierNamespaces =

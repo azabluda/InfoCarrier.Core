@@ -35,6 +35,9 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // These do NOT carry over to Tier C (SQL Server, roadmap M7), which supports APPLY.
     // -------------------------------------------------------------------------------------
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 36, 39,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_entity(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -45,18 +48,27 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // it. EF's own SQLite suite has had this override all along
     // (`NorthwindJoinQuerySqliteTest.SelectMany_with_selecting_outer_element`); this provider
     // simply was not getting far enough to need it.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 41, 44,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_element(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_selecting_outer_element(async))).Message);
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 46, 50,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_entity_column_and_inner_column(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_selecting_outer_entity_column_and_inner_column(async))).Message);
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 52, 56,
+        Justification = Upstream.GaveNoReason)]
     public override async Task Take_in_collection_projection_with_FirstOrDefault_on_top_level(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -65,18 +77,27 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
 
     // The same three EF's SQLite suite has: hoisting the collection projection lets the query
     // reach SQL, and SQLite declines the APPLY it needs.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 19, 22,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_client_eval(async))).Message);
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 24, 28,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval_with_collection_shaper(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_with_client_eval_with_collection_shaper(async))).Message);
 
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 30, 34,
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval_with_collection_shaper_ignored(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
