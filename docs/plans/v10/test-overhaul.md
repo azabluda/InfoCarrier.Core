@@ -11,16 +11,36 @@ the other tiers after that.
 **The suite is green, and there is no ratchet.** That is Microsoft's approach for EF Core's own
 providers.
 
-**We are stricter than Microsoft in one way: an override needs a reference.** An override
+**Two principles govern every override.**
+
+1. **Deviate from upstream as little as possible.** Where the store's own suite overrides a test,
+   this repository overrides it the same way: the same assertion, or the same skip.
+2. **Make every override traceable and auditable.** Each one names its label, its reference, and
+   upstream's own justification text.
+
+**We are stricter than Microsoft in traceability, not in what an override may do.** An override
 **changes the expected behaviour** of a specification test: the store refuses where EF expects an
 answer, crashes, or answers where EF expects a refusal. It is permitted only with a reference to a
 place where the store does the same thing. There are three kinds of reference and no other reason is
 accepted.
 
-**An override is not a skip, and a skip is not permitted.** The override states the new expected
-behaviour exactly — the exception type, the row count, the value — so it goes red the day the store
-behaves differently. An override that asserts nothing, `Task.CompletedTask` for example, or one that
-catches any exception, watches nothing and would stay green over a wrong answer.
+**A skip is an override too, and it is permitted where upstream skips.** EF's own suites skip often.
+Measured 2026-09-15: `Task.CompletedTask` 52 times in the SQLite functional tests, 100 in InMemory,
+25 in Cosmos and 37 in the relational specification bases, plus explicit `Skip =` arguments. Their
+reason is often in a comment, as at
+[`OwnedJsonCollectionSqliteTest.cs#L13`](https://github.com/dotnet/efcore/blob/a6217e3438ca1fb430079f2626056c1a11581927/test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs#L13)
+in `v10.0.1`: *"Base test expects "can't track owned entities" exception, but with SQLite we get
+"no CROSS APPLY""*. Copying that skip, with that text, is the minimal deviation.
+
+**A skip needs an UPSTREAM reference, never a self-hosted one.** A skip asserts nothing, so the only
+thing that justifies it is that upstream made the same choice for the same store. Where upstream has
+no test, as in Tier D, there is nothing to copy, and the override states the store's behaviour
+exactly.
+
+**The accepted risk, stated once.** A skip hides what the store does, including a wrong answer.
+MongoDB's `EF-367` is that defect in their suite, and this repository's override of 2026-09-14 was
+the same defect here. The risk is accepted only where upstream accepted it, and every skip is
+declared so that the audit counts it.
 
 | Kind | When | The reference |
 |---|---|---|
@@ -57,6 +77,10 @@ a query that EF's base expects it to refuse, and the answer is correct. That is 
 
 **An InfoCarrier defect has no store label.** It is fixed, or it carries a GitHub issue of this
 repository.
+
+**A skip still carries a label.** The label describes the store, and the skip describes the form of
+the override. Upstream's *"with SQLite we get "no CROSS APPLY""* is a `LIMIT`, whether the override
+asserts that or skips.
 
 ## Why stricter than Microsoft
 
@@ -102,8 +126,16 @@ arguments are the reference.** Each label attribute takes either form of referen
 // self-hosted reference: the control test that shows it
 [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_required_related_FirstOrDefault))]
 
-// upstream reference: the store's own test at the tagged commit
-[StoreLimit("https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>")]
+// upstream reference: the store's own test at the tagged commit, with upstream's words
+[StoreLimit(
+    "https://github.com/<owner>/<repo>/blob/<commit>/<path>#L<line>",
+    Justification = "<upstream's comment, copied verbatim>")]
+
+// a skip copied from upstream: Skip = true, and the upstream reference is mandatory
+[StoreLimit(
+    "https://github.com/dotnet/efcore/blob/a6217e3438ca1fb430079f2626056c1a11581927/test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedJson/OwnedJsonCollectionSqliteTest.cs#L13",
+    Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"",
+    Skip = true)]
 
 // a crash or a wrong answer, with its section in docs/upstream-defects.md
 [StoreDefect("1.6", typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_optional_nested_on_optional_associate))]
@@ -115,11 +147,24 @@ arguments are the reference.** Each label attribute takes either form of referen
 [InfoCarrierDefect("https://github.com/azabluda/InfoCarrier.Core/issues/<n>")]
 ```
 
+**Three properties exist for the audit.**
+
+| Property | Meaning |
+|---|---|
+| `Justification` | upstream's comment, copied verbatim. When upstream gives no reason, the constant `Upstream.GaveNoReason`, so the gap is visible rather than blank. |
+| `Skip` | the override asserts nothing. Requires an upstream reference. |
+| `Deviation` | why this override's body differs from upstream's, when it does. Empty means it is the same. |
+
 **One reflection test enforces it.** It fails when an override of a specification test carries none
-of these or more than one, when an upstream link lacks a 40-character commit and a line anchor, and
-when a `StoreDefect` names a section that `docs/upstream-defects.md` does not have. That is
-Microsoft's `Check_all_tests_overridden` made stricter: theirs proves somebody looked at a test,
-ours proves what the store did and where that is shown.
+of the label attributes or more than one; when an upstream link lacks a 40-character commit and a
+line anchor; when an upstream reference has no `Justification`; when `Skip` is set without an
+upstream reference; and when a `StoreDefect` names a section that `docs/upstream-defects.md` does
+not have. That is Microsoft's `Check_all_tests_overridden` made stricter: theirs proves somebody
+looked at a test, ours proves what the store did and where that is shown.
+
+**The same test writes the audit.** Its output lists every override with its label, its reference,
+whether it skips, its deviation, and every upstream reference that gave no reason. The counts are
+the answer to "how much does this suite not check, and why".
 
 **Open question: the form of a self-hosted reference.** The owner asked for one unified form. A
 commit link to this repository has two defects: a commit cannot contain its own hash, so the
@@ -149,8 +194,10 @@ canary for the control's wiring.
 
 1. Add the four attributes — `StoreLimit`, `StoreDefect`, `StoreIssue`, `InfoCarrierDefect` — and
    the reflection test.
-2. Give each of the 15 control tests that still fail a real assertion. Each needs its query written
-   out, because the failure happens inside the base's own assertion.
+2. Give each of the 15 control tests that still fail a real assertion. No skip is available,
+   because MongoDB's suite has no such test to copy. Where the base's own assertion fails, assert
+   that failure together with the store's text inside its message, which pins the behaviour. Write
+   the query out only where the message holds no store text, such as "No exception was thrown".
 3. Override the 14 Tier D failures, each with a reference.
 4. Replace every citation comment with an attribute, and check each against "the same". All seven
    upstream citations become self-hosted, as measured above. Choose each label again as well: the
@@ -167,11 +214,14 @@ canary for the control's wiring.
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
   suite. Pin each link to the package version this repository runs.
 - **Build a control only where upstream has none.**
-- **Every existing override gets a label and a reference, or goes.** The 83 uses of
-  `Task.CompletedTask` assert nothing, so each of those becomes an override with an exact expected
-  behaviour, or the base test runs as it is. Measured 2026-09-15 in the spec project: 83 uses
-  of `Task.CompletedTask`, 116 of `ThrowsAsync`, 113 of `AssertTranslationFailed`, 268 of
-  `ApplyNotSupported`.
+- **Every existing override gets a label and a reference, or goes.** An existing
+  `Task.CompletedTask` stays only if it copies an upstream skip, with the link and upstream's
+  justification text. Otherwise it becomes an exact expectation, or the base test runs as it is.
+  Tier B's `Distinct_projected` is the first candidate: it copies the SQLite skip above. Measured
+  2026-09-15 in the spec project: 83 uses of `Task.CompletedTask`, 116 of `ThrowsAsync`, 113 of
+  `AssertTranslationFailed`, 268 of `ApplyNotSupported`.
+- **Pin each upstream link to the test package this repository runs.** The spec project uses EF's
+  specification tests at 10.0.1, tag `v10.0.1`, commit `a6217e34`; Tier D uses them at 10.0.11.
 - **Decide first what an override that calls the base unchanged and only ADDS assertions needs.** It
   changes no expected behaviour, so it is not what a label describes. Tier D has none, so the trial
   does not need the answer.
