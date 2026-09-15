@@ -1,7 +1,7 @@
 # Test overhaul: every override points to evidence
 
 **Status: proposed, 2026-09-15.** This replaces the first version of this file from the same day.
-That version kept the ratchet; this one drops it and adds a reference to every skip. **The labels
+That version kept the ratchet; this one drops it and adds a reference to every override. **The labels
 `LIMIT`, `DEFECT` and `ISSUE` from the first version stay**, at the owner's request, because they
 answer a different question from the reference. It is tried on ADR-009 Tier D first and extended to
 the other tiers after that.
@@ -11,10 +11,16 @@ the other tiers after that.
 **The suite is green, and there is no ratchet.** That is Microsoft's approach for EF Core's own
 providers.
 
-**We are stricter than Microsoft in one way: an override needs a reference.** An override that
-replaces a specification test's assertion is a skip, whatever it asserts. It is permitted only
-with a reference to a place where the store does the same thing. There are three kinds of
-reference and no other reason is accepted.
+**We are stricter than Microsoft in one way: an override needs a reference.** An override
+**changes the expected behaviour** of a specification test: the store refuses where EF expects an
+answer, crashes, or answers where EF expects a refusal. It is permitted only with a reference to a
+place where the store does the same thing. There are three kinds of reference and no other reason is
+accepted.
+
+**An override is not a skip, and a skip is not permitted.** The override states the new expected
+behaviour exactly — the exception type, the row count, the value — so it goes red the day the store
+behaves differently. An override that asserts nothing, `Task.CompletedTask` for example, or one that
+catches any exception, watches nothing and would stay green over a wrong answer.
 
 | Kind | When | The reference |
 |---|---|---|
@@ -32,8 +38,8 @@ the trial needs no issue.
 
 ## Labels and references are two questions
 
-**The label says WHAT the store does. The reference says WHERE that is shown.** Every skip of a
-store behaviour carries exactly one of each.
+**The label says WHAT the store does. The reference says WHERE that is shown.** Every override that
+changes an expected behaviour to the store's behaviour carries exactly one of each.
 
 | Label | What the store does | Also recorded in |
 |---|---|---|
@@ -161,12 +167,14 @@ canary for the control's wiring.
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
   suite. Pin each link to the package version this repository runs.
 - **Build a control only where upstream has none.**
-- **Every existing skip gets a reference or goes.** Measured 2026-09-15 in the spec project: 83 uses
+- **Every existing override gets a label and a reference, or goes.** The 83 uses of
+  `Task.CompletedTask` assert nothing, so each of those becomes an override with an exact expected
+  behaviour, or the base test runs as it is. Measured 2026-09-15 in the spec project: 83 uses
   of `Task.CompletedTask`, 116 of `ThrowsAsync`, 113 of `AssertTranslationFailed`, 268 of
   `ApplyNotSupported`.
-- **Decide first how the reflection test tells a skip from an override that calls the base and only
-  adds assertions.** The second is not a suppression. Tier D has none, so the trial does not need
-  the answer.
+- **Decide first what an override that calls the base unchanged and only ADDS assertions needs.** It
+  changes no expected behaviour, so it is not what a label describes. Tier D has none, so the trial
+  does not need the answer.
 - **Then remove the ratchet**: `eng/ratchet.sh`, both baseline files, and the direction gate in CI.
 
 **This reverses a LOCKED guardrail.** CLAUDE.md says *"Never `[Skip]`, delete, or override a spec
