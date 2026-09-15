@@ -627,6 +627,33 @@ to override, and the pressure is hardest to see when a principled-looking mechan
 hand. Four overrides with a control behind each one looked like rigour. Give every tier a way to
 record a red before giving it a way to adopt a base.
 
+### Amendment 2026-09-15 — Tier D is green, and every override names its evidence
+
+**The two 2026-09-14 amendments above left Tier D red and gated by a script. Both halves are
+superseded for this tier.** It is the trial of `docs/plans/v10/test-overhaul.md`: a green suite, as
+EF Core's own providers run, made stricter in traceability. Tier D is 234 tests and all pass.
+
+**An override carries an attribute, and the attribute is both label and reference.** Its type says what
+the store does — `StoreLimit`, `StoreDefect` with a section of `docs/upstream-defects.md`,
+`StoreIssue` with a tracker key — and its arguments say where that is shown. Every Tier D reference is
+a control test of a `Direct*` class, named by `typeof` and `nameof` so the compiler keeps it honest.
+`OverrideAudit` fails the tier's own run on an override without a reason or disagreeing with its
+control, and writes the audit. Each of its rules was shown to fail on a deliberate mistake first.
+
+**No upstream reference exists for this family, and that was measured.** MongoDB's release tag
+`v10.0.3` has no test that queries an owned collection; its two `SelectMany` refusals select from
+`string[]`. The first classification cited them as "our shape", and it was wrong. The same pass
+relabelled `GroupBy` from an issue to a limit, because `EF-149` groups a root set.
+
+**The control changed from "fails where the store fails" to "asserts what the store does".** Where the
+base swallows the store's exception, the test asserts xUnit's failure together with the store's own
+type and text inside it, so it still goes red when the store changes. Two tests where MongoDB answers
+correctly what EF's base expects to refuse (`dotnet/efcore#36400`) write the query out, and record why
+as a `Deviation`.
+
+**`eng/tier-d-control.py`, `test/tier-d-overrides.txt` and `test/tier-d-control-pending.txt` are
+deleted.** Tier D stays in the ratchet at zero failures until the other tiers are converted.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

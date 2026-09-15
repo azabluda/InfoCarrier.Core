@@ -177,8 +177,8 @@ family as its issue #36403.
 
 **Evidence.** `DirectProjectionTest` in `test/InfoCarrier.Core.DocumentStoreTests`, which runs EF's
 bases on plain EF Core over the same embedded MongoDB **with InfoCarrier removed**. Identical
-failures with and without the wire, so none of this is ours. `eng/tier-d-control.py` gates that
-comparison.
+failures with and without the wire, so none of this is ours. Each Tier D test that meets it carries
+`[StoreDefect("1.6", …)]` naming that control test, and `OverrideAudit` checks the two agree.
 
 **What it blocks.** Nothing in InfoCarrier. **It bounds what Tier D can PROVE**, which is the honest
 cost: where the store crashes, this repository cannot tell whether the wire would have carried the
@@ -270,7 +270,7 @@ tracking arms.
 reason this entry exists at all. ADR-010's projection split cuts the untranslatable node before
 serialization, so the server receives only `e.RequiredAssociate.Int` and never sees what it cannot
 translate. Those two tests pass over the wire and fail without it — the only such pair in the tier,
-recorded in `test/tier-d-control-allowances.txt`. `ProjectionPayloadTest` proves it is a genuine
+and `ClientEvaluatedProjectionTest` measures which methods it covers. `ProjectionPayloadTest` proves it is a genuine
 push-down rather than whole documents crossing behind a green test.
 
 ### Their tracker, searched 2026-09-14, and what it changes

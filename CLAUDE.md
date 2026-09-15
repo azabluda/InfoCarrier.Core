@@ -97,11 +97,11 @@ measurement.
 **TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
 (`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS SPEC BASES SINCE 2026-09-14.** This
 paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and it adopts the whole
-`OwnedNavigations` family. **The tier is 230 tests in two halves and the failure list has to be read
-that way**: 136 run the six bases over the wire (14 red), and 94 run the SAME bases with InfoCarrier
-REMOVED — the `Direct*` classes, plain EF Core on the same embedded MongoDB (40 red). **The
-control's reds are the point rather than noise**: they are what MongoDB cannot do, measured rather
-than asserted, and they are the citation behind every override on the wire side. **The reason that
+`OwnedNavigations` family. **The tier is 234 tests in two halves, and all of them pass since
+2026-09-15**: the six bases over the wire, and the SAME bases with InfoCarrier REMOVED — the
+`Direct*` classes, plain EF Core on the same embedded MongoDB. **The control documents the store**:
+each of its overrides asserts exactly what MongoDB does, and each wire override names the control
+test that shows it. **The reason that
 sentence was written is unchanged and is what still governs which bases come here**: this tier
 exists to prove a negative that no relational tier can, that this provider is not relational-only
 (#51), and a compliance test demanding every base be adopted against a document store would misread
@@ -123,32 +123,34 @@ baseline and not one per project, and Tier D is the case that argues for it rath
 that family on one tier alone would MOVE tests between projects — exactly the "fix in one, break in
 the other" a single baseline exists to catch.
 
-**A RED MUST SAY SOMETHING ABOUT THIS PROVIDER, WHICH IS WHAT "a red test is information" MEANS.**
-If the backing store refuses a query then this provider cannot answer it either, so the red restates
-the obvious and is noise in the failure list. **That argument is only as good as the evidence the
-store really does refuse**, so every Tier D override is listed in `test/tier-d-overrides.txt` with a
-citation and gated by `eng/tier-d-control.py`. Three classes of evidence, and the weaker ones say so:
-**UPSTREAM** (MongoDB's own suite declares the feature unsupported — 7), **CONTROL** (our wire-free
-run reproduces the refusal — 13), and **REWRITTEN** (EF's base has already caught the outcome, so
-the test asserts the real result instead of the assertion failure — 4). **A crash or a wrong answer
-is never overridden**: a store that means "no" says so, and suppressing a crash buries somebody's
-defect.
+**EVERY OVERRIDE SAYS WHAT THE STORE DOES AND WHERE THAT IS SHOWN, AND TIER D IS WHERE THAT RULE IS
+TRIED FIRST** (2026-09-15, `docs/plans/v10/test-overhaul.md`). The rule is Microsoft's green suite,
+made stricter in traceability. An override carries an attribute whose TYPE is the label —
+`[StoreLimit]` for a refusal by design, `[StoreDefect("1.6")]` for a crash or a wrong answer with its
+section in `docs/upstream-defects.md`, `[StoreIssue("EF-250")]` for a tracker entry — and whose
+ARGUMENTS are the reference: an upstream link at the release tag's commit and line, or a
+`typeof`/`nameof` naming a control test. `[InfoCarrierDefect]` is the last resort for a defect of
+ours that cannot be fixed yet, and only the owner files its issue. **A skip is permitted only with an
+upstream reference**, because only upstream's own choice justifies asserting nothing, and it copies
+upstream's justification text. **A crash or a wrong answer is never `LIMIT`**: a store that means
+"no" says so.
 
-**AND THE CONTROL IS A CONFLICT OF INTEREST, WHICH IS WHY IT IS GATED RATHER THAN TRUSTED.** A
-worse-wired control fails more, so more of this tier's reds are attributed to the store and this
-provider looks cleaner; no bad intent is needed and the failure mode is silent. `tier-d-control.py`
-checks both directions and has fired on three real mistakes. **Nine reds that COULD have been
-overridden were left red** on the same reasoning read backwards: their failure is the base's own
-assertion, so an override would watch nothing and stay green even if the store began returning wrong
-rows.
+**`OverrideAudit` (in the shared harness) enforces it, and `OverrideAuditTest` runs it in the tier.**
+It fails on an override with no reason, on two reasons without distinct `Case` values, on an upstream
+link without a commit and a line, on a skip without an upstream reference, on a `DEFECT` naming a
+missing section, and on a wire override whose control test documents a different label. Its output is
+the audit: every override with its label, reference, skip and deviation. Each rule was shown to fail
+on a deliberate mistake before it was trusted.
 
-**AN OVERRIDE HERE IS LEGITIMATE ONLY IF IT ADOPTS ONE THE REFERENCE PROVIDER ALREADY SHIPS**, which
-is the same rule this file states for SQLite, and it must cite it. MongoDB's own `MongoComplianceTest`
+**EVERY TIER D REFERENCE IS SELF-HOSTED, AND THAT IS A FINDING.** MongoDB's own `MongoComplianceTest`
 lists all six `OwnedNavigations` bases in `IgnoredTestBases` under *"Test bases added in EF10+"*,
-which means "we have not run this base", NOT "the store cannot do this" — so there is nothing to
-adopt and all 38 stand red. **`OwnedNavigationsServerSideControlTest` answers WHOSE defect each one
-is; it never decides whether a red is allowed**, and conflating those two is what produced the
-overrides. Its own project exists because
+which means "we have not run this base", NOT "the store cannot do this". The one upstream test that
+looked close, `UnsupportedQueryTests.cs` at `v10.0.3`, selects from `string[]`, a primitive
+collection, and this family selects from owned entities. **The control is a conflict of interest**: a
+worse-wired control fails more and makes InfoCarrier look cleaner. Every control assertion names an
+exact outcome, and the control classes that need no override must stay green without one.
+`eng/tier-d-control.py` and its two text manifests gated this until 2026-09-15 and are deleted. Its own
+project exists because
 `MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles against a 10.0.1 floor,
 which also makes it the one place the product runs on a NEWER EF Core than it was built with.
 **It found #100 on its first run and the same change fixes it**: updating an entity that owns
@@ -192,7 +194,6 @@ estimate a count, and never derive one figure from the others.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/ratchet.sh <results.trx> [more.trx ...] <baseline-file>` | **CI only**, and wired: `.github/workflows/build.yml`'s *spec-ratchet* job invokes it against `test/known-failures.txt`. The suite is legitimately red during build-out and tests must not be skipped to force it green, so CI gates on the *direction* of the failure count, and on the **total** as well. **It reads its figures out of the TRX**, which counts the skips the console block's `passed` and `failed` do not. It also writes them to `counters.env` beside the TRX, which is where the README's spec-suite badge gets its numbers — one parser, not two. **It gates on the failing test NAMES as well**, read by `eng/trx-failures.py` and diffed against `test/known-failures.names.txt`: a change that fixes four tests and breaks four others leaves the count untouched. It publishes that delta to `$GITHUB_STEP_SUMMARY`, which the test report action cannot do because it does not know the baseline. **It takes several TRX and the LAST argument is the baseline**: counters are summed and names unioned into one list, gated against the one baseline pair. One baseline and not one per project, because a test that MOVES between projects would otherwise read as a fix in one and a break in the other. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. What `test/known-failures.names.txt` holds and what `ratchet.sh` diffs. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
-| `eng/tier-d-control.py <results.trx>` | **Gates the integrity of ADR-009 Tier D's wire-free control**, and CI runs it before the ratchet. Tier D overrides a specification test when the same base fails with InfoCarrier REMOVED, and that evidence is generated by this repository about its own product: **a worse-wired control fails more, so more of Tier D's reds are attributed to the store and this provider looks cleaner.** No bad intent is needed and the failure mode is silent, because a misconfigured control looks exactly like a less capable store. It checks BOTH directions against `test/tier-d-overrides.txt` and `test/tier-d-control-allowances.txt`: the control may not fail what Tier D passes (it is misconfigured, or a red is being hidden), and it may not PASS what Tier D overrides (a real failure wearing a citation). It has fired on three real mistakes so far. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
@@ -527,9 +528,9 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 73  TOTAL: 29788`** (2026-09-14), across the two projects `measure.sh` now runs:
-**19 of 29558** in the spec project and **54 of 230** in ADR-009 Tier D — of which 14 are the wire's
-and 40 are its wire-free control's. This line read
+**`FAILING: 19  TOTAL: 29792`** (2026-09-15), across the two projects `measure.sh` now runs:
+**19 of 29558** in the spec project and **0 of 234** in ADR-009 Tier D, which went green under
+`docs/plans/v10/test-overhaul.md`. It read `FAILING: 73  TOTAL: 29788` on 2026-09-14, and before that
 `Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238` (2026-09-07, `v12`) until then, and
 was three measurements stale — the badge had moved to 29,558 while it still said 29,516.
 **Tiers A-C are unmoved at 19**; the whole rise is Tier D joining the baseline, and the name diff

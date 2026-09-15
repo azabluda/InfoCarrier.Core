@@ -1,10 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Associations;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Xunit;
-using Xunit.Sdk;
 
 namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 
@@ -14,48 +14,39 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 /// <remarks>
 ///     <para>
 ///         <b>The sixth, <c>OwnedNavigationsCollectionInfoCarrierTest</c>, is in a file of its own</b>
-///         because it was adopted first to find out what adopting this family against a document
-///         store costs. It carries the family's reasoning; this file is the rest of the family on
-///         the shape that one settled.
+///         because it was adopted first to find out what this family costs against a document store.
 ///     </para>
 ///     <para>
-///         <b>THREE OVERRIDES IN THIS FILE, EACH CARRYING A CITATION, AND EVERYTHING ELSE IS RED.</b>
-///         The rule is that a red must say something about THIS provider. If the backing store
-///         refuses a query then this provider cannot answer it either, so the red restates the
-///         obvious and is noise in the failure list. That argument is only as good as the evidence
-///         the store really does refuse, and the evidence has to be THEIRS: a citation to the
-///         store's own suite declaring the feature unsupported. Without one, "the store cannot do
-///         this" is our assertion about somebody else's code, and the test stays red.
+///         <b>EVERY OVERRIDE SAYS WHAT THE STORE DOES AND WHERE THAT IS SHOWN, AND NONE IS A
+///         SKIP.</b> The attribute's type is the label — <c>LIMIT</c>, <c>DEFECT</c> or
+///         <c>ISSUE</c> — and its arguments name the test of a <c>Direct*</c> control that shows the
+///         same behaviour with InfoCarrier removed. <c>OverrideAudit</c> fails the build when an
+///         override has no reason or disagrees with its control. <c>docs/plans/v10/test-overhaul.md</c>
+///         is the reading.
 ///     </para>
 ///     <para>
-///         <b>Of 38 reds, 7 cases across 4 methods cleared that bar and 31 did not.</b> The reason
-///         so few is worth knowing: <c>MongoDB.EntityFrameworkCore</c>'s specification suite maps
-///         Northwind as separate COLLECTIONS and contains no owned or embedded collection anywhere,
-///         so its tracked issues — EF-X001 "subquery selection" and the rest — are about
-///         cross-collection <c>$lookup</c> joins and say nothing about a nested document. Matching
-///         them on the NAME of an operator would be a false match: <c>SelectMany</c> across
-///         collections is a join, and <c>SelectMany</c> within a document is an <c>$unwind</c>.
-///         Their hand-written <c>FunctionalTests/Query/UnsupportedQueryTests.cs</c> is the one
-///         place that does use an embedded array, and it is what the overrides below cite.
+///         <b>Every reference here is self-hosted, and that is a finding about the store.</b> The
+///         first classification cited MongoDB's <c>UnsupportedQueryTests.cs</c> for
+///         <c>SelectMany</c>, calling its test "an embedded array, which is our shape". At the
+///         <c>v10.0.3</c> tag both of those tests select from <c>string[]</c>, a primitive
+///         collection, and this family selects from owned entities. MongoDB's suite has not tested
+///         queries over nested documents, so this tier measures them itself.
 ///     </para>
 ///     <para>
-///         <b>So this tier is measuring nested-document query support that the store's own
-///         specification suite has never measured</b>, which is the strongest thing #51 has yet
-///         got out of it. Several reds are plausibly unimplemented rather than impossible.
+///         <b>No InfoCarrier defect is overridden here, because there is none.</b> Every behaviour
+///         below is reproduced by the control with the wire removed. The two cases where this
+///         provider does better than the raw store need no override at all:
+///         <c>Select_untranslatable_method_on_associate_scalar_property</c> passes here and fails
+///         on MongoDB alone, because the projection split evaluates the method on the client.
 ///     </para>
 ///     <para>
-///         <b>The CORE bases, not the relational ones, and that is not a style choice.</b> Tier B
-///         adopts <c>OwnedNavigations*RelationalTestBase</c> because SQLite is a relational store.
-///         MongoDB is not, so the relational bases' assumptions — tables, a join, golden SQL — have
-///         no meaning here. The core base is the part of the family that asks about the model and
-///         the query rather than about the statement text.
+///         <b>The CORE bases, not the relational ones.</b> Tier B adopts
+///         <c>OwnedNavigations*RelationalTestBase</c> because SQLite is relational; MongoDB is not, so
+///         golden SQL and joins have no meaning here.
 ///     </para>
 ///     <para>
-///         <b>A FIXTURE PER CLASS, BECAUSE ONE SERVER PER TEST CLASS IS THIS TIER'S RULE.</b> xUnit
-///         gives each class its own <c>IClassFixture</c> instance, so six classes start six
-///         <c>mongod</c> processes whatever their names. Naming each store separately is what keeps
-///         a failure readable: the store name is the database name, so a dump says which class the
-///         data belonged to.
+///         <b>A fixture per class, because one server per test class is this tier's rule.</b> The
+///         store name is the database name, so a failure says which class the data belonged to.
 ///     </para>
 /// </remarks>
 public class OwnedNavigationsMiscellaneousInfoCarrierTest(OwnedNavigationsMiscellaneousFixture fixture)
@@ -70,233 +61,212 @@ public class OwnedNavigationsProjectionInfoCarrierTest(OwnedNavigationsProjectio
     : OwnedNavigationsProjectionTestBase<OwnedNavigationsProjectionFixture>(fixture)
 {
     /// <summary>
-    ///     <c>SelectMany</c> over an owned collection: declared unsupported by the store, so a red
-    ///     here would say nothing about the wire.
+    ///     The prefix of EF's translation failure, which survives xUnit shortening the message.
     /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>THE CITATION IS THE WHOLE JUSTIFICATION FOR THIS OVERRIDE.</b>
-    ///         <c>MongoDB.EntityFrameworkCore</c>'s own
-    ///         <c>FunctionalTests/Query/UnsupportedQueryTests.cs</c> declares <c>SelectMany</c> over
-    ///         a non-primitive collection unsupported and asserts the same
-    ///         <c>InvalidOperationException</c>, on an EMBEDDED array
-    ///         (<c>p.mainAtmosphere</c>) rather than a cross-collection reference. The shape is
-    ///         ours and the verdict is theirs.
-    ///     </para>
-    ///     <para>
-    ///         <b>Why that earns an override where 31 other reds do not.</b> A red is information
-    ///         about THIS provider. If the backing store refuses a query, this provider cannot
-    ///         answer it either, and the red restates the obvious. The bar is a citation: without
-    ///         one, the claim "the store cannot do this" is our own assertion about somebody else's
-    ///         code, and it stays red. Their specification suite maps Northwind as separate
-    ///         COLLECTIONS and never exercises an owned collection, so its issue numbers — EF-X001
-    ///         and the rest — describe cross-collection joins and are not evidence about nested
-    ///         documents. <c>UnsupportedQueryTests</c> is, because it uses an embedded array.
-    ///     </para>
-    ///     <para>
-    ///         <b>Both tracking arms fail identically</b>, because the store refuses to translate
-    ///         before EF reaches its own rule about tracking an owned entity without its owner.
-    ///     </para>
-    /// </remarks>
+    private const string NotTranslated = "The LINQ expression 'DbSet<RootEntity>()";
+
+    /// <summary><c>SelectMany</c> over an owned collection does not translate, in either arm.</summary>
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.SelectMany_associate_collection))]
     public override Task SelectMany_associate_collection(QueryTrackingBehavior queryTrackingBehavior)
-        => RefusedByTheStore(queryTrackingBehavior, () => base.SelectMany_associate_collection(queryTrackingBehavior));
+        => NotTranslatedInEitherArm(queryTrackingBehavior, () => base.SelectMany_associate_collection(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.SelectMany_nested_collection_on_required_associate))]
     public override Task SelectMany_nested_collection_on_required_associate(QueryTrackingBehavior queryTrackingBehavior)
-        => RefusedByTheStore(
+        => NotTranslatedInEitherArm(
             queryTrackingBehavior, () => base.SelectMany_nested_collection_on_required_associate(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.SelectMany_nested_collection_on_optional_associate))]
     public override Task SelectMany_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
-        => RefusedByTheStore(
+        => NotTranslatedInEitherArm(
             queryTrackingBehavior, () => base.SelectMany_nested_collection_on_optional_associate(queryTrackingBehavior));
 
-    /// <summary>
-    ///     The store's refusal reaches the two tracking arms as two different failures, and this is
-    ///     the one helper that says so.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>Under <c>NoTracking</c> the refusal arrives as a translation failure</b> and
-    ///         <c>AssertTranslationFailed</c> is EF's own way to state that — the same call
-    ///         <c>MongoDB.EntityFrameworkCore</c>'s suite uses for its unsupported shapes.
-    ///     </para>
-    ///     <para>
-    ///         <b>Under <c>TrackAll</c> the base has already caught the exception and is comparing
-    ///         its MESSAGE</b> against EF's rule about tracking an owned entity without its owner,
-    ///         a rule the query never reaches because the store refuses first. So the failure that
-    ///         escapes is the base's own <c>EqualException</c>, and asserting it is the statement:
-    ///         EF wrote the same idiom for SQLite and Tier B adopted it verbatim in
-    ///         <c>OwnedNavigationsSetOperationsQueryInfoCarrierTest.Over_associate_collection_projected</c>.
-    ///     </para>
-    ///     <para>
-    ///         <b>One citation covers both arms</b>, because one refusal causes both.
-    ///     </para>
-    /// </remarks>
-    private static Task RefusedByTheStore(QueryTrackingBehavior queryTrackingBehavior, Func<Task> test)
-        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? Assert.ThrowsAsync<EqualException>(test)
-            : AssertTranslationFailed(test);
-
-    /// <summary>
-    ///     A subquery in a projection: the store refuses to translate it.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>CITED TO THE CONTROL, NOT UPSTREAM, WHICH IS A WEAKER CLAIM AND SHOULD READ AS
-    ///         ONE.</b> <c>OwnedNavigationsDirectStoreFixture</c> runs this shape on plain EF Core
-    ///         over the same MongoDB and gets the identical refusal, so the wire is not the cause.
-    ///         Their own suite says nothing about it: EF-X001 "subquery selection" covers
-    ///         subqueries ACROSS COLLECTIONS, which on a document store is a join, and this is a
-    ///         subquery WITHIN one document. Matching those on the operator name would be a false
-    ///         match.
-    ///     </para>
-    ///     <para>
-    ///         <b>Only the untracked arm is overridden.</b> Under <c>TrackAll</c> the base catches
-    ///         the exception and compares its message, so what escapes is xUnit's assertion failure
-    ///         rather than the store's refusal. An override there would assert almost nothing and
-    ///         would stay green if the store began returning wrong rows, so that arm stays RED.
-    ///     </para>
-    /// </remarks>
+    /// <summary>A subquery inside a projection does not translate, in either arm.</summary>
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_required_related_FirstOrDefault))]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior)
-            : StoreBehaviour.Refuses(
-                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior),
-                nameof(InvalidOperationException));
+        => NotTranslatedInEitherArm(
+            queryTrackingBehavior, () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_optional_related_FirstOrDefault))]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior)
-            : StoreBehaviour.Refuses(
-                () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior),
-                nameof(InvalidOperationException));
+        => NotTranslatedInEitherArm(
+            queryTrackingBehavior, () => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_subquery_FirstOrDefault_complex_collection))]
     public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior)
-            : StoreBehaviour.Refuses(
-                () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior),
-                nameof(InvalidOperationException));
+        => NotTranslatedInEitherArm(
+            queryTrackingBehavior, () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
 
-    /// <summary>
-    ///     Projecting an UNMAPPED property of an owned entity: the driver refuses by name.
-    /// </summary>
-    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" path="/remarks" />
+    /// <summary>The driver refuses an unmapped property by name, in either arm.</summary>
+    [StoreLimit(typeof(DirectProjectionTest), nameof(DirectProjectionTest.Select_unmapped_associate_scalar_property))]
     public override Task Select_unmapped_associate_scalar_property(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? base.Select_unmapped_associate_scalar_property(queryTrackingBehavior)
+            ? StoreBehaviour.BaseExpectedAnotherException(
+                () => base.Select_unmapped_associate_scalar_property(queryTrackingBehavior),
+                "ExpressionNotSupportedException",
+                "does not have a member named Unmapped")
             : StoreBehaviour.Refuses(
                 () => base.Select_unmapped_associate_scalar_property(queryTrackingBehavior),
                 "ExpressionNotSupportedException");
 
     /// <summary>
-    ///     A navigation from one ROOT to another, which a document store has no join to resolve.
+    ///     A navigation from one root to another: a refusal when tracked, a crash when not.
     /// </summary>
-    /// <remarks>
-    ///     <b>THE TWO ARMS FAIL FOR DIFFERENT REASONS AND ONLY ONE IS A REFUSAL.</b> Under
-    ///     <c>TrackAll</c> EF states its own rule about tracking an owned entity without its owner
-    ///     and the query stops there; that is a refusal and is overridden. Under <c>NoTracking</c>
-    ///     the store raises a <c>NullReferenceException</c> - a CRASH rather than a refusal,
-    ///     reproduced by the control without the wire, and left RED because a store that means "no"
-    ///     says so. It is one of this tier's candidate upstream defects.
-    /// </remarks>
+    [StoreLimit(
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation),
+        Case = nameof(QueryTrackingBehavior.TrackAll))]
+    [StoreDefect(
+        "1.6",
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_required_associate_via_optional_navigation),
+        Case = nameof(QueryTrackingBehavior.NoTracking))]
     public override Task Select_required_associate_via_optional_navigation(QueryTrackingBehavior queryTrackingBehavior)
+        => StoreBehaviour.Refuses(
+            () => base.Select_required_associate_via_optional_navigation(queryTrackingBehavior),
+            queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+                ? nameof(InvalidOperationException)
+                : nameof(NullReferenceException));
+
+    /// <summary>Projecting through a null optional owned reference crashes. The tracked arm passes.</summary>
+    [StoreDefect(
+        "1.6",
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_required_nested_on_optional_associate),
+        Case = nameof(QueryTrackingBehavior.NoTracking))]
+    public override Task Select_required_nested_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
-            ? StoreBehaviour.Refuses(
-                () => base.Select_required_associate_via_optional_navigation(queryTrackingBehavior),
-                nameof(InvalidOperationException))
-            : base.Select_required_associate_via_optional_navigation(queryTrackingBehavior);
+            ? base.Select_required_nested_on_optional_associate(queryTrackingBehavior)
+            : StoreBehaviour.Refuses(
+                () => base.Select_required_nested_on_optional_associate(queryTrackingBehavior),
+                nameof(NullReferenceException));
+
+    /// <inheritdoc cref="Select_required_nested_on_optional_associate" />
+    [StoreDefect(
+        "1.6",
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_optional_nested_on_optional_associate),
+        Case = nameof(QueryTrackingBehavior.NoTracking))]
+    public override Task Select_optional_nested_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Select_optional_nested_on_optional_associate(queryTrackingBehavior)
+            : StoreBehaviour.Refuses(
+                () => base.Select_optional_nested_on_optional_associate(queryTrackingBehavior),
+                nameof(NullReferenceException));
+
+    /// <summary>An absent optional owned reference is not treated as null. The tracked arm passes.</summary>
+    [StoreDefect(
+        "1.6",
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_nested_collection_on_optional_associate),
+        Case = nameof(QueryTrackingBehavior.NoTracking))]
+    public override Task Select_nested_collection_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? base.Select_nested_collection_on_optional_associate(queryTrackingBehavior)
+            : StoreBehaviour.Refuses(
+                () => base.Select_nested_collection_on_optional_associate(queryTrackingBehavior),
+                nameof(InvalidOperationException));
+
+    /// <summary>
+    ///     Reading a value-type property through a null optional owned reference crashes, in both arms.
+    /// </summary>
+    [StoreDefect(
+        "1.6",
+        typeof(DirectProjectionTest),
+        nameof(DirectProjectionTest.Select_value_type_property_on_null_associate_throws))]
+    public override Task Select_value_type_property_on_null_associate_throws(QueryTrackingBehavior queryTrackingBehavior)
+        => StoreBehaviour.BaseExpectedAnotherException(
+            () => base.Select_value_type_property_on_null_associate_throws(queryTrackingBehavior),
+            nameof(NullReferenceException),
+            "Object reference not set");
+
+    /// <summary>
+    ///     Untracked, the store's translation failure escapes. Tracked, the base compares its message
+    ///     against EF's tracking rule, so the store's text is in xUnit's failure instead.
+    /// </summary>
+    private static Task NotTranslatedInEitherArm(QueryTrackingBehavior queryTrackingBehavior, Func<Task> test)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? StoreBehaviour.BaseExpectedAnotherMessage(test, NotTranslated)
+            : StoreBehaviour.Refuses(test, nameof(InvalidOperationException));
 }
 
 /// <inheritdoc cref="OwnedNavigationsMiscellaneousInfoCarrierTest" />
 public class OwnedNavigationsSetOperationsInfoCarrierTest(OwnedNavigationsSetOperationsFixture fixture)
     : OwnedNavigationsSetOperationsTestBase<OwnedNavigationsSetOperationsFixture>(fixture)
 {
-    /// <summary>
-    ///     <c>Concat</c> over an owned collection: the store refuses to translate it, in both
-    ///     tracking arms.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>CITED TO THE CONTROL, NOT UPSTREAM.</b> The wire-free control gets the identical
-    ///         refusal, so this is not the wire. Their own suite declares <c>Except</c> and
-    ///         <c>Intersect</c> unsupported and says nothing about <c>Concat</c> - and declares
-    ///         those for CROSS-COLLECTION shapes rather than a collection nested inside one
-    ///         document, so there is no upstream citation to take and this is our own measurement.
-    ///     </para>
-    ///     <para>
-    ///         <c>Over_different_collection_properties</c> is NOT overridden: it fails with the
-    ///         store's <c>$size must be an array</c>, a crash rather than a refusal, and stays red
-    ///         as a candidate upstream defect.
-    ///     </para>
-    /// </remarks>
+    /// <summary><c>Concat</c> over an owned collection does not translate, in either arm.</summary>
+    [StoreLimit(typeof(DirectSetOperationsTest), nameof(DirectSetOperationsTest.Over_associate_collection_projected))]
     public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
         => StoreBehaviour.Refuses(
             () => base.Over_associate_collection_projected(queryTrackingBehavior),
             nameof(InvalidOperationException));
 
     /// <inheritdoc cref="Over_associate_collection_projected" />
+    [StoreLimit(
+        typeof(DirectSetOperationsTest),
+        nameof(DirectSetOperationsTest.Over_assocate_collection_Select_nested_with_aggregates_projected))]
     public override Task Over_assocate_collection_Select_nested_with_aggregates_projected(
         QueryTrackingBehavior queryTrackingBehavior)
         => StoreBehaviour.Refuses(
             () => base.Over_assocate_collection_Select_nested_with_aggregates_projected(queryTrackingBehavior),
             nameof(InvalidOperationException));
+
+    /// <summary>The store builds a pipeline whose <c>$size</c> operand is not an array.</summary>
+    [StoreDefect(
+        "1.9",
+        typeof(DirectSetOperationsTest),
+        nameof(DirectSetOperationsTest.Over_different_collection_properties),
+        Deviation = "Over the wire the store's MongoCommandException arrives wrapped as InfoCarrierServerException, "
+            + "so the store's own text is asserted as well, because that type wraps every server failure.")]
+    public override Task Over_different_collection_properties()
+        => StoreBehaviour.Refuses(
+            base.Over_different_collection_properties,
+            "InfoCarrierServerException",
+            "The argument to $size must be an array");
 }
 
 /// <inheritdoc cref="OwnedNavigationsMiscellaneousInfoCarrierTest" />
 public class OwnedNavigationsStructuralEqualityInfoCarrierTest(OwnedNavigationsStructuralEqualityFixture fixture)
     : OwnedNavigationsStructuralEqualityTestBase<OwnedNavigationsStructuralEqualityFixture>(fixture)
 {
-    /// <summary>
-    ///     Comparing two owned entities as wholes: the driver refuses by name.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>CITED TO THE CONTROL, NOT UPSTREAM.</b> Structural equality over owned entities
-    ///         is untested in <c>MongoDB.EntityFrameworkCore</c>'s suite in any shape, so there is
-    ///         nothing to cite but our own measurement: the wire-free control raises the identical
-    ///         <c>ExpressionNotSupportedException</c>.
-    ///     </para>
-    ///     <para>
-    ///         The four <c>Nested_*_with_inline</c> and <c>_with_parameter</c> tests here are NOT
-    ///         overridden. Two fail inside the base's own assertion, so an override would assert
-    ///         that the assertion failed and nothing more. The other two fail because the store
-    ///         ANSWERS a query EF's base expects it to refuse (EF #36400), and the control shows
-    ///         the answer is CORRECT. Both are more informative as red.
-    ///     </para>
-    /// </remarks>
+    /// <summary>The driver refuses to compare two owned entities as wholes.</summary>
+    [StoreLimit(typeof(DirectStructuralEqualityTest), nameof(DirectStructuralEqualityTest.Two_associates))]
     public override Task Two_associates()
         => StoreBehaviour.Refuses(base.Two_associates, "ExpressionNotSupportedException");
 
     /// <inheritdoc cref="Two_associates" />
+    [StoreLimit(typeof(DirectStructuralEqualityTest), nameof(DirectStructuralEqualityTest.Two_nested_associates))]
     public override Task Two_nested_associates()
         => StoreBehaviour.Refuses(base.Two_nested_associates, "ExpressionNotSupportedException");
 
     /// <inheritdoc cref="Two_associates" />
+    [StoreLimit(typeof(DirectStructuralEqualityTest), nameof(DirectStructuralEqualityTest.Not_equals))]
     public override Task Not_equals()
         => StoreBehaviour.Refuses(base.Not_equals, "ExpressionNotSupportedException");
 
+    /// <summary>Comparing a whole owned collection is refused with the store's own exception.</summary>
+    [StoreLimit(typeof(DirectStructuralEqualityTest), nameof(DirectStructuralEqualityTest.Nested_collection_with_inline))]
+    public override Task Nested_collection_with_inline()
+        => StoreBehaviour.BaseExpectedAnotherException(
+            base.Nested_collection_with_inline, nameof(NotSupportedException), "Entity to entity comparison is not supported");
+
+    /// <inheritdoc cref="Nested_collection_with_inline" />
+    [StoreLimit(typeof(DirectStructuralEqualityTest), nameof(DirectStructuralEqualityTest.Nested_collection_with_parameter))]
+    public override Task Nested_collection_with_parameter()
+        => StoreBehaviour.BaseExpectedAnotherException(
+            base.Nested_collection_with_parameter, nameof(NotSupportedException), "Entity to entity comparison is not supported");
+
     /// <summary>
-    ///     EF expects this to be refused (#36400). This store ANSWERS it, and the answer is right.
+    ///     EF's base expects a refusal (<c>dotnet/efcore#36400</c>). This store ANSWERS, correctly.
     /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>THE QUERY IS REWRITTEN HERE RATHER THAN SUPPRESSED, AND THAT IS THE WHOLE
-    ///         POINT.</b> <c>OwnedNavigationsStructuralEqualityTestBase</c> wraps this in
-    ///         <c>Assert.ThrowsAsync&lt;InvalidOperationException&gt;</c> for EF issue #36400, so
-    ///         when nothing throws, the base never compares the rows and the failure that escapes
-    ///         is xUnit's own. An override asserting THAT would stay green whether this store
-    ///         returned the right row, the wrong row, or none at all.
-    ///     </para>
-    ///     <para>
-    ///         So this asserts what the seed data implies: exactly one root carries that nested
-    ///         associate. EF's expectation was wrong for this store, and the right answer is
-    ///         written down instead of the disagreement being hidden.
-    ///     </para>
-    /// </remarks>
+    [StoreIssue(
+        "dotnet/efcore#36400",
+        typeof(DirectStructuralEqualityTest),
+        nameof(DirectStructuralEqualityTest.Nested_associate_with_inline),
+        Deviation = DirectStructuralEqualityTest.WrittenOut)]
     public override async Task Nested_associate_with_inline()
     {
         using DbContext context = Fixture.CreateContext();
@@ -320,10 +290,11 @@ public class OwnedNavigationsStructuralEqualityInfoCarrierTest(OwnedNavigationsS
     }
 
     /// <inheritdoc cref="Nested_associate_with_inline" />
-    /// <remarks>
-    ///     The same shape through a captured variable rather than an inline initializer, which is
-    ///     the only thing the base varies between the two.
-    /// </remarks>
+    [StoreIssue(
+        "dotnet/efcore#36400",
+        typeof(DirectStructuralEqualityTest),
+        nameof(DirectStructuralEqualityTest.Nested_associate_with_parameter),
+        Deviation = DirectStructuralEqualityTest.WrittenOut)]
     public override async Task Nested_associate_with_parameter()
     {
         using DbContext context = Fixture.CreateContext();
@@ -343,85 +314,6 @@ public class OwnedNavigationsStructuralEqualityInfoCarrierTest(OwnedNavigationsS
             .ToListAsync();
 
         Assert.Single(result);
-    }
-
-    /// <summary>
-    ///     Comparing a whole owned COLLECTION: this store refuses, with its own exception type.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>Rewritten rather than suppressed, for the same reason as
-    ///         <see cref="Nested_associate_with_inline" />.</b> The base expects EF's
-    ///         <c>InvalidOperationException</c> (#36400) and this store raises
-    ///         <c>NotSupportedException</c> instead, so the base's own assertion is what fails and
-    ///         catching THAT would assert almost nothing. Asserting the store's exception directly
-    ///         means the test goes red the day the store answers, or refuses differently.
-    ///     </para>
-    ///     <para>
-    ///         Cited to the control, not upstream: the wire-free run raises the identical
-    ///         exception, and MongoDB's own suite exercises no owned collection at all.
-    ///     </para>
-    /// </remarks>
-    public override async Task Nested_collection_with_inline()
-    {
-        using DbContext context = Fixture.CreateContext();
-
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => context.Set<RootEntity>()
-                .AsNoTracking()
-                .Where(e => e.RequiredAssociate.NestedCollection
-                    == new List<NestedAssociateType>
-                    {
-                        new()
-                        {
-                            Id = 1002,
-                            Name = "Root1_RequiredRelated_NestedCollection_1",
-                            Int = 8,
-                            String = "foo",
-                            Ints = new List<int> { 1, 2, 3 },
-                        },
-                        new()
-                        {
-                            Id = 1003,
-                            Name = "Root1_RequiredRelated_NestedCollection_2",
-                            Int = 8,
-                            String = "foo",
-                            Ints = new List<int> { 1, 2, 3 },
-                        },
-                    })
-                .ToListAsync());
-    }
-
-    /// <inheritdoc cref="Nested_collection_with_inline" />
-    public override async Task Nested_collection_with_parameter()
-    {
-        using DbContext context = Fixture.CreateContext();
-
-        var nested = new List<NestedAssociateType>
-        {
-            new()
-            {
-                Id = 1002,
-                Name = "Root1_RequiredRelated_NestedCollection_1",
-                Int = 8,
-                String = "foo",
-                Ints = [1, 2, 3],
-            },
-            new()
-            {
-                Id = 1003,
-                Name = "Root1_RequiredRelated_NestedCollection_2",
-                Int = 8,
-                String = "foo",
-                Ints = [1, 2, 3],
-            },
-        };
-
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => context.Set<RootEntity>()
-                .AsNoTracking()
-                .Where(e => e.RequiredAssociate.NestedCollection == nested)
-                .ToListAsync());
     }
 }
 

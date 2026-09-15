@@ -107,8 +107,8 @@ Proposed, and to be confirmed. All three conditions are required:
 - **SelectMany.** Their two tests, [`L48`](https://github.com/mongodb/mongo-efcore-provider/blob/de93261da6d989bd12db8815a3a672dcf28bafb1/tests/MongoDB.EntityFrameworkCore.FunctionalTests/Query/UnsupportedQueryTests.cs#L48)
   and [`L98`](https://github.com/mongodb/mongo-efcore-provider/blob/de93261da6d989bd12db8815a3a672dcf28bafb1/tests/MongoDB.EntityFrameworkCore.FunctionalTests/Query/UnsupportedQueryTests.cs#L98),
   select from `string[]`, which is a primitive collection. Ours selects from an owned entity
-  collection. The source differs. `test/tier-d-overrides.txt` calls theirs "an EMBEDDED array,
-  which is our shape", and that claim is wrong. Their `Planet` does declare an owned collection,
+  collection. The source differs. The first classification called theirs "an EMBEDDED array,
+  which is our shape", and that claim was wrong. Their `Planet` does declare an owned collection,
   `parkingCars`, and no test selects from it.
 - **GroupBy.** Their test, [`L106`](https://github.com/mongodb/mongo-efcore-provider/blob/de93261da6d989bd12db8815a3a672dcf28bafb1/tests/MongoDB.EntityFrameworkCore.FunctionalTests/Query/UnsupportedQueryTests.cs#L106),
   groups the root set and asserts `InvalidOperationException`. Ours groups inside a document and
@@ -191,6 +191,11 @@ Tier D's `Miscellaneous` and `PrimitiveCollection` — must stay green without o
 canary for the control's wiring.
 
 ## Trial on Tier D
+
+**Done 2026-09-15.** Tier D is 234 tests and all of them pass. `OverrideAuditTest` lists 55
+reasons: `LIMIT` 34, `DEFECT` 16, `ISSUE` 5, no InfoCarrier defect, no skip, five deviations. Each
+of its rules was shown to fail on a deliberate mistake before it was trusted. The steps as they
+were planned:
 
 1. Add the four attributes — `StoreLimit`, `StoreDefect`, `StoreIssue`, `InfoCarrierDefect` — and
    the reflection test.

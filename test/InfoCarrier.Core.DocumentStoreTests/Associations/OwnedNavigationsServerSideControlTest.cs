@@ -8,8 +8,8 @@ using Xunit;
 namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 
 /// <summary>
-///     The four query shapes that fail in <see cref="OwnedNavigationsCollectionInfoCarrierTest" />,
-///     run directly against the server with InfoCarrier out of the picture.
+///     Seven query shapes of the <c>OwnedNavigations</c> family, written out by hand and run directly
+///     against the server with InfoCarrier out of the picture.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -22,9 +22,14 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 ///     </para>
 ///     <para>
 ///         <b>Read it as a fork.</b> A query that behaves the same here as over the wire is the
-///         store's business; one that passes here and fails over the wire is ours. All four below
-///         are the first kind, which is what <c>test/known-failures.txt</c> records against those
-///         five red tests.
+///         store's business; one that passes here and fails over the wire is ours.
+///     </para>
+///     <para>
+///         <b>IT CAME FIRST AND IS NO LONGER THE EVIDENCE.</b> Since 2026-09-15 the evidence a Tier D
+///         override names is a <c>Direct*</c> class, which runs EF's own queries rather than copies
+///         of them. This class stays because its hand-written shapes are also a direct statement of
+///         what the store does, and it is where the NullReferenceException and the wrong count were
+///         first pinned.
 ///     </para>
 ///     <para>
 ///         <b>A CONTROL ANSWERS WHOSE DEFECT IT IS. IT NEVER DECIDED WHETHER A RED IS ALLOWED, AND

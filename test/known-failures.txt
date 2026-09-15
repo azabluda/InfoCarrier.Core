@@ -4396,5 +4396,23 @@
 #
 # Tier D is now 233 tests, 204 passing, 29 red: 14 on the wire and 15 in the control.
 
-failed=48
-total=29791
+# 2026-09-15 - ADR-009 TIER D IS GREEN. failed 48 -> 19, total 29791 -> 29792. Tiers A-C unmoved at 19
+# of 29558; every name removed is Tier D's. The one new test is OverrideAuditTest.
+#
+# This is the trial of docs/plans/v10/test-overhaul.md, which replaces the ratchet with a green suite
+# in which every override says what the store does and where that is shown. The 29 remaining Tier D
+# failures became overrides carrying an attribute: the label is the attribute's type (StoreLimit,
+# StoreDefect, StoreIssue) and the reference names the Direct* control test that shows the same
+# behaviour. The audit lists 55 reasons - LIMIT 34, DEFECT 16, ISSUE 5 - with no skip and no
+# InfoCarrier defect.
+#
+# test/tier-d-overrides.txt, test/tier-d-control-pending.txt and eng/tier-d-control.py are deleted.
+# The entries above that name them are left as they were written, because this file is a log of dated
+# readings. OverrideAudit checks what they checked, in the tier's own run, with the compiler holding
+# the pairing between a wire override and its control test.
+#
+# Tier D stays in this ratchet at zero failures until the other tiers are converted, which already
+# makes a red there fail CI.
+
+failed=19
+total=29792

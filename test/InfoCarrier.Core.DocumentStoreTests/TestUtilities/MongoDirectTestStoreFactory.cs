@@ -13,19 +13,19 @@ namespace InfoCarrier.Core.DocumentStoreTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>THIS EXISTS TO ANSWER ONE QUESTION AND IT IS NOT A TIER.</b> A red specification test
-///         on Tier D means nothing until somebody has asked whether the STORE can answer the query
-///         at all. Running the same bases through this factory answers it for every test at once:
-///         what is red here and red on Tier D is <c>MongoDB.EntityFrameworkCore</c>'s behaviour,
-///         and what is red on Tier D alone is this repository's.
+///         <b>THIS EXISTS TO ANSWER ONE QUESTION AND IT IS NOT A TIER.</b> Before a Tier D test may
+///         change what it expects, somebody has to show what the STORE does with the query. Running
+///         the same bases through this factory shows it for every test at once, and each Tier D
+///         override names the test here that shows it.
 ///     </para>
 ///     <para>
-///         <b>IT IS ALSO A CONFLICT OF INTEREST, AND THAT IS WHY <c>eng/tier-d-control.py</c>
-///         EXISTS.</b> The worse this control is wired, the more it fails, and the more of Tier D's
-///         reds get attributed to the store rather than to us. The bias runs one way and it needs
-///         no bad intent to operate. So the integrity of this control is GATED rather than trusted:
-///         that script fails the build if this control fails anything Tier D passes, outside a
-///         named allowance list. A sloppier control breaks CI instead of flattering us.
+///         <b>IT IS ALSO A CONFLICT OF INTEREST.</b> The worse this control is wired, the more it
+///         fails, and the more behaviour gets attributed to the store rather than to InfoCarrier.
+///         Two things guard it: every control test asserts an exact outcome, so a mis-wired control
+///         has to reproduce the identical exception and text to pass; and the control classes that
+///         need no override must stay green without one. A script,
+///         <c>eng/tier-d-control.py</c>, gated this until 2026-09-15 and was replaced by
+///         <c>OverrideAudit</c>.
 ///     </para>
 ///     <para>
 ///         <b>The properties below are the real ones, and passing <c>null</c> for

@@ -17,7 +17,7 @@ namespace InfoCarrier.Core.DocumentStoreTests;
 ///         <b>WRITTEN TO CHECK A CLAIM THIS REPOSITORY WAS ABOUT TO MAKE ABOUT ITSELF
 ///         (2026-09-14).</b> Tier D's wire-free control fails
 ///         <c>Select_untranslatable_method_on_associate_scalar_property</c> and Tier D passes it,
-///         and that was recorded in <c>test/tier-d-control-allowances.txt</c> as a capability gain:
+///         and that was recorded as a capability gain, first in a text file deleted on 2026-09-15:
 ///         the projection split removes the untranslatable node, so the store never sees what it
 ///         cannot translate.
 ///     </para>
