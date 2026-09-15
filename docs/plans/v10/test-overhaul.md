@@ -274,7 +274,9 @@ were planned:
 
 **Converted 2026-09-15.** `OverrideAuditTest` in the spec project lists 453 reasons over 449
 overrides: `LIMIT` 344, `DEFECT` 23, `ISSUE` 69, `DESIGN` 17, no InfoCarrier defect. 57 skip, 92
-deviate, and upstream gave no reason for 310. Tier C has no override. The rules added for `DESIGN`
+deviate, and upstream gave no reason for 310. **Those were the figures when the conversion was
+committed; after the reds and the defect review the same day they are 466 reasons: `LIMIT` 345,
+`DEFECT` 24, `ISSUE` 69, `DESIGN` 26, `INFOCARRIER DEFECT` 2.** Tier C has no override. The rules added for `DESIGN`
 were shown to fail on a deliberate mistake before they were trusted.
 
 **425 of them were mechanical.** A Roslyn parse of this repository and of `subrepos/efcore` at
@@ -299,12 +301,25 @@ which this client does not emit (tracked as #111), and a store exception crosses
   `Identifiers_are_generated_correctly` asserted a table name where EF asserts four names; EF's
   whole body passes, so it is EF's body.
 
-**One question is open.** `Inlined_dbcontext_is_not_leaking` expects EF's refusal of a client
-projection that calls a `DbContext` instance method, which EF refuses so that a cached shaper does
-not hold the context. This client answers, and a probe measured the answer right for two contexts in
-turn. Whether a context stays reachable from a cache was not settled, because the harness keeps even
-a context that ran a plain query alive. It is labelled `DESIGN ADR-010` and skipped as EF's InMemory
-suite skips it.
+**Two InfoCarrier defects came out of it, both measured and both tracked** (the owner's request,
+2026-09-15, to confirm every suspected defect).
+
+- **#52, the property-bag insert.** It was labelled `DESIGN` naming the limitations page, which
+  described the page and not the failure; an issue already tracked it.
+- **#113, a context leak.** `Inlined_dbcontext_is_not_leaking` expects EF's refusal of a client
+  projection that calls a `DbContext` instance method. This client answers, correctly, and a context
+  that ran that query stays reachable after disposal until EF's memory cache is compacted, while a
+  context that ran a plain query is collected. The first probe could not see it because pooled
+  contexts outlive every test; contexts built directly could. It had been labelled `DESIGN ADR-010`
+  and skipped, with a justification the measurement disproved.
+
+**Three suspected defects were measured and are not defects.** `AsSplitQuery` is honoured: the
+server runs two statements where a single query runs one, so R47's "silently ignored" was wrong. A
+complex collection not mapped to JSON is refused by the server's `SqliteModelValidator` with EF's
+message. The table-splitting check that fails is an `IsInModel` mark while the client's model is
+built, and a real client context inserts, updates and reads a split owned reference correctly. R138
+was confirmed as described: the client ships an unmapped member and the server refuses it, which is
+correct while client and server share one model.
 
 ## Extending to the other tiers
 
