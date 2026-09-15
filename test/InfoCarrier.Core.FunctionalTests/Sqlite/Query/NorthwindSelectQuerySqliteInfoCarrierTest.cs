@@ -38,24 +38,36 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // These do NOT carry over to Tier C (SQL Server, roadmap M7), which supports APPLY.
     // -------------------------------------------------------------------------------------
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L308-L312",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Collection_projection_selecting_outer_element_followed_by_take(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Collection_projection_selecting_outer_element_followed_by_take(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L284-L287",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Reverse_in_projection_subquery(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Reverse_in_projection_subquery(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L289-L292",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Reverse_in_projection_subquery_single_result(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Reverse_in_projection_subquery_single_result(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L294-L297",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Reverse_in_SelectMany_with_Take(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -64,12 +76,18 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
 
     // Reached SQL only once the correlated-subquery rewrite (X5) stopped the split from refusing
     // it outright. EF's SQLite suite has overridden it all along.
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L236-L240",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_whose_selector_references_outer_source(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_whose_selector_references_outer_source(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L302-L306",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_collection_being_correlated_subquery_which_references_inner_and_outer_entity(
         bool async)
         => Assert.Equal(
@@ -80,72 +98,108 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
 
     // Same story as the join suite's `SelectMany_with_selecting_outer_element`: EF's SQLite tests
     // have always overridden this, and this provider only now translates far enough to hit it.
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L278-L282",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Select_nested_collection_deep_distinct_no_identifiers(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Select_nested_collection_deep_distinct_no_identifiers(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L247-L250",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Select_nested_collection_deep(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Select_nested_collection_deep(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L166-L169",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_1(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_1(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L171-L174",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_2(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_2(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L176-L179",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_3(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_3(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L181-L184",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_4(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_4(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L186-L189",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_5(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_5(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L191-L194",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_6(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_6(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L196-L199",
+        Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_correlated_with_outer_7(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.SelectMany_correlated_with_outer_7(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L331-L334",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Set_operation_in_pending_collection(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Set_operation_in_pending_collection(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L320-L323",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Take_on_correlated_collection_in_first(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Take_on_correlated_collection_in_first(async))).Message);
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L314-L318",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Take_on_top_level_and_on_collection_projection_with_outer_apply(bool async)
         => Assert.Equal(
             SqliteStrings.ApplyNotSupported,
@@ -161,6 +215,10 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // from NorthwindSelectQueryRelationalTestBase, which asserts exactly this failure.
 
     // EF's NorthwindSelectQuerySqliteTest asserts exactly this failure for exactly this test.
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs#L155-L164",
+        Justification = Upstream.GaveNoReason,
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task
         SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
             bool async)

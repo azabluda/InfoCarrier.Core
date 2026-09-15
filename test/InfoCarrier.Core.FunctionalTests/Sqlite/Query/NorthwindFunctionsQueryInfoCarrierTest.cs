@@ -28,18 +28,30 @@ public class NorthwindFunctionsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSql
     : NorthwindFunctionsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L69-L70",
+        Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_round_works_correctly_in_projection(bool async)
         => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L72-L73",
+        Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_round_works_correctly_in_projection_2(bool async)
         => AssertTranslationFailed(() => base.Sum_over_round_works_correctly_in_projection_2(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L75-L76",
+        Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_truncate_works_correctly_in_projection(bool async)
         => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindFunctionsQuerySqliteTest.cs#L78-L79",
+        Justification = Upstream.GaveNoReason)]
     public override Task Sum_over_truncate_works_correctly_in_projection_2(bool async)
         => AssertTranslationFailed(() => base.Sum_over_truncate_works_correctly_in_projection_2(async));
 }

@@ -40,30 +40,53 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
     : NorthwindGroupByQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L23-L24",
+        Justification = Upstream.GaveNoReason,
+        Deviation = "EF's override calls base.Select_uncorrelated_collection_with_groupby_multiple_collections_work, a different test; this one refuses its own.")]
     public override Task Select_uncorrelated_collection_with_groupby_works(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_works(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L20-L21",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_uncorrelated_collection_with_groupby_multiple_collections_work(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_multiple_collections_work(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L26-L27",
+        Justification = Upstream.GaveNoReason,
+        Deviation = "EF's override calls base.Select_uncorrelated_collection_with_groupby_works, a different test; this one refuses its own.")]
     public override Task Select_uncorrelated_collection_with_groupby_when_outer_is_distinct(bool async)
         => AssertApplyNotSupported(() => base.Select_uncorrelated_collection_with_groupby_when_outer_is_distinct(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L29-L30",
+        Justification = Upstream.GaveNoReason)]
     public override Task AsEnumerable_in_subquery_for_GroupBy(bool async)
         => AssertApplyNotSupported(() => base.AsEnumerable_in_subquery_for_GroupBy(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L44-L45",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_nested_collection_with_groupby(bool async)
         => AssertApplyNotSupported(() => base.Select_nested_collection_with_groupby(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L47-L48",
+        Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_group_by_in_subquery5(bool async)
         => AssertApplyNotSupported(() => base.Complex_query_with_group_by_in_subquery5(async));
 
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs#L53-L55",
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(bool async)
         => AssertApplyNotSupported(
             () => base.Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(async));

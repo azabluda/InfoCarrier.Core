@@ -38,30 +38,75 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
     // Tier A class and is now confirmed rather than assumed.
     // -------------------------------------------------------------------------------------
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L70-L76",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_constructed_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_constructed_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L78-L84",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_constructed_multi_value_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L86-L92",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_constructed_multi_value_not_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_constructed_multi_value_not_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L94-L100",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_constructed_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L102-L108",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_multi_value_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_constructed_multi_value_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L118-L124",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_create_constructed_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L126-L132",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_multi_value_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_create_constructed_multi_value_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L110-L116",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_multi_value_not_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_constructed_multi_value_not_equal(async));
 
+    [StoreIssue(
+        "dotnet/efcore#14672",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs#L134-L140",
+        Justification = "Anonymous type to constant comparison. Issue #14672.",
+        Deviation = Deviations.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_multi_value_not_equal(bool async)
         => AssertTranslationFailed(() => base.Where_compare_tuple_create_constructed_multi_value_not_equal(async));
 }
