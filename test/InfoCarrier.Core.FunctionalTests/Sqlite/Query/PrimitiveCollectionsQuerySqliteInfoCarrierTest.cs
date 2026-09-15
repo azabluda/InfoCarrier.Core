@@ -49,55 +49,94 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///     rule CLAUDE.md states for a newly-red SQLite test. EF overrides a fourteenth,
     ///     <c>Project_collection_of_nullable_ints_with_distinct</c>, which is skipped here.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1398-L1401",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1403-L1406",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany_with_filter()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany_with_filter());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1408-L1412",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Column_collection_SelectMany_with_Select_to_anonymous_type()
         => await AssertApplyNotSupported(() => base.Column_collection_SelectMany_with_Select_to_anonymous_type());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1802-L1805",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_datetimes_filtered()
         => await AssertApplyNotSupported(() => base.Project_collection_of_datetimes_filtered());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1797-L1800",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_ordered()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_ordered());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1832-L1836",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_with_ToList_and_FirstOrDefault()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_with_ToList_and_FirstOrDefault());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1822-L1825",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_ints_with_distinct()
         => await AssertApplyNotSupported(() => base.Project_collection_of_ints_with_distinct());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1807-L1810",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1812-L1815",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging2()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging2());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1817-L1820",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_collection_of_nullable_ints_with_paging3()
         => await AssertApplyNotSupported(() => base.Project_collection_of_nullable_ints_with_paging3());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1879-L1883",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_empty_collection_of_nullables_and_collection_only_containing_nulls()
         => await AssertApplyNotSupported(
             () => base.Project_empty_collection_of_nullables_and_collection_only_containing_nulls());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1867-L1870",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_inline_collection_with_Union()
         => await AssertApplyNotSupported(() => base.Project_inline_collection_with_Union());
 
     /// <inheritdoc cref="Column_collection_SelectMany" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1838-L1841",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Project_multiple_collections()
         => await AssertApplyNotSupported(() => base.Project_multiple_collections());
 
@@ -119,14 +158,26 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         reason of ours (B14), so they stay red.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1040-L1055",
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = Deviations.StoreExceptionCrossesAsData + " " + Deviations.SqlNotAsserted)]
     public override Task Inline_collection_index_Column()
         => AssertStoreRefuses(base.Inline_collection_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1069-L1084",
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = Deviations.StoreExceptionCrossesAsData + " " + Deviations.SqlNotAsserted)]
     public override Task Inline_collection_value_index_Column()
         => AssertStoreRefuses(base.Inline_collection_value_index_Column);
 
     /// <inheritdoc cref="Inline_collection_index_Column" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1086-L1101",
+        Justification = "SQLite doesn't support correlated subqueries where the outer column is used as the LIMIT/OFFSET (see OFFSET \"p\".\"Int\" below)",
+        Deviation = Deviations.StoreExceptionCrossesAsData + " " + Deviations.SqlNotAsserted)]
     public override Task Inline_collection_List_value_index_Column()
         => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
 
@@ -240,6 +291,11 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///     than the result. Ours mismatches identically — an <see cref="EqualException" /> out of
     ///     the same assertion — so the override transfers.
     /// </remarks>
+    [StoreIssue(
+        "dotnet/efcore#32561",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs#L1459-L1484",
+        Justification = "Issue #32561",
+        Deviation = Deviations.SqlNotAsserted)]
     public override async Task Parameter_collection_Concat_column_collection()
         => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
 

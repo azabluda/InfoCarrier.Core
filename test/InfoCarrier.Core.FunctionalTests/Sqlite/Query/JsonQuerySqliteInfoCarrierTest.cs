@@ -130,73 +130,128 @@ public class JsonQuerySqliteInfoCarrierTest(
     ///         it was not applied here until after the ranking was published.
     ///     </para>
     /// </remarks>
+    [StoreIssue(
+        "dotnet/efcore#33522",
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L262-L263",
+        Justification = "#33522")]
     public override Task Json_predicate_on_byte_array(bool async)
         => Assert.ThrowsAsync<EqualException>(() => base.Json_predicate_on_byte_array(async));
 
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L325-L329",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_branch_collection_distinct_and_other_collection(bool async)
         => await AssertApplyNotSupported(() => base.Json_branch_collection_distinct_and_other_collection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L286-L291",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_Select_entity_in_anonymous_object_ElementAt(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_Select_entity_in_anonymous_object_ElementAt(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L182-L187",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_Select_entity_with_initializer_ElementAt(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_Select_entity_with_initializer_ElementAt(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L307-L311",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_distinct_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_distinct_in_projection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L313-L317",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_filter_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_filter_in_projection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L265-L270",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_in_projection_with_anonymous_projection_of_scalars(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_anonymous_projection_of_scalars(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L279-L284",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_primitive_arrays(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_primitive_arrays(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L272-L277",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_scalars(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_in_projection_with_composition_where_and_anonymous_projection_of_scalars(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L319-L323",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_leaf_filter_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_leaf_filter_in_projection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L376-L380",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_of_primitives_SelectMany(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_of_primitives_SelectMany(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L350-L354",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_skip_take_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L293-L298",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_skip_take_in_projection_project_into_anonymous_type(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection_project_into_anonymous_type(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L300-L305",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_collection_skip_take_in_projection_with_json_reference_access_as_final_operation(bool async)
         => await AssertApplyNotSupported(() => base.Json_collection_skip_take_in_projection_with_json_reference_access_as_final_operation(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L331-L335",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_leaf_collection_distinct_and_other_collection(bool async)
         => await AssertApplyNotSupported(() => base.Json_leaf_collection_distinct_and_other_collection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L337-L341",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_multiple_collection_projections(bool async)
         => await AssertApplyNotSupported(() => base.Json_multiple_collection_projections(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L356-L361",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_nested_collection_anonymous_projection_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_nested_collection_anonymous_projection_in_projection(async));
 
     /// <inheritdoc cref="Json_branch_collection_distinct_and_other_collection" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L363-L367",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_nested_collection_filter_in_projection(bool async)
         => await AssertApplyNotSupported(() => base.Json_nested_collection_filter_in_projection(async));
 
@@ -211,6 +266,9 @@ public class JsonQuerySqliteInfoCarrierTest(
     ///     checked, which is the one thing CLAUDE.md says to do before calling a Tier B failure
     ///     ours. **Age is not evidence**, and neither is a note.
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L439-L445",
+        Justification = Upstream.GaveNoReason)]
     public override async Task Json_nested_collection_anonymous_projection_of_primitives_in_projection_NoTrackingWithIdentityResolution(
         bool async)
         => await AssertApplyNotSupported(
@@ -244,19 +302,35 @@ public class JsonQuerySqliteInfoCarrierTest(
     ///         queries outside the base, which pins this file to EF's query text.
     ///     </para>
     /// </remarks>
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L457-L458",
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Json_projection_using_queryable_methods_on_top_of_JSON_collection_AsNoTrackingWithIdentityResolution(
         bool async)
         => Task.CompletedTask;
 
     /// <inheritdoc cref="Json_projection_using_queryable_methods_on_top_of_JSON_collection_AsNoTrackingWithIdentityResolution" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L454-L455",
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Json_nested_collection_anonymous_projection_in_projection_NoTrackingWithIdentityResolution(bool async)
         => Task.CompletedTask;
 
     /// <inheritdoc cref="Json_projection_using_queryable_methods_on_top_of_JSON_collection_AsNoTrackingWithIdentityResolution" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L448-L449",
+        Justification = "Sqlit throws APPLY error, but base expects different exception",
+        Skip = true)]
     public override Task Json_branch_collection_distinct_and_other_collection_AsNoTrackingWithIdentityResolution(bool async)
         => Task.CompletedTask;
 
     /// <inheritdoc cref="Json_projection_using_queryable_methods_on_top_of_JSON_collection_AsNoTrackingWithIdentityResolution" />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs#L451-L452",
+        Justification = Upstream.GaveNoReason,
+        Skip = true)]
     public override Task Json_collection_SelectMany_AsNoTrackingWithIdentityResolution(bool async)
         => Task.CompletedTask;
 
