@@ -115,6 +115,10 @@ public class ModelBuilderGenericInfoCarrierTest : ModelBuilderInfoCarrierTest
         ///     base's own <c>Assert.Throws</c> finds nothing thrown, and that is what is asserted.
         ///     Registering the validator on the client was measured on 2026-09-07 (V11) and turned 30
         ///     failures into 4037, because it compares store types the client does not have.
+        ///     <b>The mapping is still refused, by the server</b>: measured on 2026-09-15 with a model
+        ///     holding such a collection, <c>SqliteModelValidator</c> on the server's context throws
+        ///     EF's own <i>"must be mapped to a JSON column"</i> when that model is built, so the error
+        ///     reaches the application; only the client does not raise it first.
         /// </remarks>
         [InfoCarrierDesign(
             Decisions.Architecture,
@@ -193,11 +197,14 @@ public class ModelBuilderGenericInfoCarrierTest : ModelBuilderInfoCarrierTest
 
         /// <inheritdoc />
         /// <remarks>
-        ///     One of the base's <c>Assert.True</c> checks on the split mapping fails on the client's
-        ///     model, and that failure is what escapes. Registering <c>EntitySplittingConvention</c> on
-        ///     the client fixed this test and was measured on 2026-09-07 turning 30 failures into 149,
-        ///     because it needs a companion convention that decides column names the server also
-        ///     decides (V10).
+        ///     The check that fails is <c>IsInModel</c> on the owned type's mapping fragment, while the
+        ///     client's model is still being built; the column override beside it is in the model and
+        ///     maps <c>Id</c> to <c>bid</c>. Registering <c>EntitySplittingConvention</c> on the client
+        ///     fixed this test and was measured on 2026-09-07 turning 30 failures into 149, because it
+        ///     needs a companion convention that decides column names the server also decides (V10).
+        ///     <b>Nothing a caller sees depends on it</b>: measured on 2026-09-15, a real client context
+        ///     with an owned reference split to a second table and a renamed column inserts, updates and
+        ///     reads it back correctly, and its finished model carries the fragment.
         /// </remarks>
         [InfoCarrierDesign(
             Decisions.Architecture,

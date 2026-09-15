@@ -51,13 +51,14 @@ public class ComplexTypesTrackingInfoCarrierTest(
     ///     <see cref="ArgumentException" /> of EF's materializer defect,
     ///     <c>docs/upstream-defects.md</c> 1.1, which is reached on a path only this provider takes.
     ///     Every other state runs the base unchanged. Measured 2026-09-15.
+    ///     <para>
+    ///         <b>An InfoCarrier defect, tracked as #52</b>: a model EF supports cannot be inserted
+    ///         through this provider. It carried <c>[InfoCarrierDesign]</c> naming the limitations
+    ///         page for a few hours on 2026-09-15, which described the page and not the failure.
+    ///     </para>
     /// </remarks>
-    [InfoCarrierDesign(
-        Decisions.Limitations,
-        Decisions.NotSupported,
-        Justification = "Inserting an entity whose property-bag complex collection holds a primitive collection is the "
-            + "one scenario the limitations page names as not supported. EF's materializer defect on this provider's path "
-            + "causes it, and the route around it is priced and not taken.",
+    [InfoCarrierDefect(
+        52,
         Deviation = DeviationKind.Other,
         DeviationNote = "The Added cases assert the defect's exception; the other states call the base.")]
     public override Task Can_track_entity_with_complex_property_bag_collections(EntityState state, bool async)

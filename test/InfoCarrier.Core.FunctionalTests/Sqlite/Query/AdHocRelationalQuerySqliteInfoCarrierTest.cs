@@ -114,14 +114,14 @@ public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixtur
 ///         answers the query without throwing. It does not say TPT or TPC is correct.
 ///     </para>
 ///     <para>
-///         <b>Two more use <c>AsSplitQuery()</c>, and they pass because the marker is silently
-///         ignored rather than because splitting works.</b> Established, not assumed:
-///         <c>INFOCARRIER_SERVER_SQL=1</c> on
-///         <c>Two_similar_complex_properties_projected_with_split_query1</c> shows the server
-///         executing <em>one</em> <c>SELECT</c> with a <c>LEFT JOIN</c>, where a split query is
-///         two. A single query gives the same answers, so the assertion holds. <b>This is a finding
-///         for #60 rather than a reason not to adopt</b>: nothing is red, and a consumer calling
-///         <c>AsSplitQuery</c> here gets correct results from an unsplit query and no diagnostic.
+///         <b>Two more use <c>AsSplitQuery()</c>, and splitting works.</b> This paragraph said until
+///         2026-09-15 that <i>"they pass because the marker is silently ignored"</i>, from R47's
+///         reading of <c>INFOCARRIER_SERVER_SQL=1</c>: one <c>SELECT</c> with a <c>LEFT JOIN</c>. Measured
+///         again that day on <c>Two_similar_complex_properties_projected_with_split_query1</c> alone,
+///         the server runs two statements, <c>Offers</c> and then the variations joined to their
+///         nested rows, which is EF's split shape; a Northwind <c>Include</c> runs one statement with
+///         <c>AsSingleQuery</c> and two with <c>AsSplitQuery</c>. Whether R47 misread the log or a later
+///         change fixed it is not known.
 ///     </para>
 /// </remarks>
 public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
@@ -212,9 +212,9 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 ///         <c>+4</c> new tests all green and <c>2</c> newly-red <em>core</em> tests.
 ///     </para>
 ///     <para>
-///         Two of the four use <c>AsSplitQuery()</c>. As R47 established with
-///         <c>INFOCARRIER_SERVER_SQL=1</c>, that marker is silently ignored here — the server
-///         issues one query — so these pass on correct answers from an unsplit query.
+///         Two of the four use <c>AsSplitQuery()</c>, and the server splits them: see the same
+///         paragraph on <c>AdHocAdvancedMappingsQuerySqliteInfoCarrierTest</c>, which said until
+///         2026-09-15 that the marker was silently ignored.
 ///     </para>
 ///     <para>
 ///         <b>The two newly-red tests are convergence, not regression, and the check that says so

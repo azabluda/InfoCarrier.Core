@@ -39,8 +39,8 @@ do, because the entity reaches the server as values. The server's own stack was 
 under "Not supported"** on [`website/docs/limitations.md`](../website/docs/limitations.md). Two
 spec tests, both parameterizations of
 `ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`,
-red until 2026-09-15 and overridden since to assert this exception, naming the limitations page as
-the decision. The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor
+red until 2026-09-15 and overridden since to assert this exception, as `[InfoCarrierDefect(52)]`:
+for a user it is this provider's failure, whoever's line causes it. The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor
 binding, which was priced in M9 and declined.
 
 **`dotnet/efcore#36175` does not track this, and the corroboration this repository claimed for it

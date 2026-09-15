@@ -584,7 +584,7 @@ file to read before editing any of them.
 - Two `ComplexTypesTracking` parameterizations: a property-bag complex *collection* on an `Added`
   entity. J22 traced it to an upstream defect on a path only this provider takes, and the route
   around it has to reproduce constructor binding, so it is priced and not taken. Its override
-  asserts the defect's exception and names the limitations page.
+  asserts the defect's exception and carries `[InfoCarrierDefect(52)]`.
 
 **The long form is [`docs/plans/v10/findings.md`](docs/plans/v10/findings.md)**: how the HTTP
 transport, the Blazor client, complex types, JSON-mapped owned collections, spatial, `GraphUpdates`,
