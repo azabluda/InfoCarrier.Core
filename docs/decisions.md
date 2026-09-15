@@ -523,6 +523,137 @@ intermittent leaks". They can hold a static server because a container owns its 
 cannot, which is what the per-class server and the process reaping are for. Their shape trades wall
 clock for bookkeeping and would also work; ours has 13 consecutive green runs behind it and stays.
 
+### Amendment 2026-09-14 — Tier D adopts its first base, and the tier's own harness was the second cause
+
+**The 2026-09-10 amendment said this tier adopts no specification bases. That is superseded.**
+`OwnedNavigationsCollectionTestBase` is adopted, by the rule the 2026-09-13 amendment set: a base
+earns a place here by the fraction of its tests that actually RUN on the store. Fifteen tests, ten
+green untouched, five that the store itself refuses or answers wrongly — measured against the
+server's own `DbContext` by `OwnedNavigationsServerSideControlTest`, not assumed. **The refusal of a
+DEMANDING compliance test is untouched**, and so is the reason for it: this tier exists to prove
+that the provider is not relational-only, and a scan insisting every core base be adopted against a
+document store would misread that.
+
+**A control has to assert what the base asserts.** The first version of that control asserted only
+that the query did not throw. A store defect that returned three roots where the base expects five
+then looked like this provider's, and nearly landed as one.
+
+**THE ADOPTION SAT UNPUSHED FOR A DAY BEHIND A WHOLE-TIER INTERMITTENT THAT HAD TWO CAUSES, AND
+FIXING THE FIRST DID NOT FIX THE RUN.** The first was a product defect, closed by #109. With it
+merged the tier still failed 5, then 15, then 9. **The reading "it failed before because of that
+bug" was wrong, and it was wrong in the cheap direction**: a fix that is genuinely correct can still
+leave the symptom standing, so the run is the evidence and the explanation is not.
+
+**The second cause was this tier's own process bookkeeping.** Tier D names the `mongod` it started
+by diffing the process list before and after, which is sound only while nothing else is starting
+one — hence a semaphore. `EmbeddedMongo` was extracted from `DocumentStoreFixture` on 2026-09-13 and
+the original was left behind, giving the tier **two** gates. Each family serialized against itself
+and not the other, a fixture's diff claimed a neighbour's server, and teardown killed a `mongod`
+whose tests were still running. The signature is unambiguous once read: `An existing connection was
+forcibly closed by the remote host`, with classes untouched by the new work among the casualties.
+
+**A semaphore serializes the callers that share it.** `EmbeddedMongo` is now the only caller of
+`MongoDbRunner.Start` in the tier, and its comment says so with the measurement. Four consecutive
+whole-tier runs of 53 of 53, zero orphan processes, and the run time fell from 2m32s to 6s because
+the old duration was almost entirely 30-second connection timeouts.
+
+**The rule that generalises, and it is not about semaphores.** When an extraction's own comment
+argues that a duplicate is dangerous, check in that commit that the duplicate is gone. This one read
+*"two copies of process bookkeeping is two places to get the reaping wrong"* while the second copy
+compiled twenty lines away. CLAUDE.md already requires a sweep when a decision is REVERSED; this is
+the same failure at the moment a decision is CENTRALISED, and the sweep is the same.
+
+### Amendment 2026-09-14 (second) — the whole family, and Tier D stops being exceptional in CI
+
+**The amendment above adopted one base and kept four overrides. Both halves are superseded the same
+day.** All six `OwnedNavigations` classes are adopted, the tier is 132 tests with 38 red, and there
+are no overrides at all.
+
+**RED IS INFORMATION HERE TOO, AND NOTHING ABOUT THIS TIER MAKES IT AN EXCEPTION.** That is ADR-004
+and the oldest guardrail in CLAUDE.md, and it is not conditional on the backing store. The earlier
+reading treated "Tier D is always green" as a policy when it was only an OBSERVATION — true while
+the tier was hand-written tests, and untested the moment it adopted a specification base. The four
+overrides are what the untested premise produced: each asserted what the store does, and one of them
+asserted a count of three where the base says five, so the suite reported green over a wrong answer.
+
+**A CONTROL ANSWERS WHOSE DEFECT IT IS. IT NEVER DECIDED WHETHER A RED IS ALLOWED.** Conflating
+those two is the whole error, and it is easy to make because the control is real evidence and does
+real work. `OwnedNavigationsServerSideControlTest` reproduces every one of the 38 against the
+server's own `DbContext` with InfoCarrier out of the picture. That establishes the failures are
+`MongoDB.EntityFrameworkCore`'s rather than this repository's — which is worth knowing and is not a
+licence to make them green.
+
+**AN OVERRIDE IS LEGITIMATE ONLY WHEN IT ADOPTS ONE THE REFERENCE PROVIDER ALREADY SHIPS, AND IT
+MUST CITE IT.** CLAUDE.md already states this for SQLite: if EF overrides a test with
+`ApplyNotSupported`, adopting that override is convergence with the reference provider. The Cosmos
+argument used above does not reach, and the difference is worth stating because it looks like a
+counter-example. Cosmos is EF's OWN provider and its suite is the place where that store's
+capabilities are described. This tier describes no store; ADR-009 says it exists to answer whether
+the WIRE changed the answer.
+
+**THE UPSTREAM POSITION WAS CHECKED RATHER THAN ASSUMED.** MongoDB's `MongoComplianceTest` lists all
+six `OwnedNavigations*TestBase` classes in `IgnoredTestBases`, under the comment *"Test bases added
+in EF10+"*. **An ignore is not an override.** Theirs means "we have not run this base"; an override
+would mean "we ran it and the store does X". So there is nothing to adopt, all 38 stand, and this
+tier is running these tests against MongoDB when the official provider's own suite never has.
+
+**TIER D IS RATCHETED AND MEASURED WITH EVERY OTHER TIER.** Its TRX joins the spec suite's in one
+`eng/ratchet.sh` call and its project is in `eng/measure.sh`'s list; the step moved out of the fast
+gate into the spec-ratchet job. `ratchet.sh` needed no change — it has taken several TRX since it
+was written, against one baseline pair, and the comment saying that shape was kept "for the next
+backing store" was describing this.
+
+**ONE BASELINE, AND TIER D IS THE CASE THAT ARGUES FOR IT.** A separate `tier-d-known-failures.txt`
+was considered and rejected. The argument for it was that a Tier D test cannot move into the spec
+project, which is false in the way that matters: `OwnedNavigationsCollectionTestBase` is adopted in
+Tier B *and* Tier D today, so deciding to host that family on one tier alone would move tests
+between projects — precisely the "fix in one, break in the other" that `ratchet.sh` keeps a single
+baseline to catch. The second argument, that the README badge would then depend on a `mongod`
+starting, is weaker than it looked: a store that will not start is information, and the badge step's
+own comment already says a badge frozen on the last green run is a badge that lies.
+
+**WHAT THE 38 ARE, BECAUSE A COUNT IS NOT A CLASSIFICATION.** 31 are the store refusing a query.
+2 are this tier's FIXTURE rather than the store — `RootReferencingEntity` is ignored because a
+document store has no join for a root-to-root navigation, as EF's Cosmos fixture also does, and two
+projection tests need that type. The remaining 5 are differences rather than refusals and are the
+ones worth watching: a silent wrong count (three roots where five are correct, unreported and
+belonging in `upstream-defects.md`), two `NullReferenceException`s projecting through a null
+optional associate, and two where the store ANSWERS a query EF's own base wraps in
+`Assert.ThrowsAsync` for EF issue #36400 — the control confirms that answer is correct, so those two
+reds record EF's limitation rather than the store's or ours.
+
+**The general rule, and it is not about MongoDB.** A gate that cannot express red creates pressure
+to override, and the pressure is hardest to see when a principled-looking mechanism is already to
+hand. Four overrides with a control behind each one looked like rigour. Give every tier a way to
+record a red before giving it a way to adopt a base.
+
+### Amendment 2026-09-15 — Tier D is green, and every override names its evidence
+
+**The two 2026-09-14 amendments above left Tier D red and gated by a script. Both halves are
+superseded for this tier.** It is the trial of `docs/plans/v10/test-overhaul.md`: a green suite, as
+EF Core's own providers run, made stricter in traceability. Tier D is 234 tests and all pass.
+
+**An override carries an attribute, and the attribute is both label and reference.** Its type says what
+the store does — `StoreLimit`, `StoreDefect` with a section of `docs/upstream-defects.md`,
+`StoreIssue` with a tracker key — and its arguments say where that is shown. Every Tier D reference is
+a control test of a `Direct*` class, named by `typeof` and `nameof` so the compiler keeps it honest.
+`OverrideAudit` fails the tier's own run on an override without a reason or disagreeing with its
+control, and writes the audit. Each of its rules was shown to fail on a deliberate mistake first.
+
+**No upstream reference exists for this family, and that was measured.** MongoDB's release tag
+`v10.0.3` has no test that queries an owned collection; its two `SelectMany` refusals select from
+`string[]`. The first classification cited them as "our shape", and it was wrong. The same pass
+relabelled `GroupBy` from an issue to a limit, because `EF-149` groups a root set.
+
+**The control changed from "fails where the store fails" to "asserts what the store does".** Where the
+base swallows the store's exception, the test asserts xUnit's failure together with the store's own
+type and text inside it, so it still goes red when the store changes. Two tests where MongoDB answers
+correctly what EF's base expects to refuse (`dotnet/efcore#36400`) write the query out, and record why
+as a `Deviation`.
+
+**`eng/tier-d-control.py`, `test/tier-d-overrides.txt` and `test/tier-d-control-pending.txt` are
+deleted.** Tier D stays in the ratchet at zero failures until the other tiers are converted.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

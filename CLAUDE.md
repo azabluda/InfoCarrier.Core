@@ -95,11 +95,62 @@ until R135, and `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R1
 measurement.
 
 **TIER D IS AN EMBEDDED MONGODB SINCE 2026-09-10, IN A PROJECT OF ITS OWN
-(`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS NO SPEC BASES.** It exists to prove a
-negative that no relational tier can: that this provider is not relational-only (#51). A compliance
-test here demanding every base be adopted against a document store would misread it. It is gated
-beside the transport suite rather than by the spec ratchet, for the same reason that suite is, and
-it is deliberately **absent from `eng/measure.sh`**. Its own project exists because
+(`test/InfoCarrier.Core.DocumentStoreTests`), AND IT ADOPTS SPEC BASES SINCE 2026-09-14.** This
+paragraph read *"AND IT ADOPTS NO SPEC BASES"* until then, and it adopts the whole
+`OwnedNavigations` family. **The tier is 234 tests in two halves, and all of them pass since
+2026-09-15**: the six bases over the wire, and the SAME bases with InfoCarrier REMOVED — the
+`Direct*` classes, plain EF Core on the same embedded MongoDB. **The control documents the store**:
+each of its overrides asserts exactly what MongoDB does, and each wire override names the control
+test that shows it. **The reason that
+sentence was written is unchanged and is what still governs which bases come here**: this tier
+exists to prove a negative that no relational tier can, that this provider is not relational-only
+(#51), and a compliance test demanding every base be adopted against a document store would misread
+it. What changed is that "no compliance test" never meant "no bases" — a base whose tests mostly RUN
+on the store earns its place, and one that is mostly overridden into "not supported" teaches nothing
+about the wire. ADR-009's 2026-09-13 amendment carries that selection rule and its 2026-09-14 one
+carries the adoption.
+
+**IT IS RATCHETED AND MEASURED LIKE EVERY OTHER TIER SINCE 2026-09-14, AND THE PARAGRAPH ABOVE SAID
+THE OPPOSITE UNTIL THEN** — *"gated beside the transport suite rather than by the spec ratchet"*
+and *"deliberately absent from `eng/measure.sh`"*. Both were right while it adopted no bases, when
+it was green by construction and a bare `dotnet test` said everything. **A tier whose reds cannot be
+RECORDED is a tier under pressure to override them**, which is the one thing the guardrail below
+forbids, and this tier proved it: four overrides were written asserting what the store does, one of
+them blessing a count of three where five is correct. Tier D's TRX now joins the spec suite's in one
+`ratchet.sh` call against the one baseline, and its project is in `measure.sh`'s list. **One
+baseline and not one per project, and Tier D is the case that argues for it rather than against**:
+`OwnedNavigationsCollectionTestBase` is adopted in Tier B *and* Tier D today, so a decision to host
+that family on one tier alone would MOVE tests between projects — exactly the "fix in one, break in
+the other" a single baseline exists to catch.
+
+**EVERY OVERRIDE SAYS WHAT THE STORE DOES AND WHERE THAT IS SHOWN, AND TIER D IS WHERE THAT RULE IS
+TRIED FIRST** (2026-09-15, `docs/plans/v10/test-overhaul.md`). The rule is Microsoft's green suite,
+made stricter in traceability. An override carries an attribute whose TYPE is the label —
+`[StoreLimit]` for a refusal by design, `[StoreDefect("1.6")]` for a crash or a wrong answer with its
+section in `docs/upstream-defects.md`, `[StoreIssue("EF-250")]` for a tracker entry — and whose
+ARGUMENTS are the reference: an upstream link at the release tag's commit and line, or a
+`typeof`/`nameof` naming a control test. `[InfoCarrierDefect]` is the last resort for a defect of
+ours that cannot be fixed yet, and only the owner files its issue. **A skip is permitted only with an
+upstream reference**, because only upstream's own choice justifies asserting nothing, and it copies
+upstream's justification text. **A crash or a wrong answer is never `LIMIT`**: a store that means
+"no" says so.
+
+**`OverrideAudit` (in the shared harness) enforces it, and `OverrideAuditTest` runs it in the tier.**
+It fails on an override with no reason, on two reasons without distinct `Case` values, on an upstream
+link without a commit and a line, on a skip without an upstream reference, on a `DEFECT` naming a
+missing section, and on a wire override whose control test documents a different label. Its output is
+the audit: every override with its label, reference, skip and deviation. Each rule was shown to fail
+on a deliberate mistake before it was trusted.
+
+**EVERY TIER D REFERENCE IS SELF-HOSTED, AND THAT IS A FINDING.** MongoDB's own `MongoComplianceTest`
+lists all six `OwnedNavigations` bases in `IgnoredTestBases` under *"Test bases added in EF10+"*,
+which means "we have not run this base", NOT "the store cannot do this". The one upstream test that
+looked close, `UnsupportedQueryTests.cs` at `v10.0.3`, selects from `string[]`, a primitive
+collection, and this family selects from owned entities. **The control is a conflict of interest**: a
+worse-wired control fails more and makes InfoCarrier look cleaner. Every control assertion names an
+exact outcome, and the control classes that need no override must stay green without one.
+`eng/tier-d-control.py` and its two text manifests gated this until 2026-09-15 and are deleted. Its own
+project exists because
 `MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles against a 10.0.1 floor,
 which also makes it the one place the product runs on a NEWER EF Core than it was built with.
 **It found #100 on its first run and the same change fixes it**: updating an entity that owns
@@ -121,10 +172,13 @@ where the change set omits an owned navigation the model declares, and never for
 delete. ADR-009's 2026-09-10 and 2026-09-11 amendments are the reading.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
-every project in its own `projects` list and adds the figures. **That list holds the spec project
-alone, and `InfoCarrier.Core.TransportTests` is deliberately absent** — it is this repository's own
+every project in its own `projects` list and adds the figures. **That list holds TWO projects since
+2026-09-14 — the spec project and ADR-009 Tier D — and it held the spec project alone before that.**
+`InfoCarrier.Core.TransportTests` is still deliberately absent: it is this repository's own
 HTTP-transport suite, expected green, and folding it in would inflate `Total` past what
-`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong. **So
+`test/known-failures.txt` was written against, which is also why a solution-wide run is wrong.
+**Tier D was absent for that reason too and is not any more**, because it adopts specification bases
+now and its reds have to be recordable rather than overridden. **So
 a `src/` change needs the transport line above as well as `measure.sh`**; the script says so in its
 own comment. **A run of one tier alone is not comparable to the baseline either**, because the
 baseline covers every tier.
@@ -257,7 +311,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
 | `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
 | `docs/versioning.md` | **How a version is decided and how a release is shipped**, including the hotfix path off a release line. Two procedures with a shared tail, and a "what has bitten us" list: the pack baseline a branch cut from a tag inherits, the merge resolution that silently drops a fix, the site that no push republishes, and the `github-pages` environment refusing a branch it was not told about. **Read it before tagging**, and before cutting a release branch. |
-| `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers, so a comment naming a number can be checked against what it says. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
+| `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers, so a comment naming a number can be checked against what it says. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. **Since 2026-09-14 it also carries defects in `MongoDB.EntityFrameworkCore`** (§1.6-1.10), found by ADR-009 Tier D and reproduced by its wire-free control, and it records that their bugs go to the **Jira `EF` project** rather than GitHub, whose issues are disabled. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
 in `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
@@ -474,8 +528,14 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238`** (2026-09-07, `v12`).
-**All four figures come out of the run's own summary block, and none of them is arithmetic** — a
+**`FAILING: 19  TOTAL: 29792`** (2026-09-15), across the two projects `measure.sh` now runs:
+**19 of 29558** in the spec project and **0 of 234** in ADR-009 Tier D, which went green under
+`docs/plans/v10/test-overhaul.md`. It read `FAILING: 73  TOTAL: 29788` on 2026-09-14, and before that
+`Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238` (2026-09-07, `v12`) until then, and
+was three measurements stale — the badge had moved to 29,558 while it still said 29,516.
+**Tiers A-C are unmoved at 19**; the whole rise is Tier D joining the baseline, and the name diff
+says so exactly: 38 added, 0 removed.
+**Every figure comes out of the run's own summary block, and none of them is arithmetic** — a
 `c10b` entry once carried `Skipped` over from an earlier run and derived `Passed` from it. **A
 falling `total` with no note explaining it is a crashed host**: `test/known-failures.txt` records
 the one deliberate lowering, in C94, where two skipped theories turned 4 tests into 2.
@@ -587,8 +647,24 @@ nothing. Stale files are swept once at startup instead.
 rather than a test fix. On an `en-SE` machine nine spec tests fail on the decimal separator, none of
 them this provider's, which made the suite total a property of the machine. Do not remove it.
 
-**There is no known intermittent. FOUR have been closed, and the fourth was a PRODUCT DEFECT rather
-than a test one** (2026-09-13). Tier D failed about one run in ten, always on the same customer, and
+**There is no known intermittent. FIVE have been closed, and the FIFTH IS THE ONE THAT HID BEHIND
+THE FOURTH** (2026-09-14). Fixing the product defect below did NOT make a whole-tier Tier D run
+stable: it still failed 5, then 15, then 9, and the reading "it failed before because of that bug"
+was wrong. **Two causes wore one symptom.** The second is a harness defect and the evidence
+separates them cleanly: every failure said `An existing connection was forcibly closed by the remote
+host` and classes untouched by the work in hand were among the casualties, so the store's PROCESS
+was dying rather than the wire lying. **`EmbeddedMongo` was extracted from `DocumentStoreFixture`
+and the original was left in place, so the tier had two `StartGate` semaphores.** Each family
+serialized against itself and not against the other; the before-and-after process diff that names
+"my `mongod`" then picked up a neighbour's server, and teardown killed one whose tests were running.
+**A semaphore serializes the callers that share it, and a gate spelt twice is not a gate.** The rule
+that transfers is broader than the semaphore: **when an extraction says a duplicate is dangerous,
+check in the same commit that the duplicate is gone** — that type's own comment read "two copies of
+process bookkeeping is two places to get the reaping wrong" while the second copy compiled beside it.
+Four consecutive whole-tier runs of 53 of 53 closed it, and the run time fell from 2m32s to 6s
+because the old duration was almost entirely 30-second connection timeouts.
+
+**The FOURTH was a PRODUCT DEFECT rather than a test one** (2026-09-13). Tier D failed about one run in ten, always on the same customer, and
 it was not Tier D's: **`InfoCarrierDatabase.CompileQuery` captured `_expressionSerializer` into the
 delegate EF caches in `ICompiledQueryCache`**, a singleton shared by every context with the same
 options shape. Every context has a serializer of its own — measured, 600 contexts and 600 distinct

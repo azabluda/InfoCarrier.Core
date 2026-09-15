@@ -1,10 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Diagnostics;
+using InfoCarrier.Core.DocumentStoreTests.TestUtilities;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Mongo2Go;
 using Xunit;
 
 namespace InfoCarrier.Core.DocumentStoreTests;
@@ -42,19 +41,30 @@ namespace InfoCarrier.Core.DocumentStoreTests;
 ///         tier grows.
 ///     </para>
 ///     <para>
-///         <b>STARTING IS SERIALIZED AND STOPPING IS ENFORCED, BECAUSE `MongoDbRunner.Dispose()`
-///         DOES NOT RELIABLY STOP `mongod` (#102).</b> A run of this tier was measured finishing
-///         green and leaving SIX live `mongod` processes behind; the next run then failed on data a
-///         previous run had written, which is how the tier became intermittent the moment it grew
-///         from four classes to six. Orphans are not a tidiness problem here, they are the failure.
+///         <b>STARTING AND STOPPING THE PROCESS IS <see cref="EmbeddedMongo" />'s JOB, AND IT HAS
+///         BEEN SINCE 2026-09-14. THIS FIXTURE OWNED A SECOND COPY OF IT AND THAT COPY WAS A BUG.</b>
+///         The bookkeeping is "list the `mongod` processes before the start and after it, and the
+///         difference is mine", which is only sound while nothing else is starting one. It is
+///         serialized by a semaphore for exactly that reason. <b>A semaphore only serializes the
+///         callers that share it.</b> When <see cref="EmbeddedMongo" /> was extracted on
+///         2026-09-13 the original was left here, so there were two gates and the tier's two
+///         fixture families did not exclude each other at all. Their starts interleaved, a
+///         fixture's difference set picked up a NEIGHBOUR's server, and disposal then killed a
+///         `mongod` whose tests were still running: `An existing connection was forcibly closed by
+///         the remote host`, on whichever classes happened to be in flight.
 ///     </para>
 ///     <para>
-///         So each fixture records which `mongod` its own start created and kills that process if
-///         disposal left it running. <b>Identifying it is the whole reason the start is
-///         serialized</b>: with parallel starts the before-and-after difference is ambiguous and a
-///         fixture could claim a neighbour's server. Serializing costs one startup per class in
-///         sequence rather than in parallel, and that is the price of a tier whose runs do not
-///         poison each other.
+///         This paragraph used to explain why the duplication was safe. It read, until 2026-09-14:
+///         <i>"So each fixture records which `mongod` its own start created and kills that process
+///         if disposal left it running."</i> Each fixture still does, through the one type that
+///         now holds the gate. <b>The reason survives and the copy does not</b>, which is the
+///         general rule: one gate cannot be spelt twice.
+///     </para>
+///     <para>
+///         The original reason is unchanged and is worth keeping. <c>MongoDbRunner.Dispose()</c>
+///         does not reliably stop <c>mongod</c> (#102): a run of this tier was measured finishing
+///         green and leaving SIX live processes behind, and the next run then failed on data a
+///         previous run had written. Orphans are not a tidiness problem here, they are the failure.
 ///     </para>
 ///     <para>
 ///         <b>A REPLICA SET, NOT A STANDALONE, AND THAT IS NOT OPTIONAL.</b> The MongoDB EF
@@ -66,14 +76,7 @@ namespace InfoCarrier.Core.DocumentStoreTests;
 /// </remarks>
 public class DocumentStoreFixture : IAsyncLifetime
 {
-    /// <summary>
-    ///     Serializes starting a server, so that "which <c>mongod</c> is mine" has an answer.
-    /// </summary>
-    private static readonly SemaphoreSlim StartGate = new(1, 1);
-
-    private MongoDbRunner _runner = null!;
-
-    private Process[] _mongod = [];
+    private EmbeddedMongo _server = null!;
 
     private ServiceProvider _serverProvider = null!;
 
@@ -106,11 +109,11 @@ public class DocumentStoreFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await StartServerAsync();
+        _server = await EmbeddedMongo.StartAsync();
 
         var services = new ServiceCollection();
         services.AddDbContext<ShopServerContext>(
-            o => o.UseMongoDB(_runner.ConnectionString, "shop"));
+            o => o.UseMongoDB(_server.ConnectionString, "shop"));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopServerContext>());
 
         if (ServerDeclaresDocumentStore)
@@ -151,52 +154,7 @@ public class DocumentStoreFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _serverProvider.DisposeAsync();
-        _runner.Dispose();
-
-        // What `Dispose` was supposed to do. Anything still alive here is an orphan that will hold
-        // its port and its data into the next run, which is the failure this guards (#102).
-        foreach (Process process in _mongod)
-        {
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                    process.WaitForExit(10_000);
-                }
-            }
-            catch (Exception)
-            {
-                // Already gone, or not ours to kill. Either way there is nothing left to do, and a
-                // fixture that throws while tearing down hides the result of the tests it ran.
-            }
-
-            process.Dispose();
-        }
-    }
-
-    /// <summary>
-    ///     Starts this fixture's server and records which <c>mongod</c> it created.
-    /// </summary>
-    /// <remarks>
-    ///     Serialized, because the only portable way to name the process a library started is to
-    ///     compare the set of them before and after, and that difference means nothing while
-    ///     another thread is starting one too. <see cref="Process.GetProcessesByName(string)" />
-    ///     answers on Windows, Linux and macOS alike, which the tier's no-installation bar requires.
-    /// </remarks>
-    private async Task StartServerAsync()
-    {
-        await StartGate.WaitAsync();
-        try
-        {
-            HashSet<int> before = [.. Process.GetProcessesByName("mongod").Select(p => p.Id)];
-            _runner = MongoDbRunner.Start(singleNodeReplSet: true);
-            _mongod = [.. Process.GetProcessesByName("mongod").Where(p => !before.Contains(p.Id))];
-        }
-        finally
-        {
-            StartGate.Release();
-        }
+        await _server.DisposeAsync();
     }
 
     /// <summary>A client for a test to use.</summary>
