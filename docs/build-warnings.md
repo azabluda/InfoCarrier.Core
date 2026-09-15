@@ -96,5 +96,5 @@ with a deliberately unused `using` in `src/InfoCarrier.Core/Expressions/TypeNode
 
 | Gate | Measures | Unaffected by this document |
 |---|---|---|
-| `eng/ratchet.sh` | spec-test failure **count**, against `test/known-failures.txt` | yes |
+| the spec suite's own run | a green suite, and a reason on every override (`OverrideAuditTest`); it was `eng/ratchet.sh` until 2026-09-15 | yes |
 | `eng/trim-ratchet.sh` | ILLink `IL2xxx` **direction**, against `eng/trim-baseline.txt` | yes — the C# compiler never emits `IL2xxx`, and those 88 are unfixable by design |

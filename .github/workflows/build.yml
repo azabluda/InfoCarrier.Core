@@ -26,11 +26,9 @@ env:
   # here rather than run through the solution because the solution also holds
   # InfoCarrier.Core.TransportTests, which is not a spec project and is gated by the fast job.
   #
-  # "eng/ratchet.sh still takes several TRX and eng/measure.sh still takes several projects; both
-  # keep that shape because a second store would need it again." That is what this comment said
-  # until 2026-09-14, and the second store arrived: ADR-009 Tier D is a project of its own, because
-  # MongoDB.EntityFrameworkCore needs a newer EF Core patch than src/ compiles against and one
-  # project has one package graph. Both shapes are now in use rather than merely kept.
+  # ADR-009 Tier D is a project of its own, because MongoDB.EntityFrameworkCore needs a newer EF
+  # Core patch than src/ compiles against and one project has one package graph, so the spec suite
+  # is two test runs and eng/suite-summary.sh adds their counters.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
@@ -124,19 +122,15 @@ jobs:
           --filter "FullyQualifiedName~SqliteSmokeTest"
 
       # Phase 1 of M8. A separate project on purpose: InfoCarrier.Core.FunctionalTests is what
-      # the spec ratchet counts, and these are not spec tests.
+      # the spec-suite badge counts, and these are not spec tests.
       - name: Test (HTTP transport)
         run: >
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj
           --no-build --configuration Release
 
-      # ADR-009 TIER D RAN HERE AND MOVED TO THE SPEC-RATCHET JOB ON 2026-09-14. The step is not
-      # removed silently, because the reason it sat here is worth knowing: it adopted no
-      # specification bases, so it was green by construction and a bare `dotnet test` said
-      # everything there was to say. It adopts six bases now and its reds are real. A tier whose
-      # reds cannot be RECORDED is a tier under pressure to override them, which is the one thing
-      # CLAUDE.md's oldest guardrail forbids, so it is ratcheted against the single baseline with
-      # every other tier. ADR-009's 2026-09-14 amendment is the reading.
+      # ADR-009 TIER D RAN HERE UNTIL 2026-09-14 AND RUNS IN THE SPEC-SUITE JOB SINCE. It adopted
+      # no specification bases when it sat here, so a bare `dotnet test` said everything there was
+      # to say. It adopts six now, and they run with the rest of the spec suite.
 
       # Phase 2 of M8. Publishes the Blazor client trimmed and gates on the DIRECTION of this
       # product's IL2xxx count, not on zero — spec §9's "no warning attributable to
@@ -145,9 +139,16 @@ jobs:
       - name: Trim ratchet (Blazor publish)
         run: bash eng/trim-ratchet.sh
 
-  # The inherited EFCore.Specification.Tests suite is legitimately red during build-out
-  # (CLAUDE.md forbids skipping tests to force green), so this job gates on the *direction*
-  # of the failure count, not its value. See roadmap.md §CI strategy.
+  # THE SPEC SUITE, GREEN, AND `dotnet test`'S OWN EXIT CODE IS THE GATE (2026-09-15). Until then
+  # the suite was red on purpose and this job gated on the DIRECTION of the failure count against
+  # test/known-failures.txt. Now every override of a specification test says what the store does and
+  # where that is shown, and OverrideAudit, a test inside each project, fails the run on one that
+  # does not (docs/plans/v10/test-overhaul.md). So a red test fails the step, and a crashed test
+  # host does too, which was the other thing the ratchet's total guarded.
+  #
+  # THE JOB IS STILL NAMED `Spec ratchet`, AND ONLY BECAUSE THE `main` RULESET REQUIRES A CHECK OF
+  # THAT NAME. A renamed job would leave every pull request waiting for a check that never reports.
+  # Rename it here and in the ruleset together.
   spec-ratchet:
     name: Spec ratchet
     runs-on: ubuntu-latest
@@ -178,56 +179,38 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
-      # Failures are the expected state here, so a non-zero exit must not end the job —
-      # the ratchet step below is what decides. A crashed host is not exempted by this: it
-      # reports *fewer* failures because fewer tests ran, and the ratchet catches that on the
-      # total.
-      #
-      # ~15 minutes locally at 22312 tests, so allow generously rather than have a slow runner
-      # look like a regression.
-      # TWO TRX SINCE 2026-09-14, and it was one from R136 until then. eng/ratchet.sh has always
-      # accepted several and unioned them into one counter set and one sorted name list against the
-      # single baseline pair; that shape was kept "for the next backing store", and Tier D is it.
       # Named explicitly and not run through the solution: the solution also holds
       # InfoCarrier.Core.TransportTests, which is not part of this number.
       - name: Test (full suite, Tiers A-C)
-        continue-on-error: true
+        id: tiers-a-c
         timeout-minutes: 90
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
-      # ADR-009 TIER D, RATCHETED HERE SINCE 2026-09-14 AND GREEN SINCE 2026-09-15. It adopts six
-      # specification bases, and every test whose expectation it changes carries an attribute that
-      # says what the store does and which test shows it; OverrideAudit fails the tier's own run on
-      # an override that does not. docs/plans/v10/test-overhaul.md is the reading. It stays in the
-      # ratchet with zero failures while the other tiers are converted, which already makes any
-      # red here fail CI.
+      # ADR-009 Tier D. It starts a real mongod per test class from binaries Mongo2Go carries in its
+      # own package. Nothing is downloaded and no container is used, which is the bar ADR-009 set
+      # when it chose Firebird over PostgreSQL.
       #
-      # It starts a real mongod per test class from binaries Mongo2Go carries in its own package.
-      # Nothing is downloaded and no container is used, which is the bar ADR-009 set when it chose
-      # Firebird over PostgreSQL.
+      # `success() || failure()` so that a red in Tiers A-C does not hide whether Tier D is red too;
+      # a cancelled run still stops here.
       - name: Test (document store, Tier D)
-        continue-on-error: true
+        id: tier-d
+        if: success() || failure()
         timeout-minutes: 30
         run: >
           dotnet test test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj
           --no-build --configuration Release
           --logger "trx;LogFileName=tierd.trx" --results-directory artifacts/test-results
 
-      # THERE WAS A "Tier D control integrity" STEP HERE UNTIL 2026-09-15. It ran
-      # eng/tier-d-control.py over the TRX to check the wire-free control against two text
-      # manifests. OverrideAudit, a test inside the tier, replaced it: the control is green by
-      # construction, each wire override names its control test in an attribute the compiler
-      # checks, and a disagreement fails the tier's own run before this job ever reads the TRX.
-
-      - name: Ratchet
-        id: ratchet
+      # Reports and decides nothing: the counters for the badge and the failing names for the run
+      # summary. `always()`, because a red run still has numbers worth publishing.
+      - name: Summary
+        if: always()
         run: >
-          ./eng/ratchet.sh
+          ./eng/suite-summary.sh
           artifacts/test-results/results.trx
           artifacts/test-results/tierd.trx
-          test/known-failures.txt
 
       - name: Upload results
         if: always()
@@ -236,15 +219,12 @@ jobs:
           name: test-results
           path: artifacts/test-results
 
-      # Renders the TRX the ratchet just read as a browsable report, so the counts and the failing
-      # tests are visible on the pull request without downloading the artifact. It creates a check
-      # run named `Spec suite`; its title carries the three counters.
+      # Renders the TRX as a browsable report, so the counts and the failing tests are visible on
+      # the pull request without downloading the artifact. It creates a check run named
+      # `Spec suite`; its title carries the three counters.
       #
-      # THE RATCHET IS THE GATE. This step reports and never gates, and `fail-on-error: false` is
-      # what makes that true of the CHECK as well as of the job: the action's conclusion is
-      # `failOnError && anyFailed`, so with it off the check run completes green. Nothing else
-      # changes -- the title still reads `... 9 failed ...`, and the report and the annotations are
-      # identical. The count is on the check; the verdict is the ratchet's.
+      # THE TEST STEPS ARE THE GATE. This step reports and never gates, and `fail-on-error: false`
+      # keeps its check run green whatever it finds, so there is one verdict and not two.
       #
       # THIS WAS RED FOR EXACTLY ONE PULL REQUEST, on purpose, and reversed the same day. A pull
       # request LIST shows one icon per row, the rollup of every check, and it takes the worst one.
@@ -264,9 +244,8 @@ jobs:
       # tests a full listing would always be cut. `failed` lists the failures and the classes that
       # own them, which is the part worth reading anyway.
       #
-      # `fail-on-empty` is belt to eng/ratchet.sh's braces: the ratchet runs first and already exits
-      # 1 on a missing TRX, which is the failure this job must not swallow. Here it only marks the
-      # step, because continue-on-error covers this one.
+      # `fail-on-empty` marks a missing TRX. Here it only marks the step, because continue-on-error
+      # covers this one; a test step that produced no TRX has already failed the job.
       #
       # Skipped for a pull request from a fork, where the token is read-only and creating a check
       # run returns 403. On a push the expression is `null != true`, so pushes still run it. The
@@ -307,12 +286,12 @@ jobs:
           fail-on-error: 'false'
           fail-on-empty: 'true'
 
-      # Publishes the numbers the ratchet just read to the `badges` branch, where shields.io reads
-      # them for README.md's spec-suite badge. The figures come from the counters file ratchet.sh
+      # Publishes the suite's numbers to the `badges` branch, where shields.io reads them for
+      # README.md's spec-suite badge. The figures come from the counters file eng/suite-summary.sh
       # writes, so the TRX is parsed once and by one parser.
       #
-      # `always()`, because a run that FAILS the ratchet still has numbers and the badge should
-      # show them, in red. A badge frozen on the last green run is a badge that lies.
+      # `always()`, because a red run still has numbers and the badge should show them, in red. A
+      # badge frozen on the last green run is a badge that lies.
       #
       # AND NO SECRET. The usual recipe for this badge is a Gist plus a personal access token,
       # which would be the first long-lived credential in this repository -- release.yml is built
@@ -324,7 +303,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COLOR: ${{ steps.ratchet.outcome == 'success' && 'green' || 'red' }}
+          COLOR: ${{ steps.tiers-a-c.outcome == 'success' && steps.tier-d.outcome == 'success' && 'green' || 'red' }}
         run: |
           set -euo pipefail
           . artifacts/test-results/counters.env

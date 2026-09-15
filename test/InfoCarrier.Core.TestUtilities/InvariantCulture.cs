@@ -13,9 +13,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         suite's failure count is a property of the machine it runs on: this one is
 ///         <c>en-SE</c>, whose decimal separator is a comma, and that alone accounted for
 ///         <b>nine</b> failures. A run on a dot-separator machine reported nine fewer with no
-///         code change — so the number in <c>test/known-failures.txt</c>, which CI gates on, was
-///         only true here. A ratchet whose baseline depends on the runner's locale is not a
-///         ratchet.
+///         code change — so the number in <c>test/known-failures.txt</c>, which CI gated on until
+///         2026-09-15, was only true here. A ratchet whose baseline depends on the runner's locale
+///         is not a ratchet, and a green suite that depends on it is not green either, which is why
+///         the pin outlived the ratchet.
 ///     </para>
 ///     <para>
 ///         <b>None of the nine was this provider's</b>, and that is why pinning the culture is

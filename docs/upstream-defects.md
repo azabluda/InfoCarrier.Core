@@ -38,9 +38,10 @@ do, because the entity reaches the server as values. The server's own stack was 
 `Dictionary<string, object>` CLR type and holds a primitive collection. This is the **single entry
 under "Not supported"** on [`website/docs/limitations.md`](../website/docs/limitations.md). Two
 spec tests, both parameterizations of
-`ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`.
-The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor binding, which
-was priced in M9 and declined.
+`ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`,
+red until 2026-09-15 and overridden since to assert this exception, naming the limitations page as
+the decision. The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor
+binding, which was priced in M9 and declined.
 
 **`dotnet/efcore#36175` does not track this, and the corroboration this repository claimed for it
 does not exist either.** That issue is *"Support notification change tracking for complex types"* —
@@ -121,9 +122,10 @@ EXPECTED-vs-ITSELF: EqualException
 same Squad instance both times: True
 ```
 
-**What it blocks here.** Two spec tests, permanently red on the InMemory tier —
+**What it blocks here.** Two spec tests on the InMemory tier —
 `GearsOfWarQueryInfoCarrierTest.Correlated_collection_with_distinct_3_levels`, both async values.
-They are the whole of this suite's "wrong answer" class, and the answers are right: a side-by-side
+They were red until 2026-09-15 and carry `[StoreDefect("1.4", …)]` since, comparing the collection as
+a sequence. They were the whole of this suite's "wrong answer" class, and the answers are right: a side-by-side
 dump matched squad for squad, member for member, weapon count for weapon count.
 
 **Why no other provider notices.** Every one of them refuses the query before the assertion runs —

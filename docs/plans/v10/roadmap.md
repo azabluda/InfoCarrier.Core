@@ -25,15 +25,15 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-**`Total tests: 29514, Passed: 29237, Failed: 39, Skipped: 238`** (2026-09-07). All 39 are
-classified and `test/known-failures.txt` carries the dated reading for each. What is missing is
-stated for consumers in [`limitations.md`](../../../website/docs/limitations.md).
+**`FAILING: 0  TOTAL: 29792`** (2026-09-15), across the spec project and ADR-009 Tier D. The suite
+is green and every override of a specification test says what the store does and where that is
+shown ([`test-overhaul.md`](test-overhaul.md)). What is missing is stated for consumers in
+[`limitations.md`](../../../website/docs/limitations.md).
 
-**The suite has grown by about seven thousand tests since the last milestone closed, and the
-failure count grew with it.** Every rise sits on a spec base being adopted or moved to the tier
-that translates, never on a behaviour regression; `eng/ratchet.sh` gates the failing test NAMES on
-every pull request, which is what makes that statement checkable rather than hopeful. The count is
-not a quality trend and must not be read as one.
+**This read `Total tests: 29514, Passed: 29237, Failed: 39` (2026-09-07) until then**, with every
+failure classified in `test/known-failures.txt` and `eng/ratchet.sh` gating the failing names on
+every pull request. Both are deleted; the audit `OverrideAuditTest` writes on every run is the
+current account of what the suite does not check and why.
 
 **This section has been wrong before.** It read "M5 is one criterion from done" and quoted a
 2026-08-11 measurement for a day after M5 closed, which put the first screen of the stable plan
@@ -625,6 +625,12 @@ here is broken; the question is what would break under a store that is neither I
 ---
 
 ## CI strategy
+
+**Amended 2026-09-15: the spec suite is green and there is no ratchet.** Job 2 below gated the
+direction of a failure count while the suite was red on purpose. Every override of a specification
+test now says what the store does and where that is shown, `OverrideAuditTest` checks it, and the
+test run's own exit code is the gate. [`test-overhaul.md`](test-overhaul.md) is the reading; the
+text below is kept as it was.
 
 Two jobs, because the spec suite is legitimately red during build-out and
 [`CLAUDE.md`](../../../CLAUDE.md) forbids skipping tests to force green.

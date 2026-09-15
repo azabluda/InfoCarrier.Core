@@ -65,11 +65,10 @@ public class OwnedJsonQueryInfoCarrierFixture : OwnedJsonRelationalFixtureBase
 //
 //  A. Twelve: SQLite has no APPLY. Every one has an EF override, and R29a adopts all six methods
 //     (six tests times two QueryTrackingBehavior arms).
-//  B. Three `Contains_*`: the relational base asserts KeyNotFoundException, this provider raises
-//     InvalidOperationException instead. LEFT FAILING -- see the remark on
-//     OwnedJsonStructuralEqualityQueryInfoCarrierTest.
-//  C. One, `Associate_with_parameter_null`: it fails because it PASSES. Also left failing, and
-//     for a better reason -- see the same remark.
+//  B. Three `Contains_*`: the relational base asserts KeyNotFoundException, this provider raised
+//     InvalidOperationException instead. Left failing at R29; none of them is red on 2026-09-15.
+//  C. One, `Associate_with_parameter_null`: it failed because it PASSED. Not red on 2026-09-15
+//     either -- see the remark on OwnedJsonStructuralEqualityQueryInfoCarrierTest.
 //
 // The BulkUpdate class is the odd one here and it is worth knowing before reading it: it derives
 // from BulkUpdatesTestBase directly rather than from an Associations base, because bulk update is
@@ -180,8 +179,11 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
 
 /// <remarks>
 ///     <para>
-///         <b>Four tests in this class are left failing on purpose, and they are two different
-///         things.</b> Nothing is overridden: EF's <c>OwnedJsonStructuralEqualitySqliteTest</c>
+///         <b>NONE OF THE FOUR BELOW IS RED ON 2026-09-15, AND THIS REMARK SAID "LEFT FAILING ON
+///         PURPOSE" UNTIL THEN.</b> Each was fixed by later work without this remark being
+///         revisited, and the suite is green with no ratchet since that date. It is kept as the
+///         account of what the four were. <b>Four tests in this class were left failing, and they
+///         were two different things.</b> Nothing is overridden: EF's <c>OwnedJsonStructuralEqualitySqliteTest</c>
 ///         overrides every one of them only to assert golden SQL, calling <c>base</c> for the
 ///         behaviour, so there is no upstream statement of a different <em>reason</em> to adopt.
 ///     </para>

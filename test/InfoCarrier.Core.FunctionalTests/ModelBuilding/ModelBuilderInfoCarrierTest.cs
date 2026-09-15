@@ -197,7 +197,7 @@ public class ModelBuilderGenericInfoCarrierTest : ModelBuilderInfoCarrierTest
         ///     model, and that failure is what escapes. Registering <c>EntitySplittingConvention</c> on
         ///     the client fixed this test and was measured on 2026-09-07 turning 30 failures into 149,
         ///     because it needs a companion convention that decides column names the server also
-        ///     decides (<c>known-failures.txt</c>, V10).
+        ///     decides (V10).
         /// </remarks>
         [InfoCarrierDesign(
             Decisions.Architecture,

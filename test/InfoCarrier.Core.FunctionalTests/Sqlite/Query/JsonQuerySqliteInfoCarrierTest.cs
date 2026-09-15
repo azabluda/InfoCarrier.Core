@@ -337,8 +337,8 @@ public class JsonQuerySqliteInfoCarrierTest(
     // The three `Project_json_*_tracking_query_fails` overrides that used to sit here are gone:
     // `JsonQueryRelationalTestBase` declares all three, with the same assertion, and R70's
     // re-parent inherits them. They had been mirrored by hand only because the assembly holding
-    // that base was not referenced before R1. `OwnsMany_correlated_projection` still raises the
-    // same refusal here and EF overrides nothing for it, so that one stays red and stays ours.
+    // that base was not referenced before R1. `OwnsMany_correlated_projection` was left red here as
+    // raising the same refusal with no EF override; it is not red on 2026-09-15.
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

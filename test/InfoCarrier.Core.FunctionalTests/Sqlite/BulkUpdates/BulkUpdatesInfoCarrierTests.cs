@@ -140,11 +140,11 @@ public class FiltersInheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUp
 ///         by hand, each matched by reason against a measured failure first (A63).
 ///     </para>
 ///     <para>
-///         Four failures are deliberately left red: two are EF issue #28886, which EF's own
-///         SQLite suite carries as a <c>[ConditionalTheory(Skip = …)]</c> and which reproduces
-///         here exactly (<c>SQLite Error 1: 'no such column'</c>) — recorded rather than skipped,
-///         as `PrimitiveCollectionsQuery`'s EF issue #30730 already is. The other two are
-///         <c>Update_with_invalid_lambda_in_set_property_throws</c>; see C20.
+///         <b>This said "four failures are deliberately left red" until 2026-09-15</b>, two of
+///         them EF issue #28886 and two <c>Update_with_invalid_lambda_in_set_property_throws</c>.
+///         There is no red left: the #28886 pair carries EF's own skip with its reference, and the
+///         other pair asserts this provider's refusal, each with the reason on its attribute
+///         (<c>docs/plans/v10/test-overhaul.md</c>).
 ///     </para>
 /// </remarks>
 public class NorthwindBulkUpdatesInfoCarrierTest(

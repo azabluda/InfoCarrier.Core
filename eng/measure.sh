@@ -13,10 +13,9 @@
 # tell "fixed 4, broke 4" from "changed nothing".
 #
 # SEVERAL PROJECTS, ONE MEASUREMENT. `projects` below is the list; the counters are summed and the
-# failing names are merged into one sorted snapshot, exactly as eng/ratchet.sh aggregates the TRX
-# files in CI. One snapshot and not one per project, for the reason ratchet.sh states at length:
-# with a snapshot per project, a test that MOVES between projects reads as a fix in one and a break
-# in the other.
+# failing names are merged into one sorted snapshot, as eng/suite-summary.sh aggregates the TRX files
+# in CI. One snapshot and not one per project: with a snapshot per project, a test that MOVES between
+# projects reads as a fix in one and a break in the other.
 #
 # THE LIST HOLDS ONE PROJECT TODAY, and it held two between R122 and R136, one per backing store.
 # The plural shape stays because the reason for it has not gone away: the next backing store adds a
@@ -46,20 +45,18 @@ reasons="$out/$label.reasons.txt"
 # and from the baseline it is compared with, so add one here in the same commit that creates it.
 #
 # InfoCarrier.Core.TransportTests is deliberately ABSENT. It is not a spec project: it holds this
-# repository's own HTTP-transport tests, it is expected to be green, and folding it in would
-# inflate `total` past what test/known-failures.txt was written against. CLAUDE.md says the same
-# thing about pointing a hand run at the .slnx.
+# repository's own HTTP-transport tests, and the spec suite's number counts spec tests. CLAUDE.md
+# says the same thing about pointing a hand run at the .slnx.
 #
 # INFOCARRIER.CORE.DOCUMENTSTORETESTS IS PRESENT SINCE 2026-09-14, AND IT WAS ABSENT BEFORE THAT
 # FOR A REASON THAT EXPIRED. ADR-009 Tier D adopted no specification bases when it was written, so
-# it was gated as a plain `dotnet test` beside the transport suite. It adopts six now. A tier whose
-# reds cannot be recorded is a tier under pressure to override them, which is the failure mode
-# CLAUDE.md's oldest guardrail names, so Tier D is measured and ratcheted like every other tier.
+# it was gated as a plain `dotnet test` beside the transport suite. It adopts six now, so it is
+# measured like every other tier.
 #
-# ONE BASELINE STILL, NOT ONE PER PROJECT, and this tier is the case that argues for it rather than
-# against: OwnedNavigationsCollectionTestBase is adopted in BOTH projects today, so a decision to
-# host that family on one tier alone would MOVE tests between them. That is exactly the "fix in one,
-# break in the other" that eng/ratchet.sh keeps a single baseline to catch.
+# ONE SNAPSHOT, NOT ONE PER PROJECT, and this tier is the case that argues for it:
+# OwnedNavigationsCollectionTestBase is adopted in BOTH projects today, so a decision to host that
+# family on one tier alone would MOVE tests between them, which one snapshot per project would read
+# as a fix in one and a break in the other.
 #
 # It starts a real mongod per test class from binaries Mongo2Go carries in its own package, so a
 # local run of this script now needs no installation but does need those few seconds.
@@ -136,8 +133,9 @@ sed -n 's/^\[xUnit\.net [^]]*\] *\(.*\) \[FAIL\]$/\1/p' "$log" | sort -u > "$sna
     { grep -E "^[[:space:]]+(System|Microsoft|Assert|InfoCarrier|Xunit)" || true; } |
     sed 's/^ *//' | cut -c1-120 | sort | uniq -c | sort -rn > "$reasons"
 
-# The total is guarded for the same reason eng/ratchet.sh guards it: a crashed host reports
-# fewer failures because fewer tests ran, which looks exactly like progress.
+# Read the total as well as the failures: a crashed host reports fewer failures because fewer tests
+# ran, which looks exactly like progress. eng/ratchet.sh guarded it in CI until 2026-09-15; the test
+# run's own exit code does now.
 echo "FAILING: $failed  TOTAL: $total  ($label)"
 
 if [ -z "$baseline" ]; then

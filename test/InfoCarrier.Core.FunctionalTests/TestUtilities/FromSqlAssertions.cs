@@ -17,8 +17,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         with no diagnostic. R75 refuses the subclass instead.
 ///     </para>
 ///     <para>
-///         <b>Asserting the refusal, rather than skipping the test.</b> An unimplemented feature is
-///         left red where the base is the only statement of it, but where the base's own premise
+///         <b>Asserting the refusal, rather than skipping the test.</b> An unimplemented feature was
+///         left red where the base is the only statement of it, until the suite went green on
+///         2026-09-15; but where the base's own premise
 ///         is that the query <em>runs</em>, the useful thing to pin is the contract this provider
 ///         actually offers — which is what <c>QuerySplitter</c>'s own remarks call the clearest
 ///         statement of it. These assertions are also the tripwire: <b>if <c>FromSql</c> is ever

@@ -213,10 +213,10 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///     </para>
     ///     <para>
     ///         <b>Note what this does NOT do.</b> The sibling
-    ///         <c>Correlated_collection_with_distinct_3_levels</c> stays red, and deliberately: C64
-    ///         proved its assertion cannot be satisfied by <em>any</em> answer, so an override there
-    ///         would be green because the assertion is broken. See
-    ///         <c>docs/upstream-defects.md</c> §1.4 and <c>implementation-plan.md</c> V12.
+    ///         <c>Correlated_collection_with_distinct_3_levels</c> was left red here until 2026-09-15:
+    ///         C64 proved its assertion cannot be satisfied by <em>any</em> answer. Its Tier A
+    ///         override now compares the collection as a sequence instead, which is the assertion
+    ///         the base meant. See <c>docs/upstream-defects.md</c> §1.4.
     ///     </para>
     /// </remarks>
     [InfoCarrierDesign(

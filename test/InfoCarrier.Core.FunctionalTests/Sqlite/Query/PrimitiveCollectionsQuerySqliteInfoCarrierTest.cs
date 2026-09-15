@@ -323,8 +323,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // specification assembly, and the re-parent now inherits them verbatim -- along with three
     // more of that base's that this file never carried.
     //
-    // THOSE THREE ARE LEFT FAILING, AND THEY FAIL BECAUSE THEY PASS. Each asserts that translation
-    // must fail, and here it does not: "Assert.Throws() Failure: No exception was thrown".
+    // THOSE THREE WERE LEFT FAILING, AND THEY FAILED BECAUSE THEY PASS. Each asserts that translation
+    // must fail, and here it does not: "Assert.Throws() Failure: No exception was thrown". They are
+    // overridden since V12 to assert the rows, and carry docs/upstream-defects.md 1.12 since
+    // 2026-09-15.
     //
     //   Parameter_collection_in_subquery_and_Convert_as_compiled_query
     //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
@@ -338,9 +340,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // provider does not reach that state, and the base tests' own result assertions hold, so the
     // answers are right rather than merely un-thrown (measured in R31, not inferred).
     //
-    // Not overridden. There is no grandparent to call -- an override here could only re-state the
-    // core test's body -- and asserting the correct behaviour to turn the red green would be
-    // overriding a spec test to make the suite green, which CLAUDE.md forbids. This is the R29
+    // "Not overridden", this said at R31: there is no grandparent to call, and asserting the correct
+    // behaviour to turn the red green would be overriding a spec test to make the suite green, which
+    // CLAUDE.md then forbade. V12 overrode them with the core body on the owner's decision, and the
+    // rule itself was replaced on 2026-09-15 by an override that says why. This is the R29
     // category (`OwnedJson.Associate_with_parameter_null`) three more times: a query this provider
     // answers that other EF providers refuse, which is `website/docs/limitations.md`'s territory.
 
