@@ -188,6 +188,11 @@ public static class ChangeEntryMapper
         // with every complex member null, and EF answered "Required properties {'Species',
         // 'Species'} are missing" — which also names the reason they cannot be flattened into
         // the loop above: two complex leaves share a name.
+        // Which of their members changed, for the same reason `modified` exists: every value is on
+        // the wire either way, and the server cannot tell a member the client changed from one it
+        // merely loaded. See `ChangeEntry.ModifiedComplexProperties`.
+        List<string>? modifiedComplex = entry.EntityState == EntityState.Modified ? [] : null;
+
         foreach (IComplexProperty complexProperty in entityType.GetComplexProperties())
         {
             properties.Add(new DynamicPropertyValue
@@ -199,6 +204,11 @@ public static class ChangeEntryMapper
                 // an `Ignore`d member goes on the wire (C92).
                 Value = mapper.ToComplexValue(entry.GetCurrentValue(complexProperty), complexProperty),
             });
+
+            if (modifiedComplex is not null)
+            {
+                CollectModifiedComplexMembers(entry, complexProperty, complexProperty.Name, modifiedComplex);
+            }
         }
 
         return new ChangeEntry
@@ -211,8 +221,48 @@ public static class ChangeEntryMapper
             SerializedOriginalValues = originals is null ? null : Serialize(entityType, originals, mapper),
             TemporaryProperties = temporary,
             ModifiedProperties = modified,
+            ModifiedComplexProperties = modifiedComplex,
             SentinelProperties = sentinel,
         };
+    }
+
+    /// <summary>
+    ///     The changed members of one complex property, as dotted paths into
+    ///     <paramref name="into" />.
+    /// </summary>
+    /// <remarks>
+    ///     A complex collection is written as one value, a JSON column, so it is named as a whole. A
+    ///     single complex value is written member by member, so each changed member is named, and
+    ///     a nested complex property is walked the same way.
+    /// </remarks>
+    private static void CollectModifiedComplexMembers(
+        IUpdateEntry entry,
+        IComplexProperty complexProperty,
+        string path,
+        List<string> into)
+    {
+        if (complexProperty.IsCollection)
+        {
+            if (entry.IsModified(complexProperty))
+            {
+                into.Add(path);
+            }
+
+            return;
+        }
+
+        foreach (IProperty member in complexProperty.ComplexType.GetProperties())
+        {
+            if (entry.IsModified(member))
+            {
+                into.Add($"{path}.{member.Name}");
+            }
+        }
+
+        foreach (IComplexProperty nested in complexProperty.ComplexType.GetComplexProperties())
+        {
+            CollectModifiedComplexMembers(entry, nested, $"{path}.{nested.Name}", into);
+        }
     }
 
 

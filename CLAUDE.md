@@ -535,9 +535,11 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29793`** (2026-09-15, `parity-sides`), across the two projects `measure.sh`
-runs: **0 of 29559** in the spec project (`Passed: 29321, Skipped: 238`) and **0 of 234** in ADR-009
-Tier D. The one new test is `ServerParameterizationTest`'s inline collection of parameters. It read
+**`FAILING: 0  TOTAL: 29800`** (2026-09-16, `server-sql-fixes-2`), across the two projects `measure.sh`
+runs: **0 of 29566** in the spec project (`Passed: 29328, Skipped: 238`) and **0 of 234** in ADR-009
+Tier D. It read `FAILING: 0  TOTAL: 29793` the day before; the seven since are a differential case,
+two concurrency-token tests and four partial-update tests, from comparing the server's SQL with EF's
+(`docs/plans/v10/test-overhaul.md`). It read
 `FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
 above, each with an exact assertion and its reason, not by a skip. **Every figure comes out of the
 run's own summary block, and none of them is arithmetic** — a `c10b` entry once carried `Skipped`
