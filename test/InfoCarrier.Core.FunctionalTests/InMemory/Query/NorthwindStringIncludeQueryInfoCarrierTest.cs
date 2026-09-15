@@ -25,6 +25,9 @@ public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     : NorthwindStringIncludeQueryTestBase<NorthwindQueryInfoCarrierFixture<NoopModelCustomizer>>(fixture)
 {
     /// <inheritdoc />
+    [StoreLimit(
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/Query/NorthwindStringIncludeQueryInMemoryTest.cs#L10-L11",
+        Justification = "Right join not supported in InMemory")]
     public override Task Include_collection_with_right_join_clause_with_filter(bool async)
         => AssertTranslationFailed(() => base.Include_collection_with_right_join_clause_with_filter(async));
 }

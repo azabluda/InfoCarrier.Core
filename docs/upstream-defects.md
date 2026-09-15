@@ -325,6 +325,32 @@ crash or a wrong answer is never overridden here.
 reproducing their exact shape, so no entry has moved to §2. Doing that verification is the work that
 would turn any of these into a report, and it is the owner's call whether it is worth it.
 
+### 1.11 EF's InMemory provider crashes where its own suite pins the crash
+
+**Recorded 2026-09-15, when ADR-009 Tier A's overrides were given reasons, and not found by this
+repository.** EF's own `EFCore.InMemory.FunctionalTests` overrides each test below to assert the
+crash, so EF knows. None carries an issue number, and a crash is never a store limit here, so each
+Tier A override that copies one carries `[StoreDefect("1.11", …)]` with the link to EF's override.
+
+**Site.** Not located, and not looked for. The evidence is EF's own assertion at the `v10.0.1` tag.
+
+**Symptom.**
+
+| Tests | Raised |
+|---|---|
+| `JsonTypesTestBase.Can_read_write_point`, `…_with_M`, `…_with_Z`, `…_with_Z_and_M`, `Can_read_write_line_string`, `Can_read_write_multi_line_string`, `Can_read_write_polygon`, `Can_read_write_polygon_typed_as_geometry` | `NullReferenceException`; EF's comment: *"No built-in JSON support for spatial types in the in-memory provider"* |
+| `SpatialQueryTestBase.Intersects_equal_to_null`, `Intersects_not_equal_to_null` | `NullReferenceException` |
+| `SpatialQueryTestBase.GetGeometryN_with_null_argument` | skipped by EF, whose comment is *"Sequence contains no elements"* |
+| `GearsOfWarQueryTestBase.Null_semantics_is_correctly_applied_for_function_comparisons_that_take_arguments_from_optional_navigation_complex`, `Find_underlying_property_after_GroupJoin_DefaultIfEmpty` | `InvalidOperationException: Nullable object must have a value.` EF's sibling override on the non-complex test cites its issue #13721, *"Null protection"* |
+| `GearsOfWarQueryTestBase.Select_StartsWith_with_null_parameter_as_argument`, `OrderBy_…`, `Group_by_on_…`, `Group_by_with_having_…` | `ArgumentNullException: Value cannot be null. (Parameter 'value')`: `string.StartsWith(null)` evaluated in .NET rather than with database null semantics |
+| `GearsOfWarQueryTestBase.Include_after_SelectMany_throws` | `NullReferenceException` where the base expects EF's own refusal |
+| `GearsOfWarQueryTestBase.Include_on_GroupJoin_SelectMany_DefaultIfEmpty_with_coalesce_result4`, `…_with_complex_projection_result` | `TargetInvocationException` |
+
+**What it blocks.** Nothing in InfoCarrier. Tier A's store is EF's InMemory provider, so these reach
+the wire as the store's answer and cross it unchanged. **It bounds what Tier A can prove**, as 1.6
+does for Tier D: where the store crashes, the tier cannot tell whether the wire would have carried
+the correct answer.
+
 ## 2. Already reported
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a

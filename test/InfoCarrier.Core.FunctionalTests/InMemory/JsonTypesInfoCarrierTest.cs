@@ -44,34 +44,66 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     // dereferences a null reader/writer. Matched by reason before being taken (A63).
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L10-L12",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L14-L16",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_M()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_M());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L18-L20",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_Z()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_Z());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L22-L24",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_Z_and_M()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_Z_and_M());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L26-L28",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_line_string()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_line_string());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L30-L32",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_multi_line_string()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_multi_line_string());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L34-L36",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_polygon()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_polygon());
 
     /// <inheritdoc />
+    [StoreDefect(
+        "1.11",
+        Upstream.EfCore + "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs#L38-L40",
+        Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_polygon_typed_as_geometry()
         => Assert.ThrowsAsync<NullReferenceException>(base.Can_read_write_polygon_typed_as_geometry);
 
