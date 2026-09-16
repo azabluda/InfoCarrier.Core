@@ -120,6 +120,28 @@ ORDER BY "t"."Id"
 """);
 
     /// <summary>
+    ///     A join on a composite key is one statement on the server, and it keeps C# null matching.
+    /// </summary>
+    /// <remarks>
+    ///     <b>This is the defect found on 2026-09-16.</b> A composite key is written
+    ///     <c>new { … }</c>, whose type the caller's compiler generates, so the boundary could not
+    ///     ship it and cut below the join: the server read both tables whole and this client joined
+    ///     them. The answer was right and the wire carried everything.
+    ///     <c>JoinKeyRewriter</c> gives the key a type the server has.
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_join_on_a_composite_key_runs_one_statement_on_the_server()
+        => AssertServerRuns(
+            client => (from t in client.Tickets
+                       join s in client.Seats on new { Id = t.Id, Name = t.Subject } equals new { Id = s.TicketId, Name = s.Label }
+                       select new { t.Id, s.Label }).ToListAsync(),
+            """
+SELECT "t"."Id" AS "Item1", "s"."Label" AS "Item2"
+FROM "Tickets" AS "t"
+INNER JOIN "Seats" AS "s" ON "t"."Id" = "s"."TicketId" AND ("t"."Subject" = "s"."Label" OR ("t"."Subject" IS NULL AND "s"."Label" IS NULL))
+""");
+
+    /// <summary>
     ///     A split query stays split: two statements cross the wire, not one join and not three.
     /// </summary>
     [ConditionalFact]

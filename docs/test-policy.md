@@ -514,16 +514,20 @@ serially with the server SQL log on, and prints the disagreements grouped by kin
   decision recorded in a test is checked on every run and a decision recorded in a file is not;
 - **an artifact of EF's own harness** — nothing to write.
 
-**What the run of 2026-09-16 says**, on the whole tier: **791 tests paired, 784 identical, 7
-differing** (PARAMETER 1, STRUCTURAL 7; one test is in both). Read, they are three groups and one
-upstream accident:
+**What the run of 2026-09-16 says**, on the whole tier: **791 tests paired, 786 identical, 5
+differing** (PARAMETER 1, STRUCTURAL 5; one test is in both). It read 784 and 7 before the join-key
+rewrite below. What is left is two groups and one upstream accident:
 
-- **Three tests where an operator the type boundary leaves on the client reads whole tables**:
+- **One test where an operator the type boundary leaves on the client reads a whole table**:
+  `NorthwindGroupBy.Odata_groupby_empty_key` reads every order and groups here, because its group key
+  is a class the caller declared, with its own `Equals`. Nothing can rewrite that, so the decision it
+  needs is the owner's: refuse, or keep and document.
+- **Two tests that used to be in this group are fixed.**
   `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition` and
-  `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` each run two full-table reads where EF
-  runs one join, and `NorthwindGroupBy.Odata_groupby_empty_key` reads every order and groups on the
-  client. **This is the one dangerous group**, and the decision it needs is the owner's: refuse,
-  rewrite, or keep and document.
+  `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` each ran two full-table reads where EF
+  runs one join, because a composite key is written `new { … }` and that type is the caller's.
+  `JoinKeyRewriter` gives the key a `Tuple<…>` the server already accepts, and both now run EF's own
+  statement (`docs/projection-split.md` §3.3a). `ServerSqlTest` pins it.
 - **Two compiled queries over a parameter collection** (`PrimitiveCollections.*_as_compiled_query`),
   where ADR-006's capture evaluates the `Skip` on the client and ships one value instead of the
   collection. The answers are right and the statement is simpler; the intent is partly evaluated

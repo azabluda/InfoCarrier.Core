@@ -68,6 +68,13 @@ internal sealed class QueryExecutor<TElement>
         // Substitute compiled-query parameters as plain constants (research-findings §6).
         Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
 
+        // Then give a composite join key a type the server has. `new { a.X, a.Y }` is generated in
+        // the CALLER's assembly, so the boundary analyzer below cannot ship it and used to cut under
+        // the join: the server ran both roots and this client joined them, which answers correctly
+        // and carries both tables over the wire. See `JoinKeyRewriter`, and the measurement that
+        // found it in `docs/test-policy.md`.
+        substituted = new Query.JoinKeyRewriter().Visit(substituted);
+
         // Then, and only then, decide what the server can execute: a surviving closure field
         // access names a compiler-generated display class and would push the boundary in for
         // no reason (ADR-010, docs/projection-split.md).
