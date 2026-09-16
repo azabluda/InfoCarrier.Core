@@ -143,7 +143,7 @@ jobs:
   # the suite was red on purpose and this job gated on the DIRECTION of the failure count against
   # test/known-failures.txt. Now every override of a specification test says what the store does and
   # where that is shown, and OverrideAudit, a test inside each project, fails the run on one that
-  # does not (docs/plans/v10/test-overhaul.md). So a red test fails the step, and a crashed test
+  # does not (docs/test-policy.md). So a red test fails the step, and a crashed test
   # host does too, which was the other thing the ratchet's total guarded.
   #
   # `Spec tests` IS A REQUIRED CHECK IN THE `main` RULESET, BY THIS EXACT NAME. It was `Spec ratchet`
@@ -303,7 +303,7 @@ jobs:
       # test cases that ran through InfoCarrier on which it behaves as EF's own provider, and the
       # colour carries the rest: red when a test step failed, yellow while an InfoCarrier defect is
       # tracked by an [InfoCarrierDefect] override, green otherwise (the owner's decision, the same
-      # day; docs/plans/v10/test-overhaul.md). The file keeps its name, so README.md is unchanged.
+      # day; docs/test-policy.md). The file keeps its name, so README.md is unchanged.
       #
       # `always()`, because a red run still has numbers and the badge should show them, in red. A
       # badge frozen on the last green run is a badge that lies.

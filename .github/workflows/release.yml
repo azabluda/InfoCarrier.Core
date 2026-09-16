@@ -64,7 +64,7 @@ jobs:
 
       # The same gates build.yml runs, because a release must clear at least what a push clears.
       # The spec suite is green since 2026-09-15, so its own exit code decides; there is no ratchet
-      # any more (docs/plans/v10/test-overhaul.md).
+      # any more (docs/test-policy.md).
       - name: Test (round-trip + smoke)
         run: >
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release

@@ -20,7 +20,7 @@ specification bases against an embedded MongoDB.
 says what the store does and where that is shown: EF Core's own test at the release commit, a
 tracker issue, or the decision in `docs/decisions.md`. `OverrideAuditTest` fails the run on an
 override without one. A skip is allowed only where EF's own suite skips the same test.
-[`docs/plans/v10/test-overhaul.md`](docs/plans/v10/test-overhaul.md) has the rules.
+[`docs/test-policy.md`](docs/test-policy.md) has the rules.
 
 ## Warnings are errors in CI, and only in CI
 

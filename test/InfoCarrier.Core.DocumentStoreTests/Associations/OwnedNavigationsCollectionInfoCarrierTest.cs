@@ -19,7 +19,7 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 ///         <b>EVERY OVERRIDE HERE SAYS WHAT THE STORE DOES AND WHERE THAT IS SHOWN.</b> The attribute
 ///         is the label; its arguments name the test of <see cref="DirectCollectionTest" /> that shows
 ///         the same behaviour with InfoCarrier removed. <c>OverrideAudit</c> fails the build if the
-///         two disagree. <c>docs/plans/v10/test-overhaul.md</c> is the reading.
+///         two disagree. <c>docs/test-policy.md</c> is the reading.
 ///     </para>
 ///     <para>
 ///         <b>This class held four overrides with no reference until 2026-09-14</b>, argued from EF's

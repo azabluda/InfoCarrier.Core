@@ -1,40 +1,42 @@
 #!/usr/bin/env python3
 """Compare the SQL the server ran, test by test, with the SQL EF's own SQLite suite expects.
 
-This is the measuring half of #111. It asserts nothing and gates nothing: it reads a server-sql.log
-written by a run with INFOCARRIER_SERVER_SQL=1, and EF's `AssertSql` text at the pinned commit, and
-says for each test whether the statements agree.
+WHAT THIS IS FOR. It is an INVESTIGATION, not a gate and not a quality claim. EF's specification
+suite is thousands of little users of this provider: they report a wrong answer loudly, and say
+nothing at all about a full table crossing the wire. This is the instrument that makes the silent
+half visible, by asking what the server ran and comparing it with what EF's own provider runs for
+the same test. Each difference is then read and triaged:
 
-HOW TO PRODUCE THE LOG. Serially, or the statements of two tests interleave between two markers:
+  * our defect  -> fix it, and pin the promise in `Sqlite/ServerSqlTest.cs`, in our own words;
+  * a deviation we accept -> pin THAT in the same file, with the reason;
+  * an artifact of EF's own test harness -> nothing to write.
 
-    INFOCARRIER_SERVER_SQL=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj \\
-        --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite" -- xUnit.ParallelizeTestCollections=false
-    eng/ef-sql-diff.py test/InfoCarrier.Core.FunctionalTests/bin/Debug/net10.0/server-sql.log
+Nothing here is copied into the suite. Four defects came out of the run on 2026-09-15/16: a
+parameter replaced by its literal values, a concurrency token dropped from a write, a whole complex
+column written for a one-member change, and a `First()` that ran with no `LIMIT`.
 
-It needs `subrepos/efcore` checked out at the commit `Upstream.CommitOf` pins, which a CI runner has
-not, so this is a local tool. Tier B only: EF asserts SQL in its SQLite suite, and Tier A has no SQL.
+HOW TO RUN IT: `bash eng/ef-sql-compare.sh`, which needs nothing checked out and leaves nothing
+behind. This script is the comparing half of it, and can be run alone on a log produced by a
+SERIAL run with INFOCARRIER_SERVER_SQL naming a file (parallel tests interleave between two
+markers, which corrupts the comparison quietly).
 
 WHAT IS IGNORED, AND WHY EACH IS A NAME AND NOT A PLAN. Whitespace; parameter names (`@Value` for
 `@id`: a parameter crosses inside `ParameterBox<T>` and EF names it after the box's property);
 aliases and the qualifiers that reference them (`"Item1"` for `"X"`, `"v"` for `"i"`: the projection
 split and a boxed collection name them differently). Literals and structure are kept.
 
-WHAT ELSE IT REPORTS, with --reasons: how many of the tests EF asserts SQL for this suite asserts
-too, read from the *.override-reasons.tsv that OverrideAudit writes (INFOCARRIER_OVERRIDE_REASONS).
-That count is #111's progress, and it is the ALARM FOR A NEW EF VERSION: a test EF has added since
-the last bump is one this suite runs, inherits and does not assert, so the figure falls. A test EF
-moved or renamed is caught earlier, by the audit, which checks that an [UpstreamOverride]'s line
-range still declares that test at the pinned commit.
-
-WHAT IT REPORTS, per statement EF expects and the server did not produce:
+WHAT IT REPORTS, in the order it prints, dangerous first:
   LITERAL     the server ran the same shape with a literal where EF has a parameter
   PARAMETER   the server ran the same shape with a parameter where EF has a literal
   STRUCTURAL  the server ran no statement of that shape in that test
-The owner's rule (docs/plans/v10/test-overhaul.md): the first two are equally bad, and a structural
-difference that can change the store's plan is a red flag. A refused query is a false positive here,
-because the log records only commands that ran.
+  EXTRA       the server ran a statement EF does not expect at all
+  ORDER       the same statements, in another order
+The owner's rule (docs/test-policy.md): the first two are equally bad, a structural
+difference that can change the store's plan is a red flag, and an EXTRA read is how a whole table
+crosses the wire. A refused query is a false positive here, because the log records only commands
+that ran; so is a test whose own seeding runs between the markers.
 
-Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--reasons <tsv> ...] [--quiet]
+Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--quiet] [--limit N]
 """
 
 import argparse
@@ -55,10 +57,13 @@ PARAM = re.compile(r'@[A-Za-z_][A-Za-z0-9_]*')
 ALIAS = re.compile(r'\s+AS "[^"]*"')
 QUALIFIER = re.compile(r'"[^"]*"\.')
 DML = re.compile(r'^\s*(SELECT|UPDATE|DELETE|WITH|INSERT)\b', re.I)
+WRITE = re.compile(r'^\s*(UPDATE|DELETE|INSERT)\b', re.I)
 LOG_HEADER = re.compile(r'^\w+: \d\d/\d\d/\d{4} ')
 METHOD = re.compile(r'public\s+(?:override\s+)?(?:async\s+)?[\w<>\[\],?. ]+?\s+(\w+)\s*\(')
 CLASS = re.compile(r'\bclass\s+(\w+)')
 ASSERT_SQL = re.compile(r'\bAssert(?:ExecuteUpdate)?Sql\s*\(')
+
+KINDS = ('LITERAL', 'PARAMETER', 'STRUCTURAL', 'EXTRA READ', 'EXTRA WRITE', 'ORDER')
 
 
 def canon(sql):
@@ -183,18 +188,6 @@ def server_sections(path):
     return sections
 
 
-def upstream_overrides(paths):
-    """(class, method) of every test carrying [UpstreamOverride], read off the audit's rows."""
-    asserted = set()
-    for path in paths:
-        with open(path, encoding='utf-8') as tsv:
-            for line in tsv:
-                fields = line.rstrip('\n').split('\t')
-                if len(fields) == 6 and fields[0] == 'reason' and fields[4] == 'upstream':
-                    asserted.add((key(fields[1].rsplit('.', 1)[-1]), fields[2]))
-    return asserted
-
-
 def classify(statement, ran_shapes):
     sh, kinds = shape(statement)
     if sh not in ran_shapes:
@@ -205,15 +198,43 @@ def classify(statement, ran_shapes):
     return 'LITERAL' if literal and not clean else 'PARAMETER'
 
 
+def compare_case(wanted, ran):
+    """The differences between what EF expects and what one test case ran, both directions."""
+    missing = list(wanted)
+    extra = list(ran)
+    for statement in list(missing):
+        match = next((s for s in extra if exact(s) == exact(statement)), None)
+        if match is not None:
+            missing.remove(statement)
+            extra.remove(match)
+
+    if not missing and not extra and [exact(s) for s in wanted] != [exact(s) for s in ran]:
+        return [], [], True
+    return missing, extra, False
+
+
+def differences(wanted_variants, cases):
+    """The worst case's differences, against the variant that fits it best."""
+    worst = ([], [], False, None)
+    for case in cases:
+        best = None
+        for wanted, where in wanted_variants:
+            missing, extra, reordered = compare_case(wanted, case)
+            cost = len(missing) + len(extra) + (1 if reordered else 0)
+            if best is None or cost < best[0]:
+                best = (cost, missing, extra, reordered, where, case)
+        if best[0] > (len(worst[0]) + len(worst[1]) + (1 if worst[2] else 0)):
+            worst = (best[1], best[2], best[3], (best[4], best[5]))
+    return worst
+
+
 def main(argv):
     sys.stdout.reconfigure(newline='\n')
     parser = argparse.ArgumentParser(description='Compare the server SQL log with EF\'s expected SQL.')
-    parser.add_argument('log', help='a server-sql.log from a serial run with INFOCARRIER_SERVER_SQL=1')
+    parser.add_argument('log', help='a server-sql.log from a serial run with INFOCARRIER_SERVER_SQL set')
     parser.add_argument('--efcore', default='subrepos/efcore', help="EF Core checkout (default: subrepos/efcore)")
-    parser.add_argument('--quiet', action='store_true', help='counts only, no per-statement listing')
-    parser.add_argument(
-        '--reasons', nargs='*', default=[],
-        help='*.override-reasons.tsv from OverrideAudit, to report how many of these tests assert SQL here')
+    parser.add_argument('--quiet', action='store_true', help='counts only, no per-test listing')
+    parser.add_argument('--limit', type=int, default=20, help='how many tests to list per kind (default: 20)')
     args = parser.parse_args(argv[1:])
 
     try:
@@ -224,61 +245,62 @@ def main(argv):
         return 1
 
     paired = [k for k in expected if k in sections]
-    print(f'EF tests with expected SQL {len(expected)}; tests in the log {len(sections)}; paired {len(paired)}')
-
-    if args.reasons:
-        try:
-            asserted = upstream_overrides(args.reasons)
-        except OSError as error:
-            print(f'ef-sql-diff: {error}', file=sys.stderr)
-            return 1
-
-        here = {k for k in paired if k in asserted}
-        print(f'of those paired tests, this suite asserts the SQL of {len(here)}; {len(paired) - len(here)} do not assert it')
-        if not args.quiet:
-            for cls, method in sorted(k for k in paired if k not in asserted)[:40]:
-                print(f'    not asserted here: {cls}.{method}')
-
     counts = collections.Counter()
-    findings = []
+    findings = collections.defaultdict(list)
+
+    # Counted per TEST and not per statement: one test that re-seeds its data runs dozens of
+    # statements EF never runs, and counting those would bury the two that matter.
     for k in paired:
-        ran = [s for case in sections[k] for s in case]
-        ran_exact = {exact(s) for s in ran}
+        missing, extra, reordered, source = differences(expected[k], sections[k])
+        if not missing and not extra and not reordered:
+            counts['same'] += 1
+            continue
+
+        counts['differs'] += 1
+        where, ran = source
         ran_shapes = collections.defaultdict(set)
         for statement in ran:
             sh, kinds = shape(statement)
             ran_shapes[sh].add(kinds)
 
-        # EF may assert several variants of one test, one per class in the file; any that matches counts.
-        missing, where = min(
-            (([s for s in statements if exact(s) not in ran_exact], source) for statements, source in expected[k]),
-            key=lambda pair: len(pair[0]))
-
-        if not missing:
-            counts['same'] += 1
-            continue
-
-        counts['differs'] += 1
+        seen = collections.defaultdict(list)
         for statement in missing:
-            kind = classify(statement, ran_shapes)
-            counts[kind] += 1
-            findings.append((kind, k, where, statement, ran))
+            seen[classify(statement, ran_shapes)].append(('EF expects', statement))
+        for statement in extra:
+            seen['EXTRA WRITE' if WRITE.match(statement) else 'EXTRA READ'].append(('the server ran', statement))
+        if reordered:
+            seen['ORDER'].append(('in another order', ran[0] if ran else ''))
 
-    print(f'identical {counts["same"]}, differing tests {counts["differs"]} '
-          f'(LITERAL {counts["LITERAL"]}, PARAMETER {counts["PARAMETER"]}, STRUCTURAL {counts["STRUCTURAL"]})')
+        for kind, examples in seen.items():
+            counts[kind] += 1
+            findings[kind].append((k, where, examples, ran))
+
+    print(f'EF tests with expected SQL {len(expected)}; tests in the log {len(sections)}; paired {len(paired)}')
+    print(f'identical {counts["same"]}, differing tests {counts["differs"]}')
+    print('by kind, in tests: ' + ', '.join(f'{kind} {counts[kind]}' for kind in KINDS))
 
     if args.quiet:
         return 0
 
-    for kind in ('LITERAL', 'PARAMETER', 'STRUCTURAL'):
-        for found_kind, (cls, method), where, statement, ran in findings:
-            if found_kind != kind:
-                continue
-            print(f'\n{kind}  {cls}.{method}  (EF: {where})')
-            print('    EF     :', ' '.join(canon(statement).split())[:400])
-            same_shape = [r for r in ran if shape(r)[0] == shape(statement)[0]] or ran[:2]
-            for statement_ran in same_shape[:2]:
-                print('    server :', ' '.join(canon(statement_ran).split())[:400])
+    for kind in KINDS:
+        found = findings[kind]
+        if not found:
+            continue
+        print(f'\n===== {kind}  ({len(found)} tests)')
+        if kind == 'EXTRA WRITE':
+            print('      a write EF does not expect is usually the test seeding or restoring its own data')
+        for (cls, method), where, examples, ran in found[:args.limit]:
+            print(f'\n{cls}.{method}  (EF: {where})')
+            for direction, statement in examples[:2]:
+                print(f'    {direction:>14} :', ' '.join(canon(statement).split())[:300])
+                if kind in ('LITERAL', 'PARAMETER', 'STRUCTURAL'):
+                    same_shape = [r for r in ran if shape(r)[0] == shape(statement)[0]] or ran[:1]
+                    for statement_ran in same_shape[:1]:
+                        print('    the server ran :', ' '.join(canon(statement_ran).split())[:300])
+            if len(examples) > 2:
+                print(f'                     ... and {len(examples) - 2} more in this test')
+        if len(found) > args.limit:
+            print(f'\n    ... and {len(found) - args.limit} more tests; raise --limit to see them')
 
     return 0
 

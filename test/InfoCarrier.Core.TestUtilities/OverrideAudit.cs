@@ -25,7 +25,7 @@ public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, strin
 ///         <b>MICROSOFT'S <c>Check_all_tests_overridden</c> MADE STRICTER.</b> Theirs proves somebody
 ///         looked at every test. This proves, for every test whose expectation was changed, what the
 ///         store did and where that is shown, and it produces the audit of how much the suite does
-///         not check and why. <c>docs/plans/v10/test-overhaul.md</c> is the reading.
+///         not check and why. <c>docs/test-policy.md</c> is the reading.
 ///     </para>
 ///     <para>
 ///         <b>An override of a specification test</b> is a public method of the assembly whose base
@@ -146,12 +146,7 @@ public static class OverrideAudit
             {
                 foreach (OverrideReasonAttribute reason in method.GetCustomAttributes<OverrideReasonAttribute>(inherit: false))
                 {
-                    string side = reason switch
-                    {
-                        StoreBehaviourAttribute => "store",
-                        UpstreamOverrideAttribute => "upstream",
-                        _ => "infocarrier",
-                    };
+                    string side = reason is StoreBehaviourAttribute ? "store" : "infocarrier";
                     text.Append("reason\t").Append(type.FullName).Append('\t').Append(method.Name).Append('\t')
                         .Append(reason.Case).Append('\t').Append(side).Append('\t').Append(Label(reason)).Append('\n');
                 }
@@ -201,7 +196,6 @@ public static class OverrideAudit
     private static string Label(OverrideReasonAttribute reason)
         => reason switch
         {
-            UpstreamOverrideAttribute => "UPSTREAM",
             StoreLimitAttribute => "LIMIT",
             StoreDefectAttribute d => $"DEFECT {d.Section}",
             StoreIssueAttribute i => $"ISSUE {i.Key}",
@@ -245,8 +239,7 @@ public static class OverrideAudit
                 return;
             }
 
-            OverrideReasonAttribute[] store =
-                [.. reasons.Where(r => r is StoreBehaviourAttribute or UpstreamOverrideAttribute)];
+            StoreBehaviourAttribute[] store = [.. reasons.OfType<StoreBehaviourAttribute>()];
             if (store.Length > 1
                 && (store.Any(r => r.Case is null)
                     || store.Select(r => r.Case).Distinct(StringComparer.Ordinal).Count() != store.Length))
@@ -255,7 +248,7 @@ public static class OverrideAudit
             }
 
             foreach (IGrouping<string, OverrideReasonAttribute> repeated in reasons
-                .Where(r => r is not (StoreBehaviourAttribute or UpstreamOverrideAttribute))
+                .Where(r => r is not StoreBehaviourAttribute)
                 .GroupBy(r => $"{r.Case}\n{Label(r)}", StringComparer.Ordinal)
                 .Where(g => g.Count() > 1))
             {
@@ -278,7 +271,6 @@ public static class OverrideAudit
         public string Report()
         {
             var text = new StringBuilder();
-            int copies = _audited.Count(a => a.Reason is UpstreamOverrideAttribute);
             int limits = _audited.Count(a => a.Reason is StoreLimitAttribute);
             int storeDefects = _audited.Count(a => a.Reason is StoreDefectAttribute);
             int issues = _audited.Count(a => a.Reason is StoreIssueAttribute);
@@ -289,7 +281,7 @@ public static class OverrideAudit
             int silent = _audited.Count(a => a.Reason is StoreBehaviourAttribute { Justification: Upstream.GaveNoReason });
 
             text.AppendLine(
-                $"Override audit: {_audited.Count} reasons. UPSTREAM {copies}, LIMIT {limits}, DEFECT {storeDefects}, ISSUE {issues}, "
+                $"Override audit: {_audited.Count} reasons. LIMIT {limits}, DEFECT {storeDefects}, ISSUE {issues}, "
                 + $"INFOCARRIER DEFECT {own}, DESIGN {designs}. Skips {skips}. Deviations {deviations}. "
                 + $"Upstream gave no reason {silent}. Upstream references checked against a checkout {_checkedReferences}, "
                 + $"not checked for want of one {_uncheckedReferences}. "
@@ -335,15 +327,6 @@ public static class OverrideAudit
 
             switch (reason)
             {
-                case UpstreamOverrideAttribute copied:
-                    if (isControl)
-                    {
-                        Violations.Add($"{at}: a wire-free control copies no upstream override, because upstream has none.");
-                    }
-
-                    CheckUpstream(copied.Repository, copied.UpstreamPath, copied.UpstreamFirstLine, copied.UpstreamLastLine, methodName, at);
-                    break;
-
                 case InfoCarrierDefectAttribute own:
                     if (isControl)
                     {
@@ -569,8 +552,7 @@ public static class OverrideAudit
         private static string Reference(OverrideReasonAttribute reason)
             => reason switch
             {
-                UpstreamOverrideAttribute u => Upstream.Link(u.Repository, u.UpstreamPath, u.UpstreamFirstLine, u.UpstreamLastLine),
-            InfoCarrierDefectAttribute own => $"https://github.com/azabluda/InfoCarrier.Core/issues/{own.Issue}",
+                InfoCarrierDefectAttribute own => $"https://github.com/azabluda/InfoCarrier.Core/issues/{own.Issue}",
                 InfoCarrierDesignAttribute { Repository: not UpstreamRepository.None } d
                     => Upstream.Link(d.Repository, d.UpstreamPath!, d.UpstreamFirstLine, d.UpstreamLastLine),
                 InfoCarrierDesignAttribute { Adr: > 0 } d => $"docs/decisions.md {d.Decision}",

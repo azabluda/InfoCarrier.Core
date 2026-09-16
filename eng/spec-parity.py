@@ -6,7 +6,7 @@ same day, so that badge could only ever say 100% and carried no information. EF 
 shows passed, failed and skipped, which is the same figure; no other EF provider shows any. The
 nearest model is a conformance percentage, as a JavaScript engine publishes against test262, and
 this is that figure for a provider that means to make no difference to EF (the owner's decision,
-2026-09-15, docs/plans/v10/test-overhaul.md).
+2026-09-15, docs/test-policy.md).
 
 WHAT IS COUNTED. A test case is one TRX result. The base is every case that ran through InfoCarrier:
 a case of a wire-free control class runs without InfoCarrier and is left out, and so is a case xUnit

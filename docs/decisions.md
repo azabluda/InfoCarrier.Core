@@ -135,7 +135,7 @@ Converting the last nineteen found two real InfoCarrier defects that the red cou
 (#52, #113), and three standing classifications that measurement disproved.
 
 **What it does not change.** Silently suppressing tests stays v1's failure mode and stays forbidden:
-an override without a checked reason fails the build. [`test-overhaul.md`](plans/v10/test-overhaul.md)
+an override without a checked reason fails the build. [`test-policy.md`](test-policy.md)
 is the reading; CLAUDE.md's guardrail says the same since the same commit.
 
 ## ADR-005 — Research subrepos: ignored, no un-ignore exceptions — LOCKED (2026-07-19)
@@ -660,7 +660,7 @@ record a red before giving it a way to adopt a base.
 ### Amendment 2026-09-15 — Tier D is green, and every override names its evidence
 
 **The two 2026-09-14 amendments above left Tier D red and gated by a script. Both halves are
-superseded for this tier.** It is the trial of `docs/plans/v10/test-overhaul.md`: a green suite, as
+superseded for this tier.** It is the trial of `docs/test-policy.md`: a green suite, as
 EF Core's own providers run, made stricter in traceability. Tier D is 234 tests and all pass.
 
 **An override carries an attribute, and the attribute is both label and reference.** Its type says what
@@ -731,7 +731,7 @@ filtering it here. `InMemorySmokeTest.A_filter_the_server_cannot_run_throws_rath
 pins it.
 
 **Written down because the test overhaul needed a decision to cite**
-([`test-overhaul.md`](plans/v10/test-overhaul.md)). Two kinds of specification override follow from
+([`test-policy.md`](test-policy.md)). Two kinds of specification override follow from
 this ADR and carry `[InfoCarrierDesign("ADR-010")]`: a test EF's InMemory provider answers by
 evaluating in .NET, which is refused here as EF's relational providers refuse it; and a test a
 relational provider refuses to translate, which is answered here because the part it cannot

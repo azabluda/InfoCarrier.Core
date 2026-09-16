@@ -21,7 +21,7 @@ namespace InfoCarrier.Core.DocumentStoreTests.Associations;
 ///         SKIP.</b> The attribute's type is the label — <c>LIMIT</c>, <c>DEFECT</c> or
 ///         <c>ISSUE</c> — and its arguments name the test of a <c>Direct*</c> control that shows the
 ///         same behaviour with InfoCarrier removed. <c>OverrideAudit</c> fails the build when an
-///         override has no reason or disagrees with its control. <c>docs/plans/v10/test-overhaul.md</c>
+///         override has no reason or disagrees with its control. <c>docs/test-policy.md</c>
 ///         is the reading.
 ///     </para>
 ///     <para>
