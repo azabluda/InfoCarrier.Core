@@ -386,12 +386,19 @@ carry `[StoreDefect("1.12")]` and `[InfoCarrierDesign(6)]`.
 
 ## The server's SQL, compared with EF's test by test
 
-**Measured 2026-09-15 on `main` at `f588004`.** Tier B ran serially with a temporary xUnit
+**Measured 2026-09-15 on `main` at `f588004`.** Tier B ran serially with an xUnit
 `BeforeAfterTest` attribute writing each test's name into `server-sql.log`, and a deterministic
 script compared every test's statements with the `AssertSql` text of the same test in
 `EFCore.Sqlite.FunctionalTests` at `v10.0.1`: whitespace, parameter names, aliases and alias
-qualifiers ignored, literals and structure kept. Neither the attribute nor the script is committed;
-#111 is where a permanent version belongs. 791 tests were paired, and 758 produced EF's statements
+qualifiers ignored, literals and structure kept. **Both are committed since 2026-09-16** —
+`ServerSqlTestMarkerAttribute` beside `ServerSqlLog`, and `eng/ef-sql-diff.py` — because they found
+two lost updates in one run, and because #111's own progress is what they measure:
+
+```
+INFOCARRIER_SERVER_SQL=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj \
+    --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite" -- xUnit.ParallelizeTestCollections=false
+eng/ef-sql-diff.py test/InfoCarrier.Core.FunctionalTests/bin/Debug/net10.0/server-sql.log
+``` 791 tests were paired, and 758 produced EF's statements
 exactly. **No statement had a literal where EF has a parameter.** A first, shape-only pass over the
 parallel run's log found the same, and was shown to catch the inline-collection defect by planting
 it back into a copy of the log.
@@ -419,6 +426,17 @@ it back into a copy of the log.
   After the fix the per-test comparison of those two classes found all 19 paired tests identical to
   EF, the `Engines` concurrency statement included.
 
+- **A terminal `First()` above a client-side projection ran without EF's `LIMIT`.** The operator
+  consumes the rows the client reassembles, so it cannot ship, and nothing told the server how many
+  rows were wanted: every matching row crossed the wire for one row of answer.
+  `QuerySplitter.WithRowLimitForTerminalOperator` now sends the limit with the shipped query, as an
+  inline constant so that it lands as `LIMIT 1` exactly as EF writes it rather than as a parameter.
+  `Single` sends `LIMIT 2`, because one row cannot show that a second exists, and the client still
+  raises EF's own exceptions. Only a reassembled projection was affected: a scalar projection, an
+  entity query and a `Take` the caller wrote were already right, measured both ways. Three
+  differential cases pin it, and the trim baseline rises by one for the `MakeGenericMethod` the limit
+  needs.
+
 **Red flags not yet fixed, which are design questions:**
 
 - **An operator the type boundary leaves behind runs on the client over whole tables.**
@@ -427,8 +445,11 @@ it back into a copy of the log.
   `NorthwindGroupBy.Odata_groupby_empty_key` each read entire tables where EF runs one statement.
   `QuerySplitter.RejectClientEvaluation` lets these through on purpose, because the operator is
   translatable and only this provider's boundary stopped it.
-- **`First()` is not pushed down**: `EnumTranslations.HasFlag` and `Bitwise_projects_values_in_select`
-  run without EF's `LIMIT 1`.
+
+**After the fixes, a fresh serial run compared 791 paired tests again: 777 identical**, up from 758.
+Of the 14 that remain, five are refused queries the log cannot show, three are the client-side
+operators above, two are the ADR-006 compiled queries, two are the mode deviation below, one is EF's
+own `IsNullOrEmpty` quirk, and one is `HasFlag`, which the pushdown fixed after that run.
 
 **A legitimate deviation**: `Check_inlined_constants_redacting` asks for
 `ParameterTranslationMode.Constant`, which the client has no builder to carry, so the server sends

@@ -152,5 +152,20 @@
 # `total` rises 1134 -> 1137 and the other two are not ours: EFCore is unchanged at 864 and the
 # movement is in `other` and `FluentUI`.
 
-ours=91
+# 2026-09-16 (the First pushdown) -- 91 -> 92, A DELIBERATE RISE OF ONE, of the same shape as the
+# four above it. A terminal `First()` over a projection this client reassembles cannot ship, so the
+# row limit EF would have written is sent with the shipped query instead
+# (`QuerySplitter.WithRowLimitForTerminalOperator`). Building `Queryable.Take<TSource>` for the
+# element type of whatever the caller's query returns goes through `MakeGenericMethod`: IL2060, one
+# unique diagnostic.
+#
+# Both `MethodInfo`s it needs -- `Queryable.Take` and `EF.Constant` -- are taken from delegates
+# rather than from `GetMethod(name)`, which is R149's lesson and is why this costs one and not three.
+#
+# What it buys is the whole table not crossing the wire for one row, measured against EF's own SQL:
+# `SELECT ... WHERE ...` here where EF's client runs `SELECT ... WHERE ... LIMIT 1`.
+#
+# `total` is unchanged at 1137: EFCore is still 864 and the rise is entirely ours.
+
+ours=92
 total=1137

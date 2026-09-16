@@ -198,6 +198,7 @@ estimate a count, and never derive one figure from the others.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: reads the spec suite's TRX files, sums their counters into `counters.env`, lists the failing names in the run summary, and runs `eng/spec-parity.py` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate since the ratchet went on 2026-09-15. It replaced `eng/ratchet.sh`, which gated the direction of the failure count against `test/known-failures.txt`; both files are deleted, and git history keeps them. |
 | `eng/spec-parity.py <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge since 2026-09-15**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX result with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory, which CI sets for both test steps. The badge showed `passed / total` until the suite went green and made that a constant. |
+| `eng/ef-sql-diff.py <server-sql.log>` | **The measuring half of #111, local only.** Compares the SQL the server ran, test by test, with the `AssertSql` text of the same test in EF's SQLite suite at the pinned commit, and reports each difference as LITERAL, PARAMETER or STRUCTURAL. It needs a `subrepos/efcore` checkout, which a CI runner has not, and a **serial** run with `INFOCARRIER_SERVER_SQL=1` — `ServerSqlTestMarkerAttribute` writes each test's name into the log, and parallel tests interleave between two markers. It asserts nothing: `docs/plans/v10/test-overhaul.md` carries the owner's rule for reading its output, and it found two lost updates on 2026-09-15. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
@@ -535,10 +536,10 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29800`** (2026-09-16, `server-sql-fixes-2`), across the two projects `measure.sh`
-runs: **0 of 29566** in the spec project (`Passed: 29328, Skipped: 238`) and **0 of 234** in ADR-009
-Tier D. It read `FAILING: 0  TOTAL: 29793` the day before; the seven since are a differential case,
-two concurrency-token tests and four partial-update tests, from comparing the server's SQL with EF's
+**`FAILING: 0  TOTAL: 29803`** (2026-09-16, `first-pushdown`), across the two projects `measure.sh`
+runs: **0 of 29569** in the spec project and **0 of 234** in ADR-009 Tier D. It read
+`FAILING: 0  TOTAL: 29793` the day before; the ten since are differential cases, two concurrency-token
+tests and four partial-update tests, from comparing the server's SQL with EF's
 (`docs/plans/v10/test-overhaul.md`). It read
 `FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
 above, each with an exact assertion and its reason, not by a skip. **Every figure comes out of the

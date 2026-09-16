@@ -68,4 +68,47 @@ public static class ServerSqlLog
             System.IO.File.AppendAllText(Path, line + Environment.NewLine + Environment.NewLine);
         }
     }
+
+    /// <summary>
+    ///     Writes the line that says which test the statements after it belong to.
+    /// </summary>
+    /// <param name="test">The test's class and method.</param>
+    public static void WriteTestMarker(string test)
+        => Write(TestMarker + test);
+
+    /// <summary>The prefix of a test marker line, which <c>eng/ef-sql-diff.py</c> reads.</summary>
+    public const string TestMarker = "=== TEST ";
+}
+
+/// <summary>
+///     Marks each test's start in <see cref="ServerSqlLog" />, so the statements after it are known
+///     to be that test's.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>Applied to the assembly</b>, in <c>ServerSqlLogAssemblyInfo.cs</c>, and inert unless
+///         <c>INFOCARRIER_SERVER_SQL</c> is set. It is what makes <c>eng/ef-sql-diff.py</c> possible:
+///         the log is otherwise one stream with nothing saying where a test begins.
+///     </para>
+///     <para>
+///         <b>A comparison run has to be serial</b> —
+///         <c>dotnet test … -- xUnit.ParallelizeTestCollections=false</c> — or the statements of two
+///         tests interleave between two markers. That is the caller's business, not this attribute's:
+///         a parallel run with the switch on is still a usable diagnostic, as it was before markers
+///         existed.
+///     </para>
+/// </remarks>
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
+public sealed class ServerSqlTestMarkerAttribute : Xunit.Sdk.BeforeAfterTestAttribute
+{
+    /// <inheritdoc />
+    public override void Before(System.Reflection.MethodInfo methodUnderTest)
+    {
+        ArgumentNullException.ThrowIfNull(methodUnderTest);
+
+        if (ServerSqlLog.IsEnabled)
+        {
+            ServerSqlLog.WriteTestMarker($"{methodUnderTest.ReflectedType?.FullName}.{methodUnderTest.Name}");
+        }
+    }
 }

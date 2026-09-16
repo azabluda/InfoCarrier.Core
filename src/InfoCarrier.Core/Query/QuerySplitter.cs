@@ -44,6 +44,45 @@ public sealed class QuerySplitter
     private static readonly HashSet<string> SplitHints = [AsSplitQueryName, "AsSingleQuery"];
 
     /// <summary>
+    ///     How many rows the server needs for a terminal operator the client runs, by its name.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Single</c> takes two, because one row cannot show that there were more, and the client
+    ///     is what raises EF's "more than one element" for the second. The predicate overloads are
+    ///     absent on purpose: the predicate runs before the limit, so a limit sent in its place would
+    ///     answer from the wrong rows. <c>ElementAt</c> and <c>Last</c> are absent too — the first
+    ///     needs a <c>Skip</c> the client's own operator would then repeat, and the second needs the
+    ///     ordering reversed, which is what EF does for it.
+    /// </remarks>
+    private static readonly Dictionary<string, int> RowsForTerminalOperator = new(StringComparer.Ordinal)
+    {
+        [nameof(Queryable.First)] = 1,
+        [nameof(Queryable.FirstOrDefault)] = 1,
+        [nameof(Queryable.Single)] = 2,
+        [nameof(Queryable.SingleOrDefault)] = 2,
+    };
+
+    /// <summary>
+    ///     <see cref="Queryable.Take{TSource}(IQueryable{TSource}, int)" />, taken from a delegate so
+    ///     the trimmer sees it (R149).
+    /// </summary>
+    private static readonly MethodInfo TakeMethod =
+        ((Func<IQueryable<object>, int, IQueryable<object>>)Queryable.Take).Method.GetGenericMethodDefinition();
+
+    /// <summary>
+    ///     <see cref="EF.Constant{T}(T)" />, so the row limit reaches SQL as <c>LIMIT 1</c> and not as
+    ///     a parameter.
+    /// </summary>
+    /// <remarks>
+    ///     EF's own client writes the limit of a <c>First()</c> as a literal and parameterizes a
+    ///     <c>Take(1)</c> the caller wrote. This limit is EF's, not the caller's, so it is inlined:
+    ///     a parameter here would be a literal turned into a parameter, which the owner's rule for
+    ///     comparing the server's SQL with EF's calls a defect in either direction (2026-09-15).
+    /// </remarks>
+    private static readonly MethodInfo ConstantMethod =
+        ((Func<object, object>)EF.Constant).Method.GetGenericMethodDefinition();
+
+    /// <summary>
     ///     Whether the server's backing store is relational, and so whether relational query rules
     ///     are enforced here. <see langword="true" /> unless the application said otherwise.
     /// </summary>
@@ -269,6 +308,21 @@ public sealed class QuerySplitter
 
         IReadOnlyList<Expression> augmented = AugmentWithNavigations(analysis.Shippable, residualBody);
 
+        // A `First()` ABOVE A CLIENT-SIDE PROJECTION HAS TO TELL THE SERVER SO (2026-09-16). The
+        // operator itself cannot ship — it consumes the rows the client reassembles — so without
+        // this the server sent every matching row and the client kept one:
+        // `Select(b => new { b.Id, b.Title }).First()` ran `SELECT … WHERE …` here and
+        // `SELECT … WHERE … LIMIT 1` on EF's own client, measured against
+        // `EnumTranslationsSqliteTest.HasFlag` and by running the same query both ways. On a large
+        // table that is the whole table on the wire for one row.
+        //
+        // Sound because of what may be on the client at all: `RejectClientEvaluation` has just
+        // established that the only client-side work is the reassembly of a rewritten projection,
+        // which is row for row, so no filtering stands between the rows the limit bounds and the row
+        // the operator returns. The operator still runs on the client over the rows that arrive, so
+        // an empty result and a second row raise EF's own exceptions, with EF's own wording.
+        augmented = WithRowLimitForTerminalOperator(residualBody, parameters, augmented);
+
         // Only here, never on the pass-through return above: a query the server runs whole has
         // nothing to report and must stay as cheap as it is.
         //
@@ -371,6 +425,51 @@ public sealed class QuerySplitter
         }
 
         return kept;
+    }
+
+    /// <summary>
+    ///     Bounds the shipped rows when the whole query is a terminal operator over client-side
+    ///     projections of one shipped subtree, as EF's own client bounds them.
+    /// </summary>
+    private static IReadOnlyList<Expression> WithRowLimitForTerminalOperator(
+        Expression residual,
+        IReadOnlyList<ParameterExpression> parameters,
+        IReadOnlyList<Expression> augmented)
+    {
+        if (residual is not MethodCallExpression { Method.DeclaringType: var declaring, Arguments.Count: 1 } terminal
+            || declaring != typeof(Queryable)
+            || !RowsForTerminalOperator.TryGetValue(terminal.Method.Name, out int rows))
+        {
+            return augmented;
+        }
+
+        // Down through the client's own projections, which are all it may run.
+        Expression source = terminal.Arguments[0];
+        while (source is MethodCallExpression
+               {
+                   Method: { DeclaringType: var selectDeclaring, Name: nameof(Queryable.Select) }, Arguments.Count: 2,
+               } projection
+               && selectDeclaring == typeof(Queryable))
+        {
+            source = projection.Arguments[0];
+        }
+
+        // The residual reads each shipped subtree through the parameter of the same position, and
+        // `augmented` is the shipped list with an `Include` added here and there, so all three agree.
+        for (int i = 0; i < parameters.Count && i < augmented.Count; i++)
+        {
+            if (ReferenceEquals(parameters[i], source) && typeof(IQueryable).IsAssignableFrom(augmented[i].Type))
+            {
+                var limited = new List<Expression>(augmented);
+                limited[i] = Expression.Call(
+                    TakeMethod.MakeGenericMethod(ElementTypeOf(augmented[i].Type)),
+                    augmented[i],
+                    Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), Expression.Constant(rows)));
+                return limited;
+            }
+        }
+
+        return augmented;
     }
 
     private static ServerQuery ToServerQuery(Expression query)
