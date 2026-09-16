@@ -514,10 +514,40 @@ serially with the server SQL log on, and prints the disagreements grouped by kin
   decision recorded in a test is checked on every run and a decision recorded in a file is not;
 - **an artifact of EF's own harness** — nothing to write.
 
-**What the run of 2026-09-16 says**, on the whole tier: 791 tests paired, 606 identical, 185
-differing — LITERAL 0, PARAMETER 2, STRUCTURAL 14, EXTRA READ 129, EXTRA WRITE 75. The four defects
-already found came out of the first two kinds; the EXTRA groups are mostly a test's own seeding
-between two markers, and are read next.
+**What the run of 2026-09-16 says**, on the whole tier: **791 tests paired, 784 identical, 7
+differing** (PARAMETER 1, STRUCTURAL 7; one test is in both). Read, they are three groups and one
+upstream accident:
+
+- **Three tests where an operator the type boundary leaves on the client reads whole tables**:
+  `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition` and
+  `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` each run two full-table reads where EF
+  runs one join, and `NorthwindGroupBy.Odata_groupby_empty_key` reads every order and groups on the
+  client. **This is the one dangerous group**, and the decision it needs is the owner's: refuse,
+  rewrite, or keep and document.
+- **Two compiled queries over a parameter collection** (`PrimitiveCollections.*_as_compiled_query`),
+  where ADR-006's capture evaluates the `Skip` on the client and ships one value instead of the
+  collection. The answers are right and the statement is simpler; the intent is partly evaluated
+  here rather than in the store.
+- **One test where EF's `ParameterTranslationMode` does not cross the wire**
+  (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
+  parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
+  SQL runs and the behaviour is right.
+- **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
+  `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
+
+**And the first reading of that run was mostly the instrument, which is the lesson worth keeping.**
+It reported 182 differing, and two defects of the tool accounted for 175 of them:
+
+- **A statement that FAILED was invisible**, because the parser read only `Executed DbCommand`. Every
+  `[StoreLimit]` test asserts a statement that fails, so each looked like a statement never run.
+- **The window was wrong.** EF clears its baseline inside the test, so what EF asserts is a fragment;
+  our marker covers the whole test, arrange and verify included. Matching EF's statements IN ORDER
+  inside ours compares what can be compared and drops what cannot.
+
+**A third defect was in the harness and the promises found it**: `DbContextOptionsBuilder.LogTo`
+keeps ONE sink, so the log and the recorder could not both use it — switching the log on emptied the
+recorder and every promise failed in that run alone. The recorder is an interceptor now, and
+`AddInterceptors` appends.
 
 **What this is NOT any more.** Copying EF's `AssertSql` text into overrides here was tried and
 dropped on 2026-09-16, with 580 of them generated and green. Three reasons: the set was never
