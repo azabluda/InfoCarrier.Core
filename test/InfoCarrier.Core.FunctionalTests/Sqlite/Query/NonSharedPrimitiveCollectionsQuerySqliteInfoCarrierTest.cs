@@ -37,9 +37,11 @@ public class NonSharedPrimitiveCollectionsQuerySqliteInfoCarrierTest(NonSharedFi
     ///     A no-op. EF's SQLite writes
     ///     <c>new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(...)</c>, a
     ///     relational option on the <em>client's</em> builder that this provider does not have.
-    ///     The six <c>*_with_default_mode_EF_MultipleParameters</c> tests that ask for a
-    ///     non-default mode are red because of it, and they are #60's fourth shape rather than a
-    ///     translation gap: the query is right and the knob to request it is missing.
+    ///     The <c>*_with_default_mode*</c> tests that ask for a non-default mode are #60's fourth
+    ///     shape rather than a translation gap: the query is right and the knob to request it is
+    ///     missing. <b>This said they were red until 2026-09-15; they pass</b>, because they assert
+    ///     rows and not SQL, and the server answers with its own mode. A legitimate deviation by the
+    ///     owner's rule of the same day: no dangerous SQL runs, and what the caller sees is right.
     /// </remarks>
     protected override DbContextOptionsBuilder SetParameterizedCollectionMode(
         DbContextOptionsBuilder optionsBuilder,

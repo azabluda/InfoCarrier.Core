@@ -824,7 +824,8 @@ internal sealed class QueryExecutor<TElement>
             // The price was the store's plan: `new[] { i, j }.Contains(p.Id)` reached SQLite as
             // `IN (2, 999)` with `[Parameters=[]]`, where EF's own client sends `IN (@i, @j)`,
             // measured by logging the server's commands. A parameter replaced by its literal values is
-            // a defect (the owner, 2026-09-15), whatever it buys. Boxed, the elements stay separate
+            // a defect (the owner, 2026-09-15), whatever it buys, and so is a literal replaced by a
+            // parameter: either one changes the plan the caller's LINQ asked EF for. Boxed, the elements stay separate
             // parameters, `IN (@Value, @Value0)`, and `c.Ints == new[] { i, j }` is refused with EF's
             // own "new array expression with non-constant elements", which is what EF's relational
             // specification base asserts. The guard said EF would fold a boxed array into ONE

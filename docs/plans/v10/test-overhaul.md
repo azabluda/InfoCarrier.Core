@@ -358,7 +358,12 @@ correct while client and server share one model.
   upstream's lines, and a `SqlDiffers` deviation on an InfoCarrier reason where the server's SQL
   differs from EF's. **The owner's rule for the comparison**: parameter names do not matter; a
   structural difference that can change the store's execution plan is a red flag; and a parameter
-  replaced by its literal values is a defect.
+  replaced by its literal values is a defect. **And a literal replaced by a parameter is as bad**
+  (the owner, later the same evening): both change the plan the caller's LINQ asked EF for, one by
+  parsing again for every value and flooding the plan cache, the other by hiding the value from the
+  optimizer. **A deviation from EF is still legitimate when no dangerous SQL runs on the server and
+  what the caller sees is right**, which is the owner's answer for the parameterized-collection mode
+  below.
 
 **That last rule found a defect the same evening.** Measuring why the §1.12 overrides answer, with
 the server's SQL log, showed `WHERE "p"."Ints" = '[1,10]'` for
@@ -378,6 +383,63 @@ carry `[StoreDefect("1.12")]` and `[InfoCarrierDesign(6)]`.
 
 **The audit after all of it**: 469 reasons, `LIMIT` 347, `DEFECT` 23, `ISSUE` 69, `DESIGN` 28,
 `INFOCARRIER DEFECT` 2, and 4 overrides with a reason from each side.
+
+## The server's SQL, compared with EF's test by test
+
+**Measured 2026-09-15 on `main` at `f588004`.** Tier B ran serially with a temporary xUnit
+`BeforeAfterTest` attribute writing each test's name into `server-sql.log`, and a deterministic
+script compared every test's statements with the `AssertSql` text of the same test in
+`EFCore.Sqlite.FunctionalTests` at `v10.0.1`: whitespace, parameter names, aliases and alias
+qualifiers ignored, literals and structure kept. Neither the attribute nor the script is committed;
+#111 is where a permanent version belongs. 791 tests were paired, and 758 produced EF's statements
+exactly. **No statement had a literal where EF has a parameter.** A first, shape-only pass over the
+parallel run's log found the same, and was shown to catch the inline-collection defect by planting
+it back into a copy of the log.
+
+**Fixed on the branch that found them:**
+
+- **An owned reference in its owner's table lost its concurrency tokens.** EF checks the tokens of
+  every tracked entry that shares the row being written; the client sent only what changed, so the
+  server's `UPDATE` checked the key alone and overwrote a row someone else had changed. `Expand`
+  now sends the row-mates that carry a token, as `Unchanged`, on a relational store. EF's
+  `Property_entry_original_value_is_set` statement now matches, and
+  `ConcurrencyTokenTest.A_stale_write_is_refused_when_the_token_is_in_an_owned_reference` failed
+  before the fix. The same test for a complex property passed before and after.
+- **A write set every complex member and every JSON column.** `ModifiedProperties` names only
+  `GetProperties()`, so the server left complex members modified: a change to `Name` wrote
+  `SET "Stops", "Name", "Destination_City", "Destination_Street"`, and a concurrent change to those
+  columns was overwritten. `ChangeEntry.ModifiedComplexProperties` now names the changed members, and
+  a `null` from an older client keeps the old behaviour. All 19 `ComplexCollectionJsonUpdate`
+  statements were this; `PartialUpdateTest` failed on both mappings before the fix. **The first
+  version of the fix broke six tests, and the reason is a trap in EF's API**: the public
+  `ComplexCollectionEntry.IsModified` setter recurses through every complex element of the entity,
+  not only its own, and each element reports back to its own collection, so clearing `Employees`
+  cleared `Contacts` and setting `Contacts` set `Employees`. The server now clears one collection
+  through its own elements, before the scalar pass, which keeps EF from turning the entry unchanged.
+  After the fix the per-test comparison of those two classes found all 19 paired tests identical to
+  EF, the `Engines` concurrency statement included.
+
+**Red flags not yet fixed, which are design questions:**
+
+- **An operator the type boundary leaves behind runs on the client over whole tables.**
+  `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` (a join on an anonymous key),
+  `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition` and
+  `NorthwindGroupBy.Odata_groupby_empty_key` each read entire tables where EF runs one statement.
+  `QuerySplitter.RejectClientEvaluation` lets these through on purpose, because the operator is
+  translatable and only this provider's boundary stopped it.
+- **`First()` is not pushed down**: `EnumTranslations.HasFlag` and `Bitwise_projects_values_in_select`
+  run without EF's `LIMIT 1`.
+
+**A legitimate deviation**: `Check_inlined_constants_redacting` asks for
+`ParameterTranslationMode.Constant`, which the client has no builder to carry, so the server sends
+`IN (@Value1, @Value2, @Value3)` where EF sends `IN (1, 2, 3)`. No dangerous SQL, and the caller's
+rows are right.
+
+**Not findings**: five refused queries (the log records only commands that ran), EF's own
+`IsNullOrEmpty` override calling `IsNullOrWhiteSpace`, `Where_subquery_expression` (a direct run
+showed EF also sends two statements), and the ADR-006 evaluation of a compiled query's parameters,
+which stay parameters. `Contains_over_concatenated_parameter_and_constant`, for which EF's suite
+asserts no SQL, is now a case of `ServerParameterizationTest` and matches.
 
 ## Extending to the other tiers
 

@@ -72,6 +72,30 @@ public sealed record ChangeEntry
     public IReadOnlyList<string>? ModifiedProperties { get; init; }
 
     /// <summary>
+    ///     The members of complex properties that a <c>Modified</c> entry actually changed, as
+    ///     dotted paths from the entity (<c>Destination.City</c>), with a complex collection named
+    ///     as a whole; or <see langword="null" /> when the sender does not say.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <see cref="ModifiedProperties" /> names what <c>GetProperties()</c> returns, and a
+    ///         complex property's members are not in it. So the server set <c>State = Modified</c>,
+    ///         put the scalars right from that list, and left every complex member and every JSON
+    ///         column modified: a change to one scalar wrote <c>SET "Stops", "Name",
+    ///         "Destination_City", "Destination_Street"</c>, where EF's own client writes
+    ///         <c>SET "Name"</c>, and a concurrent change to those columns was overwritten with the
+    ///         values this client had loaded (2026-09-15).
+    ///     </para>
+    ///     <para>
+    ///         <b>A separate field and not more names in <see cref="ModifiedProperties" /></b>, so that
+    ///         <see langword="null" /> can mean "not said": a server reading a request from a client
+    ///         that predates this field keeps writing every complex member, which loses nothing that
+    ///         client changed, where reading an empty list as "nothing changed" would.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<string>? ModifiedComplexProperties { get; init; }
+
+    /// <summary>
     ///     Names of the properties nobody set — the ones whose value is EF's <em>sentinel</em>, so
     ///     the store supplies its own.
     /// </summary>

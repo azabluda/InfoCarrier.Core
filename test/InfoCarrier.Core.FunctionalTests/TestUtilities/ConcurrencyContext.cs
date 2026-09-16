@@ -22,6 +22,52 @@ public class Widget
 }
 
 /// <summary>
+///     An entity whose concurrency tokens are the members of a complex property, as
+///     <c>Engine.StorageLocation</c> is in EF's own optimistic-concurrency model.
+/// </summary>
+public class Crate
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+
+    public Place Place { get; set; } = new();
+}
+
+/// <summary>
+///     The complex type whose members are concurrency tokens.
+/// </summary>
+public class Place
+{
+    public double Latitude { get; set; }
+
+    public double Longitude { get; set; }
+}
+
+/// <summary>
+///     An entity whose concurrency tokens are the members of an OWNED reference in the owner's
+///     table, which is how EF's own optimistic-concurrency model maps <c>Engine.StorageLocation</c>.
+/// </summary>
+public class Parcel
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+
+    public Spot Spot { get; set; } = new();
+}
+
+/// <summary>
+///     The owned type whose members are concurrency tokens.
+/// </summary>
+public class Spot
+{
+    public double Latitude { get; set; }
+
+    public double Longitude { get; set; }
+}
+
+/// <summary>
 ///     A minimal context for the concurrency-token tests, on both client and server.
 /// </summary>
 /// <remarks>
@@ -33,6 +79,10 @@ public class ConcurrencyContext(DbContextOptions<ConcurrencyContext> options) : 
 {
     public DbSet<Widget> Widgets => Set<Widget>();
 
+    public DbSet<Crate> Crates => Set<Crate>();
+
+    public DbSet<Parcel> Parcels => Set<Parcel>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +90,26 @@ public class ConcurrencyContext(DbContextOptions<ConcurrencyContext> options) : 
         {
             b.Property(w => w.Id).ValueGeneratedNever();
             b.Property(w => w.Version).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<Crate>(b =>
+        {
+            b.Property(c => c.Id).ValueGeneratedNever();
+            b.ComplexProperty(c => c.Place, p =>
+            {
+                p.Property(l => l.Latitude).IsConcurrencyToken();
+                p.Property(l => l.Longitude).IsConcurrencyToken();
+            });
+        });
+
+        modelBuilder.Entity<Parcel>(b =>
+        {
+            b.Property(c => c.Id).ValueGeneratedNever();
+            b.OwnsOne(c => c.Spot, s =>
+            {
+                s.Property(l => l.Latitude).IsConcurrencyToken();
+                s.Property(l => l.Longitude).IsConcurrencyToken();
+            });
         });
     }
 }

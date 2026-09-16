@@ -97,4 +97,78 @@ public class ConcurrencyTokenTest
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
     }
+
+    /// <summary>
+    ///     The same stale write, where the token that changed is a member of a complex property.
+    /// </summary>
+    /// <remarks>
+    ///     EF's <c>OptimisticConcurrencySqliteTest.Property_entry_original_value_is_set</c> expects
+    ///     <c>WHERE … "StorageLocation_Latitude" = @p4 AND "StorageLocation_Longitude" = @p5</c>, and
+    ///     the server's <c>UPDATE</c> for that test checked only the scalar tokens: comparing its SQL
+    ///     with EF's, 2026-09-15. A write that ignores a changed token overwrites someone else's row.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_stale_write_is_refused_when_the_token_is_in_a_complex_property()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Crate { Id = 1, Name = "original", Place = new Place { Latitude = 1, Longitude = 2 } });
+                await context.SaveChangesAsync();
+            });
+
+        await using ConcurrencyContext client = CreateClient(store);
+        Crate crate = await client.Crates.SingleAsync();
+
+        await using (DbContext other = store.CreateDbContext())
+        {
+            Crate theirs = await other.Set<Crate>().SingleAsync();
+            theirs.Place.Latitude = 99;
+            await other.SaveChangesAsync();
+        }
+
+        crate.Name = "mine";
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+    }
+
+    /// <summary>
+    ///     The same stale write, where the token that changed is a member of an owned reference
+    ///     that shares the owner's table.
+    /// </summary>
+    /// <remarks>
+    ///     This is the shape of EF's <c>Engine.StorageLocation</c>, which is <c>OwnsOne</c> and not a
+    ///     complex property, and the one whose tokens were missing from the server's <c>UPDATE</c>.
+    ///     EF checks an unchanged owned entry's tokens when the row it shares is written.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_stale_write_is_refused_when_the_token_is_in_an_owned_reference()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.Add(new Parcel { Id = 1, Name = "original", Spot = new Spot { Latitude = 1, Longitude = 2 } });
+                await context.SaveChangesAsync();
+            });
+
+        await using ConcurrencyContext client = CreateClient(store);
+        Parcel parcel = await client.Parcels.SingleAsync();
+
+        await using (DbContext other = store.CreateDbContext())
+        {
+            Parcel theirs = await other.Set<Parcel>().SingleAsync();
+            theirs.Spot.Latitude = 99;
+            await other.SaveChangesAsync();
+        }
+
+        parcel.Name = "mine";
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+    }
 }

@@ -61,9 +61,13 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     /// <remarks>
     ///     A no-op. EF's SQLite writes
     ///     <c>new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(…)</c>, a
-    ///     relational option on the client's builder that this provider does not have. No test in
-    ///     this base asks for a non-default mode, so nothing here depends on it — measured, not
-    ///     assumed.
+    ///     relational option on the client's builder that this provider does not have, so the
+    ///     server translates with its own mode. <b>This read "No test in this base asks for a
+    ///     non-default mode … measured, not assumed" until 2026-09-15, and
+    ///     <c>Check_inlined_constants_redacting</c> asks for <c>Constant</c>.</b> It passes because
+    ///     it asserts no SQL: EF sends <c>IN (1, 2, 3)</c> and the server sends
+    ///     <c>IN (@Value1, @Value2, @Value3)</c>. That is a legitimate deviation by the owner's rule
+    ///     of the same day: no dangerous SQL runs, and what the caller sees is right.
     /// </remarks>
     protected override DbContextOptionsBuilder SetParameterizedCollectionMode(
         DbContextOptionsBuilder optionsBuilder,

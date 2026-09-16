@@ -526,6 +526,42 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 throw new InvalidOperationException(failure.Message + Diagnose(failure, replay), failure);
             }
 
+            // The members of complex properties, which `GetProperties()` does not return, so the scalar
+            // pass below would leave every one of them modified and every JSON column written
+            // (2026-09-15). Only when the client said: a client that predates
+            // `ModifiedComplexProperties` sends null, and writing every member loses nothing it changed.
+            //
+            // ONLY CLEARING, AND NEVER THROUGH EF'S PUBLIC SETTER FOR A COLLECTION. `State = Modified`
+            // has just marked everything, so what is left is to clear what the client did not change.
+            // `ComplexCollectionEntry.IsModified` recurses through EVERY element of the entity, not
+            // only its own, and each element reports back to its own collection: clearing `Employees`
+            // cleared `Contacts`, and setting `Contacts` again set `Employees`, so six
+            // `ComplexCollectionJsonUpdate` tests wrote nothing and then eleven wrote both columns.
+            // `ClearComplexCollection` sets only that collection's elements unchanged. BEFORE the scalar
+            // pass, because EF turns an entry unchanged when a cleared flag leaves no scalar flag set,
+            // and here every scalar is still set.
+            if (state == EntityState.Modified && replay.Change.ModifiedComplexProperties is { } modifiedComplex)
+            {
+                var modified = new HashSet<string>(modifiedComplex, StringComparer.Ordinal);
+                InternalEntityEntry internalEntry = entry.GetInfrastructure();
+
+                foreach (IComplexProperty complexProperty in replay.EntityType.GetComplexProperties())
+                {
+                    if (complexProperty.IsCollection)
+                    {
+                        if (!modified.Contains(complexProperty.Name))
+                        {
+                            ClearComplexCollection(internalEntry, complexProperty);
+                        }
+                    }
+                    else
+                    {
+                        ClearUnchangedComplexMembers(
+                            internalEntry, entry.ComplexProperty(complexProperty.Name), complexProperty.Name, modified);
+                    }
+                }
+            }
+
             // A *partial* update writes only the properties the client actually changed. Setting
             // `State = Modified` marks every one of them modified, which is right for an entity
             // the client loaded and edited and wrong for the stub `Save_partial_update` attaches:
@@ -949,6 +985,61 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 }
             }
         }
+    }
+
+    /// <summary>
+    ///     Clears the flag of every member of one complex value that the client did not name, by the
+    ///     dotted paths <c>ChangeEntryMapper</c> writes.
+    /// </summary>
+    private static void ClearUnchangedComplexMembers(
+        InternalEntityEntry internalEntry,
+        ComplexPropertyEntry complexEntry,
+        string path,
+        HashSet<string> modified)
+    {
+        foreach (PropertyEntry member in complexEntry.Properties)
+        {
+            if (!modified.Contains($"{path}.{member.Metadata.Name}"))
+            {
+                member.IsModified = false;
+            }
+        }
+
+        foreach (ComplexPropertyEntry nested in complexEntry.ComplexProperties)
+        {
+            ClearUnchangedComplexMembers(internalEntry, nested, $"{path}.{nested.Metadata.Name}", modified);
+        }
+
+        foreach (ComplexCollectionEntry nested in complexEntry.ComplexCollections)
+        {
+            if (!modified.Contains($"{path}.{nested.Metadata.Name}"))
+            {
+                ClearComplexCollection(internalEntry, nested.Metadata);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Marks one complex collection, and its own elements only, unchanged.
+    /// </summary>
+    /// <remarks>
+    ///     EF's public <c>ComplexCollectionEntry.IsModified</c> recurses through every complex element
+    ///     of the entity (<c>InternalEntryBase.SetPropertyModified</c> with <c>recurse: true</c> walks
+    ///     <c>GetFlattenedComplexEntries()</c>), so it cannot clear one collection without touching
+    ///     the others. An element's own state change reaches only its own collection
+    ///     (<c>OnComplexElementStateChange</c>), which is what this uses.
+    /// </remarks>
+    private static void ClearComplexCollection(InternalEntityEntry internalEntry, IComplexProperty collection)
+    {
+        foreach (InternalComplexEntry element in internalEntry.GetFlattenedComplexEntries().ToList())
+        {
+            if (element.ComplexProperty == collection && element.EntityState != EntityState.Unchanged)
+            {
+                element.SetEntityState(EntityState.Unchanged, modifyProperties: true);
+            }
+        }
+
+        internalEntry.SetPropertyModified(collection, isModified: false, recurse: false);
     }
 
     /// <summary>
