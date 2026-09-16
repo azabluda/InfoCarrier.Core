@@ -462,6 +462,34 @@ showed EF also sends two statements), and the ADR-006 evaluation of a compiled q
 which stay parameters. `Contains_over_concatenated_parameter_and_constant`, for which EF's suite
 asserts no SQL, is now a case of `ServerParameterizationTest` and matches.
 
+## Asserting the server's SQL (#111)
+
+**The harness landed on 2026-09-16, and the copying is what remains.** Until then this suite could
+not assert SQL at all: EF's `AssertSql` reads the fixture's `TestSqlLoggerFactory`, which belongs to
+the **client**, and the client emits none. Three pieces close that:
+
+- **`ServerSqlRecorder`**, one per store, filled by the server context's own logger. Not the client's
+  factory, because several specification bases assert on its contents with `Assert.Single`.
+- **`TestStore.AssertServerSql(expected)`**, which compares EF's text with what the server ran,
+  ignoring whitespace, parameter names and column aliases — a parameter crosses inside
+  `ParameterBox<T>` and the projection split names a column `Item1`, and neither decides a plan.
+- **`[UpstreamOverride]`**, the fifth label, which says the override is EF's own, copied, and changes
+  no expectation. It carries the upstream line range like every other label, so the audit checks that
+  those lines still declare that test at the pinned commit.
+
+A test class that asserts clears the recorder in its constructor, exactly as EF's SQLite classes call
+`Fixture.TestSqlLoggerFactory.Clear()`. `NorthwindWhereQuerySqliteInfoCarrierTest` is the proof: two of
+EF's overrides copied verbatim, and its 408 tests pass.
+
+**The progress figure, and what it is for.** `eng/ef-sql-diff.py --reasons` reports how many of the
+tests EF asserts SQL for this suite asserts too: **2 of 791 on 2026-09-16**. That number is also the
+alarm after an EF version bump, because a test EF has added is inherited here, runs, asserts nothing,
+and the figure falls. A test EF moved or renamed is caught earlier, by the audit's line check.
+
+**What remains**: generate the other 789 from EF's source, with the per-class constructor and helper,
+and handle by hand the 14 tests whose SQL differs from EF's on purpose, five of which refuse the query
+and run no statement at all.
+
 ## Extending to the other tiers
 
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's

@@ -246,6 +246,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public virtual Type? StoreParameterType => null;
 
     /// <summary>
+    ///     The statements this store's server has run since the last clear, for a test that asserts
+    ///     them against EF's own text (#111). See <see cref="ServerSqlRecorder" />.
+    /// </summary>
+    public ServerSqlRecorder ServerSql { get; } = new();
+
+    /// <summary>
     ///     Whether this store is relational, which the CLIENT cannot work out for itself.
     /// </summary>
     /// <remarks>
@@ -323,6 +329,19 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         //
         // The switch stays per fixture regardless, and this repository has nothing to fix.
         builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+
+        // Always recorded, and in memory: a test that asserts the server's SQL (#111) reads
+        // `ServerSql` and compares it with EF's own text. One recorder per store, cleared by the
+        // test class that asserts, which is how EF keeps its own log per fixture.
+        builder = builder.LogTo(
+            (eventId, _) => eventId == Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted,
+            data =>
+            {
+                if (data is Microsoft.EntityFrameworkCore.Diagnostics.CommandExecutedEventData executed)
+                {
+                    ServerSql.Add(executed.Command.CommandText);
+                }
+            });
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
         // file rather than output attached to a failing test.
