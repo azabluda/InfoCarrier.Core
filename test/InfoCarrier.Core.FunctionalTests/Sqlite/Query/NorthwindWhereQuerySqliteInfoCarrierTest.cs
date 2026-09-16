@@ -23,61 +23,9 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         showed. Red here is information (CLAUDE.md), not a regression.
 ///     </para>
 /// </remarks>
-public class NorthwindWhereQuerySqliteInfoCarrierTest
-    : NorthwindWhereQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>
+public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
+    : NorthwindWhereQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
-    /// <summary>
-    ///     Initializes a new instance and forgets the statements of the test before this one.
-    /// </summary>
-    /// <remarks>
-    ///     <b>Per test, because xUnit builds the test class per test</b>, which is how EF's own SQLite
-    ///     classes clear their <c>TestSqlLoggerFactory</c>. The recorder belongs to the store, and the
-    ///     store to this fixture, so nothing another class runs is in it.
-    /// </remarks>
-    public NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-        : base(fixture)
-        => fixture.TestStore.ServerSqlRecorderOf().Clear();
-
-    /// <summary>
-    ///     Asserts the statements the SERVER ran, with EF's own text for this test (#111).
-    /// </summary>
-    private void AssertSql(params string[] expected)
-        => Fixture.TestStore.AssertServerSql(expected);
-
-    /// <inheritdoc />
-    /// <remarks>EF's own override, copied: the body is the base test and the statement is EF's.</remarks>
-    [UpstreamOverride(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 17, 30)]
-    public override async Task Where_ternary_boolean_condition_negated(bool async)
-    {
-        await base.Where_ternary_boolean_condition_negated(async);
-
-        AssertSql(
-            """
-SELECT "p"."ProductID", "p"."Discontinued", "p"."ProductName", "p"."SupplierID", "p"."UnitPrice", "p"."UnitsInStock"
-FROM "Products" AS "p"
-WHERE CASE
-    WHEN "p"."UnitsInStock" >= 20 THEN 1
-    ELSE 0
-END
-""");
-    }
-
-    /// <inheritdoc cref="Where_ternary_boolean_condition_negated" />
-    [UpstreamOverride(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 58, 68)]
-    public override async Task Decimal_cast_to_double_works(bool async)
-    {
-        await base.Decimal_cast_to_double_works(async);
-
-        AssertSql(
-            """
-SELECT "p"."ProductID", "p"."Discontinued", "p"."ProductName", "p"."SupplierID", "p"."UnitPrice", "p"."UnitsInStock"
-FROM "Products" AS "p"
-WHERE CAST("p"."UnitPrice" AS REAL) > 100.0
-""");
-    }
-
     // -------------------------------------------------------------------------------------
     // UPSTREAM EF CORE LIMITATION — anonymous-type / tuple structural equality against a
     // constant, EF Core issue #14672. EF's own NorthwindWhereQuerySqliteTest overrides these

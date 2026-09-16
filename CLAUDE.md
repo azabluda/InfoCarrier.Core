@@ -116,7 +116,7 @@ the spec ratchet"* before 2026-09-14, which was right while the tier adopted no 
 in `measure.sh`'s list, and CI runs it in the `Spec tests` job, a required check that was named
 `Spec ratchet` until the same day. ADR-004 carries the amendment for the whole change.
 
-**THE WHOLE SUITE IS GREEN AND THERE IS NO RATCHET SINCE 2026-09-15** (`docs/plans/v10/test-overhaul.md`).
+**THE WHOLE SUITE IS GREEN AND THERE IS NO RATCHET SINCE 2026-09-15** (`docs/test-policy.md`).
 This is Microsoft's approach for EF Core's own providers, made stricter in traceability: **every
 override of a specification test says what the store does and where that is shown.** The override
 carries an attribute whose TYPE is the label and whose ARGUMENTS are the reference, all typed:
@@ -129,10 +129,18 @@ carries an attribute whose TYPE is the label and whose ARGUMENTS are the referen
   heading (`Decisions.*`) that records the decision.
 - `[InfoCarrierDefect(n)]` is the last resort for a defect of ours that cannot be fixed yet, and
   **only the owner files its issue.**
-- `[UpstreamOverride(...)]` is not a reason at all: the override is EF's own, copied, and adds the
-  SQL assertion EF's provider test makes (#111). The server's statements are recorded per store
-  (`ServerSqlRecorder`), and the test class clears the recorder in its constructor, as EF's SQLite
-  classes clear their own log.
+
+**THE SQL THE SERVER RUNS IS ASSERTED IN OUR OWN WORDS, IN `Sqlite/ServerSqlTest.cs` (2026-09-16).**
+Twenty-one promises, each with our own model, our own query and our own expected text: a filter and
+an aggregate run on the server, a `First` above a client projection still bounds the rows there, a
+captured collection ships as parameters, a write touches only the changed columns and carries every
+concurrency token, a query the server cannot run is refused and runs nothing. **Each was shown to
+fail before it was trusted**, by reverting the fix it is about. **Copying EF's `AssertSql` text into
+overrides here was tried and dropped the same day**, with 580 generated and green: the set could not
+be complete, the scenario belongs to upstream, and golden text argues for conformance where the
+owner's rule allows a deviation that runs no dangerous SQL. `[UpstreamOverride]` is deleted.
+**`eng/ef-sql-compare.sh` is the investigation** that produced the four defects of 2026-09-15/16, and
+it is a report, never a gate.
 
 **A test can carry a store reason and InfoCarrier reasons together** (the owner, 2026-09-15): the
 store one says what EF's own provider test does, the InfoCarrier ones why this test differs from it.
@@ -202,7 +210,8 @@ estimate a count, and never derive one figure from the others.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: reads the spec suite's TRX files, sums their counters into `counters.env`, lists the failing names in the run summary, and runs `eng/spec-parity.py` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate since the ratchet went on 2026-09-15. It replaced `eng/ratchet.sh`, which gated the direction of the failure count against `test/known-failures.txt`; both files are deleted, and git history keeps them. |
 | `eng/spec-parity.py <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge since 2026-09-15**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX result with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory, which CI sets for both test steps. The badge showed `passed / total` until the suite went green and made that a constant. |
-| `eng/ef-sql-diff.py <server-sql.log> [--reasons <tsv> ...]` | **The measuring half of #111, local only.** Compares the SQL the server ran, test by test, with the `AssertSql` text of the same test in EF's SQLite suite at the pinned commit, and reports each difference as LITERAL, PARAMETER or STRUCTURAL. It needs a `subrepos/efcore` checkout, which a CI runner has not, and a **serial** run with `INFOCARRIER_SERVER_SQL=1` — `ServerSqlTestMarkerAttribute` writes each test's name into the log, and parallel tests interleave between two markers. It asserts nothing: `docs/plans/v10/test-overhaul.md` carries the owner's rule for reading its output, and it found two lost updates on 2026-09-15. **With `--reasons` it also says how many of those tests assert the SQL here**, read from the audit's rows, which is #111's progress and **the alarm after an EF version bump**: a test EF has added is inherited, runs, asserts nothing, and the figure falls. |
+| `eng/ef-sql-compare.sh [--filter X] [--no-cache] [--keep]` | **The #111 investigation, in one command, local only.** Reads the EF version from `Directory.Packages.props`, uses `subrepos/efcore` when it is at that tag and otherwise fetches the tag alone (one second, 8 MB), runs Tier B **serially** with `INFOCARRIER_SERVER_SQL` naming a fresh log, and prints the disagreements with EF's own `AssertSql` text grouped by kind. **It is not a gate and always exits 0**: each difference is read once and ends as a fix plus a promise in `Sqlite/ServerSqlTest.cs`, as a promise pinning a deviation we accept, or as nothing when it is an artifact of EF's harness. It found four defects on 2026-09-15/16. `--filter` narrows the run to one class, which takes seconds. |
+| `eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--limit N]` | The comparing half of the script above, on a log that already exists. Reports LITERAL, PARAMETER, STRUCTURAL, EXTRA READ, EXTRA WRITE and ORDER, counted per test. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so renaming a heading silently breaks inbound links and the build stays green: three did, over a dead link on the security path. Exit 1 if any link is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
@@ -321,6 +330,7 @@ Each of the following has already cost a wrong conclusion here, and each is chea
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
 | `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
 | `docs/versioning.md` | **How a version is decided and how a release is shipped**, including the hotfix path off a release line. Two procedures with a shared tail, and a "what has bitten us" list: the pack baseline a branch cut from a tag inherits, the merge resolution that silently drops a fix, the site that no push republishes, and the `github-pages` environment refusing a branch it was not told about. **Read it before tagging**, and before cutting a release branch. |
+| `docs/test-policy.md` | **What a test of this suite may assert, and why.** The override rule and its typed reasons, the promises this provider makes about the SQL its server runs (`Sqlite/ServerSqlTest.cs`), and the investigation that finds new ones (`eng/ef-sql-compare.sh`). **Read it before overriding a specification test or adding a golden SQL string.** It was `docs/plans/v10/test-overhaul.md` until 2026-09-16. |
 | `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers, so a comment naming a number can be checked against what it says. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. **Since 2026-09-14 it also carries defects in `MongoDB.EntityFrameworkCore`** (§1.6-1.10), found by ADR-009 Tier D and reproduced by its wire-free control, and it records that their bugs go to the **Jira `EF` project** rather than GitHub, whose issues are disabled. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go
@@ -363,7 +373,7 @@ inherited `EFCore.Specification.Tests` classes *are* the coverage goal (ADR-004)
 suppressing tests was v1's stated failure mode. **This rule read *"Never `[Skip]`, delete, or override
 a spec test to make the suite green … a red test is information"* until 2026-09-15.** The suite is
 green now and every override carries a typed reason that `OverrideAudit` checks; see the Tier D
-paragraphs above and `docs/plans/v10/test-overhaul.md`. A skip needs an upstream skip to copy, a
+paragraphs above and `docs/test-policy.md`. A skip needs an upstream skip to copy, a
 defect of ours is fixed first, and nothing is filed anywhere unless the owner asks.
 
 **Update the plan checkbox in the same commit as the work.** `docs/plans/v10/implementation-plan.md`
@@ -540,11 +550,11 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29803`** (2026-09-16, `first-pushdown`), across the two projects `measure.sh`
-runs: **0 of 29569** in the spec project and **0 of 234** in ADR-009 Tier D. It read
+**`FAILING: 0  TOTAL: 29824`** (2026-09-16, `server-sql-promises`), across the two projects `measure.sh`
+runs: **0 of 29590** in the spec project and **0 of 234** in ADR-009 Tier D. It read
 `FAILING: 0  TOTAL: 29793` the day before; the ten since are differential cases, two concurrency-token
 tests and four partial-update tests, from comparing the server's SQL with EF's
-(`docs/plans/v10/test-overhaul.md`). It read
+(`docs/test-policy.md`). It read
 `FAILING: 19  TOTAL: 29792` earlier the same day, and the nineteen went by the override rule
 above, each with an exact assertion and its reason, not by a skip. **Every figure comes out of the
 run's own summary block, and none of them is arithmetic** — a `c10b` entry once carried `Skipped`

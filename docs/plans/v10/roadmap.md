@@ -1,4 +1,4 @@
-﻿# Roadmap
+# Roadmap
 
 Status: **Every milestone is closed. M5 closed 2026-08-24, last of them; M8 closed and M7's SQL Server half dropped the same day** · Milestone-level plan for the whole project.
 
@@ -27,7 +27,7 @@ rather than hidden by the in-process harness.
 
 **`FAILING: 0  TOTAL: 29792`** (2026-09-15), across the spec project and ADR-009 Tier D. The suite
 is green and every override of a specification test says what the store does and where that is
-shown ([`test-overhaul.md`](test-overhaul.md)). What is missing is stated for consumers in
+shown ([`test-policy.md`](../../test-policy.md)). What is missing is stated for consumers in
 [`limitations.md`](../../../website/docs/limitations.md).
 
 **This read `Total tests: 29514, Passed: 29237, Failed: 39` (2026-09-07) until then**, with every
@@ -629,7 +629,7 @@ here is broken; the question is what would break under a store that is neither I
 **Amended 2026-09-15: the spec suite is green and there is no ratchet.** Job 2 below gated the
 direction of a failure count while the suite was red on purpose. Every override of a specification
 test now says what the store does and where that is shown, `OverrideAuditTest` checks it, and the
-test run's own exit code is the gate. [`test-overhaul.md`](test-overhaul.md) is the reading; the
+test run's own exit code is the gate. [`test-policy.md`](../../test-policy.md) is the reading; the
 text below is kept as it was.
 
 Two jobs, because the spec suite is legitimately red during build-out and

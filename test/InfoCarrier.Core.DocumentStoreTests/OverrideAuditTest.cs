@@ -13,7 +13,7 @@ namespace InfoCarrier.Core.DocumentStoreTests;
 /// <remarks>
 ///     <b>The report is the audit.</b> It lists every override with its label, its reference, whether
 ///     it skips, and why it deviates from upstream, so "how much does this tier not check, and why"
-///     has a written answer on every run. <c>docs/plans/v10/test-overhaul.md</c> is the reading.
+///     has a written answer on every run. <c>docs/test-policy.md</c> is the reading.
 /// </remarks>
 public class OverrideAuditTest(ITestOutputHelper output)
 {

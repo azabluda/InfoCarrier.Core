@@ -7,7 +7,7 @@
 # to be red on purpose, so CI gated on the direction of the failure count against
 # test/known-failures.txt. It is green now, the way EF Core's own provider suites are, and every
 # override of a specification test says what the store does and where that is shown, which
-# OverrideAudit checks inside the suite (docs/plans/v10/test-overhaul.md). So the gate is
+# OverrideAudit checks inside the suite (docs/test-policy.md). So the gate is
 # `dotnet test`'s own exit code: a red test fails the step, and so does a crashed test host, which
 # was the other thing the ratchet's total guarded.
 #

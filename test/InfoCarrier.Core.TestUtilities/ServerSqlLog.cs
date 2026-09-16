@@ -24,9 +24,11 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         already in.
 ///     </para>
 ///     <para>
-///         This is diagnosis, not coverage. The test that asserts the server's SQL is
-///         <c>ServerParameterizationTest</c>, and it compares a statement against the same query
-///         run directly rather than against a golden string.
+///         This is diagnosis, not coverage, and it is what <c>eng/ef-sql-compare.sh</c> reads. The
+///         tests that ASSERT the server's SQL are <c>ServerSqlTest</c>, which states this provider's
+///         promises with its own model and its own expected text, and
+///         <c>ServerParameterizationTest</c>, which compares a statement against the same query run
+///         directly and needs no text at all.
 ///     </para>
 /// </remarks>
 public static class ServerSqlLog
@@ -40,14 +42,21 @@ public static class ServerSqlLog
         = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOCARRIER_SERVER_SQL"));
 
     /// <summary>
-    ///     Where the statements are written.
+    ///     Where the statements are written: the value of <c>INFOCARRIER_SERVER_SQL</c> when it names
+    ///     a file, and <c>server-sql.log</c> in the test output directory otherwise.
     /// </summary>
     /// <remarks>
-    ///     The test output directory, so it sits beside the <c>.db</c> files of the run that
-    ///     produced it. Truncated once per process, on the first write.
+    ///     <b>A path, so that a run can write somewhere new.</b> The file is appended to and
+    ///     truncated once per process, so a second run in the same output directory reuses the same
+    ///     file, and a stale one from an earlier run is easy to read as this run's.
+    ///     <c>eng/ef-sql-compare.sh</c> passes a fresh temporary path for exactly that reason. A
+    ///     value that is not a path, <c>1</c> for instance, only turns the log on.
     /// </remarks>
     public static string Path { get; }
-        = System.IO.Path.Combine(AppContext.BaseDirectory, "server-sql.log");
+        = Environment.GetEnvironmentVariable("INFOCARRIER_SERVER_SQL") is { } value
+            && value.IndexOfAny([System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar]) >= 0
+                ? value
+                : System.IO.Path.Combine(AppContext.BaseDirectory, "server-sql.log");
 
     private static bool _started;
 

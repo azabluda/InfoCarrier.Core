@@ -1,6 +1,10 @@
-# Test overhaul: every override points to evidence
+# Test policy: every override points to evidence, and every promise is ours
 
-**Status: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
+**This is the standing policy for this repository's tests.** It was `docs/plans/v10/test-overhaul.md`
+until 2026-09-16, when the name stopped matching the file: an overhaul is an event, and this is the
+rule the suite runs on. Nothing about the rule changed with the move.
+
+**Status of the overhaul that produced it: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
 29792`), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are deleted, and
 `eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
 and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
@@ -464,31 +468,63 @@ asserts no SQL, is now a case of `ServerParameterizationTest` and matches.
 
 ## Asserting the server's SQL (#111)
 
-**The harness landed on 2026-09-16, and the copying is what remains.** Until then this suite could
-not assert SQL at all: EF's `AssertSql` reads the fixture's `TestSqlLoggerFactory`, which belongs to
-the **client**, and the client emits none. Three pieces close that:
+**The suite's own promises, and an investigation that finds new ones.** Two things, and the split
+between them is the whole design (the owner, 2026-09-16).
 
-- **`ServerSqlRecorder`**, one per store, filled by the server context's own logger. Not the client's
-  factory, because several specification bases assert on its contents with `Assert.Single`.
-- **`TestStore.AssertServerSql(expected)`**, which compares EF's text with what the server ran,
-  ignoring whitespace, parameter names and column aliases — a parameter crosses inside
-  `ParameterBox<T>` and the projection split names a column `Item1`, and neither decides a plan.
-- **`[UpstreamOverride]`**, the fifth label, which says the override is EF's own, copied, and changes
-  no expectation. It carries the upstream line range like every other label, so the audit checks that
-  those lines still declare that test at the pinned commit.
+### The promises are ours: `Sqlite/ServerSqlTest.cs`
 
-A test class that asserts clears the recorder in its constructor, exactly as EF's SQLite classes call
-`Fixture.TestSqlLoggerFactory.Clear()`. `NorthwindWhereQuerySqliteInfoCarrierTest` is the proof: two of
-EF's overrides copied verbatim, and its 408 tests pass.
+Twenty-one tests, each named as a statement about this provider, each with our own model, our own
+query and our own expected text:
 
-**The progress figure, and what it is for.** `eng/ef-sql-diff.py --reasons` reports how many of the
-tests EF asserts SQL for this suite asserts too: **2 of 791 on 2026-09-16**. That number is also the
-alarm after an EF version bump, because a test EF has added is inherited here, runs, asserts nothing,
-and the figure falls. A test EF moved or renamed is caught earlier, by the audit's line check.
+- a filter, a projection, an aggregate and a grouping run on the server;
+- a `First` or a `Single` above a projection this client reassembles still bounds the rows there;
+- paging sends its limit and offset;
+- an `Include` is one statement with a join, and a split query stays two;
+- a captured collection reaches the store as parameters, not as its values;
+- a query the server cannot run is refused and runs no statement at all;
+- a write touches the columns the client changed, carries every concurrency token of the row, and
+  leaves a JSON collection alone when nobody changed it;
+- `ExecuteUpdate` and `ExecuteDelete` run one statement and read nothing first.
 
-**What remains**: generate the other 789 from EF's source, with the per-class constructor and helper,
-and handle by hand the 14 tests whose SQL differs from EF's on purpose, five of which refuse the query
-and run no statement at all.
+**Each was shown to fail before it was trusted.** Reverting the four fixes of 2026-09-15/16 one at a
+time turns exactly the promises about them red: the pushdown fix (2 tests), the inline-collection fix
+(1), the owned-row token fix (5) and the partial complex write fix (5).
+
+**Why its own model rather than Northwind.** The expected text has to be readable, and a Northwind
+row prints eleven columns before the interesting clause. Northwind is also upstream's schema, so a
+change of theirs would rewrite what our tests expect, and it has no concurrency token, no complex
+value and no JSON collection, which half the promises are about.
+
+**Where a promise is a relation rather than a construct, it goes in `ServerParameterizationTest`**,
+which runs the same query over the wire and directly against the server and compares the two. That
+one needs no text at all and never churns.
+
+### The investigation is `eng/ef-sql-compare.sh`
+
+EF's specification suite is thousands of little users of this provider. They report a wrong answer
+loudly and say nothing about a full table crossing the wire. The comparison makes that silent half
+visible: one command, no checkout, nothing left behind. It reads the EF version from
+`Directory.Packages.props`, fetches that tag if `subrepos/efcore` is not already at it, runs Tier B
+serially with the server SQL log on, and prints the disagreements grouped by kind.
+
+**It is not a gate and not a quality claim.** Each difference it reports is read once and ends as:
+
+- **our defect** — fix it, and pin the promise in `ServerSqlTest`;
+- **a deviation we accept** — pin that in `ServerSqlTest` too, with the reason beside it, because a
+  decision recorded in a test is checked on every run and a decision recorded in a file is not;
+- **an artifact of EF's own harness** — nothing to write.
+
+**What the run of 2026-09-16 says**, on the whole tier: 791 tests paired, 606 identical, 185
+differing — LITERAL 0, PARAMETER 2, STRUCTURAL 14, EXTRA READ 129, EXTRA WRITE 75. The four defects
+already found came out of the first two kinds; the EXTRA groups are mostly a test's own seeding
+between two markers, and are read next.
+
+**What this is NOT any more.** Copying EF's `AssertSql` text into overrides here was tried and
+dropped on 2026-09-16, with 580 of them generated and green. Three reasons: the set was never
+complete (580 of 798, and the 218 left out were precisely the tests where our SQL differs, which is
+where the questions are), the scenario belongs to upstream so we would own the string and not the
+query, and a wall of golden text argues quietly for conformance every time it goes red. The
+`[UpstreamOverride]` label that supported it is deleted.
 
 ## Extending to the other tiers
 
