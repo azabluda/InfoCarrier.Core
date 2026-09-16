@@ -39,3 +39,7 @@ website/site/
 # `mkdocs build --strict` locally. CI installs into the runner instead, so this exists only on a
 # developer machine -- and it is ~50 MB of somebody else's code.
 .venv/
+
+# Python leaves these beside a script that is imported as a module.
+__pycache__/
+*.pyc
