@@ -529,13 +529,22 @@ rewrite below. What is left is two groups and one upstream accident:
   `JoinKeyRewriter` gives the key a `Tuple<…>` the server already accepts, and both now run EF's own
   statement (`docs/projection-split.md` §3.3a). `ServerSqlTest` pins it.
 - **Two compiled queries over a parameter collection** (`PrimitiveCollections.*_as_compiled_query`),
-  where ADR-006's capture evaluates the `Skip` on the client and ships one value instead of the
-  collection. The answers are right and the statement is simpler; the intent is partly evaluated
-  here rather than in the store.
+  where ADR-006's capture substitutes the execution's values, so an operator over the collection is
+  folded here and the values that survive cross as parameters. **Measured 2026-09-17, and the
+  deviation is narrower than it first read**: for an ORDINARY query EF folds such an operator itself
+  and sends individual parameters, which is what this client sends, statement for statement. The
+  difference is only inside `EF.CompileQuery`, where EF keeps the collection symbolic because that is
+  what compiling buys. Our statement's shape varies with the collection's length exactly as EF's own
+  default does, so the plan cache is no worse off; the constant-shape form (`EF.Parameter`, over
+  `json_each`) is one neither side uses by default. **Pinned as a promise**
+  (`A_compiled_query_over_a_collection_parameter_ships_the_values_it_still_needs`), so a change to
+  the capture reports itself instead of waiting for the next comparison.
 - **One test where EF's `ParameterTranslationMode` does not cross the wire**
   (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
   parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
-  SQL runs and the behaviour is right.
+  SQL runs and the behaviour is right. **It has no promise test, and cannot have one**: that option
+  is set through a relational options builder this client does not have, so it cannot even be
+  expressed against an InfoCarrier context. The record is this paragraph.
 - **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
   `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
 

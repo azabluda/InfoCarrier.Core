@@ -16,6 +16,11 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         run for it. A red test here says which promise broke, not which scenario changed.
 ///     </para>
 ///     <para>
+///         <b>The last region holds something else</b>: a difference from EF that was read and
+///         accepted. It is pinned for the same reason, and kept apart so that the promises above read
+///         as one list.
+///     </para>
+///     <para>
 ///         <b>The model, the query and the expected text are all ours.</b> Comparing with EF's own
 ///         provider tests is how several of these were found (<c>eng/ef-sql-diff.py</c>, 2026-09-16),
 ///         and that comparison is an investigation, not a gate: it reports, we read it, and what we
@@ -419,6 +424,60 @@ WHERE "s"."Label" = 'A1'
 """);
 
     #endregion Writes
+
+    #region Accepted deviations from EF
+
+    // A difference from EF that was read, judged harmless and kept. It is pinned here for the
+    // same reason a promise is: so that a change to it reports itself, rather than waiting to be
+    // found by the next comparison run. What makes one acceptable is the owner's rule: no
+    // dangerous SQL runs on the server and the visible behaviour is right.
+
+    /// <summary>
+    ///     A compiled query over a collection parameter ships the values it still needs, and not the
+    ///     collection.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A deviation from EF, accepted and pinned here (2026-09-17), and it is narrower than
+    ///         it looks.</b> For an ORDINARY query EF folds the operator over a captured collection
+    ///         itself and sends what is left as individual parameters, which is exactly what this
+    ///         client sends — measured both ways, statement for statement. The difference is only
+    ///         inside <c>EF.CompileQuery</c>: there EF keeps the collection symbolic, because that is
+    ///         what compiling buys, and translates the operator into SQL over the parameter.
+    ///     </para>
+    ///     <para>
+    ///         This client substitutes a compiled query's parameters before the boundary is computed
+    ///         (ADR-006), so the operator folds here and the remaining values cross as parameters.
+    ///         The answers agree, and the statement's shape varies with the collection's length
+    ///         exactly as EF's own default does outside a compiled query, so the store's plan cache
+    ///         is no worse off. <c>EF.Parameter</c> would give a constant shape through
+    ///         <c>json_each</c>, and EF does not use it by default either.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_compiled_query_over_a_collection_parameter_ships_the_values_it_still_needs()
+    {
+        Func<ServerSqlContext, int[], Task<int>> compiled = EF.CompileAsyncQuery(
+            (ServerSqlContext context, int[] ids) => context.Tickets.Count(t => ids.Skip(1).Contains(t.Id)));
+
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await SeedAsync(store);
+        await using ServerSqlContext client = CreateClient(store);
+
+        store.ServerSql.Clear();
+        Assert.Equal(1, await compiled(client, [1, 2]));
+
+        // One parameter, the value that is left after `Skip(1)`, and still a PARAMETER: the plan
+        // cache sees one statement however the collection changes.
+        store.AssertServerSql(
+            """
+SELECT COUNT(*)
+FROM "Tickets" AS "t"
+WHERE "t"."Id" = @Skip1
+""");
+    }
+
+    #endregion Accepted deviations from EF
 
     private static bool NotTranslatable(string? subject)
         => subject?.Length > 3;

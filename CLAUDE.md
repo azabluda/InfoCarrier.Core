@@ -558,8 +558,8 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29825`** (2026-09-16, `join-key-rewrite`), across the two projects `measure.sh`
-runs: **0 of 29591** in the spec project and **0 of 234** in ADR-009 Tier D. It read
+**`FAILING: 0  TOTAL: 29826`** (2026-09-17, `deviation-promise`), across the two projects `measure.sh`
+runs: **0 of 29592** in the spec project and **0 of 234** in ADR-009 Tier D. It read
 `FAILING: 0  TOTAL: 29793` the day before; the ten since are differential cases, two concurrency-token
 tests and four partial-update tests, from comparing the server's SQL with EF's
 (`docs/test-policy.md`). It read
