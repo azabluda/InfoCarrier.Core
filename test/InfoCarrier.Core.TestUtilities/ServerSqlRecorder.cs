@@ -1,6 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -58,6 +60,70 @@ public sealed class ServerSqlRecorder
         {
             _statements.Clear();
         }
+    }
+}
+
+/// <summary>
+///     Records every statement the server's context executes into a <see cref="ServerSqlRecorder" />.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>An interceptor and not a second <c>LogTo</c>, and that cost a whole comparison run to
+///         learn (2026-09-16).</b> <c>DbContextOptionsBuilder.LogTo</c> keeps ONE sink: calling it
+///         again REPLACES the first. The recorder was wired with one call and
+///         <see cref="ServerSqlLog" /> with another, so switching the log on emptied the recorder,
+///         and every test that asserts the server's SQL failed with "the server ran 0 statements"
+///         while passing in an ordinary run.
+///     </para>
+///     <para>
+///         <c>AddInterceptors</c> appends, so this and the log coexist, and the log keeps the
+///         formatted text <c>eng/ef-sql-diff.py</c> reads.
+///     </para>
+/// </remarks>
+public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : DbCommandInterceptor
+{
+    /// <inheritdoc />
+    public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
+        => Record(command, base.ReaderExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<DbDataReader> ReaderExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        DbDataReader result,
+        CancellationToken cancellationToken = default)
+        => Record(command, base.ReaderExecutedAsync(command, eventData, result, cancellationToken));
+
+    /// <inheritdoc />
+    public override int NonQueryExecuted(DbCommand command, CommandExecutedEventData eventData, int result)
+        => Record(command, base.NonQueryExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<int> NonQueryExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        int result,
+        CancellationToken cancellationToken = default)
+        => Record(command, base.NonQueryExecutedAsync(command, eventData, result, cancellationToken));
+
+    /// <inheritdoc />
+    public override object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
+        => Record(command, base.ScalarExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<object?> ScalarExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        object? result,
+        CancellationToken cancellationToken = default)
+        => Record(command, base.ScalarExecutedAsync(command, eventData, result, cancellationToken));
+
+    private T Record<T>(DbCommand command, T result)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        recorder.Add(command.CommandText);
+        return result;
     }
 }
 

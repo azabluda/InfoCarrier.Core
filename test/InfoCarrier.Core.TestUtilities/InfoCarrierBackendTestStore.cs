@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Data.Common;
 using InfoCarrier.Core.Common;
@@ -333,15 +333,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // Always recorded, and in memory: a test that asserts the server's SQL (#111) reads
         // `ServerSql` and compares it with EF's own text. One recorder per store, cleared by the
         // test class that asserts, which is how EF keeps its own log per fixture.
-        builder = builder.LogTo(
-            (eventId, _) => eventId == Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted,
-            data =>
-            {
-                if (data is Microsoft.EntityFrameworkCore.Diagnostics.CommandExecutedEventData executed)
-                {
-                    ServerSql.Add(executed.Command.CommandText);
-                }
-            });
+        //
+        // An INTERCEPTOR and not a LogTo, because `LogTo` keeps one sink and a second call replaces
+        // the first: wiring both this and `ServerSqlLog` with `LogTo` emptied the recorder whenever
+        // the log was switched on, and every test asserting server SQL failed in that run alone
+        // (2026-09-16). `AddInterceptors` appends, so the two coexist.
+        builder = builder.AddInterceptors(new ServerSqlRecordingInterceptor(ServerSql));
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
         // file rather than output attached to a failing test.

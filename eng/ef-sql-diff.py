@@ -25,16 +25,21 @@ WHAT IS IGNORED, AND WHY EACH IS A NAME AND NOT A PLAN. Whitespace; parameter na
 aliases and the qualifiers that reference them (`"Item1"` for `"X"`, `"v"` for `"i"`: the projection
 split and a boxed collection name them differently). Literals and structure are kept.
 
-WHAT IT REPORTS, in the order it prints, dangerous first:
+WHAT IT COMPARES. EF's expected statements, matched IN ORDER inside the test's own statements.
+EF clears its baseline inside the test, so what it asserts is a FRAGMENT: the reads a test does to
+arrange and to verify are not in it, and neither is the seeding of a fixture that builds its store
+per test. Comparing whole against whole reported 182 tests as differing on 2026-09-16, and 7 of
+them were real; the statements the server ran that EF does not assert are therefore not reported.
+A round trip of OURS is pinned in `Sqlite/ServerSqlTest.cs` instead, where the query is ours too.
+
+WHAT IT REPORTS, per statement EF asserts and the server did not run, dangerous first:
   LITERAL     the server ran the same shape with a literal where EF has a parameter
   PARAMETER   the server ran the same shape with a parameter where EF has a literal
+  VALUE       the same shape and kinds, a different value
   STRUCTURAL  the server ran no statement of that shape in that test
-  EXTRA       the server ran a statement EF does not expect at all
-  ORDER       the same statements, in another order
-The owner's rule (docs/test-policy.md): the first two are equally bad, a structural
-difference that can change the store's plan is a red flag, and an EXTRA read is how a whole table
-crosses the wire. A refused query is a false positive here, because the log records only commands
-that ran; so is a test whose own seeding runs between the markers.
+The owner's rule (docs/test-policy.md): the first two are equally bad, and a structural difference
+that can change the store's plan is a red flag. A structural difference is also how a client-side
+join shows: the server ran two whole-table reads and EF ran one join.
 
 Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--quiet] [--limit N]
 """
@@ -63,7 +68,7 @@ METHOD = re.compile(r'public\s+(?:override\s+)?(?:async\s+)?[\w<>\[\],?. ]+?\s+(
 CLASS = re.compile(r'\bclass\s+(\w+)')
 ASSERT_SQL = re.compile(r'\bAssert(?:ExecuteUpdate)?Sql\s*\(')
 
-KINDS = ('LITERAL', 'PARAMETER', 'STRUCTURAL', 'EXTRA READ', 'EXTRA WRITE', 'ORDER')
+KINDS = ('LITERAL', 'PARAMETER', 'VALUE', 'STRUCTURAL')
 
 
 def canon(sql):
@@ -156,7 +161,9 @@ def server_sections(path):
 
     def flush():
         for index, line in enumerate(entry):
-            if 'Executed DbCommand' in line:
+            # A statement that FAILED counts. It is exactly what a store-limit test asserts, and
+            # EF's own baseline records it, so skipping it reported the statement as never run.
+            if 'Executed DbCommand' in line or 'Failed executing DbCommand' in line:
                 sql = '\n'.join(l[6:] if l.startswith('      ') else l for l in entry[index + 1:]).strip()
                 if DML.match(sql):
                     statements.append(sql)
@@ -188,43 +195,54 @@ def server_sections(path):
     return sections
 
 
-def classify(statement, ran_shapes):
-    sh, kinds = shape(statement)
-    if sh not in ran_shapes:
+def classify(statement, ran):
+    """What kind of difference an unmatched statement of EF's is, against everything we ran."""
+    expected_shape, expected_kinds = shape(statement)
+    same_shape = [shape(s)[1] for s in ran if shape(s)[0] == expected_shape]
+    if not same_shape:
         return 'STRUCTURAL'
-
-    literal = any(any(e == 'P' and r == 'L' for e, r in zip(kinds, k)) for k in ran_shapes[sh])
-    clean = any(all(not (e == 'P' and r == 'L') for e, r in zip(kinds, k)) for k in ran_shapes[sh])
-    return 'LITERAL' if literal and not clean else 'PARAMETER'
+    if any(any(e == 'P' and r == 'L' for e, r in zip(expected_kinds, k)) for k in same_shape):
+        return 'LITERAL'
+    if any(any(e == 'L' and r == 'P' for e, r in zip(expected_kinds, k)) for k in same_shape):
+        return 'PARAMETER'
+    return 'VALUE'
 
 
 def compare_case(wanted, ran):
-    """The differences between what EF expects and what one test case ran, both directions."""
-    missing = list(wanted)
-    extra = list(ran)
-    for statement in list(missing):
-        match = next((s for s in extra if exact(s) == exact(statement)), None)
-        if match is not None:
-            missing.remove(statement)
-            extra.remove(match)
+    """EF's expected statements, matched IN ORDER inside one test case's run.
 
-    if not missing and not extra and [exact(s) for s in wanted] != [exact(s) for s in ran]:
-        return [], [], True
-    return missing, extra, False
+    WHY IN ORDER AND NOT ONE BLOCK. EF's baseline is cleared inside the test and asserted inside it,
+    so what EF expects is a fragment of the test, and our marker covers the whole test. The reads a
+    test does to arrange and to verify are ours alone, and EF clears its log between two writes, so
+    its fragment is not even contiguous in ours. Requiring the fragment IN ORDER keeps what can be
+    compared and drops what cannot: on 2026-09-16 comparing whole against whole reported 182 tests
+    as differing and eight of them were real.
+
+    The statements the server ran that EF does not assert are counted and never reported. They are
+    the test's own arrange, verify and seeding, outside EF's window, and a promise of ours in
+    `Sqlite/ServerSqlTest.cs` is where a round trip of ours is pinned instead.
+    """
+    unmatched, index = [], 0
+    for statement in wanted:
+        found = next((i for i in range(index, len(ran)) if exact(ran[i]) == exact(statement)), None)
+        if found is None:
+            unmatched.append(statement)
+        else:
+            index = found + 1
+    return unmatched
 
 
 def differences(wanted_variants, cases):
-    """The worst case's differences, against the variant that fits it best."""
-    worst = ([], [], False, None)
+    """The worst case's unmatched statements, against the variant that fits it best."""
+    worst = ([], None)
     for case in cases:
         best = None
         for wanted, where in wanted_variants:
-            missing, extra, reordered = compare_case(wanted, case)
-            cost = len(missing) + len(extra) + (1 if reordered else 0)
-            if best is None or cost < best[0]:
-                best = (cost, missing, extra, reordered, where, case)
-        if best[0] > (len(worst[0]) + len(worst[1]) + (1 if worst[2] else 0)):
-            worst = (best[1], best[2], best[3], (best[4], best[5]))
+            unmatched = compare_case(wanted, case)
+            if best is None or len(unmatched) < len(best[0]):
+                best = (unmatched, where, case)
+        if len(best[0]) > len(worst[0]):
+            worst = (best[0], (best[1], best[2]))
     return worst
 
 
@@ -248,28 +266,18 @@ def main(argv):
     counts = collections.Counter()
     findings = collections.defaultdict(list)
 
-    # Counted per TEST and not per statement: one test that re-seeds its data runs dozens of
-    # statements EF never runs, and counting those would bury the two that matter.
+    # Counted per TEST and not per statement, so that one test cannot dominate the report.
     for k in paired:
-        missing, extra, reordered, source = differences(expected[k], sections[k])
-        if not missing and not extra and not reordered:
+        unmatched, source = differences(expected[k], sections[k])
+        if not unmatched:
             counts['same'] += 1
             continue
 
         counts['differs'] += 1
         where, ran = source
-        ran_shapes = collections.defaultdict(set)
-        for statement in ran:
-            sh, kinds = shape(statement)
-            ran_shapes[sh].add(kinds)
-
         seen = collections.defaultdict(list)
-        for statement in missing:
-            seen[classify(statement, ran_shapes)].append(('EF expects', statement))
-        for statement in extra:
-            seen['EXTRA WRITE' if WRITE.match(statement) else 'EXTRA READ'].append(('the server ran', statement))
-        if reordered:
-            seen['ORDER'].append(('in another order', ran[0] if ran else ''))
+        for statement in unmatched:
+            seen[classify(statement, ran)].append(statement)
 
         for kind, examples in seen.items():
             counts[kind] += 1
@@ -287,18 +295,15 @@ def main(argv):
         if not found:
             continue
         print(f'\n===== {kind}  ({len(found)} tests)')
-        if kind == 'EXTRA WRITE':
-            print('      a write EF does not expect is usually the test seeding or restoring its own data')
         for (cls, method), where, examples, ran in found[:args.limit]:
-            print(f'\n{cls}.{method}  (EF: {where})')
-            for direction, statement in examples[:2]:
-                print(f'    {direction:>14} :', ' '.join(canon(statement).split())[:300])
-                if kind in ('LITERAL', 'PARAMETER', 'STRUCTURAL'):
-                    same_shape = [r for r in ran if shape(r)[0] == shape(statement)[0]] or ran[:1]
-                    for statement_ran in same_shape[:1]:
-                        print('    the server ran :', ' '.join(canon(statement_ran).split())[:300])
+            print(f'\n{cls}.{method}  (EF: {where}; {len(ran)} statements ran in the test)')
+            for statement in examples[:2]:
+                print('    EF    :', ' '.join(canon(statement).split())[:300])
+                same_shape = [s for s in ran if shape(s)[0] == shape(statement)[0]] or ran[:1]
+                for ran_statement in same_shape[:1]:
+                    print('    ours  :', ' '.join(canon(ran_statement).split())[:300])
             if len(examples) > 2:
-                print(f'                     ... and {len(examples) - 2} more in this test')
+                print(f'              ... and {len(examples) - 2} more in this test')
         if len(found) > args.limit:
             print(f'\n    ... and {len(found) - args.limit} more tests; raise --limit to see them')
 
