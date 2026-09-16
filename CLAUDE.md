@@ -397,6 +397,14 @@ keeps "prefer public API where one exists" enforceable. A `NoWarn` would remove 
 **Do not add a NuGet dependency on Remote.Linq or Aqua** (ADR-001). They are specification
 material only.
 
+**A COMPOSITE JOIN KEY IS REWRITTEN SO THE JOIN SHIPS, SINCE 2026-09-16.** `new { a.X, a.Y }`
+is a type the caller's compiler generates, so the boundary could not ship it and cut below the join:
+the server read both tables whole and this client joined them, answering correctly and carrying
+everything over the wire. `JoinKeyRewriter` gives the key a `Tuple<...>`, which EF translates to the
+same SQL an anonymous key gets, null matching included. **`ValueTuple` does not work and was
+measured**: EF refuses to translate it. A key of a type the caller declared still runs on the client,
+because a class with its own `Equals` is not data. `docs/projection-split.md` §3.3a is the reading.
+
 **Client-side work is allowed only where it is a projection reassembly, and everything else
 throws.** `QuerySplitter.RejectClientEvaluation` raises EF's own `TranslationFailed` /
 `TranslationFailedWithDetails`, so an untranslatable `Where` behaves here exactly as it does on
@@ -550,8 +558,8 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29824`** (2026-09-16, `server-sql-promises`), across the two projects `measure.sh`
-runs: **0 of 29590** in the spec project and **0 of 234** in ADR-009 Tier D. It read
+**`FAILING: 0  TOTAL: 29825`** (2026-09-16, `join-key-rewrite`), across the two projects `measure.sh`
+runs: **0 of 29591** in the spec project and **0 of 234** in ADR-009 Tier D. It read
 `FAILING: 0  TOTAL: 29793` the day before; the ten since are differential cases, two concurrency-token
 tests and four partial-update tests, from comparing the server's SQL with EF's
 (`docs/test-policy.md`). It read

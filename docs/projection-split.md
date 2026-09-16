@@ -141,6 +141,29 @@ The rewrite is **recursive**: a nested projection inside a fragment
 (`Select(c => new { Orders = c.Orders.Select(o => new { o.OrderID }) })`) is rewritten by the
 same rule, and reassembled by the same rule on the client.
 
+### 3.3a A composite join KEY is rewritten too (2026-09-16)
+
+§3.3 is about the lambda that becomes the element. A join's **key** selector is not that lambda, and
+it was left alone: a key written `new { a.X, a.Y }` has a type the caller's compiler generated, so
+`ServerOk` was false for the `Join` node and §3.5 cut below it. The server then ran the two roots and
+the client joined them. **The answer was right and both tables crossed the wire**, which no test
+could see until the server's SQL was compared with EF's.
+
+`JoinKeyRewriter` rewrites such a key to `Tuple<...>` before the analysis, and the join ships.
+Three measurements decided the shape:
+
+- EF does **not** translate a `ValueTuple` key — `Translation of method 'System.ValueTuple.Create'
+  failed`, and a `new ValueTuple<…>(…)` tree fails the same way, with or without member bindings.
+- EF **does** translate a `NewExpression` that carries its members over a named class.
+  `Tuple<...>` is one, is already on the allowlist, and produces the identical SQL, including the
+  null matching a C# anonymous key gets: `ON (a = b OR (a IS NULL AND b IS NULL)) AND ...`.
+- The wire already carries `NewExpression.Members` (`NewNode.Members`), so nothing about the payload
+  had to change.
+
+**What is not rewritten**: a key of a type the caller declared, which has its own `Equals` and is not
+data, and a key of more than seven members, which `Tuple` cannot hold without nesting. Both keep the
+old behaviour rather than gaining a new one.
+
 ### 3.4 The residual chain
 
 Everything downstream of the first rewritten projection runs on the client: its element type is a

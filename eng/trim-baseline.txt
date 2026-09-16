@@ -167,5 +167,21 @@
 #
 # `total` is unchanged at 1137: EFCore is still 864 and the rise is entirely ours.
 
-ours=92
-total=1137
+# 2026-09-16, 92 -> 96 (`JoinKeyRewriter`, four diagnostics).
+#
+# A composite join key is written `new { a.X, a.Y }`, a type the CALLER's compiler generates, so the
+# server does not have it and the boundary cut below the join: both tables crossed the wire and this
+# client joined them. The rewrite gives the key a `Tuple<...>` instead, which the server already
+# accepts, and the join runs as one statement -- measured against EF's own SQL, the identical
+# `INNER JOIN ... ON (a = b OR (a IS NULL AND b IS NULL)) AND ...`.
+#
+# The four are the price of building a type at run time: `MakeGenericType` in `TupleOf`,
+# `MakeGenericMethod` for the rewritten `Queryable.Join`, and `Expression.New(ConstructorInfo, ...)`.
+# They are the same kind as the 92 already here, and `UseInfoCarrier` already carries
+# `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]` for exactly this reason. There is no
+# version of this rewrite without them: the key's arity and member types are the caller's.
+#
+# `total` rises with ours, 1137 -> 1141: EFCore is unchanged at 864.
+
+ours=96
+total=1141
