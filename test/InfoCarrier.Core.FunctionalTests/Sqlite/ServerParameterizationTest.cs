@@ -409,6 +409,80 @@ public partial class ServerParameterizationTest
         Assert.Equal(directly, overTheWire);
     }
 
+    /// <summary>
+    ///     A terminal operator above a projection this client reassembles.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The operator cannot ship — it consumes the rows the client puts back together — and
+    ///         without the limit going with the shipped query the server sent every matching row and
+    ///         the client kept one. EF's own client writes <c>LIMIT 1</c>, and its
+    ///         <c>EnumTranslationsSqliteTest.HasFlag</c> is where the comparison with EF's SQL found it.
+    ///     </para>
+    ///     <para>
+    ///         Only a projection the client reassembles is affected: a scalar or an entity projection
+    ///         keeps the operator on the server, and a <c>Take</c> the caller wrote ships as it is.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_First_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.Where(b => b.Id > 0).Select(b => new { b.Id, b.Title }).FirstAsync());
+
+    /// <inheritdoc cref="A_First_over_a_client_projection_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_FirstOrDefault_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.Where(b => b.Id > 99).Select(b => new { b.Id, b.Title }).FirstOrDefaultAsync());
+
+    /// <summary>
+    ///     <c>Single</c>, whose limit is two: one row cannot show that a second exists, and the client
+    ///     is what raises EF's "more than one element".
+    /// </summary>
+    /// <inheritdoc cref="A_First_over_a_client_projection_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_Single_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> over the wire and again directly against the server, and
+    ///     asserts the store saw one statement, not two — for a query whose terminal operator cannot
+    ///     be expressed as an <see cref="IQueryable{T}" />.
+    /// </summary>
+    private async Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" },
+                    new Blog { Id = 3, Title = "gamma" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            await run(client.Blogs);
+        }
+
+        string overTheWire = SingleStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            await run(server.Set<Blog>());
+        }
+
+        Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
     private SqliteInfoCarrierBackendTestStore CreateStore()
         => new(
             Guid.NewGuid().ToString(),
@@ -448,9 +522,16 @@ public partial class ServerParameterizationTest
 
         string sql = string.Join('\n', lines[start..]).Trim();
 
-        return ParameterName().Replace(sql, "@p");
+        // A column alias is a name too, and the same argument applies: the projection split sends a
+        // tuple, so EF names a column `Item1` where the caller's projection called it `Id`. The
+        // columns, their order and everything around them are what this compares, and
+        // `eng/ef-sql-diff.py` ignores an alias for the same reason.
+        return ColumnAlias().Replace(ParameterName().Replace(sql, "@p"), string.Empty);
     }
 
     [GeneratedRegex(@"@[A-Za-z_][A-Za-z0-9_]*")]
     private static partial Regex ParameterName();
+
+    [GeneratedRegex(@"\s+AS ""[^""]*""")]
+    private static partial Regex ColumnAlias();
 }
