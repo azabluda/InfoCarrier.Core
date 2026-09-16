@@ -19,6 +19,13 @@ WHAT IS IGNORED, AND WHY EACH IS A NAME AND NOT A PLAN. Whitespace; parameter na
 aliases and the qualifiers that reference them (`"Item1"` for `"X"`, `"v"` for `"i"`: the projection
 split and a boxed collection name them differently). Literals and structure are kept.
 
+WHAT ELSE IT REPORTS, with --reasons: how many of the tests EF asserts SQL for this suite asserts
+too, read from the *.override-reasons.tsv that OverrideAudit writes (INFOCARRIER_OVERRIDE_REASONS).
+That count is #111's progress, and it is the ALARM FOR A NEW EF VERSION: a test EF has added since
+the last bump is one this suite runs, inherits and does not assert, so the figure falls. A test EF
+moved or renamed is caught earlier, by the audit, which checks that an [UpstreamOverride]'s line
+range still declares that test at the pinned commit.
+
 WHAT IT REPORTS, per statement EF expects and the server did not produce:
   LITERAL     the server ran the same shape with a literal where EF has a parameter
   PARAMETER   the server ran the same shape with a parameter where EF has a literal
@@ -27,7 +34,7 @@ The owner's rule (docs/plans/v10/test-overhaul.md): the first two are equally ba
 difference that can change the store's plan is a red flag. A refused query is a false positive here,
 because the log records only commands that ran.
 
-Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--quiet]
+Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--reasons <tsv> ...] [--quiet]
 """
 
 import argparse
@@ -176,6 +183,18 @@ def server_sections(path):
     return sections
 
 
+def upstream_overrides(paths):
+    """(class, method) of every test carrying [UpstreamOverride], read off the audit's rows."""
+    asserted = set()
+    for path in paths:
+        with open(path, encoding='utf-8') as tsv:
+            for line in tsv:
+                fields = line.rstrip('\n').split('\t')
+                if len(fields) == 6 and fields[0] == 'reason' and fields[4] == 'upstream':
+                    asserted.add((key(fields[1].rsplit('.', 1)[-1]), fields[2]))
+    return asserted
+
+
 def classify(statement, ran_shapes):
     sh, kinds = shape(statement)
     if sh not in ran_shapes:
@@ -192,6 +211,9 @@ def main(argv):
     parser.add_argument('log', help='a server-sql.log from a serial run with INFOCARRIER_SERVER_SQL=1')
     parser.add_argument('--efcore', default='subrepos/efcore', help="EF Core checkout (default: subrepos/efcore)")
     parser.add_argument('--quiet', action='store_true', help='counts only, no per-statement listing')
+    parser.add_argument(
+        '--reasons', nargs='*', default=[],
+        help='*.override-reasons.tsv from OverrideAudit, to report how many of these tests assert SQL here')
     args = parser.parse_args(argv[1:])
 
     try:
@@ -203,6 +225,19 @@ def main(argv):
 
     paired = [k for k in expected if k in sections]
     print(f'EF tests with expected SQL {len(expected)}; tests in the log {len(sections)}; paired {len(paired)}')
+
+    if args.reasons:
+        try:
+            asserted = upstream_overrides(args.reasons)
+        except OSError as error:
+            print(f'ef-sql-diff: {error}', file=sys.stderr)
+            return 1
+
+        here = {k for k in paired if k in asserted}
+        print(f'of those paired tests, this suite asserts the SQL of {len(here)}; {len(paired) - len(here)} do not assert it')
+        if not args.quiet:
+            for cls, method in sorted(k for k in paired if k not in asserted)[:40]:
+                print(f'    not asserted here: {cls}.{method}')
 
     counts = collections.Counter()
     findings = []

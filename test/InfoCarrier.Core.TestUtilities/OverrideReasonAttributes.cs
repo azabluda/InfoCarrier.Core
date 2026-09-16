@@ -360,6 +360,40 @@ public sealed class InfoCarrierDesignAttribute : OverrideReasonAttribute
     public bool Skip { get; set; }
 }
 
+/// <summary>
+///     <c>UPSTREAM</c>: the override is EF's own, copied, and changes no expectation — it adds the
+///     SQL assertion EF's provider test makes (#111).
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>The fifth label is not a reason, because nothing differs.</b> The other four say why
+///         this suite expects something else than the base does. This one says the opposite: the
+///         body is upstream's, and what it adds is the statement EF asserts for the same test, which
+///         this suite could not assert until the server's SQL was recorded
+///         (<see cref="ServerSqlRecorder" />).
+///     </para>
+///     <para>
+///         <b>It carries the upstream reference like every other label</b>, so the audit can check
+///         that those lines declare that test at the pinned commit, and so a reader can see where
+///         the text came from. A skip is meaningless here and there is no property for one.
+///     </para>
+/// </remarks>
+public sealed class UpstreamOverrideAttribute(UpstreamRepository repository, string path, int firstLine, int lastLine)
+    : OverrideReasonAttribute
+{
+    /// <summary>The repository of the upstream test this copies.</summary>
+    public UpstreamRepository Repository { get; } = repository;
+
+    /// <summary>That test's file, relative to its repository's root.</summary>
+    public string UpstreamPath { get; } = path;
+
+    /// <summary>The first line of the upstream override.</summary>
+    public int UpstreamFirstLine { get; } = firstLine;
+
+    /// <summary>The last line of the upstream override.</summary>
+    public int UpstreamLastLine { get; } = lastLine;
+}
+
 /// <summary>Decisions recorded outside the ADR log, for <see cref="InfoCarrierDesignAttribute(string, string)" />.</summary>
 public static class Decisions
 {
