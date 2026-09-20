@@ -135,10 +135,6 @@ context.Entities.Where(e => e.Ints == new[] { low, high }).ToList();
 // EF Core providers: throws.   This provider: returns the matching rows.
 ```
 
-A compiled query that puts a collection of parameters in a subquery behaves the same way. EF Core
-has no type mapping to give it and refuses; this provider builds no SQL, so the question never
-arises.
-
 ## Consequences of the client having no database
 
 These are not defects. They follow from where the client sits.

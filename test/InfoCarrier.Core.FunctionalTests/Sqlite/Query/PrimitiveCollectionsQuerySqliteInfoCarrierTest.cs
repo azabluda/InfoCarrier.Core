@@ -237,36 +237,6 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
         Assert.All(query(context, ["foo"]).ToList(), e => Assert.Equal("foo", e.String));
     }
 
-    /// <inheritdoc cref="Parameter_collection_in_subquery_and_Convert_as_compiled_query" />
-    [StoreDefect(
-        "1.12",
-        UpstreamRepository.EfCore, "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs", 38, 44,
-        Justification = Upstream.GaveNoReason)]
-    [InfoCarrierDesign(
-        6,
-        Justification = "A compiled query's parameters cross as values, so the server's EF evaluates "
-            + "ints1.Skip(1).Union(ints2).Count() == 3 before translation and runs WHERE @p. The set operation EF cannot type is never built.",
-        Deviation = DeviationKind.AnswerNotRefusal | DeviationKind.QueryWrittenOut,
-        DeviationNote = "EF's core body, with the rows asserted.")]
-    public override async Task Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query()
-    {
-        var compiledQuery = EF.CompileQuery(
-            (PrimitiveCollectionsContext context, int[] ints1, int[] ints2)
-                => context.Set<PrimitiveCollectionsEntity>().Where(p => ints1.Skip(1).Union(ints2).Count() == 3));
-
-        await using PrimitiveCollectionsContext context = Fixture.CreateContext();
-
-        int[] ints1 = [10, 111];
-        int[] ints2 = [7, 42];
-
-        // `{10, 111}.Skip(1)` is `{111}`, unioned with `{7, 42}` is three distinct values, so the
-        // predicate is true for every row. EF's core body only calls `.ToList()`; the count is
-        // asserted here against the same set read without the predicate.
-        Assert.Equal(
-            context.Set<PrimitiveCollectionsEntity>().Count(),
-            compiledQuery(context, ints1, ints2).ToList().Count);
-    }
-
     /// <summary>
     ///     The same refusal EF asserts, described the way a <em>remoting</em> client can see it
     ///     (wire-protocol W5, plan C46).

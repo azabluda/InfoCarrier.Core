@@ -218,6 +218,44 @@ WHERE "t"."Id" IN (@Value, @Value0)
     }
 
     /// <summary>
+    ///     A compiled query keeps its collection parameter a parameter, and the operator over it runs
+    ///     on the server, as EF's own client does it.
+    /// </summary>
+    /// <remarks>
+    ///     <b>This is the defect found on 2026-09-17.</b> A compiled query's parameters cross as
+    ///     values, so the server's own funcletizer folded what EF had deliberately kept symbolic: the
+    ///     statement's shape then changed with the number of values, and a compiled query lost the one
+    ///     thing compiling buys. The rewrite keeps it symbolic with EF's own marker, so the server
+    ///     writes the statement EF writes. An ORDINARY query is untouched, because EF folds such an
+    ///     operator itself before this client ever sees the tree.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_compiled_query_keeps_its_collection_a_parameter()
+    {
+        Func<ServerSqlContext, int[], Task<int>> compiled = EF.CompileAsyncQuery(
+            (ServerSqlContext context, int[] ids) => context.Tickets.Count(t => ids.Skip(1).Contains(t.Id)));
+
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await SeedAsync(store);
+        await using ServerSqlContext client = CreateClient(store);
+
+        store.ServerSql.Clear();
+        Assert.Equal(1, await compiled(client, [1, 2]));
+
+        store.AssertServerSql(
+            """
+SELECT COUNT(*)
+FROM "Tickets" AS "t"
+WHERE "t"."Id" IN (
+    SELECT "v"."Value"
+    FROM (SELECT 0 AS "_ord", @Value1 AS "Value" UNION ALL VALUES (1, @Value2)) AS "v"
+    ORDER BY "v"."_ord"
+    LIMIT -1 OFFSET 1
+)
+""");
+    }
+
+    /// <summary>
     ///     A query the server cannot translate is refused, and no statement runs at all.
     /// </summary>
     /// <remarks>
