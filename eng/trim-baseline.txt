@@ -183,5 +183,24 @@
 #
 # `total` rises with ours, 1137 -> 1141: EFCore is unchanged at 864.
 
-ours=96
-total=1141
+# 2026-09-17, 96 -> 97 (`EF.MultipleParameters` for a compiled query's collection, one diagnostic).
+#
+# A compiled query's parameters cross this wire as values, so the SERVER's funcletizer folded an
+# operator over a collection that EF had deliberately kept symbolic. The statement's shape then
+# changed with the number of values, and a compiled query lost the one thing compiling buys. The
+# substitution now marks such a collection with EF's own `EF.MultipleParameters`, which names EF's
+# DEFAULT mode, so the server writes the statement EF's own client writes -- measured, the identical
+# `(SELECT 0 AS "_ord", @p AS "Value" UNION ALL VALUES (1, @p)) ... ORDER BY "_ord" LIMIT -1 OFFSET 1`.
+#
+# The one diagnostic is the `MakeGenericMethod` that builds that call, and it is the same kind as the
+# 96 already here. An ORDINARY query is untouched: EF folds such an operator itself before this
+# client sees the tree, so nothing is marked and nothing changes.
+#
+# It DELETED an override rather than adding one: `Parameter_collection_in_subquery_Union_another_
+# parameter_collection_as_compiled_query` now behaves as EF's relational base already expects, so
+# this provider carries one less deviation.
+#
+# `total` rises with ours, 1141 -> 1142: EFCore is unchanged at 864.
+
+ours=97
+total=1142

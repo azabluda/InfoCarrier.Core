@@ -131,7 +131,7 @@ carries an attribute whose TYPE is the label and whose ARGUMENTS are the referen
   **only the owner files its issue.**
 
 **THE SQL THE SERVER RUNS IS ASSERTED IN OUR OWN WORDS, IN `Sqlite/ServerSqlTest.cs` (2026-09-16).**
-Twenty-one promises, each with our own model, our own query and our own expected text: a filter and
+Twenty-three promises, each with our own model, our own query and our own expected text: a filter and
 an aggregate run on the server, a `First` above a client projection still bounds the rows there, a
 captured collection ships as parameters, a write touches only the changed columns and carries every
 concurrency token, a query the server cannot run is refused and runs nothing. **Each was shown to
@@ -405,6 +405,15 @@ same SQL an anonymous key gets, null matching included. **`ValueTuple` does not 
 measured**: EF refuses to translate it. A key of a type the caller declared still runs on the client,
 because a class with its own `Equals` is not data. `docs/projection-split.md` §3.3a is the reading.
 
+**A COMPILED QUERY'S COLLECTION PARAMETER STAYS A PARAMETER, SINCE 2026-09-17.** A compiled
+query's parameters cross this wire as values, so the server's funcletizer folded an operator EF had
+kept symbolic and the statement's shape changed with the number of values.
+`SubstituteParametersExpressionVisitor` marks such a collection with EF's own
+`EF.MultipleParameters`, EF's DEFAULT mode, so the server writes EF's own statement. **An ordinary
+query is untouched**: EF folds such an operator before this client sees the tree, which is why the
+two look different and are not. It DELETED an override rather than adding one, and
+`website/docs/limitations.md` lost the claim that went with it.
+
 **Client-side work is allowed only where it is a projection reassembly, and everything else
 throws.** `QuerySplitter.RejectClientEvaluation` raises EF's own `TranslationFailed` /
 `TranslationFailedWithDetails`, so an untranslatable `Where` behaves here exactly as it does on
@@ -558,8 +567,8 @@ is now "all of them".
 Query, projection split and SaveChanges work end-to-end. Lazy loading works: Phase L began at 505 of
 505 failing and stands at **825 of 825**.
 
-**`FAILING: 0  TOTAL: 29825`** (2026-09-16, `join-key-rewrite`), across the two projects `measure.sh`
-runs: **0 of 29591** in the spec project and **0 of 234** in ADR-009 Tier D. It read
+**`FAILING: 0  TOTAL: 29826`** (2026-09-17, `ef-like-compiled-collections`), across the two projects `measure.sh`
+runs: **0 of 29592** in the spec project and **0 of 234** in ADR-009 Tier D. It read
 `FAILING: 0  TOTAL: 29793` the day before; the ten since are differential cases, two concurrency-token
 tests and four partial-update tests, from comparing the server's SQL with EF's
 (`docs/test-policy.md`). It read

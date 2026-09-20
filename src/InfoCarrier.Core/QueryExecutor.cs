@@ -617,6 +617,35 @@ internal sealed class QueryExecutor<TElement>
         /// </remarks>
         private bool _insideEFCall;
 
+        /// <summary>
+        ///     Set while visiting a call that TRANSFORMS a collection parameter, where the parameter
+        ///     must stay a parameter on the far side rather than be folded into its result.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>This is the compiled-query signature, and it is the only place it appears
+        ///         (measured 2026-09-17).</b> In an ordinary query EF's own parameter extraction runs
+        ///         BEFORE this client captures, so <c>ids.Skip(1).Contains(x.Id)</c> arrives here with
+        ///         the <c>Skip</c> already evaluated: one parameter, and nothing to preserve. In a
+        ///         compiled query the collection is a lambda parameter with no value, EF cannot fold
+        ///         it, and the operator is still here.
+        ///     </para>
+        ///     <para>
+        ///         Without this, substituting the execution's values puts an evaluable subtree in the
+        ///         tree and the SERVER's funcletizer folds what EF had deliberately kept, so the
+        ///         statement's shape changes with the number of values and a compiled query loses the
+        ///         one thing compiling buys. <c>EF.MultipleParameters</c> is EF's own instruction not
+        ///         to fold, and it names EF's DEFAULT mode, so what the server then writes is the
+        ///         statement EF's own client writes for the same query.
+        ///     </para>
+        ///     <para>
+        ///         <b>Only a transforming operator counts.</b> <c>Skip</c>, <c>Take</c> and their
+        ///         siblings return a sequence; <c>Contains</c>, <c>Any</c> and <c>Count</c> consume
+        ///         one and are what remains in an ORDINARY query, where nothing must change.
+        ///     </para>
+        /// </remarks>
+        private bool _transformingACollectionParameter;
+
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
@@ -627,7 +656,16 @@ internal sealed class QueryExecutor<TElement>
         {
             if (node.Method.DeclaringType != typeof(EF))
             {
-                return base.VisitMethodCall(node);
+                bool transforming = _transformingACollectionParameter;
+                _transformingACollectionParameter = TransformsACollectionParameter(node);
+                try
+                {
+                    return base.VisitMethodCall(node);
+                }
+                finally
+                {
+                    _transformingACollectionParameter = transforming;
+                }
             }
 
             bool outer = _insideEFCall;
@@ -641,6 +679,23 @@ internal sealed class QueryExecutor<TElement>
                 _insideEFCall = outer;
             }
         }
+
+        /// <summary>
+        ///     Whether this call transforms a collection parameter, rather than consuming one.
+        /// </summary>
+        private static bool TransformsACollectionParameter(MethodCallExpression node)
+            => node.Arguments.Count > 0
+                && node.Arguments[0] is QueryParameterExpression
+                && node.Method.DeclaringType is { } declaring
+                && (declaring == typeof(Enumerable) || declaring == typeof(Queryable))
+                && SequenceElementType(node.Type) is not null;
+
+        /// <summary>
+        ///     <c>EF.MultipleParameters</c>, EF's own marker for its default collection mode, taken
+        ///     from a delegate so the trimmer sees it (R149).
+        /// </summary>
+        private static readonly System.Reflection.MethodInfo MultipleParametersMethod =
+            ((Func<int[], int[]>)EF.MultipleParameters).Method.GetGenericMethodDefinition();
 
         /// <summary>
         ///     Drops <see langword="null" /> elements from a collection of <em>entities</em>.
@@ -778,7 +833,12 @@ internal sealed class QueryExecutor<TElement>
 
             if (collectionShaped)
             {
-                return Boxed(value, parameterType);
+                Expression boxed = Boxed(value, parameterType);
+
+                // Kept a parameter on purpose: see `_transformingACollectionParameter`.
+                return _transformingACollectionParameter
+                    ? Expression.Call(MultipleParametersMethod.MakeGenericMethod(boxed.Type), boxed)
+                    : boxed;
             }
 
             // J21: a **scalar** the wire does not carry as a primitive is boxed for the same reason

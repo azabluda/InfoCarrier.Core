@@ -528,10 +528,14 @@ rewrite below. What is left is two groups and one upstream accident:
   runs one join, because a composite key is written `new { … }` and that type is the caller's.
   `JoinKeyRewriter` gives the key a `Tuple<…>` the server already accepts, and both now run EF's own
   statement (`docs/projection-split.md` §3.3a). `ServerSqlTest` pins it.
-- **Two compiled queries over a parameter collection** (`PrimitiveCollections.*_as_compiled_query`),
-  where ADR-006's capture evaluates the `Skip` on the client and ships one value instead of the
-  collection. The answers are right and the statement is simpler; the intent is partly evaluated
-  here rather than in the store.
+- **Two compiled queries over a parameter collection are FIXED (2026-09-17)**, and the reading that
+  called them a deviation was wrong. ADR-006's capture substituted the execution's values, so the
+  SERVER's funcletizer folded an operator EF had deliberately kept symbolic: the statement's shape
+  then changed with the number of values, and a compiled query lost the one thing compiling buys.
+  `SubstituteParametersExpressionVisitor` now marks such a collection with EF's own
+  `EF.MultipleParameters`, which names EF's DEFAULT mode, so the server writes the statement EF's own
+  client writes. **An ordinary query is untouched**, because EF folds such an operator itself before
+  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`.
 - **One test where EF's `ParameterTranslationMode` does not cross the wire**
   (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
   parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
