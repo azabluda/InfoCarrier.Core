@@ -364,8 +364,11 @@ this.
 ## Guardrails
 
 **Never edit anything under `subrepos/`.** Those are git-ignored reference clones of
-`efcore`, `rlinq`, `aqua`, and `infocarrier-v1`, kept for source-level study. `efcore` is the
-authoritative EF Core 10 reference — grep it to confirm API shapes rather than guessing.
+`efcore`, `rlinq`, `aqua`, `infocarrier-v1`, and `firebird` (`FirebirdSQL/NETProvider` at
+`EFCore-13.0.0.0`, the tag matching the package ADR-009 Tier C runs), kept for source-level study.
+Each is checked out at the tag this repository references, and `firebird` restores and loads in
+`roslyn-codelens` from `subrepos/firebird/src/NETProvider.slnx` with `rootProjects` naming its two
+EF Core projects. `efcore` is the authoritative EF Core 10 reference — grep it to confirm API shapes rather than guessing.
 Edits there are invisible to git and will be lost.
 
 **Never override a spec test without saying what the store does and where that is shown.** The

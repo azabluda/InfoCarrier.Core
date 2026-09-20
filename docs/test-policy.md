@@ -402,7 +402,8 @@ two lost updates in one run, and because #111's own progress is what they measur
 INFOCARRIER_SERVER_SQL=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj \
     --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite" -- xUnit.ParallelizeTestCollections=false
 eng/ef-sql-diff.py test/InfoCarrier.Core.FunctionalTests/bin/Debug/net10.0/server-sql.log
-``` 791 tests were paired, and 758 produced EF's statements
+```
+791 tests were paired, and 758 produced EF's statements
 exactly. **No statement had a literal where EF has a parameter.** A first, shape-only pass over the
 parallel run's log found the same, and was shown to catch the inline-collection defect by planting
 it back into a copy of the log.
@@ -583,6 +584,113 @@ reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read
 contains one thing of ours, and it was already on the list. Re-run it with
 `bash eng/ef-sql-compare.sh --keep` and then `--extras` on the log it names.
 
+### Tier C: what upstream gives us, and what the tier gives back (2026-09-20)
+
+**The Firebird provider is a reference clone now.** `subrepos/firebird` is `FirebirdSQL/NETProvider`
+at tag `EFCore-13.0.0.0`, the tag matching the `FirebirdSql.EntityFrameworkCore.Firebird` version
+this repository runs. Its two EF Core projects restore and load in `roslyn-codelens`, so what
+follows is the compiler's answer rather than a reading of text.
+
+**It records no expected SQL, so the comparison of 2026-09-15 cannot run here.** Nothing in the loaded solution
+declares an `AssertSql` helper, which is the mechanism every EF provider suite that asserts SQL
+uses, and across all 596 files of the repository the strings `AssertSql`, `AssertBaseline`,
+`AssertExecuteUpdateSql` and `ExpectedSql` appear in none (`AssertTranslationFailed`, in 7 files, is
+the control that the search works). **Its unit tests do look at the SQL and never keep a
+statement**: 21 places capture `LastCommandText` and 7 assert anything about it, each a
+`StringAssert.Contains` of a fragment such as `TRIM(`, and three of those seven are migration DDL.
+A fragment cannot be compared with a statement, so there is nothing recorded here to pair with.
+**What can be compared is a RUN of their suite**, and that is the exercise below.
+
+**What its suite does record is what it cannot do.** The functional project declares 303 test
+methods and marks 120 of them `[NotSupportedOnFirebirdFact]`, across 12 files. In
+`UdfDbFunctionFbTests`, the class this tier exists to host, it overrides 24 tests: **14
+`[NotSupportedOnFirebirdFact]`**, every one a correlated or `APPLY` shape, **9
+`[DoesNotHaveTheDataFact]`**, and one plain `[Fact]`.
+
+**This tier runs all 23 of those, and they pass.** Checked name by name against the run's own
+markers. Two things buy it: the fixture creates every routine the base names, where theirs omits
+some, and `FirebirdLateralQuerySqlGenerator` adds the branch their generator lacks. **Their defect
+is still there at `EFCore-13.0.0.0`**, read in the source: `VisitCrossApply` and `VisitOuterApply`
+wrap a `TableExpression` as `(SELECT * FROM "T") AS "t"` and pass anything else to `Visit`, and
+`VisitTableValuedFunction` then writes `"F"(args) AS "a"`, a bare function after `LATERAL`, which
+the store will not parse. Our override takes the `TableValuedFunctionExpression` case and wraps it.
+So `FirebirdLateralQuerySqlGenerator` stays (`docs/upstream-defects.md` §2).
+
+**THEIR SUITE CAN BE RUN HERE, AND ITS SQL MATCHES OURS (2026-09-20).** It needs a Firebird server
+on localhost, which this repository deliberately does not have; the embedded engine it does have
+ships `fbclient.dll` and no server binary. Both facts are true and neither one blocks the exercise,
+because the suite does not need a server: it needs a connection string that names the embedded
+engine. One file, patched behind an environment switch and reverted afterwards, is the whole of it.
+**This was a one-off and is written down rather than scripted**; a third run earns an `eng/` entry.
+
+In `subrepos/firebird`, `…FunctionalTests/TestUtilities/FbTestStore.cs` takes two changes.
+`CreateConnection` keeps its `localhost` builder and adds an embedded one, chosen when
+`INFOCARRIER_FB_CLIENT` names a client library: `ServerType = FbServerType.Embedded`, that library,
+`UserID = "SYSDBA"`, `Charset = "UTF8"`, `Pooling = false`, and an absolute `Database` path. And
+`AddProviderOptions` adds `LogTo(Console.WriteLine, …)` for `RelationalEventId.CommandExecuted` and
+`CommandError` when `INFOCARRIER_FB_PRINT_SQL` is `1`, because their suite prints nothing. Then:
+
+```bash
+root=$PWD/test/InfoCarrier.Core.FunctionalTests/bin/Release/net10.0/firebird/win-x64/V5
+cd subrepos/firebird
+INFOCARRIER_FB_CLIENT="$root/fbclient.dll" FIREBIRD="$root" INFOCARRIER_FB_PRINT_SQL=1 \
+  dotnet test src/FirebirdSql.EntityFrameworkCore.Firebird.FunctionalTests \
+  --filter "FullyQualifiedName~UdfDbFunctionFbTests" -- xUnit.ParallelizeTestCollections=false
+git checkout -- .    # ALWAYS: an edit under subrepos/ is invisible to git and must not survive
+```
+
+**Their run: 106 tests, 82 passed, 24 skipped, none failed.** Comparing the statements by SQL shape
+against ours for the same base, both runs serial (`parallel mode = none`, which the run prints):
+
+| | theirs | ours |
+|---|---|---|
+| statements | 87 | 118 |
+| shapes | 33 | 57 |
+| shapes both sides ran | 30 | 30 |
+
+- **Nothing they emit is a shape we do not.** The 3 shapes only theirs are our own queries with a
+  different routine name: their fixture calls it `GetCustWithMostOrdersAfterDate` and ours
+  `GetCustomerWithMostOrdersAfterDate`.
+- **The 27 only ours are the tests they skip.** Three are those name twins; the rest are
+  `JOIN LATERAL` and `CROSS JOIN` over a table-valued function, and the whole-table reads of
+  `Udf_with_argument_being_comparison_of_nullable_columns`.
+- **A literal where the other side has a parameter, on the 30 shapes both ran: none.** That is the
+  difference this repository weights most, and it is the reason the exercise was worth running.
+
+**So a wire-free control for this tier is priced and not built.** The `Direct*` pattern of ADR-009
+Tier D would answer the same question, and this answers it with no test code at all. Build one only
+if their suite stops being runnable.
+
+**The reading the tier gets instead of a comparison** is `eng/ef-sql-diff.py --survey`, which groups
+every statement in a log and needs no reference:
+
+```bash
+INFOCARRIER_SERVER_SQL=<file> dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj     --configuration Release --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"     -- xUnit.ParallelizeTestCollections=false
+python eng/ef-sql-diff.py <file> --survey --limit 100
+```
+
+**The run of 2026-09-20: 109 passed, 1 skipped, six seconds, 106 statements in 57 shapes** — 10
+unbounded reads, 45 other reads, 2 writes. Read group by group:
+
+- **Every unbounded read is the test's own, and nine of the ten are one test's expected value.**
+  `Udf_with_argument_being_comparison_of_nullable_columns` computes what it expects with
+  `from a in context.Addresses.ToList() from r in context.Orders.ToList()`, which reads `Orders`
+  once per address before the query under test runs. Eight addresses, eight reads, and EF calls
+  `ClearLog()` immediately after them. The rest are queries a test asks for outright, three of them
+  this repository's own smoke tests.
+- **The 45 other reads are the capability this tier exists for, in SQL**: `JOIN LATERAL` over a
+  table-valued function, `CROSS JOIN` with one, scalar functions in the projection, in a `WHERE`
+  and nested inside each other, and `ROWS (n)` where a row limit is asked for. Nothing came back to
+  be finished on the client.
+- **Two writes, both parameterized.** No statement changes rows without a predicate.
+- **The one skip is EF's own.** `QF_Select_Direct_In_Anonymous_distinct` is skipped upstream and
+  this repository declares no override of it, so nothing here asserts nothing.
+
+**A survey is weaker evidence than a comparison and is not a substitute for one.** It says what the
+server ran, not what a second provider would have run for the same query, so it can show a whole
+table crossing the wire and cannot show a subtly worse plan. It is what this tier has on every run;
+the comparison above is what it has when somebody spends ten minutes on it.
+
 **And the first reading of that run was mostly the instrument, which is the lesson worth keeping.**
 It reported 182 differing, and two defects of the tool accounted for 175 of them:
 
@@ -607,7 +715,8 @@ query, and a wall of golden text argues quietly for conformance every time it go
 ## Extending to the other tiers
 
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
-  suite. Pin each link to the package version this repository runs.
+  suite. Pin each link to the package version this repository runs. **The Firebird suite was read on
+  2026-09-20 and asserts no SQL at all**, so Tier C is surveyed rather than compared (above).
 - **Build a control only where upstream has none.**
 - **Every existing override gets a label and a reference, or goes.** An existing
   `Task.CompletedTask` stays only if it copies an upstream skip, with the link and upstream's
