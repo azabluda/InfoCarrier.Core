@@ -29,8 +29,17 @@ WHAT IT COMPARES. EF's expected statements, matched IN ORDER inside the test's o
 EF clears its baseline inside the test, so what it asserts is a FRAGMENT: the reads a test does to
 arrange and to verify are not in it, and neither is the seeding of a fixture that builds its store
 per test. Comparing whole against whole reported 182 tests as differing on 2026-09-16, and 7 of
-them were real; the statements the server ran that EF does not assert are therefore not reported.
-A round trip of OURS is pinned in `Sqlite/ServerSqlTest.cs` instead, where the query is ours too.
+them were real; the statements the server ran that EF does not assert are therefore not part of the
+report below. A round trip of OURS is pinned in `Sqlite/ServerSqlTest.cs` instead, where the query
+is ours too.
+
+`--extras` READS THAT REMAINDER, and it is a second question rather than a louder version of the
+first. Most of it is the test's own arrange and verify, which EF runs too and never asserts. What
+hides in it is the silent half of the silent half: a round trip this provider makes that EF's
+provider does not, which no assertion of EF's can report because EF's window is not open when it
+happens. The statements are grouped by SHAPE, so one shape is read once however many tests run it,
+and every extra belongs to a group. Unbounded reads come first, because a table crossing the wire
+is what this instrument was built to find.
 
 WHAT IT REPORTS, per statement EF asserts and the server did not run, dangerous first:
   LITERAL     the server ran the same shape with a literal where EF has a parameter
@@ -41,7 +50,7 @@ The owner's rule (docs/test-policy.md): the first two are equally bad, and a str
 that can change the store's plan is a red flag. A structural difference is also how a client-side
 join shows: the server ran two whole-table reads and EF ran one join.
 
-Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--quiet] [--limit N]
+Usage: eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--quiet] [--limit N] [--extras]
 """
 
 import argparse
@@ -69,6 +78,10 @@ CLASS = re.compile(r'\bclass\s+(\w+)')
 ASSERT_SQL = re.compile(r'\bAssert(?:ExecuteUpdate)?Sql\s*\(')
 
 KINDS = ('LITERAL', 'PARAMETER', 'VALUE', 'STRUCTURAL')
+
+# A read with nothing to bound it: no predicate, no row limit, no join and no aggregate. It is the
+# shape a whole table crosses the wire in, and the shape a client-side operator leaves behind.
+BOUND = re.compile(r'\b(WHERE|LIMIT|JOIN|EXISTS|COUNT|SUM|AVG|MIN|MAX|GROUP BY|UNION|INTERSECT|EXCEPT)\b', re.I)
 
 
 def canon(sql):
@@ -208,7 +221,7 @@ def classify(statement, ran):
     return 'VALUE'
 
 
-def compare_case(wanted, ran):
+def match_case(wanted, ran):
     """EF's expected statements, matched IN ORDER inside one test case's run.
 
     WHY IN ORDER AND NOT ONE BLOCK. EF's baseline is cleared inside the test and asserted inside it,
@@ -222,14 +235,15 @@ def compare_case(wanted, ran):
     the test's own arrange, verify and seeding, outside EF's window, and a promise of ours in
     `Sqlite/ServerSqlTest.cs` is where a round trip of ours is pinned instead.
     """
-    unmatched, index = [], 0
+    unmatched, consumed, index = [], set(), 0
     for statement in wanted:
         found = next((i for i in range(index, len(ran)) if exact(ran[i]) == exact(statement)), None)
         if found is None:
             unmatched.append(statement)
         else:
+            consumed.add(found)
             index = found + 1
-    return unmatched
+    return unmatched, consumed
 
 
 def differences(wanted_variants, cases):
@@ -238,12 +252,93 @@ def differences(wanted_variants, cases):
     for case in cases:
         best = None
         for wanted, where in wanted_variants:
-            unmatched = compare_case(wanted, case)
+            unmatched, _ = match_case(wanted, case)
             if best is None or len(unmatched) < len(best[0]):
                 best = (unmatched, where, case)
         if len(best[0]) > len(worst[0]):
             worst = (best[0], (best[1], best[2]))
     return worst
+
+
+def unbounded(sql):
+    """Whether a statement reads without a predicate, a row limit, a join or an aggregate."""
+    return not WRITE.match(sql) and not BOUND.search(canon(sql))
+
+
+def extras(expected, sections):
+    """shape -> (occurrences, tests, one example), for every statement EF's fragment did not take.
+
+    Per test CASE, because a theory runs its arrange once per row and each run is a chance for an
+    extra round trip; grouped by shape, because reading the same arrange read four hundred times is
+    not reading it four hundred times. The variant chosen per case is the one that matches it best,
+    exactly as the difference report chooses it, so the two halves account for the same statements.
+    """
+    groups = collections.defaultdict(lambda: [0, set(), None])
+    for k in expected:
+        if k not in sections:
+            continue
+        for case in sections[k]:
+            best = None
+            for wanted, _ in expected[k]:
+                unmatched, consumed = match_case(wanted, case)
+                if best is None or len(unmatched) < best[0]:
+                    best = (len(unmatched), consumed)
+            for index, statement in enumerate(case):
+                if index in best[1]:
+                    continue
+                group = groups[shape(statement)[0]]
+                group[0] += 1
+                group[1].add(k)
+                if group[2] is None:
+                    group[2] = statement
+    return groups
+
+
+def survey(sections):
+    """shape -> (occurrences, tests, one example), for EVERY statement in the log.
+
+    The reading for a tier with no upstream baseline to compare against. ADR-009 Tier C is the
+    case: the Firebird provider ships 158 functional test files at EFCore-13.0.0.0 and not one
+    AssertSql call, so there is nothing to subtract and nothing to pair. What is left is still
+    worth reading, because the red flags this instrument was built to find are visible without a
+    baseline: a table crossing the wire has no predicate and no row limit whatever EF would have
+    written.
+    """
+    groups = collections.defaultdict(lambda: [0, set(), None])
+    for k, cases in sections.items():
+        for case in cases:
+            for statement in case:
+                group = groups[shape(statement)[0]]
+                group[0] += 1
+                group[1].add(k)
+                if group[2] is None:
+                    group[2] = statement
+    return groups
+
+
+def report_groups(groups, limit, label):
+    """Every group, unbounded reads first, then the other reads, then the writes."""
+    def rank(item):
+        example = item[1][2]
+        return (0 if unbounded(example) else 1 if not WRITE.match(example) else 2, -item[1][0])
+
+    order = sorted(groups.items(), key=rank)
+    statements = sum(g[0] for g in groups.values())
+    reads = sum(1 for g in groups.values() if not WRITE.match(g[2]))
+    loose = sum(1 for g in groups.values() if unbounded(g[2]))
+    print()
+    print(f'{label}: {statements} statements in {len(groups)} shapes '
+          f'({loose} unbounded reads, {reads - loose} other reads, {len(groups) - reads} writes)')
+
+    for _, (count, tests, example) in order[:limit]:
+        flag = 'UNBOUNDED' if unbounded(example) else 'WRITE' if WRITE.match(example) else 'READ'
+        names = ', '.join(sorted(f'{c}.{m}' for c, m in tests)[:3])
+        print()
+        print(f'  {flag}  x{count} in {len(tests)} tests: {names}'
+              + (', ...' if len(tests) > 3 else ''))
+        print('    ', ' '.join(canon(example).split())[:280])
+    if len(order) > limit:
+        print(f'    ... and {len(order) - limit} more shapes; raise --limit to see them')
 
 
 def main(argv):
@@ -253,14 +348,23 @@ def main(argv):
     parser.add_argument('--efcore', default='subrepos/efcore', help="EF Core checkout (default: subrepos/efcore)")
     parser.add_argument('--quiet', action='store_true', help='counts only, no per-test listing')
     parser.add_argument('--limit', type=int, default=20, help='how many tests to list per kind (default: 20)')
+    parser.add_argument('--extras', action='store_true',
+                        help='read the statements EF does not assert, grouped by shape')
+    parser.add_argument('--survey', action='store_true',
+                        help='read EVERY statement in the log, grouped by shape, for a tier with no baseline')
     args = parser.parse_args(argv[1:])
 
     try:
-        expected = ef_expected(args.efcore)
         sections = server_sections(args.log)
+        # A survey needs no reference at all, which is the point of it: the tier it is for has none.
+        expected = {} if args.survey else ef_expected(args.efcore)
     except (OSError, ValueError) as error:
         print(f'ef-sql-diff: {error}', file=sys.stderr)
         return 1
+
+    if args.survey:
+        report_groups(survey(sections), args.limit, 'the server ran')
+        return 0
 
     paired = [k for k in expected if k in sections]
     counts = collections.Counter()
@@ -286,6 +390,10 @@ def main(argv):
     print(f'EF tests with expected SQL {len(expected)}; tests in the log {len(sections)}; paired {len(paired)}')
     print(f'identical {counts["same"]}, differing tests {counts["differs"]}')
     print('by kind, in tests: ' + ', '.join(f'{kind} {counts[kind]}' for kind in KINDS))
+
+    if args.extras:
+        report_groups(extras(expected, sections), args.limit, 'extras, which EF does not assert')
+        return 0
 
     if args.quiet:
         return 0

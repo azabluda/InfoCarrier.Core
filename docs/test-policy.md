@@ -543,6 +543,46 @@ rewrite below. What is left is two groups and one upstream accident:
 - **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
   `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
 
+### The extras, read case by case (2026-09-20)
+
+**The comparison drops most of what the server ran, and that remainder had been dismissed by
+sampling.** EF clears its baseline inside the test, so what EF asserts is a fragment; our marker
+covers the whole test. Matching EF's statements in order inside ours made the report readable
+(#119), and it left every unmatched statement of ours unreported and, after that rewrite, uncounted.
+The category was about 176 statements at the time and was classified by looking at a few.
+
+`eng/ef-sql-diff.py --extras` reads it. The statements are grouped by SQL **shape**, so one shape is
+read once however many tests run it, every extra belongs to a group, and the groups are ordered
+unbounded reads first, because a table crossing the wire is what this instrument exists to find.
+`--survey` is the same reading with nothing subtracted, for a tier upstream gives no baseline for.
+
+**The whole remainder, on the run of 2026-09-20: 2683 statements in 280 shapes** — 4 unbounded
+reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read group by group:
+
+- **No write is unbounded.** All 20 `UPDATE` shapes were printed and each carries a key predicate,
+  simple or composite. There is no `DELETE` at all.
+- **Three of the four unbounded reads are the test's own.** `Set<Kiwi>()` and `Set<Coke>()` are read
+  by EF's `BulkUpdatesAsserter`, which runs the query once before the `ExecuteUpdate` and once after
+  it, and the SQL carries no predicate because the test's query has none. The third is the
+  projection `StringTranslations.IsNullOrEmpty` asks for.
+- **The fourth is ours, and it is already known**: `NorthwindGroupBy.Odata_groupby_empty_key` reads
+  every order, which is the deferred group-key case above. **The extras found it independently**,
+  through a channel that does not use EF's assertion at all, which is the evidence that the channel
+  works.
+- **The 60 other reads are the same before-and-after reads carrying the test's own predicate**, plus
+  `SELECT EXISTS (SELECT 1 FROM "T")`, which the log shows running BEFORE a fixture's seeding
+  inserts, plus the two statements of the accepted `Check_inlined_constants_redacting` deviation.
+- **The repeats are seeding.** 65 shapes run five or more times inside one test; 60 are the
+  fixture's `INSERT`s and 5 are the `UPDATE`s that wire up its optional and self references
+  afterwards, each keyed.
+- **The writes that carry literals rather than parameters are EF's own**, emitted on the server by
+  its seeding of `HasData` rows, one batch with `SELECT changes()` between the statements. Nothing
+  of that crosses this wire.
+
+**So the sampling verdict holds, and it is now a reading rather than a sample.** The remainder
+contains one thing of ours, and it was already on the list. Re-run it with
+`bash eng/ef-sql-compare.sh --keep` and then `--extras` on the log it names.
+
 **And the first reading of that run was mostly the instrument, which is the lesson worth keeping.**
 It reported 182 differing, and two defects of the tool accounted for 175 of them:
 
