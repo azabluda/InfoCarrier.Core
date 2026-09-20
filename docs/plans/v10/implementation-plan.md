@@ -18,6 +18,20 @@ The suite stands at `Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177`
 classified in the archived M9 plan and stated for consumers in
 [`limitations.md`](../../../website/docs/limitations.md).
 
+## Branches that outlive their pull request
+
+**A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
+was named in any document.** Work branches are deleted when their pull request merges, by the
+repository setting rather than by hand, so only two prefixes live here: `park/` for work that may
+resume, `archive/` for work that will not. A machine branch keeps whatever name its workflow types.
+
+| Branch | What it holds | What would revive it |
+|---|---|---|
+| `park/r77-relational-client-store` | A fixture may opt into a relational client test store (#56). Six adopted bases re-declare `TestStore` as `RelationalTestStore` and 25 tests threw `InvalidCastException`; the branch splits that type into its string half, which is harmless, and its connection half, which would reach the database past the wire | Adopting a base whose tests need the string half. The connection half never ships: a green that reaches the store says nothing about this provider |
+| `park/d7-streaming-half` | Streaming results over the HTTP transport, complete and measured green, parked 2026-08-17 because its cost is countable and none of its headline benefits was ever measured | A measurement: peak memory, payload size, time to first byte or throughput. Not an argument from reading the code, which is the error its commit message exists to correct. Renamed from `streaming/d7-half-a-parked` on 2026-09-20 |
+| `archive/v5` | The v5 line, last touched 2026-06-28. Kept for history only | Nothing. Renamed from `v5/abandoned` on 2026-09-20 |
+| `badges` | Written by `build.yml`, which clones it by name and pushes the EF parity figure that shields.io reads for the README | Not a work branch. Do not rename it: the workflow names it in four places |
+
 ## Phase Q — verifying the cancellation path over HTTP
 
 **This is verification of work that already shipped, not a milestone.** Phase P made the server use
