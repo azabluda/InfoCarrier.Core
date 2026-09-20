@@ -296,6 +296,31 @@ rejected request, and it showed the root twice, one collection element twice and
 marked `Deleted`. It was missed for a while because a `grep` truncated its output to six lines.
 **Read the whole of a diagnostic that exists to be read.**
 
+## The fifth intermittent hid behind the fourth, and it was a gate spelt twice (2026-09-14)
+
+Fixing the product defect above did **not** make a whole-tier Tier D run stable. It still failed 5,
+then 15, then 9, and the reading "it failed before because of that bug" was wrong. **Two causes wore
+one symptom**, and the second was a harness defect.
+
+**The evidence separated them cleanly.** Every failure said `An existing connection was forcibly
+closed by the remote host`, and classes untouched by the work in hand were among the casualties. So
+the store's PROCESS was dying rather than the wire lying — a wire that lies corrupts the answer of
+the test that asked; a process that dies takes its neighbours with it.
+
+**The cause: `EmbeddedMongo` was extracted from `DocumentStoreFixture` and the original was left in
+place, so the tier had two `StartGate` semaphores.** Each family serialized against itself and not
+against the other. The before-and-after process diff that names "my `mongod`" then picked up a
+neighbour's server, and teardown killed one whose tests were still running.
+
+**A semaphore serializes the callers that share it, and a gate spelt twice is not a gate.** The rule
+that transfers is broader than the semaphore: **when an extraction says a duplicate is dangerous,
+check in the same commit that the duplicate is gone.** That type's own comment read *"two copies of
+process bookkeeping is two places to get the reaping wrong"* while the second copy compiled beside
+it.
+
+Four consecutive whole-tier runs of 53 of 53 closed it, and the run time fell from 2m32s to 6s —
+the old duration was almost entirely 30-second connection timeouts.
+
 ## The boundary analyzer does not consult the client model for member mappability (R138, 2026-09-03)
 
 **Found by an experiment that was reverted**, which is the only reason it is visible at all.
