@@ -5,16 +5,18 @@ SQL Server, SQLite and InMemory providers run. This page lists every scenario in
 does not behave the way a normal EF Core provider behaves, so you can judge whether any of them
 affects your application.
 
-It is complete for what a caller can observe as a limitation. The suite's other failures ask the
-client for something only a database has, assert a refusal this provider does not need to make, or
-are EF Core defects that every provider hits and this one reports with a different exception type.
+It is complete for what a caller can observe as a limitation. The suite's other differences ask
+the client for something only a database has, assert a refusal this provider does not need to make,
+or are EF Core defects that every provider hits and this one reports with a different exception
+type.
 
 ```
-Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238
+Total tests: 29826, Passed: 29588, Failed: 0, Skipped: 238
 ```
 
-Measured against `10.1.0`. The 238 skips are EF Core's own, tests EF itself skips for the
-store behind them, not suppressions added here.
+Measured on 2026-09-20. No test fails. Where this provider answers differently from EF Core, the
+test that covers it says so, and this page names the differences you can observe. The 238 skips are
+EF Core's own, tests EF itself skips for the store behind them, not suppressions added here.
 
 ## Not supported
 
@@ -144,6 +146,8 @@ These are not defects. They follow from where the client sits.
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
 | The client never sees the server's provider, so it assumes a relational store and refuses three queries relational providers refuse. `UseInfoCarrier(client, o => o.UseNonRelationalServerStore())` says otherwise | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
+| The server's provider writes the SQL, so how a query is translated is settled there, not on the client. `EF.Constant` and `EF.Parameter` are part of your query, so they cross the wire and the server honours them | |
+| `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](guide/querying.md#round-trips-and-result-size) |
 | A query result arrives in one response rather than as a stream, so a very large result set is a very large response. Page it. | |
 | Authentication and authorization are yours | [Security](security.md) |
 | Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](platforms/blazor-webassembly.md#trimming) |
@@ -151,8 +155,8 @@ These are not defects. They follow from where the client sits.
 ## What this page cannot tell you
 
 Every entry above corresponds to tests in EF Core's specification suite that run on every build.
-The number of failing tests is gated in continuous integration, so it cannot grow without being
-noticed. When an entry is fixed, or a new one appears, this page changes with it.
+A failing test breaks the build, so a new entry cannot appear unnoticed. When an entry is fixed,
+or a new one appears, this page changes with it.
 
 What the suite measures bounds what this page can promise. A conformance suite says nothing about
 performance, payload size or concurrency under load. A scenario it never exercises is outside what
