@@ -424,7 +424,11 @@ mode: the client sends its argument as a constant, and the server rewrites only 
 **Only an operator the server could fold is marked.** One that reads the row,
 `ids.Where(y => y == x.Id)`, reaches this client in an ordinary query too, and a mark there replaced
 the server's own collection mode with the default. This said "an ordinary query is untouched" until
-2026-09-21; `ServerParameterizationTest` now measures the server's three modes.
+2026-09-21; `ServerParameterizationTest` now measures the server's three modes. **An operator that
+CONSUMES the list is marked too, since 2026-09-22**, so a compiled `ids.Count()` runs EF's
+`json_array_length(@ids)` and, in `Constant` and `MultipleParameters` mode, **fails with EF Core
+10's own `UnreachableException`** (dotnet/efcore#37370, fixed for EF 11 only). That failure is
+EF's, parked by the owner until EF 11: do not "fix" it here.
 
 **Anything the wire computes from a type mapping is computed twice, by two different providers, and
 is only sound if the two agree.** The client's model is built by this provider and the server's by

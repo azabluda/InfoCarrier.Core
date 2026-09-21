@@ -357,9 +357,10 @@ the correct answer.
 
 **Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
 overrides three core tests to assert that the query is refused. **This provider answered all three
-until 2026-09-15 and answers two now**, and its overrides assert the rows, so each carries
-`[StoreDefect("1.12", …)]` with the link to EF's refusal, and `[InfoCarrierDesign(6)]` for why this
-provider does not reach the defect.
+until 2026-09-15, two until 2026-09-20, and answers one now**, the `Convert` test. Its override
+asserts the rows, so it carries `[StoreDefect("1.12", …)]` with the link to EF's refusal, and
+`[InfoCarrierDesign(6)]` for why this provider does not reach the defect. This said "answers two
+now" until 2026-09-22.
 
 **Site.** Named by EF itself, on one of the three, in a comment at the `v10.0.1` tag: *"The array
 indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a CAST over
@@ -380,10 +381,13 @@ rules when to do this."*
 their messages; EF says nothing about them, and nobody has read a fix, because none exists.
 
 **What it blocks.** Nothing. **Why this provider does not reach that state was established on
-2026-09-15**, from the server's SQL log, and it read *"not established"* until then. The two compiled
-queries reach the server with their parameters as values (ADR-006), so the server's EF evaluates
-`(string)parameters[0]` and `ints1.Skip(1).Union(ints2).Count() == 3` before translation and runs
-`WHERE "p"."String" = @p` and `WHERE @p`. The subquery EF cannot type is never built.
+2026-09-15**, from the server's SQL log, and it read *"not established"* until then. A compiled
+query's parameters reach the server as values (ADR-006), so the server's EF evaluates
+`(string)parameters[0]` before translation and runs `WHERE "p"."String" = @p`. The subquery EF cannot
+type is never built. **The `Union` test reaches EF's state since 2026-09-20.** It answered the same
+way, with `WHERE @p`, until #122 made the client mark `ints1.Skip(1)` as EF keeps it; it now raises
+EF's own `SetOperationsRequireAtLeastOneSideWithValidTypeMapping` and inherits EF's refusal. An array
+index is not an operator the client marks, which is why the `Convert` test still answers.
 **`Column_collection_equality_inline_collection_with_parameters` answered for a worse reason**: its
 two parameters reached SQLite as the literal `'[1,10]'`. That was a defect of this provider's, and the
 same rule sent `new[] { i, j }.Contains(p.Id)` as `IN (2, 999)`. It is fixed, and that test now
@@ -400,5 +404,6 @@ reader meeting one of these numbers in a comment can see what it covers.
 | [dotnet/efcore#36401](https://github.com/dotnet/efcore/issues/36401) | An owned JSON entity compared to a **parameterized** null translates to `WHERE 0 = 1` instead of `IS NULL`, so the rows are wrong | `Associate_with_parameter_null`. This provider answered it correctly until V8, by the accident of sending the parameter inline; it now reproduces EF's answer, and the `limitations.md` entry claiming otherwise is removed |
 | [dotnet/efcore#33522](https://github.com/dotnet/efcore/issues/33522) | A `byte[]` inside a JSON document is not comparable by value | `Json_predicate_on_byte_array`. EF's own SQLite override adopted in C85 |
 | [dotnet/efcore#30730](https://github.com/dotnet/efcore/issues/30730) | `Array_of_TimeOnly` round-trips wrong on SQLite | Reclassified from "ours" to SQLite's in one run, by reading the row the store actually holds |
+| [dotnet/efcore#37370](https://github.com/dotnet/efcore/issues/37370) | A compiled query over a list parameter that nothing compares with a column throws `UnreachableException`, because EF has no element type mapping to give the list. Fixed by dotnet/efcore#37372 for EF Core 11 only; `release/10.0` still has the old code (read 2026-09-21) | `ServerParameterizationTest.A_compiled_query_consuming_a_list_fails_where_EF_Core_10_fails`, which asserts the same failure over the wire in `Constant` and `MultipleParameters` mode. **Parked until EF 11 by the owner (2026-09-22)**: this provider behaves as plain EF Core does, and that test turns red when the server runs EF 11. **Listed since a comment first cited it**; before that the owner kept it out, because §2 lists only numbers this repository cites |
 | [dotnet/efcore#31751](https://github.com/dotnet/efcore/issues/31751) | Lazy-loading proxies need threads, which WebAssembly has none of | Automatic lazy loading in Blazor WebAssembly. Not a defect this repository found; listed because two documents cite it |
 | [FirebirdSQL/NETProvider#1277](https://github.com/FirebirdSQL/NETProvider/issues/1277) | `FbQuerySqlGenerator` wraps a plain table after `LATERAL` and never added the branch for a function, which is the whole of that provider's fourteen "Not supported on Firebird" skips | Tier C. **Reported by this repository on 2026-09-04**, with the repro and the suggested branch. `FirebirdLateralQuerySqlGenerator` in the test harness is the correction, and is deleted when the fix lands. **Still open at `EFCore-13.0.0.0`, read in `subrepos/firebird` on 2026-09-20**: `VisitCrossApply` and `VisitOuterApply` wrap a `TableExpression` and pass everything else to `Visit`, and `VisitTableValuedFunction` writes the bare function |

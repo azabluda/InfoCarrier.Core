@@ -182,25 +182,33 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
         => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
 
     /// <summary>
-    ///     Two compiled queries EF's relational base asserts a refusal for, and this provider answers.
+    ///     A compiled query EF's relational base asserts a refusal for, and this provider answers.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         <b>The store reason and this provider's reason are two attributes</b> (2026-09-15).
-    ///         <c>PrimitiveCollectionsQueryRelationalTestBase</c> wraps each in a refusal, because
-    ///         EF's relational pipeline leaves a compiled query's parameter inside a subquery without
-    ///         a type mapping, and EF's own comment on the first says so outright:
-    ///         <c>docs/upstream-defects.md</c> §1.12. <b>This provider never reaches that state, and
-    ///         the reason is measured</b>: the client sends a compiled query's parameters as values
-    ///         (ADR-006), so the server's EF evaluates every expression over them before translation.
-    ///         The server ran <c>WHERE "p"."String" = @p</c> for the first and <c>WHERE @p</c> for
-    ///         the second, each with its value as a parameter.
+    ///         <c>PrimitiveCollectionsQueryRelationalTestBase</c> wraps it in a refusal, because EF's
+    ///         relational pipeline leaves a compiled query's parameter inside a subquery without a
+    ///         type mapping, and EF's own comment says so outright: <c>docs/upstream-defects.md</c>
+    ///         §1.12. <b>This provider does not reach that state, and the reason is measured</b>: the
+    ///         client sends a compiled query's parameters as values (ADR-006), and
+    ///         <c>parameters[0]</c> is an array index rather than an operator the client marks, so
+    ///         the server's EF evaluates it before translation and runs
+    ///         <c>WHERE "p"."String" = @p</c>.
     ///     </para>
     ///     <para>
-    ///         <b>The query bodies are EF's core ones, copied</b>, because C# cannot call a
-    ///         grandparent's implementation and the relational base sits between, and each asserts the
-    ///         rows where the core body asserts nothing. The copy is the real cost: an edit to EF's
-    ///         base will not reach it.
+    ///         <b>This was two tests until 2026-09-20.</b>
+    ///         <c>Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query</c>
+    ///         answered for the same reason, with <c>WHERE @p</c>, until #122 made the client mark
+    ///         <c>ints1.Skip(1)</c> as EF keeps it. It now raises EF's own
+    ///         <c>SetOperationsRequireAtLeastOneSideWithValidTypeMapping</c>, and its override went.
+    ///         This remark said "two" until 2026-09-22.
+    ///     </para>
+    ///     <para>
+    ///         <b>The query body is EF's core one, copied</b>, because C# cannot call a grandparent's
+    ///         implementation and the relational base sits between, and it asserts the rows where the
+    ///         core body asserts nothing. The copy is the real cost: an edit to EF's base will not
+    ///         reach it.
     ///     </para>
     ///     <para>
     ///         <b>There were three until 2026-09-15.</b>
@@ -295,8 +303,10 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // overridden since V12 to assert the rows, and carry docs/upstream-defects.md 1.12 since
     // 2026-09-15.
     //
-    //   Parameter_collection_in_subquery_and_Convert_as_compiled_query
-    //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query
+    //   Parameter_collection_in_subquery_and_Convert_as_compiled_query, still overridden
+    //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query,
+    //     inherited again since 2026-09-20 (#122), when the client began to mark `ints1.Skip(1)`
+    //     as EF keeps it; it passes with EF's refusal
     //   Column_collection_equality_inline_collection_with_parameters, inherited again since
     //     2026-09-15, when the literal it answered through was fixed; it passes with EF's refusal
     //
@@ -314,8 +324,9 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // behaviour to turn the red green would be overriding a spec test to make the suite green, which
     // CLAUDE.md then forbade. V12 overrode them with the core body on the owner's decision, and the
     // rule itself was replaced on 2026-09-15 by an override that says why. This is the R29
-    // category (`OwnedJson.Associate_with_parameter_null`) two more times: a query this provider
-    // answers that other EF providers refuse, which is `website/docs/limitations.md`'s territory.
+    // category (`OwnedJson.Associate_with_parameter_null`) once more: a query this provider answers
+    // that other EF providers refuse, which is `website/docs/limitations.md`'s territory. It said
+    // "two more times" until 2026-09-22, two days after #122 took the Union test out of it.
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

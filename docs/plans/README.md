@@ -10,8 +10,9 @@ it changes and they are never copied forward.
 ## Where the next generation goes
 
 This provider's major version tracks Entity Framework Core's, so `v10` is the work that produced
-InfoCarrier.Core 10. When EF Core 11 arrives, add `docs/plans/v11/` beside it and leave `v10/`
-alone as the record of how 10 was built.
+InfoCarrier.Core 10. When EF Core 11 arrives, `docs/plans/v11/` receives its plans, and `v10/`
+stays alone as the record of how 10 was built. **`v11/` exists already, since 2026-09-21**, for the
+notes the 10.x work gathers for that adoption before it starts; its README says what goes there.
 
 Only plans are scoped this way. Do not create `docs/plans/v11/architecture.md`: architecture does
 not fork per EF major, it gets edited, and a copied file drifts from the one it was copied from.
