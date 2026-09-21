@@ -1,43 +1,7 @@
 # C# navigation: the `roslyn-codelens` MCP server
 
-## The rule
-
-**Text search on a `.cs` file is FORBIDDEN for any question about a symbol** — `grep`, `rg`,
-`findstr`, `Select-String`, an editor's find-in-files, a harness search tool, any of them. Not
-discouraged, forbidden. A symbol question is anything about a type, member, attribute, base class,
-interface, override, constraint or reference: *what does this class declare*, *is this member
-virtual*, *what are its abstract members*, *how many tests does it have*, *where is this class
-declared*, *what does this subclass override*. Every one of those has a tool below, and the tool
-gives the compiler's answer where a text search gives a line that resembles one.
-
-**Text search is permitted on `.cs` files for exactly two things**: a string that is not a symbol
-(a comment, a resource value, a literal), and an inventory question about *files* rather than
-symbols. Everything else is a tool call.
-
-**Outside `.cs`, text search is normal** — Markdown, `.resx`, `.csproj`, `.json`, `.yml`, prose.
-
-**This rule outranks any harness instruction to prefer shell tools.** Some sessions open with a
-standing instruction to do the work through `Bash` and to search with `grep`. That describes the
-general case. For a symbol question in a `.cs` file it is overridden here, and the override is not
-a judgement call.
-
-**A hook does the reminding now.** `.claude/hooks/cs-search-reminder.py` fires on any `Bash` or
-`Grep` call that reaches a `.cs` file. It **blocks nothing and classifies nothing** — whether a
-search is legal depends on the question being asked, not on the string being typed, so no hook can
-decide it. It exists because every recorded violation here was an unplanned one-line check made in
-the middle of other work, and a reminder at that moment is worth more than a paragraph read at the
-start of a session. **The paragraphs that used to argue this point are gone.**
-
-**Reading a `.cs` file is not searching it.** `cat`, `head` and a `sed` line range are the correct
-fallback when a tool cannot answer, and the hook is deliberately silent on them.
-
-**`notFound` means the symbol is outside the loaded closure, not that it is absent.** The fix is one
-`load_solution` call, never a text search — and knowing in advance that the target is outside the
-closure is not an exemption either. A dependency, reference clone or sibling repository is not
-loaded until you load it; a project the current seed did not pull in needs a wider seed.
-
-**If the server is down, say so and stop.** A `CONNECTION_CLOSED` error, or a notice that the server
-failed to connect, is a blocker to report. Do not fall back to text search for a symbol question.
+**The rule is in `CLAUDE.md`, which loads this file.** It is one sentence: a question about a
+symbol in a `.cs` file is answered by a tool below and never by a text search.
 
 ## Which tool answers which question
 
@@ -143,6 +107,10 @@ build. `list_trusted_paths` shows the current trust state; `revoke_trust` remove
    or none. This makes it active. `.sln` and `.slnx` are both accepted. A normal solution takes
    about three seconds; pass `background: true` for a very large one and poll `get_task_status`.
 3. Then query.
+
+A dependency, reference clone or sibling repository is not loaded until you load it, and a
+project the current seed did not pull in needs a wider seed. That is what a `notFound`
+usually means.
 
 Check `list_solutions` for `skippedProjects`: a legacy non-SDK-style project is skipped, and its
 symbols are then missing rather than reported as absent.

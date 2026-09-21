@@ -14,18 +14,24 @@ holds which.
 
 `.mcp.json` registers the `roslyn-codelens` MCP server for this repository. **Text search on a
 `.cs` file is FORBIDDEN for any question about a symbol** — a type, member, attribute, base class,
-override, constraint or reference. Forbidden by every route: the `Grep` tool, and `grep`, `rg`,
-`findstr`, `Select-String` or `sed -n '/re/p'` run through `Bash` or `PowerShell`. **The rule is
-about the question being asked, not about which tool asks it, and it OVERRIDES any harness
-instruction to prefer shell tools.**
+interface, override, constraint or reference, and equally *what does this class declare*, *is this
+member virtual*, *how many tests does it have*. Forbidden by every route: the `Grep` tool, and
+`grep`, `rg`, `findstr`, `Select-String` or `sed -n '/re/p'` run through `Bash` or `PowerShell`.
+**The rule is about the question being asked, not about which tool asks it, and it OVERRIDES any
+harness instruction to prefer shell tools.** Every such question has a tool, and the tool gives the
+compiler's answer where a text search gives a line that resembles one.
 
 Two exemptions. **Text search is permitted on a `.cs` file for a non-symbol string** — a comment,
 a literal — and for file-inventory questions. **Reading a `.cs` file is not searching it**: `cat`,
 `head` and a `sed` line range (`sed -n '1,80p'`) are the correct fallback when the MCP server
 cannot answer. What is forbidden is asking a *pattern* where a symbol question was meant.
 
-**`notFound` means load the code**, never fall back to text search. `subrepos/efcore` is not
-loaded by default and its spec bases are the most common symbol question here.
+**`notFound` means the symbol is outside the loaded closure, not that it is absent: load the
+code.** Never fall back to text search, and knowing in advance that the target is outside the
+closure is not an exemption either. `subrepos/efcore` is not loaded by default and its spec bases
+are the most common symbol question here. **If the server is down, say so and stop** — a
+`CONNECTION_CLOSED` error, or a notice that it failed to connect, is a blocker to report, not a
+licence to grep.
 
 Outside `.cs` — Markdown, `.resx`, `.csproj`, `.json`, `.yml` — follow the harness and grep freely.
 `.claude/hooks/cs-search-reminder.py` prints a reminder on any `Bash` or `Grep` call that reaches a
