@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -62,6 +63,37 @@ public partial class ServerParameterizationTest
         => AssertSameStatement(
             new List<string> { "alpha", "gamma" },
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <summary>
+    ///     A list filtered by the row it is compared with keeps the collection mode the server is
+    ///     configured with.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The client used to override that mode, whatever either half was configured
+    ///         with.</b> <c>Where</c> transforms a collection parameter, so the client wrapped
+    ///         <c>ids</c> in <c>EF.MultipleParameters</c>, and EF gives a mode on one parameter
+    ///         priority over the server's option. A server set to <c>Constant</c> then ran
+    ///         <c>VALUES (@p), (@p)</c> where EF runs <c>VALUES (1), (3)</c>, and one set to
+    ///         <c>Parameter</c> got a statement whose text changes with the size of the list.
+    ///         Measured 2026-09-21, here and in <c>AdHocMiscellaneous.Check_inlined_constants_redacting</c>.
+    ///     </para>
+    ///     <para>
+    ///         The wrapper is for an operator the server could otherwise evaluate, which is a
+    ///         compiled query's. This one reads the row, so nothing can evaluate it, and EF's own
+    ///         client leaves the mode to the server. <c>MultipleParameters</c> is EF's default and
+    ///         passed before the fix, which makes it the control.
+    ///     </para>
+    /// </remarks>
+    [ConditionalTheory]
+    [InlineData(ParameterTranslationMode.Constant)]
+    [InlineData(ParameterTranslationMode.Parameter)]
+    [InlineData(ParameterTranslationMode.MultipleParameters)]
+    public Task A_list_filtered_by_the_row_keeps_the_servers_collection_mode(ParameterTranslationMode mode)
+        => AssertSameStatement(
+            new List<int> { 1, 3 },
+            static (blogs, ids) => blogs.Where(b => ids.Where(i => i == b.Id).Any()),
+            mode);
 
     [ConditionalFact]
     public Task A_limit_and_offset_stay_parameters()
@@ -372,11 +404,17 @@ public partial class ServerParameterizationTest
     ///     Runs <paramref name="query" /> over the wire and again directly against the server, and
     ///     asserts the store saw one statement, not two.
     /// </summary>
+    /// <param name="value">What the query captures.</param>
+    /// <param name="query">The query, written once and run both ways.</param>
+    /// <param name="collectionMode">
+    ///     The server's collection mode, or <see langword="null" /> for EF's default.
+    /// </param>
     private async Task AssertSameStatement<TValue, TResult>(
         TValue value,
-        Func<IQueryable<Blog>, TValue, IQueryable<TResult>> query)
+        Func<IQueryable<Blog>, TValue, IQueryable<TResult>> query,
+        ParameterTranslationMode? collectionMode = null)
     {
-        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(collectionMode: collectionMode);
         await store.InitializeAsync(
             store.ServiceProvider,
             store.CreateDbContext,
@@ -743,7 +781,9 @@ public partial class ServerParameterizationTest
         Assert.Equal(SingleStatement(Drain()), overTheWire);
     }
 
-    private SqliteInfoCarrierBackendTestStore CreateStore(Type[]? allowedTypes = null)
+    private SqliteInfoCarrierBackendTestStore CreateStore(
+        Type[]? allowedTypes = null,
+        ParameterTranslationMode? collectionMode = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -752,9 +792,19 @@ public partial class ServerParameterizationTest
                 ContextType = typeof(SqliteSmokeContext),
                 OnModelCreating = (_, _) => { },
                 AllowedTypes = allowedTypes,
-                OnAddOptions = b => b.LogTo(
-                    line => { lock (_sink) { _sink.Add(line); } },
-                    [RelationalEventId.CommandExecuted]),
+                OnAddOptions = b =>
+                {
+                    // The store's own option, on the server, which is where an application sets it.
+                    // The client has no such option: it never translates to SQL.
+                    if (collectionMode is { } mode)
+                    {
+                        new SqliteDbContextOptionsBuilder(b).UseParameterizedCollectionMode(mode);
+                    }
+
+                    return b.LogTo(
+                        line => { lock (_sink) { _sink.Add(line); } },
+                        [RelationalEventId.CommandExecuted]);
+                },
             });
 
     private string[] Drain()
@@ -793,7 +843,12 @@ public partial class ServerParameterizationTest
         // tuple, so EF names a column `Item1` where the caller's projection called it `Id`. The
         // columns, their order and everything around them are what this compares, and
         // `eng/ef-sql-diff.py` ignores an alias for the same reason.
-        return ColumnAlias().Replace(ParameterName().Replace(sql, "@p"), string.Empty);
+        //
+        // The same holds for the alias a column is READ through, which the line above leaves in
+        // place. EF names a `VALUES` table after its parameter, so the caller's `ids` gives
+        // `"i"."Value"` and the box's `Value` gives `"v"."Value"` for the same statement.
+        string unaliased = ColumnAlias().Replace(ParameterName().Replace(sql, "@p"), string.Empty);
+        return AliasQualifier().Replace(unaliased, "\"_\".");
     }
 
     [GeneratedRegex(@"@[A-Za-z_][A-Za-z0-9_]*")]
@@ -801,4 +856,7 @@ public partial class ServerParameterizationTest
 
     [GeneratedRegex(@"\s+AS ""[^""]*""")]
     private static partial Regex ColumnAlias();
+
+    [GeneratedRegex(@"""[^""]*""\.")]
+    private static partial Regex AliasQualifier();
 }

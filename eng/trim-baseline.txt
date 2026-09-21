@@ -196,6 +196,10 @@
 # 96 already here. An ORDINARY query is untouched: EF folds such an operator itself before this
 # client sees the tree, so nothing is marked and nothing changes.
 #
+# Corrected 2026-09-21, with no change to the count: an operator that reads the row,
+# `ids.Where(y => y == x.Id)`, cannot be folded and reached the client in an ordinary query, where it
+# was marked and so overrode the server's collection mode. Such an operator is not marked any more.
+#
 # It DELETED an override rather than adding one: `Parameter_collection_in_subquery_Union_another_
 # parameter_collection_as_compiled_query` now behaves as EF's relational base already expects, so
 # this provider carries one less deviation.

@@ -554,7 +554,12 @@ What is left is one query of ours, one deviation the owner accepted, and one ups
   `SubstituteParametersExpressionVisitor` now marks such a collection with EF's own
   `EF.MultipleParameters`, which names EF's DEFAULT mode, so the server writes the statement EF's own
   client writes. **An ordinary query is untouched**, because EF folds such an operator itself before
-  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`.
+  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`. **Corrected
+  2026-09-21: not every such operator.** One that reads the row, `ids.Where(y => y == x.Id).Any()`,
+  cannot be folded, reaches this client in an ordinary query, and was marked. The mark names a mode,
+  and EF prefers it to the server's option, so a server set to `Constant` ran parameters. Only an
+  operator the server could fold is marked now, and `ServerParameterizationTest` compares all three
+  modes with plain EF Core.
 - **One test where EF's `ParameterTranslationMode` does not cross the wire**
   (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
   parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
