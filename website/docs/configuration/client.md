@@ -124,8 +124,8 @@ optionsBuilder
 ```
 
 At `Information` this provider adds one event of its own, `InfoCarrierEventId.QuerySplit`, raised
-when part of a query stays on the client. It names how many queries the server ran and which
-operators stayed here. A `Where`, a `Skip` or a `Take` among them means the server sent more rows
+when part of a query stays on the client. It names how many queries the server ran, which
+operators stayed here, and which unregistered key types kept them here. A `Where`, a `Skip` or a `Take` among them means the server sent more rows
 than your query asked for, because they were rebuilt with the projection above them. See
 [Paging](../guide/querying.md#paging).
 
