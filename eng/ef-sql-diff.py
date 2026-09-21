@@ -33,6 +33,11 @@ them were real; the statements the server ran that EF does not assert are theref
 report below. A round trip of OURS is pinned in `Sqlite/ServerSqlTest.cs` instead, where the query
 is ours too.
 
+A TEST WHOSE EF OVERRIDE RUNS ANOTHER EF TEST IS NOT PAIRED, and is listed as such. EF's SQLite
+`IsNullOrEmpty` runs `base.IsNullOrWhiteSpace()` and asserts that statement, a copy-and-paste
+slip in EF's own suite since the refactor that created the file. Pairing it compared two
+different queries and reported the same difference on every run (2026-09-21).
+
 `--extras` READS THAT REMAINDER, and it is a second question rather than a louder version of the
 first. Most of it is the test's own arrange and verify, which EF runs too and never asserts. What
 hides in it is the silent half of the silent half: a round trip this provider makes that EF's
@@ -76,6 +81,7 @@ LOG_HEADER = re.compile(r'^\w+: \d\d/\d\d/\d{4} ')
 METHOD = re.compile(r'public\s+(?:override\s+)?(?:async\s+)?[\w<>\[\],?. ]+?\s+(\w+)\s*\(')
 CLASS = re.compile(r'\bclass\s+(\w+)')
 ASSERT_SQL = re.compile(r'\bAssert(?:ExecuteUpdate)?Sql\s*\(')
+BASE_CALL = re.compile(r'\bbase\.(\w+)\s*[(<]')
 
 KINDS = ('LITERAL', 'PARAMETER', 'VALUE', 'STRUCTURAL')
 
@@ -111,12 +117,20 @@ def key(class_name):
 
 
 def ef_expected(efcore):
-    """(class, method) -> [(statements, where)], from the raw strings of every AssertSql call."""
+    """(class, method) -> [(statements, where)], from the raw strings of every AssertSql call.
+
+    Also returns the tests it did NOT keep, (class, method) -> (the other test, where): an override
+    whose body runs a DIFFERENT EF test that has its own AssertSql. Its assertion is that other
+    test's SQL, so pairing it with the test of the same name compares two different queries. The
+    rule names no test and reads EF's own source, so it stops matching the day EF corrects one.
+    `DeviationKind.UpstreamCallsAnotherTest` is the same finding for an override of ours.
+    """
     root = os.path.join(efcore, 'test', 'EFCore.Sqlite.FunctionalTests')
     if not os.path.isdir(root):
         raise ValueError(f"no EF SQLite functional tests under '{root}'")
 
     expected = collections.defaultdict(list)
+    calls = {}
     for path in glob.glob(root + '/**/*.cs', recursive=True):
         text = open(path, encoding='utf-8-sig').read()
         classes = [(m.start(), m.group(1)) for m in CLASS.finditer(text)]
@@ -125,15 +139,29 @@ def ef_expected(efcore):
             end = call_end(text, call.end() - 1)
             if end is None:
                 continue
-            method = next((n for p, n in reversed(methods) if p < call.start()), None)
+            start, method = next(((p, n) for p, n in reversed(methods) if p < call.start()), (None, None))
             cls = next((n for p, n in reversed(classes) if p < call.start()), None)
             if method is None or cls is None or method.startswith('Assert'):
                 continue
             statements = [s for s in raw_strings(text[call.end():end]) if DML.match(s)]
             if statements:
                 line = text.count('\n', 0, call.start()) + 1
-                expected[(key(cls), method)].append((statements, f'{os.path.relpath(path, root)}:{line}'))
-    return expected
+                where = f'{os.path.relpath(path, root)}:{line}'
+                expected[(key(cls), method)].append((statements, where))
+                called = set(BASE_CALL.findall(text[start:call.start()]))
+                if called and method not in called:
+                    calls[(key(cls), method)] = (called, where)
+
+    # A base call to a helper, or to `OnModelCreating`, is not another test: only a name that has
+    # an AssertSql of its own is. Anything looser matched three such calls when it was tried.
+    another = {}
+    for (cls, method), (called, where) in calls.items():
+        others = sorted(c for c in called if (cls, c) in expected)
+        if others:
+            another[(cls, method)] = (others[0], where)
+    for k in another:
+        del expected[k]
+    return expected, another
 
 
 def call_end(text, start):
@@ -357,7 +385,7 @@ def main(argv):
     try:
         sections = server_sections(args.log)
         # A survey needs no reference at all, which is the point of it: the tier it is for has none.
-        expected = {} if args.survey else ef_expected(args.efcore)
+        expected, another = ({}, {}) if args.survey else ef_expected(args.efcore)
     except (OSError, ValueError) as error:
         print(f'ef-sql-diff: {error}', file=sys.stderr)
         return 1
@@ -387,8 +415,11 @@ def main(argv):
             counts[kind] += 1
             findings[kind].append((k, where, examples, ran))
 
+    not_paired = sorted(k for k in another if k in sections)
+
     print(f'EF tests with expected SQL {len(expected)}; tests in the log {len(sections)}; paired {len(paired)}')
-    print(f'identical {counts["same"]}, differing tests {counts["differs"]}')
+    print(f'identical {counts["same"]}, differing tests {counts["differs"]}; '
+          f"not paired, EF asserts another test's SQL {len(not_paired)}")
     print('by kind, in tests: ' + ', '.join(f'{kind} {counts[kind]}' for kind in KINDS))
 
     if args.extras:
@@ -397,6 +428,12 @@ def main(argv):
 
     if args.quiet:
         return 0
+
+    if not_paired:
+        print(f"\n===== NOT PAIRED: EF asserts another test's SQL  ({len(not_paired)} tests)")
+        for cls, method in not_paired:
+            other, where = another[(cls, method)]
+            print(f'\n{cls}.{method}  (EF: {where}) runs base.{other}(), so its AssertSql is {other}\'s')
 
     for kind in KINDS:
         found = findings[kind]

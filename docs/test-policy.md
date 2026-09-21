@@ -583,7 +583,11 @@ The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skippe
   statement now. With both changes the whole tier compared 790 identical of 791 paired; the one left
   is `IsNullOrEmpty`, below.
 - **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
-  `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
+  `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write. **Since
+  2026-09-21 the comparison does not pair it**: an EF override that runs another EF test with its
+  own `AssertSql` is listed under "not paired" instead, so it stops reappearing as a difference. It
+  has been a slip since dotnet/efcore#35319 created the file; SQL Server and Cosmos call
+  `base.IsNullOrEmpty()`, and a direct run showed the server writes plain EF Core's statement.
 
 ### The extras, read case by case (2026-09-20)
 
