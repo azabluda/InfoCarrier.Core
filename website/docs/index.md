@@ -101,15 +101,8 @@ ways to load. In a browser client it does not work at all, for a reason that is 
 [Blazor WebAssembly](platforms/blazor-webassembly.md).
 
 The provider runs Microsoft's own EF Core specification suite, the same suite the SQL Server,
-SQLite and InMemory providers run:
-
-```
-Total tests: 29516, Passed: 29259, Failed: 19, Skipped: 238
-```
-
-The failures a caller can observe are written up on the [limitations](limitations.md) page in terms
-of the code that triggers them. The 238 skips are EF Core's own: tests EF itself skips for the
-store behind them.
+SQLite and InMemory providers run. The [limitations](limitations.md) page gives the result for this
+release, and describes each difference you can observe in terms of the code that triggers it.
 
 ## Security
 

@@ -4,8 +4,7 @@
 until 2026-09-16, when the name stopped matching the file: an overhaul is an event, and this is the
 rule the suite runs on. Nothing about the rule changed with the move.
 
-**Status of the overhaul that produced it: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
-29837` on 2026-09-21), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are
+**Status of the overhaul that produced it: done, 2026-09-15.** Every tier is converted, the suite is green, and the ratchet is gone: `eng/ratchet.sh` and both baseline files are
 deleted, and
 `eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
 and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
@@ -536,7 +535,8 @@ serially with the server SQL log on, and prints the disagreements grouped by kin
 differing** (LITERAL 0, PARAMETER 0, VALUE 0, STRUCTURAL 1). It read 788 and 3 on 2026-09-20, 786
 and 5 on 2026-09-16, before the compiled-query fix below, and 784 and 7 before the join-key rewrite.
 The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skipped: 155, Total:
-19550`. What is left is one upstream accident, the last bullet.
+19550`. What is left is one upstream accident, the last bullet. **These figures are a dated
+record and are not refreshed after a run**; `eng/ef-sql-compare.sh` prints the current ones.
 
 - **One test read a whole table, and the class it stands for is decided.**
   `NorthwindGroupBy.Odata_groupby_empty_key` read every order and grouped here, because its group

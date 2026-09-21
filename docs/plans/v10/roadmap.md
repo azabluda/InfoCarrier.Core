@@ -25,9 +25,8 @@ EF execute → client materialization with identity resolution. The **projection
 **SaveChanges (M3)** and **transactions (M4)** are implemented, with the type boundary enforced
 rather than hidden by the in-process harness.
 
-**`FAILING: 0  TOTAL: 29792`** (2026-09-15), across the spec project and ADR-009 Tier D. The suite
-is green and every override of a specification test says what the store does and where that is
-shown ([`test-policy.md`](../../test-policy.md)). What is missing is stated for consumers in
+**The suite is green since 2026-09-15**, across the spec project and ADR-009 Tier D, and every
+override of a specification test says what the store does and where that is shown ([`test-policy.md`](../../test-policy.md)). What is missing is stated for consumers in
 [`limitations.md`](../../../website/docs/limitations.md).
 
 **This read `Total tests: 29514, Passed: 29237, Failed: 39` (2026-09-07) until then**, with every

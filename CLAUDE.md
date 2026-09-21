@@ -480,10 +480,14 @@ spec-suite badge is still `main`-only**, because a badge is a claim about the tr
 
 ## Current state
 
-**`FAILING: 0  TOTAL: 29837`** (2026-09-21, `main-2026-09-21`), across the two projects
-`measure.sh` runs: **0 of 29603** in the spec project and **0 of 234** in Tier D. **Every figure
-comes out of the run's own summary block, and none of them is arithmetic** — one entry once carried
-`Skipped` over from an earlier run and derived `Passed` from it.
+**The suite is green, and CI fails on any failing test**: `dotnet test`'s own exit code is the gate,
+on every push and every pull request. **No document keeps the current count.** `eng/measure.sh`
+prints it, a commit message or a PR body records it with its date, and the published site gives it
+once per release (`docs/versioning.md`, "A minor from `main`"). This paragraph gave the count until
+2026-09-21, when six hand-kept copies were found stale within days, two of them wrong and the two
+website pages disagreeing with each other, so **do not add one back**. **Every figure a report
+gives comes out of the run's own summary block, and none of them is arithmetic** — one entry once
+carried `Skipped` over from an earlier run and derived `Passed` from it.
 
 **There is no baseline any more.** `test/known-failures.txt` and `test/known-failures.names.txt` were
 deleted with the ratchet on 2026-09-15; git history keeps them. **The audit is the current answer to
