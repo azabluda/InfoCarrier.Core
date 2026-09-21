@@ -51,7 +51,16 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
             arbitrarySqlExecution: true,
-            allowedTypes: AdHocProjectionTypes);
+            allowedTypes:
+            [
+                .. AdHocProjectionTypes,
+
+                // A grouping key rather than a projection type, and the same argument: without it
+                // `Odata_groupby_empty_key` keeps its `GroupBy` on this client and the server sends
+                // every order. See `UpstreamKeyTypes`, which resolves it and fails loudly.
+                UpstreamKeyTypes.NoGroupByWrapper(
+                    typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
+            ]);
 
     /// <summary>
     ///     The projection types <c>SqlQueryTestBase</c> names, declared as an application must
