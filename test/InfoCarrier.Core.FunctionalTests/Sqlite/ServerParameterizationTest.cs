@@ -95,6 +95,58 @@ public partial class ServerParameterizationTest
             static (blogs, ids) => blogs.Where(b => ids.Where(i => i == b.Id).Any()),
             mode);
 
+    /// <summary>
+    ///     A compiled query's list, transformed before it is compared, keeps the collection mode the
+    ///     server is configured with.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The client marks such a list so that the server does not evaluate the operator over
+    ///         it</b> (<see cref="ServerSqlTest.A_compiled_query_keeps_its_collection_a_parameter" />),
+    ///         and the mark is <c>EF.MultipleParameters</c>, which names EF's default mode. EF prefers
+    ///         a mode on one parameter to the server's option, so a server set to <c>Constant</c> ran
+    ///         <c>SELECT 0, @p UNION ALL VALUES (1, @p)</c> where EF runs
+    ///         <c>SELECT 0, CAST(1 AS INTEGER) UNION ALL VALUES (1, 2)</c>, and one set to
+    ///         <c>Parameter</c> ran the same where EF runs <c>json_each(@p)</c>. Measured 2026-09-21.
+    ///     </para>
+    ///     <para>
+    ///         The server now replaces the mark with EF's marker for the mode it is configured with.
+    ///         <c>MultipleParameters</c> passed before the change and is the control.
+    ///     </para>
+    /// </remarks>
+    [ConditionalTheory]
+    [InlineData(ParameterTranslationMode.Constant)]
+    [InlineData(ParameterTranslationMode.Parameter)]
+    [InlineData(ParameterTranslationMode.MultipleParameters)]
+    public Task A_compiled_query_transforming_a_list_keeps_the_servers_collection_mode(ParameterTranslationMode mode)
+    {
+        // One compiled query per context: EF binds a compiled query to the first model it runs on,
+        // and the client's model is not the server's.
+        static Func<DbContext, int[], Task<int>> Compile()
+            => EF.CompileAsyncQuery(
+                (DbContext context, int[] ids) => context.Set<Blog>().Count(b => ids.Skip(1).Contains(b.Id)));
+
+        return AssertSameStatementFor(context => Compile()(context, [1, 2, 3]), mode);
+    }
+
+    /// <summary>
+    ///     A list the caller marks with <c>EF.MultipleParameters</c> keeps the caller's mode, whatever
+    ///     the server is configured with.
+    /// </summary>
+    /// <remarks>
+    ///     The server replaces the client's own mark (above) and must leave the caller's alone. They
+    ///     are told apart by what they wrap: the client marks a <c>ParameterBox</c>, and a marker the
+    ///     caller wrote reaches the server over a plain constant.
+    /// </remarks>
+    [ConditionalTheory]
+    [InlineData(ParameterTranslationMode.Constant)]
+    [InlineData(ParameterTranslationMode.Parameter)]
+    public Task A_list_the_caller_marks_keeps_the_callers_mode(ParameterTranslationMode mode)
+        => AssertSameStatement(
+            new List<int> { 1, 3 },
+            static (blogs, ids) => blogs.Where(b => EF.MultipleParameters(ids).Contains(b.Id)),
+            mode);
+
     [ConditionalFact]
     public Task A_limit_and_offset_stay_parameters()
         => AssertSameStatement(
@@ -748,9 +800,21 @@ public partial class ServerParameterizationTest
     ///     asserts the store saw one statement, not two — for a query whose terminal operator cannot
     ///     be expressed as an <see cref="IQueryable{T}" />.
     /// </summary>
-    private async Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run)
+    private Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run)
+        => AssertSameStatementFor(context => run(context.Set<Blog>()), collectionMode: null);
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> against the client context and again against the server
+    ///     context, and asserts the store saw one statement, not two — for a query that needs the
+    ///     context itself, as a compiled query does.
+    /// </summary>
+    /// <param name="run">The query, written once and run both ways.</param>
+    /// <param name="collectionMode">
+    ///     The server's collection mode, or <see langword="null" /> for EF's default.
+    /// </param>
+    private async Task AssertSameStatementFor(Func<DbContext, Task> run, ParameterTranslationMode? collectionMode)
     {
-        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(collectionMode: collectionMode);
         await store.InitializeAsync(
             store.ServiceProvider,
             store.CreateDbContext,
@@ -768,14 +832,14 @@ public partial class ServerParameterizationTest
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
         {
-            await run(client.Blogs);
+            await run(client);
         }
 
         string overTheWire = SingleStatement(Drain());
 
         using (DbContext server = store.CreateDbContext())
         {
-            await run(server.Set<Blog>());
+            await run(server);
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);

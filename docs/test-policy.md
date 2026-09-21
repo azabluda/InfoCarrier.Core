@@ -565,7 +565,14 @@ The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skippe
   cannot be folded, reaches this client in an ordinary query, and was marked. The mark names a mode,
   and EF prefers it to the server's option, so a server set to `Constant` ran parameters. Only an
   operator the server could fold is marked now, and `ServerParameterizationTest` compares all three
-  modes with plain EF Core.
+  modes with plain EF Core. **Corrected again 2026-09-21: "the server writes the statement EF's own
+  client writes" held only on a server in EF's default mode.** A compiled query whose operator the
+  server could fold, `ids.Skip(1).Contains(b.Id)`, still carried the mark, so a server set to
+  `Constant` ran `SELECT 0, @p UNION ALL VALUES (1, @p)` where EF runs
+  `SELECT 0, CAST(1 AS INTEGER) UNION ALL VALUES (1, 2)`, and one set to `Parameter` ran the same
+  where EF runs `json_each(@p)`. The server now replaces the mark with EF's marker for its own mode
+  (`CollectionParameterMark`), and a marker the caller wrote keeps the caller's mode.
+  `ServerParameterizationTest` compares both, in each mode, with plain EF Core.
 - **One test where EF's `ParameterTranslationMode` did not reach the server, now EF's on all
   three statements** (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked
   for constants and got parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation,

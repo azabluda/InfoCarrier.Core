@@ -103,6 +103,10 @@ public class ServerQueryExecutor(
             // provider can act on it.
             query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
 
+            // A compiled query's collection parameter arrives marked with EF's default collection
+            // mode, because the client cannot know this server's. Name this server's instead.
+            query = CollectionParameterMark.ToServerMode(query, _context);
+
             // The query is read for the entity types its rows carry: an owned or shared-type value
             // projected directly has no other name (A56). Read before execution, because it also
             // decides whether this query can be tracked at all.

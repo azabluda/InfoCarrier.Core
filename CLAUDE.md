@@ -414,8 +414,12 @@ data. `docs/projection-split.md` §3.3a is the reading.
 **A compiled query's collection parameter stays a parameter.** A compiled query's parameters cross
 this wire as values, so the server's funcletizer folded an operator EF had kept symbolic and the
 statement's shape changed with the number of values. `SubstituteParametersExpressionVisitor` marks
-such a collection with EF's own `EF.MultipleParameters`, EF's DEFAULT mode, so the server writes EF's
-own statement. **Only an operator the server could fold is marked.** One that reads the row,
+such a collection with EF's own `EF.MultipleParameters`, and **the server replaces that mark with
+EF's marker for its own collection mode** (`CollectionParameterMark`), so it writes EF's own
+statement in every mode. This said "EF's DEFAULT mode, so the server writes EF's own statement" until
+2026-09-21, which held only on a server in that mode. A marker the CALLER wrote keeps the caller's
+mode: the client sends its argument as a constant, and the server rewrites only a boxed one.
+**Only an operator the server could fold is marked.** One that reads the row,
 `ids.Where(y => y == x.Id)`, reaches this client in an ordinary query too, and a mark there replaced
 the server's own collection mode with the default. This said "an ordinary query is untouched" until
 2026-09-21; `ServerParameterizationTest` now measures the server's three modes.
