@@ -173,8 +173,9 @@ response is as large as the table.
 orders.GroupBy(o => new PeriodKey(o.Placed.Year, o.Placed.Month))
 ```
 
-Nothing reports it, because the query succeeds either way. Name the type on both halves and the
-same query runs in the database:
+The query succeeds either way, so only the `InfoCarrierEventId.QuerySplit` log event reports it,
+and that event names the type. See [Logging](../configuration/client.md#logging). Name the type on
+both halves and the same query runs in the database:
 
 ```csharp
 services.AddInfoCarrierAllowedTypes(typeof(PeriodKey));                       // server

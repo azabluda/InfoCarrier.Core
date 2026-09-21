@@ -138,6 +138,12 @@ public class InMemorySmokeTest
         public static bool TitleIsLong(string? title) => title is { Length: > 4 };
     }
 
+    /// <summary>
+    ///     A grouping key of a type the application declares and has not registered. Value
+    ///     equality is what lets it stay on the client rather than be refused.
+    /// </summary>
+    public sealed record TitleKey(string? Title);
+
     [ConditionalFact]
     public async Task A_projection_the_server_cannot_run_is_logged_as_a_split()
     {
@@ -180,6 +186,10 @@ public class InMemorySmokeTest
         // The `Where` ships, so what is left here only reshapes rows. The event says so, and the
         // test below is the other branch of the same sentence.
         Assert.Contains(log, line => line.Contains("reshapes rows"));
+
+        // The boundary refused `ClientOnly` too, and the event must not advise registering it:
+        // that would ask the server to run this client's code. A projection names no key type.
+        Assert.DoesNotContain(log, line => line.Contains("AllowTypes"));
     }
 
     [ConditionalFact]
@@ -220,6 +230,45 @@ public class InMemorySmokeTest
         }
 
         Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("Take"));
+    }
+
+    [ConditionalFact]
+    public async Task A_split_over_an_unregistered_key_names_the_type()
+    {
+        // THE EVENT NAMES WHAT TO REGISTER. A `GroupBy` keyed on a type the application declared
+        // stays on this client while the type is not registered, and the server sends every row.
+        // The query succeeds, so this event is the only report, and until it named the type the
+        // caller had to find it by reading the query. The name is what `AllowTypes` takes.
+        await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
+
+        await using (SmokeContext seed = CreateClient(store))
+        {
+            seed.Blogs.AddRange(
+                new Blog { Id = 1, Title = "alpha" },
+                new Blog { Id = 2, Title = "beta" },
+                new Blog { Id = 3, Title = "beta" });
+            await seed.SaveChangesAsync();
+        }
+
+        var log = new List<string>();
+
+        await using (var context = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>()
+                .UseInfoCarrier(store)
+                .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
+                .Options))
+        {
+            List<int> counts = await context.Blogs
+                .GroupBy(b => new TitleKey(b.Title))
+                .Select(g => g.Count())
+                .ToListAsync();
+
+            Assert.Equal(new[] { 1, 2 }, counts.Order());
+        }
+
+        string split = Assert.Single(log, line => line.Contains("Part of the query cannot be sent to the server"));
+        Assert.Contains("AllowTypes", split);
+        Assert.Contains(nameof(TitleKey), split);
     }
 
     [ConditionalFact]

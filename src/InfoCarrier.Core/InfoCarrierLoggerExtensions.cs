@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
+using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -92,6 +93,51 @@ public static class InfoCarrierLoggerExtensions
         ArgumentNullException.ThrowIfNull(diagnostics);
         ArgumentNullException.ThrowIfNull(clientRemainder);
 
+        LogQuerySplit(diagnostics, serverQueryCount, clientRemainder, allowlist: null);
+    }
+
+    /// <summary>
+    ///     Raises <see cref="InfoCarrierEventId.QuerySplit" />, naming the operators the client
+    ///     kept that remove rows and the key types the server was not told about.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The key types are the half a caller can act on.</b> A <c>GroupBy</c> or a
+    ///         <c>Join</c> keyed on a type the application declared stays on the client when that
+    ///         type is not registered, and the server sends every row. The query succeeds, so
+    ///         nothing else reports it, and the type's name is what
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> takes.
+    ///     </para>
+    ///     <para>
+    ///         <b>Another overload, for the reason the one above gives.</b> The allowlist is the
+    ///         server's own list, the one the boundary was drawn with, so the event names exactly
+    ///         the types the boundary refused. A split with none to name logs the message it logged
+    ///         before.
+    ///     </para>
+    /// </remarks>
+    /// <param name="diagnostics">The query logger.</param>
+    /// <param name="serverQueryCount">How many queries the server runs for this execution.</param>
+    /// <param name="clientRemainder">The part of the query this client runs.</param>
+    /// <param name="allowlist">The types the server accepts, which drew the boundary.</param>
+    public static void QuerySplit(
+        this IDiagnosticsLogger<DbLoggerCategory.Query> diagnostics,
+        int serverQueryCount,
+        Expression clientRemainder,
+        TypeAllowlist allowlist)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        ArgumentNullException.ThrowIfNull(clientRemainder);
+        ArgumentNullException.ThrowIfNull(allowlist);
+
+        LogQuerySplit(diagnostics, serverQueryCount, clientRemainder, allowlist);
+    }
+
+    private static void LogQuerySplit(
+        IDiagnosticsLogger<DbLoggerCategory.Query> diagnostics,
+        int serverQueryCount,
+        Expression clientRemainder,
+        TypeAllowlist? allowlist)
+    {
         if (diagnostics.Definitions is not InfoCarrierLoggingDefinitions definitions)
         {
             return;
@@ -99,6 +145,8 @@ public static class InfoCarrierLoggerExtensions
 
         EventDefinition<int, string> definition = definitions.LogQuerySplitClientOperators(diagnostics);
 
+        // One question for all three definitions: they share the event id and the level, and
+        // `ConfigureWarnings` is keyed by the id, so each would give the same answer.
         bool shouldLog = diagnostics.ShouldLog(definition);
         bool needsEventData = diagnostics.NeedsEventData(
             definition, out bool diagnosticSourceEnabled, out bool simpleLogEnabled);
@@ -109,6 +157,27 @@ public static class InfoCarrierLoggerExtensions
         }
 
         string clientOperators = RowRemovingOperators.Describe(clientRemainder);
+        IReadOnlyList<Type> keyTypes = allowlist is null ? [] : UnregisteredKeyTypes.Find(clientRemainder, allowlist);
+
+        if (keyTypes.Count > 0)
+        {
+            EventDefinition<int, string, string> named = definitions.LogQuerySplitUnregisteredKeyTypes(diagnostics);
+
+            if (shouldLog)
+            {
+                named.Log(diagnostics, serverQueryCount, clientOperators, UnregisteredKeyTypes.Describe(keyTypes));
+            }
+
+            if (needsEventData)
+            {
+                var eventData = new QuerySplitEventData(
+                    named, QuerySplitWithUnregisteredKeyTypes, serverQueryCount, clientOperators, keyTypes);
+
+                diagnostics.DispatchEventData(named, eventData, diagnosticSourceEnabled, simpleLogEnabled);
+            }
+
+            return;
+        }
 
         if (shouldLog)
         {
@@ -136,6 +205,14 @@ public static class InfoCarrierLoggerExtensions
         var d = (EventDefinition<int, string>)definition;
         var p = (QuerySplitEventData)payload;
         return d.GenerateMessage(p.ServerQueryCount, p.ClientOperators);
+    }
+
+    private static string QuerySplitWithUnregisteredKeyTypes(EventDefinitionBase definition, EventData payload)
+    {
+        var d = (EventDefinition<int, string, string>)definition;
+        var p = (QuerySplitEventData)payload;
+        return d.GenerateMessage(
+            p.ServerQueryCount, p.ClientOperators, UnregisteredKeyTypes.Describe(p.UnregisteredKeyTypes));
     }
 }
 
@@ -185,4 +262,37 @@ public class QuerySplitEventData(
         string clientOperators)
         : this(eventDefinition, messageGenerator, serverQueryCount)
         => ClientOperators = clientOperators;
+
+    /// <summary>
+    ///     The types that keys of the operators left on the client construct and that the server
+    ///     was not told about. Registering one with
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> on the client and the
+    ///     server can send its operator to the server.
+    /// </summary>
+    /// <remarks>
+    ///     Empty when there is none, and for a payload built by a constructor that predates it.
+    /// </remarks>
+    public virtual IReadOnlyList<Type> UnregisteredKeyTypes { get; } = [];
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="QuerySplitEventData" /> class that also
+    ///     carries the key types the server was not told about.
+    /// </summary>
+    /// <param name="eventDefinition">The event definition.</param>
+    /// <param name="messageGenerator">Builds the message, lazily.</param>
+    /// <param name="serverQueryCount">How many queries the server runs for this execution.</param>
+    /// <param name="clientOperators">
+    ///     One sentence naming the operators the client kept that remove rows.
+    /// </param>
+    /// <param name="unregisteredKeyTypes">
+    ///     The key types that kept an operator on the client.
+    /// </param>
+    public QuerySplitEventData(
+        EventDefinitionBase eventDefinition,
+        Func<EventDefinitionBase, EventData, string> messageGenerator,
+        int serverQueryCount,
+        string clientOperators,
+        IReadOnlyList<Type> unregisteredKeyTypes)
+        : this(eventDefinition, messageGenerator, serverQueryCount, clientOperators)
+        => UnregisteredKeyTypes = unregisteredKeyTypes;
 }

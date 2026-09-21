@@ -333,7 +333,9 @@ public sealed class QuerySplitter
         // The residual goes with the count, so the event can say whether the split cost anything:
         // a residual that only reshapes rows carried what the caller asked for, and one that
         // drops them means the server sent more. It is walked inside the log guards, never here.
-        _queryLogger?.QuerySplit(augmented.Count, residualBody);
+        // The allowlist goes too, so the event can name a key type the server was not told about:
+        // that name is what the caller passes to `AllowTypes` to move the operator to the server.
+        _queryLogger?.QuerySplit(augmented.Count, residualBody, _allowlist);
 
         return new SplitQuery(
             [.. augmented.Select(ToServerQuery)],
@@ -1857,30 +1859,38 @@ public sealed class QuerySplitter
 
             return node;
         }
+    }
 
-        /// <summary>
-        ///     Whether an operator produces a different element type than it consumed — that is,
-        ///     whether it is a projection.
-        /// </summary>
-        /// <remarks>
-        ///     EF's line is drawn here, and it is the right one. Client code in a projection is
-        ///     legal everywhere: the rows have already been chosen, and evaluating it locally
-        ///     costs nothing extra. Client code in a <c>Where</c> or an <c>OrderBy</c> decides
-        ///     <em>which</em> rows, so evaluating it locally means fetching all of them first.
-        /// </remarks>
-        private static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
+    /// <summary>
+    ///     The arguments of an operator that decide which rows it yields, as opposed to how each row
+    ///     is shaped.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's line is drawn here, and it is the right one. Client code in a projection is
+    ///         legal everywhere: the rows have already been chosen, and evaluating it locally
+    ///         costs nothing extra. Client code in a <c>Where</c> or an <c>OrderBy</c> decides
+    ///         <em>which</em> rows, so evaluating it locally means fetching all of them first.
+    ///     </para>
+    ///     <para>
+    ///         Two readers, and that is why it is here rather than in
+    ///         <see cref="ClientEvaluationFinder" />: that class refuses client code in these
+    ///         arguments, and <see cref="UnregisteredKeyTypes" /> names the key types in them for
+    ///         the split event. One definition keeps the two from disagreeing about what a key is.
+    ///     </para>
+    /// </remarks>
+    internal static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
+    {
+        // A result selector runs after the rows are chosen, so client code in it costs
+        // nothing extra and EF allows it. Everything else -- predicates, join keys, ordering
+        // keys -- decides *which* rows, and running that locally means fetching them all.
+        // `Join` is both at once: its result selector is a projection, its key selectors are
+        // not, which is why the split has to be per argument rather than per operator.
+        int skipLast = ProjectionRewriter.IsResultSelectorOperator(node, out _) ? 1 : 0;
+
+        for (int i = 1; i < node.Arguments.Count - skipLast; i++)
         {
-            // A result selector runs after the rows are chosen, so client code in it costs
-            // nothing extra and EF allows it. Everything else -- predicates, join keys, ordering
-            // keys -- decides *which* rows, and running that locally means fetching them all.
-            // `Join` is both at once: its result selector is a projection, its key selectors are
-            // not, which is why the split has to be per argument rather than per operator.
-            int skipLast = ProjectionRewriter.IsResultSelectorOperator(node, out _) ? 1 : 0;
-
-            for (int i = 1; i < node.Arguments.Count - skipLast; i++)
-            {
-                yield return node.Arguments[i];
-            }
+            yield return node.Arguments[i];
         }
     }
 
