@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +25,9 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         — which EF's SQLite implements on the <em>client's</em> options builder — and called
 ///         the base blocked. R71 measured it instead: a <b>no-op</b> implementation is enough, and
 ///         the base then yields 11 new green tests against 2 red. The member is only consulted by
-///         tests that ask for a non-default mode, and this base has none.
+///         tests that ask for a non-default mode. <b>This said "and this base has none" until
+///         2026-09-21</b>; <c>Check_inlined_constants_redacting</c> asks for one, and the member now
+///         gives it to the server.
 ///     </para>
 ///     <para>
 ///         <b>Four <c>Task.CompletedTask</c> overrides moved across unchanged, and they are not a
@@ -59,20 +62,41 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
 
     /// <inheritdoc />
     /// <remarks>
-    ///     A no-op. EF's SQLite writes
-    ///     <c>new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(…)</c>, a
-    ///     relational option on the client's builder that this provider does not have, so the
-    ///     server translates with its own mode. <b>This read "No test in this base asks for a
-    ///     non-default mode … measured, not assumed" until 2026-09-15, and
-    ///     <c>Check_inlined_constants_redacting</c> asks for <c>Constant</c>.</b> It passes because
-    ///     it asserts no SQL: EF sends <c>IN (1, 2, 3)</c> and the server sends
-    ///     <c>IN (@Value1, @Value2, @Value3)</c>. That is a legitimate deviation by the owner's rule
-    ///     of the same day: no dangerous SQL runs, and what the caller sees is right.
+    ///     <para>
+    ///         <b>The server's builder gets the mode, and the client's builder gets nothing.</b>
+    ///         EF's SQLite writes
+    ///         <c>new SqliteDbContextOptionsBuilder(o).UseParameterizedCollectionMode(…)</c>, an
+    ///         option of the store, and the store is the server's. The harness hands the test's
+    ///         <c>onConfiguring</c> to both sides, so this runs once for each, and only the client's
+    ///         builder carries <see cref="InfoCarrierOptionsExtension" />. A real application
+    ///         configures its store's mode the same way, on the server.
+    ///     </para>
+    ///     <para>
+    ///         <b>Until 2026-09-21 this was a no-op on both sides</b> and read "the server
+    ///         translates with its own mode". <c>Check_inlined_constants_redacting</c> asks for
+    ///         <c>Constant</c> and passed anyway, because it asserts no SQL, while the server sent
+    ///         <c>IN (@Value1, @Value2, @Value3)</c> where EF sends <c>IN (1, 2, 3)</c>. The server
+    ///         now sends <c>IN (1, 2, 3)</c>.
+    ///     </para>
+    ///     <para>
+    ///         <b>One statement of that test still differs, and this fixture is not the cause.</b>
+    ///         For <c>ids.Where(y =&gt; y == x.Id).Any()</c> the server sends
+    ///         <c>VALUES (@Value2), (@Value3)</c> where EF sends <c>VALUES (2), (3)</c>: the client
+    ///         wraps that collection in <c>EF.MultipleParameters</c>, a mode for one parameter,
+    ///         which overrides the mode the server is configured with.
+    ///     </para>
     /// </remarks>
     protected override DbContextOptionsBuilder SetParameterizedCollectionMode(
         DbContextOptionsBuilder optionsBuilder,
         ParameterTranslationMode parameterizedCollectionMode)
-        => optionsBuilder;
+    {
+        if (optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() is null)
+        {
+            new SqliteDbContextOptionsBuilder(optionsBuilder).UseParameterizedCollectionMode(parameterizedCollectionMode);
+        }
+
+        return optionsBuilder;
+    }
 
     /// <inheritdoc />
     /// <remarks>
