@@ -565,8 +565,10 @@ What is left is one query of ours, one deviation the owner accepted, and one ups
   parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
   SQL runs and the behaviour is right. **Since 2026-09-21 the fixture gives the mode to the server's
   builder**, as a real application configures its store, and the `Contains` statement is EF's
-  `IN (1, 2, 3)`. The `Where(…).Any()` statement still sends parameters, because the client wraps
-  that collection in `EF.MultipleParameters`, which overrides the server's mode.
+  `IN (1, 2, 3)`. The `Where(…).Any()` statement sent parameters until the client stopped wrapping
+  that collection in `EF.MultipleParameters` the same day (the correction above), and it is EF's
+  statement now. With both changes the whole tier compared 790 identical of 791 paired; the one left
+  is `IsNullOrEmpty`, below.
 - **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
   `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
 

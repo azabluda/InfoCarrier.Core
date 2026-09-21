@@ -79,11 +79,13 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///         now sends <c>IN (1, 2, 3)</c>.
     ///     </para>
     ///     <para>
-    ///         <b>One statement of that test still differs, and this fixture is not the cause.</b>
-    ///         For <c>ids.Where(y =&gt; y == x.Id).Any()</c> the server sends
-    ///         <c>VALUES (@Value2), (@Value3)</c> where EF sends <c>VALUES (2), (3)</c>: the client
-    ///         wraps that collection in <c>EF.MultipleParameters</c>, a mode for one parameter,
-    ///         which overrides the mode the server is configured with.
+    ///         <b>All three statements of that test are EF's since 2026-09-21.</b> Until the same
+    ///         day this paragraph said one still differed, and this fixture was not the cause: for
+    ///         <c>ids.Where(y =&gt; y == x.Id).Any()</c> the server sent
+    ///         <c>VALUES (@Value2), (@Value3)</c> where EF sends <c>VALUES (2), (3)</c>, because the
+    ///         client wrapped that collection in <c>EF.MultipleParameters</c> and so overrode the
+    ///         server's mode. The client no longer wraps a collection an operator filters by the
+    ///         row; <c>ServerParameterizationTest</c> compares all three modes with plain EF Core.
     ///     </para>
     /// </remarks>
     protected override DbContextOptionsBuilder SetParameterizedCollectionMode(
