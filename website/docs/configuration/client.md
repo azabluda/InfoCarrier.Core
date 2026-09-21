@@ -24,7 +24,7 @@ optionsBuilder.UseInfoCarrier(client, o => o
 
 | Call | What it says |
 |---|---|
-| `AllowTypes(...)` | These CLR types may appear in a query beyond the ones the model implies. The usual reason is the `EF.Functions` family your server's provider declares. Register the same types on the server. |
+| `AllowTypes(...)` | These CLR types may appear in a query beyond the ones the model implies. The usual reason is the `EF.Functions` family your server's provider declares. It also decides where a query runs: a key of a type you have not named here keeps its `GroupBy` or `Join` on the client, so the server sends every row. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). Register the same types on the server. |
 | `AllowArbitrarySqlExecution()` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server has to grant it too, and only the server's half is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
 | `UseNonRelationalServerStore()` | The server's store is not a relational database, so three relational query rules do not apply, and a change to part of a document sends the whole document. **On a document store the server needs [its own registration](server.md#saying-the-store-is-a-document-store) as well**, and that one is what keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
 

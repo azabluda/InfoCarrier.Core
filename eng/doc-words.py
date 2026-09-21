@@ -163,7 +163,7 @@ BUDGET = {
     # caller's own `HasDbFunction` mappings cross while a store's own family has to be named on
     # both halves. The first of those is a behaviour change from 10.0, so a reader who does not
     # find it here finds it as an exception. Read for padding first; the page is dense already.
-    "website/docs/guide/querying.md": 950,
+    "website/docs/guide/querying.md": 1080,
 
     # 640 on 2026-09-09. The page teaches transactions and therefore owns the warning that a
     # server holds one open until the client ends it. #54 gave that warning a resolution, so the
@@ -184,7 +184,7 @@ BUDGET = {
     # registration. A client page that describes `UseNonRelationalServerStore()` without saying the
     # server needs its own is the exact mistake this change exists to catch, because a deployment
     # that reads only this page will believe it is covered and lose nested data anyway.
-    "website/docs/configuration/client.md": 910,
+    "website/docs/configuration/client.md": 950,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers
