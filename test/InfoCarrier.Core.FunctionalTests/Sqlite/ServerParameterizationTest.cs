@@ -446,6 +446,133 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     A grouping key of a type the application declares — the shape a real application writes,
+    ///     and the one the specification suite's <c>NorthwindGroupBy.Odata_groupby_empty_key</c> is
+    ///     an example of.
+    /// </summary>
+    private sealed class TitleKey(string? title)
+    {
+        public string? Title { get; } = title;
+
+        public override bool Equals(object? obj)
+            => obj is TitleKey other && other.Title == Title;
+
+        public override int GetHashCode()
+            => Title?.GetHashCode(StringComparison.Ordinal) ?? 0;
+    }
+
+    /// <summary>
+    ///     A grouping key the application has registered runs on the server, statement for
+    ///     statement with plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <b>This is what <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> is for, and
+    ///     the second half of what it is for was undocumented until this test.</b> The pages that
+    ///     describe it say a registered type stops a query being REFUSED, and every example they
+    ///     give is an <c>EF.Functions</c> family. It also decides WHERE THE WORK HAPPENS: the type
+    ///     is what the boundary analyzer cannot ship, so without it the cut lands below the
+    ///     <c>GroupBy</c> and the grouping runs here. With it, the statement is EF's own.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_registered_group_key_matches_the_direct_query()
+    {
+        (string overTheWire, string directly) = await StatementsFor(
+            [typeof(TitleKey)],
+            blogs => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => new { N = g.Count() }));
+
+        Assert.Equal(directly, overTheWire);
+        Assert.Contains("GROUP BY", overTheWire, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     An <em>unregistered</em> grouping key reads the whole table here, and this records the
+    ///     cost rather than fixing it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>There is no error, and that is deliberate.</b>
+    ///         <c>QuerySplitter.RejectClientEvaluation</c> throws EF's <c>TranslationFailed</c> for
+    ///         client CODE in a row-deciding argument, and says in its own remarks why it does not
+    ///         throw for a client TYPE: a <c>GroupBy</c> keyed on one is perfectly translatable and
+    ///         lands here only because of this provider's type boundary, and refusing it cost 235
+    ///         passing tests. So the answer is right, the payload is the whole table, and nothing
+    ///         says so.
+    ///     </para>
+    ///     <para>
+    ///         <b>The caller's fix is one line</b>, and
+    ///         <see cref="A_registered_group_key_matches_the_direct_query" /> is the measurement:
+    ///         name the type on both halves and the statement becomes EF's own. This test exists so
+    ///         the untreated case cannot change silently, and so the pair reads as one decision.
+    ///     </para>
+    ///     <para>
+    ///         <b>An anonymous key already ships and is not in this class</b> — measured
+    ///         2026-09-21, <c>GroupBy(b =&gt; new { b.Title })</c> produces
+    ///         <c>GROUP BY "b"."Title"</c> over the wire. Only a NAMED type the application has not
+    ///         registered falls here.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_unregistered_group_key_reads_the_whole_table()
+    {
+        (string overTheWire, string directly) = await StatementsFor(
+            allowedTypes: null,
+            blogs => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => new { N = g.Count() }));
+
+        Assert.Contains("GROUP BY", directly, StringComparison.Ordinal);
+        Assert.DoesNotContain("GROUP BY", overTheWire, StringComparison.Ordinal);
+        Assert.DoesNotContain("COUNT(", overTheWire, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The one statement the store saw for <paramref name="query" /> over the wire, and the one
+    ///     it saw for the same query run directly against the server.
+    /// </summary>
+    private async Task<(string OverTheWire, string Directly)> StatementsFor(
+        Type[]? allowedTypes,
+        Func<IQueryable<Blog>, IQueryable<object>> query)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(allowedTypes);
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" },
+                    new Blog { Id = 3, Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>()
+                .UseInfoCarrier(
+                    store,
+                    o =>
+                    {
+                        if (allowedTypes is not null)
+                        {
+                            o.AllowTypes(allowedTypes);
+                        }
+                    })
+                .Options))
+        {
+            _ = await query(client.Blogs).ToListAsync();
+        }
+
+        string overTheWire = SingleStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            _ = await query(server.Set<Blog>()).ToListAsync();
+        }
+
+        return (overTheWire, SingleStatement(Drain()));
+    }
+
+    /// <summary>
     ///     Runs <paramref name="run" /> over the wire and again directly against the server, and
     ///     asserts the store saw one statement, not two — for a query whose terminal operator cannot
     ///     be expressed as an <see cref="IQueryable{T}" />.
@@ -483,7 +610,7 @@ public partial class ServerParameterizationTest
         Assert.Equal(SingleStatement(Drain()), overTheWire);
     }
 
-    private SqliteInfoCarrierBackendTestStore CreateStore()
+    private SqliteInfoCarrierBackendTestStore CreateStore(Type[]? allowedTypes = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -491,6 +618,7 @@ public partial class ServerParameterizationTest
             {
                 ContextType = typeof(SqliteSmokeContext),
                 OnModelCreating = (_, _) => { },
+                AllowedTypes = allowedTypes,
                 OnAddOptions = b => b.LogTo(
                     line => { lock (_sink) { _sink.Add(line); } },
                     [RelationalEventId.CommandExecuted]),
