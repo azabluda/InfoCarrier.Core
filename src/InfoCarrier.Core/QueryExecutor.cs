@@ -614,6 +614,14 @@ internal sealed class QueryExecutor<TElement>
         ///         needs the element-by-element form there: <c>EF.Constant</c> exists precisely to
         ///         say "inline this", and EF does that itself once translation reaches it.
         ///     </para>
+        ///     <para>
+        ///         <b><c>EF.MultipleParameters</c> counts too, since 2026-09-21</b>, although
+        ///         <see cref="EFExtensions" /> declares it and <see cref="EF" /> does not. Until then
+        ///         its argument was boxed, which is also the shape of
+        ///         <see cref="CollectionParameterMark" />, the client's own mark, and the server
+        ///         replaces that mark with its own collection mode. A constant is what tells the
+        ///         caller's marker apart; <c>ServerParameterizationTest</c> measures both.
+        ///     </para>
         /// </remarks>
         private bool _insideEFCall;
 
@@ -637,6 +645,13 @@ internal sealed class QueryExecutor<TElement>
         ///         one thing compiling buys. <c>EF.MultipleParameters</c> is EF's own instruction not
         ///         to fold, and it names EF's DEFAULT mode, so what the server then writes is the
         ///         statement EF's own client writes for the same query.
+        ///     </para>
+        ///     <para>
+        ///         <b>Only on a server in that default mode, corrected 2026-09-21.</b> EF prefers a
+        ///         mode on one parameter to the server's option, so a server set to <c>Constant</c>
+        ///         ran parameters here and one set to <c>Parameter</c> ran one per value. The mark is
+        ///         <see cref="CollectionParameterMark" /> now, and the server replaces it with EF's
+        ///         marker for the mode it is configured with.
         ///     </para>
         ///     <para>
         ///         <b>Only a transforming operator counts.</b> <c>Skip</c>, <c>Take</c> and their
@@ -664,7 +679,7 @@ internal sealed class QueryExecutor<TElement>
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (node.Method.DeclaringType != typeof(EF))
+            if (node.Method.DeclaringType != typeof(EF) && node.Method.DeclaringType != typeof(EFExtensions))
             {
                 bool transforming = _transformingACollectionParameter;
                 _transformingACollectionParameter = TransformsACollectionParameter(node);
@@ -717,13 +732,6 @@ internal sealed class QueryExecutor<TElement>
             finder.Visit(node);
             return !finder.Found;
         }
-
-        /// <summary>
-        ///     <c>EF.MultipleParameters</c>, EF's own marker for its default collection mode, taken
-        ///     from a delegate so the trimmer sees it (R149).
-        /// </summary>
-        private static readonly System.Reflection.MethodInfo MultipleParametersMethod =
-            ((Func<int[], int[]>)EF.MultipleParameters).Method.GetGenericMethodDefinition();
 
         /// <summary>
         ///     Drops <see langword="null" /> elements from a collection of <em>entities</em>.
@@ -864,9 +872,7 @@ internal sealed class QueryExecutor<TElement>
                 Expression boxed = Boxed(value, parameterType);
 
                 // Kept a parameter on purpose: see `_transformingACollectionParameter`.
-                return _transformingACollectionParameter
-                    ? Expression.Call(MultipleParametersMethod.MakeGenericMethod(boxed.Type), boxed)
-                    : boxed;
+                return _transformingACollectionParameter ? CollectionParameterMark.Mark(boxed) : boxed;
             }
 
             // J21: a **scalar** the wire does not carry as a primitive is boxed for the same reason
