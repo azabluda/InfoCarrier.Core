@@ -186,9 +186,9 @@ bases added in EF10+"*, which means "we have not run this base", NOT "the store 
 **The control is a conflict of interest** — a worse-wired control fails more and makes InfoCarrier
 look cleaner — so every control assertion names an exact outcome.
 
-**The SQL the server runs is asserted in our own words, in `Sqlite/ServerSqlTest.cs`.** Twenty-three
-promises, each with our own model, our own query and our own expected text, and **each was shown to
-fail before it was trusted**, by reverting the fix it is about. **Copying EF's `AssertSql` text into
+**The SQL the server runs is asserted in our own words, in `Sqlite/ServerSqlTest.cs`.** Each promise
+has our own model, our own query and our own expected text, and **each was shown to fail before it
+was trusted**, by reverting the fix it is about. **Copying EF's `AssertSql` text into
 overrides was tried and dropped the same day**, with 580 generated and green: the set could not be
 complete, the scenario belongs to upstream, and golden text argues for conformance where the
 owner's rule allows a deviation that runs no dangerous SQL. `eng/ef-sql-compare.sh` is the
@@ -250,8 +250,10 @@ invisible to `trim-ratchet.sh`. Nothing gates that axis, because Native AOT is n
 | `docs/`, `eng/` text only | neither |
 | **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
 
-**The pack gate runs on the PR too.** Package validation compares the assembly with the published
-`10.0.0` (`Directory.Build.props`). **Adding an optional parameter to a public member is
+**The pack gate runs on the PR too.** Package validation compares the assembly with the last
+published stable, which `PackageValidationBaselineVersion` in `Directory.Build.props` names, and
+`docs/versioning.md` says when it moves. This said "the published `10.0.0`" until 2026-09-22, after
+the value had moved to `10.1.0` and then `10.1.1` with those releases. **Adding an optional parameter to a public member is
 source-compatible and BINARY breaking** — the compiler emits one member and the old arity leaves the
 assembly, which validation reports as `CP0002`. Six such breaks once rode a green PR into `main` and
 turned it red on merge, because only the `main`-only `Packages` workflow packed. `build.yml`'s
@@ -448,7 +450,7 @@ live on different carriers, check that one reader answers for both.**
 **There are TWO shipped packages, and `release.yml` names them one by one**: `InfoCarrier.Core` and
 `InfoCarrier.Core.AspNetCore`. The push steps use exact filenames rather than a glob, so **a third
 package would ship nothing until that workflow named it**. Every packable project validates against
-`10.0.0`.
+the last published stable, which `PackageValidationBaselineVersion` names.
 
 **`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
 (`architecture.md` §6a, 2026-09-03): the relational half lives at `src/InfoCarrier.Core/Relational/`,

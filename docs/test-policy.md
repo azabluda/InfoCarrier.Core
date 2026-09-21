@@ -487,8 +487,9 @@ between them is the whole design (the owner, 2026-09-16).
 
 ### The promises are ours: `Sqlite/ServerSqlTest.cs`
 
-Twenty-three tests, each named as a statement about this provider, each with our own model, our own
-query and our own expected text:
+Each test is named as a statement about this provider, with our own model, our own query and our own
+expected text. **This list is by kind and gives no count**: `ServerSqlTest` holds the current set,
+and this said "Twenty-three tests" until 2026-09-22:
 
 - a filter, a projection, an aggregate and a grouping run on the server;
 - a `First` or a `Single` above a projection this client reassembles still bounds the rows there;
