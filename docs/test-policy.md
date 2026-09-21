@@ -579,7 +579,11 @@ record and are not refreshed after a run**; `eng/ef-sql-compare.sh` prints the c
   (dotnet/efcore#37370, fixed for EF Core 11 only). A list already marked, `ids.Skip(1).Count()`,
   reached EF's statement or EF's failure. The owner chose EF's behaviour for both, so the client marks
   a consuming operator too, and the failure is parked until EF 11. `ServerParameterizationTest`
-  compares the statement in `Parameter` mode and the failure in the other two.
+  compares the statement in `Parameter` mode and the failure in the other two. **And an index,
+  2026-09-22**: the server folded a compiled `ids[1]` to `@p`, where plain EF runs `@p ->> 1` in every
+  mode, and the same fold answered §1.12's `Convert` test, which EF refuses. The client keeps a list
+  read by index as one parameter with `EF.Parameter`; the mode-named mark made a server in `Constant`
+  mode inline the list as `'[1,2,3]' ->> 1`.
 - **One test where EF's `ParameterTranslationMode` did not reach the server, now EF's on all
   three statements** (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked
   for constants and got parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation,

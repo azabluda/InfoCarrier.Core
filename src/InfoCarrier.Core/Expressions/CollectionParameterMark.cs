@@ -59,6 +59,21 @@ internal static class CollectionParameterMark
         => Call(MultipleParameters, boxed);
 
     /// <summary>
+    ///     Marks <paramref name="boxed" /> where the query reads one element of it by its index.
+    /// </summary>
+    /// <remarks>
+    ///     <b>EF's <c>EF.Parameter</c>, which the server does not replace</b> (2026-09-22). EF
+    ///     translates an index over the list as one parameter in every collection mode,
+    ///     <c>@ids -&gt;&gt; 1</c> on SQLite, measured in all three against plain EF Core. The mode-named
+    ///     mark above would make a server in <c>Constant</c> mode inline the list as
+    ///     <c>'[1,2,3]' -&gt;&gt; 1</c>, which plain EF does not do.
+    /// </remarks>
+    /// <param name="boxed">The collection parameter, as the client substitutes it.</param>
+    /// <returns>The marked collection parameter.</returns>
+    public static Expression MarkIndexed(Expression boxed)
+        => Call(Parameter, boxed);
+
+    /// <summary>
     ///     Replaces every mark in <paramref name="query" /> with EF's marker for the collection mode
     ///     <paramref name="context" /> is configured with.
     /// </summary>

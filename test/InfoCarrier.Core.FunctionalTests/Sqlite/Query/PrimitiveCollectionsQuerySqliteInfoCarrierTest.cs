@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -182,70 +181,6 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
         => AssertStoreRefuses(base.Inline_collection_List_value_index_Column);
 
     /// <summary>
-    ///     A compiled query EF's relational base asserts a refusal for, and this provider answers.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>The store reason and this provider's reason are two attributes</b> (2026-09-15).
-    ///         <c>PrimitiveCollectionsQueryRelationalTestBase</c> wraps it in a refusal, because EF's
-    ///         relational pipeline leaves a compiled query's parameter inside a subquery without a
-    ///         type mapping, and EF's own comment says so outright: <c>docs/upstream-defects.md</c>
-    ///         §1.12. <b>This provider does not reach that state, and the reason is measured</b>: the
-    ///         client sends a compiled query's parameters as values (ADR-006), and
-    ///         <c>parameters[0]</c> is an array index rather than an operator the client marks, so
-    ///         the server's EF evaluates it before translation and runs
-    ///         <c>WHERE "p"."String" = @p</c>.
-    ///     </para>
-    ///     <para>
-    ///         <b>This was two tests until 2026-09-20.</b>
-    ///         <c>Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query</c>
-    ///         answered for the same reason, with <c>WHERE @p</c>, until #122 made the client mark
-    ///         <c>ints1.Skip(1)</c> as EF keeps it. It now raises EF's own
-    ///         <c>SetOperationsRequireAtLeastOneSideWithValidTypeMapping</c>, and its override went.
-    ///         This remark said "two" until 2026-09-22.
-    ///     </para>
-    ///     <para>
-    ///         <b>The query body is EF's core one, copied</b>, because C# cannot call a grandparent's
-    ///         implementation and the relational base sits between, and it asserts the rows where the
-    ///         core body asserts nothing. The copy is the real cost: an edit to EF's base will not
-    ///         reach it.
-    ///     </para>
-    ///     <para>
-    ///         <b>There were three until 2026-09-15.</b>
-    ///         <c>Column_collection_equality_inline_collection_with_parameters</c> answered too, because
-    ///         a scalar inside <c>new[] { i, j }</c> crossed as a literal, and the same rule turned
-    ///         <c>new[] { i, j }.Contains(p.Id)</c> into <c>IN (2, 999)</c> where EF sends
-    ///         <c>IN (@i, @j)</c>. That was a defect and is fixed in <c>Substitute</c>; the test now
-    ///         inherits EF's refusal and passes with it.
-    ///     </para>
-    /// </remarks>
-    [StoreDefect(
-        "1.12",
-        UpstreamRepository.EfCore, "test/EFCore.Relational.Specification.Tests/Query/PrimitiveCollectionsQueryRelationalTestBase.cs", 25, 36,
-        Justification = "The array indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a "
-            + "CAST over that, the type mapping inference from the other side (p.String) doesn't propagate inside to the "
-            + "subquery. In this case, the CAST operand gets the default CLR type mapping, but that's object in this case. "
-            + "We should apply the default type mapping to the parameter, but need to figure out the exact rules when to do this.")]
-    [InfoCarrierDesign(
-        6,
-        Justification = "A compiled query's parameters cross as values, so the server's EF evaluates (string)parameters[0] before "
-            + "translation and runs WHERE \"p\".\"String\" = @p. The indexed subquery EF cannot type is never built.",
-        Deviation = DeviationKind.AnswerNotRefusal | DeviationKind.QueryWrittenOut,
-        DeviationNote = "EF's core body, with the rows asserted.")]
-    public override void Parameter_collection_in_subquery_and_Convert_as_compiled_query()
-    {
-        var query = EF.CompileQuery(
-            (PrimitiveCollectionsContext context, object[] parameters)
-                => context.Set<PrimitiveCollectionsEntity>().Where(p => p.String == (string)parameters[0]));
-
-        using PrimitiveCollectionsContext context = Fixture.CreateContext();
-
-        // EF's core body ends at `.ToList()` and asserts nothing about the rows. Asserting them is
-        // the whole point of taking the override, so the predicate is checked here.
-        Assert.All(query(context, ["foo"]).ToList(), e => Assert.Equal("foo", e.String));
-    }
-
-    /// <summary>
     ///     The same refusal EF asserts, described the way a <em>remoting</em> client can see it
     ///     (wire-protocol W5, plan C46).
     /// </summary>
@@ -303,7 +238,9 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // overridden since V12 to assert the rows, and carry docs/upstream-defects.md 1.12 since
     // 2026-09-15.
     //
-    //   Parameter_collection_in_subquery_and_Convert_as_compiled_query, still overridden
+    //   Parameter_collection_in_subquery_and_Convert_as_compiled_query, inherited again since
+    //     2026-09-22, when the client began to mark `parameters[0]`, an index into the list, as EF
+    //     keeps it (the owner chose EF's behaviour); it passes with EF's refusal
     //   Parameter_collection_in_subquery_Union_another_parameter_collection_as_compiled_query,
     //     inherited again since 2026-09-20 (#122), when the client began to mark `ints1.Skip(1)`
     //     as EF keeps it; it passes with EF's refusal
@@ -315,18 +252,20 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // the other side does not propagate inside, and the parameter is left without a mapping --
     // "in the SQL tree does not have a type mapping assigned",
     // SetOperationsRequireAtLeastOneSideWithValidTypeMapping, or a plain translation failure. This
-    // provider does not reach that state, and the base tests' own result assertions hold, so the
-    // answers are right rather than merely un-thrown (measured in R31, not inferred).
-    // WHY it does not reach that state was measured on 2026-09-15, and it is ADR-006: a compiled
-    // query's parameters cross as values, and the server's EF evaluates what is built on them.
+    // provider did not reach that state until each fix above, and the base tests' own result
+    // assertions held, so the answers were right rather than merely un-thrown (measured in R31, not
+    // inferred). WHY it did not was measured on 2026-09-15, and it is ADR-006: a compiled query's
+    // parameters cross as values, and the server's EF evaluated what is built on them. The client now
+    // keeps each such list a parameter, so all three reach EF's own refusal. This paragraph said
+    // "does not reach" until 2026-09-22.
     //
     // "Not overridden", this said at R31: there is no grandparent to call, and asserting the correct
     // behaviour to turn the red green would be overriding a spec test to make the suite green, which
     // CLAUDE.md then forbade. V12 overrode them with the core body on the owner's decision, and the
-    // rule itself was replaced on 2026-09-15 by an override that says why. This is the R29
-    // category (`OwnedJson.Associate_with_parameter_null`) once more: a query this provider answers
-    // that other EF providers refuse, which is `website/docs/limitations.md`'s territory. It said
-    // "two more times" until 2026-09-22, two days after #122 took the Union test out of it.
+    // rule itself was replaced on 2026-09-15 by an override that says why. They were the R29
+    // category (`OwnedJson.Associate_with_parameter_null`): a query this provider answers that other
+    // EF providers refuse, which is `website/docs/limitations.md`'s territory. None of the three is
+    // in it since 2026-09-22.
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

@@ -426,7 +426,10 @@ the server's own collection mode with the default. This said "an ordinary query 
 CONSUMES the list is marked too, since 2026-09-22**, so a compiled `ids.Count()` runs EF's
 `json_array_length(@ids)` and, in `Constant` and `MultipleParameters` mode, **fails with EF Core
 10's own `UnreachableException`** (dotnet/efcore#37370, fixed for EF 11 only). That failure is
-EF's, parked by the owner until EF 11: do not "fix" it here.
+EF's, parked by the owner until EF 11: do not "fix" it here. **An index into the list, `ids[1]`,
+is kept one parameter too, since 2026-09-22, and with `EF.Parameter` rather than the mode-named
+mark**: EF translates an index over the list as one parameter in every mode (`@ids ->> 1`), and the
+mode-named mark made a server in `Constant` mode inline the list.
 
 **Anything the wire computes from a type mapping is computed twice, by two different providers, and
 is only sound if the two agree.** The client's model is built by this provider and the server's by
