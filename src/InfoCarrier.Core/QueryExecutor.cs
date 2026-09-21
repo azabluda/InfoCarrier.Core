@@ -643,6 +643,16 @@ internal sealed class QueryExecutor<TElement>
         ///         siblings return a sequence; <c>Contains</c>, <c>Any</c> and <c>Count</c> consume
         ///         one and are what remains in an ORDINARY query, where nothing must change.
         ///     </para>
+        ///     <para>
+        ///         <b>And only one the server could evaluate, since 2026-09-21.</b> The first
+        ///         paragraph called this "the only place it appears", and an ordinary query
+        ///         contradicted it: <c>ids.Where(y =&gt; y == x.Id).Any()</c> reads the row, so EF
+        ///         cannot fold it before this client captures, and it arrived here and was wrapped.
+        ///         The wrapper names a mode, and EF prefers a mode on one parameter to the server's
+        ///         option, so a server configured with <c>Constant</c> ran parameters. An operator
+        ///         that reads the row cannot be folded by anyone, so it needs no wrapper and gets
+        ///         none; see <see cref="TransformsACollectionParameter" />.
+        ///     </para>
         /// </remarks>
         private bool _transformingACollectionParameter;
 
@@ -681,14 +691,32 @@ internal sealed class QueryExecutor<TElement>
         }
 
         /// <summary>
-        ///     Whether this call transforms a collection parameter, rather than consuming one.
+        ///     Whether this call transforms a collection parameter, rather than consuming one, in a
+        ///     way the server's funcletizer could evaluate.
         /// </summary>
-        private static bool TransformsACollectionParameter(MethodCallExpression node)
-            => node.Arguments.Count > 0
-                && node.Arguments[0] is QueryParameterExpression
-                && node.Method.DeclaringType is { } declaring
-                && (declaring == typeof(Enumerable) || declaring == typeof(Queryable))
-                && SequenceElementType(node.Type) is not null;
+        /// <remarks>
+        ///     <b>A call that reads the row is not one</b> (2026-09-21):
+        ///     <c>ids.Where(y =&gt; y == x.Id)</c> reads <c>x</c>, so no funcletizer can fold it,
+        ///     and EF's own client leaves the collection's mode to the server. Wrapping it anyway
+        ///     replaced a server's <c>Constant</c> or <c>Parameter</c> mode with
+        ///     <c>MultipleParameters</c>; <c>ServerParameterizationTest</c> measures all three.
+        ///     The finder runs last, because the clauses before it reject almost every call.
+        /// </remarks>
+        private bool TransformsACollectionParameter(MethodCallExpression node)
+        {
+            if (node.Arguments.Count == 0
+                || node.Arguments[0] is not QueryParameterExpression
+                || node.Method.DeclaringType is not { } declaring
+                || (declaring != typeof(Enumerable) && declaring != typeof(Queryable))
+                || SequenceElementType(node.Type) is null)
+            {
+                return false;
+            }
+
+            var finder = new OuterParameterFinder(_queryContext);
+            finder.Visit(node);
+            return !finder.Found;
+        }
 
         /// <summary>
         ///     <c>EF.MultipleParameters</c>, EF's own marker for its default collection mode, taken
@@ -1120,14 +1148,55 @@ internal sealed class QueryExecutor<TElement>
 
         protected override Expression VisitParameter(ParameterExpression node)
         {
-            if (node.Name is not null
-                && node.Name.StartsWith("__", StringComparison.Ordinal)
-                && _queryContext.Parameters.TryGetValue(node.Name, out object? value))
+            if (IsQueryParameter(_queryContext, node, out object? value))
             {
                 return Substitute(value, node.Type);
             }
 
             return base.VisitParameter(node);
+        }
+
+        /// <summary>
+        ///     Whether a <see cref="ParameterExpression" /> is a compiled query's parameter, which this
+        ///     visitor replaces with its value, rather than a lambda's.
+        /// </summary>
+        /// <remarks>
+        ///     One test for both readers: <see cref="VisitParameter" /> replaces what it accepts, and
+        ///     <see cref="OuterParameterFinder" /> must not count what will be replaced as the row.
+        /// </remarks>
+        private static bool IsQueryParameter(QueryContext queryContext, ParameterExpression node, out object? value)
+        {
+            value = null;
+            return node.Name is not null
+                && node.Name.StartsWith("__", StringComparison.Ordinal)
+                && queryContext.Parameters.TryGetValue(node.Name, out value);
+        }
+
+        /// <summary>
+        ///     Finds a lambda parameter that a subtree reads but does not bind: the row of an
+        ///     enclosing query.
+        /// </summary>
+        private sealed class OuterParameterFinder(QueryContext queryContext) : ExpressionVisitor
+        {
+            private readonly HashSet<ParameterExpression> _bound = [];
+
+            public bool Found { get; private set; }
+
+            protected override Expression VisitLambda<T>(Expression<T> node)
+            {
+                _bound.UnionWith(node.Parameters);
+                return base.VisitLambda(node);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                if (!_bound.Contains(node) && !IsQueryParameter(queryContext, node, out _))
+                {
+                    Found = true;
+                }
+
+                return node;
+            }
         }
     }
 }

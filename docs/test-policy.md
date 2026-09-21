@@ -554,14 +554,21 @@ What is left is one query of ours, one deviation the owner accepted, and one ups
   `SubstituteParametersExpressionVisitor` now marks such a collection with EF's own
   `EF.MultipleParameters`, which names EF's DEFAULT mode, so the server writes the statement EF's own
   client writes. **An ordinary query is untouched**, because EF folds such an operator itself before
-  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`.
+  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`. **Corrected
+  2026-09-21: not every such operator.** One that reads the row, `ids.Where(y => y == x.Id).Any()`,
+  cannot be folded, reaches this client in an ordinary query, and was marked. The mark names a mode,
+  and EF prefers it to the server's option, so a server set to `Constant` ran parameters. Only an
+  operator the server could fold is marked now, and `ServerParameterizationTest` compares all three
+  modes with plain EF Core.
 - **One test where EF's `ParameterTranslationMode` does not cross the wire**
   (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
   parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
   SQL runs and the behaviour is right. **Since 2026-09-21 the fixture gives the mode to the server's
   builder**, as a real application configures its store, and the `Contains` statement is EF's
-  `IN (1, 2, 3)`. The `Where(…).Any()` statement still sends parameters, because the client wraps
-  that collection in `EF.MultipleParameters`, which overrides the server's mode.
+  `IN (1, 2, 3)`. The `Where(…).Any()` statement sent parameters until the client stopped wrapping
+  that collection in `EF.MultipleParameters` the same day (the correction above), and it is EF's
+  statement now. With both changes the whole tier compared 790 identical of 791 paired; the one left
+  is `IsNullOrEmpty`, below.
 - **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
   `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write.
 

@@ -415,8 +415,10 @@ data. `docs/projection-split.md` §3.3a is the reading.
 this wire as values, so the server's funcletizer folded an operator EF had kept symbolic and the
 statement's shape changed with the number of values. `SubstituteParametersExpressionVisitor` marks
 such a collection with EF's own `EF.MultipleParameters`, EF's DEFAULT mode, so the server writes EF's
-own statement. **An ordinary query is untouched**: EF folds such an operator before this client sees
-the tree, which is why the two look different and are not.
+own statement. **Only an operator the server could fold is marked.** One that reads the row,
+`ids.Where(y => y == x.Id)`, reaches this client in an ordinary query too, and a mark there replaced
+the server's own collection mode with the default. This said "an ordinary query is untouched" until
+2026-09-21; `ServerParameterizationTest` now measures the server's three modes.
 
 **Anything the wire computes from a type mapping is computed twice, by two different providers, and
 is only sound if the two agree.** The client's model is built by this provider and the server's by
