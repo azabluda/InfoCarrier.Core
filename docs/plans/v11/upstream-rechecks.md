@@ -20,15 +20,17 @@ At the EF 11 tag:
 1. **EF 11 adds `PrimitiveCollectionsQueryTestBase.Compiled_query_with_uncorrelated_parameter_collection_expression`**,
    which Tier B inherits. If this provider's result differs from EF's own SQLite test, the override
    carries `[StoreIssue(IssueTracker.EfCore, 37370)]` (the owner, 2026-09-21).
-2. **Re-decide the deviation that
-   `ServerSqlTest.A_compiled_query_consuming_a_list_sends_its_result_as_one_parameter` pins.** The
-   client does not mark a list that `Count` or `Any` consumes, so the server evaluates it and sends
-   one scalar, where EF 10 runs `json_array_length(@ids)` in `Parameter` mode. The reason for
-   accepting that was that marking the list would reach EF 10's crash in the other two modes. On EF
-   11 that reason is gone. Matching EF is then possible, and whether to do it is the owner's call; the
-   promise is what turns red if the client changes.
+2. **`ServerParameterizationTest.A_compiled_query_consuming_a_list_fails_where_EF_Core_10_fails`
+   turns red**, because the direct query answers on EF 11. The failure is parked there on purpose
+   (the owner, 2026-09-22): this client marks a list that `Count` or `Any` consumes, as plain EF
+   keeps it, so it fails where plain EF Core 10 fails. Move the test's two modes into
+   `A_compiled_query_consuming_a_list_matches_the_direct_query`, and delete the failing test.
 3. **Update the row in [`docs/upstream-defects.md`](../../upstream-defects.md) §2**, which says
    "fixed for EF Core 11 only", to the release that shipped the fix.
+4. **Read the `Parameter` mode of `ids.Skip(1).Count()` too.** On EF 10 it fails with a different
+   message, *"Expression '@ids' in the SQL tree does not have a type mapping assigned"*, directly
+   and over the wire alike (measured 2026-09-22). That is §1.12's message, and #37372 did not claim
+   it. No test of ours pins it.
 
 ## `docs/upstream-defects.md` §1.12: a primitive-collection parameter without a type mapping
 
