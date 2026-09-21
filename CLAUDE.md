@@ -46,7 +46,7 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # 26 tests, separate project, NOT in measure.sh
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in measure.sh
 ```
 
 ### Where the tests live
@@ -383,7 +383,7 @@ drifted out of sync with git once already. One substep per commit, message prefi
 **EF1001 usage is expected and allowed; the warning is suppressed per file, EF's own way.** This
 provider legitimately depends on EF Core internals (`IStateManager`, `EntityQueryable<>`,
 `InternalEntityEntry`). Do not refactor to avoid them — but do prefer public API where one exists.
-The 19 files that use internals carry a **file-scoped** `#pragma warning disable EF1001` under a
+Each file that uses an internal carries a **file-scoped** `#pragma warning disable EF1001` under a
 two-line comment naming the reason; `subrepos/efcore` has 51 such files across eight projects and no
 `NoWarn` for EF1001 anywhere. **Do not add `NoWarn=EF1001`** to a project or to
 `Directory.Build.props`. The pragma is per file on purpose: a *new* file that reaches for an internal
@@ -474,8 +474,8 @@ spec-suite badge is still `main`-only**, because a badge is a claim about the tr
 
 ## Current state
 
-**`FAILING: 0  TOTAL: 29826`** (2026-09-17, `ef-like-compiled-collections`), across the two projects
-`measure.sh` runs: **0 of 29592** in the spec project and **0 of 234** in Tier D. **Every figure
+**`FAILING: 0  TOTAL: 29833`** (2026-09-21, `main-be3dab9`), across the two projects
+`measure.sh` runs: **0 of 29599** in the spec project and **0 of 234** in Tier D. **Every figure
 comes out of the run's own summary block, and none of them is arithmetic** — one entry once carried
 `Skipped` over from an earlier run and derived `Passed` from it.
 
