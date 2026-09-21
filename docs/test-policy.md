@@ -572,7 +572,14 @@ record and are not refreshed after a run**; `eng/ef-sql-compare.sh` prints the c
   `SELECT 0, CAST(1 AS INTEGER) UNION ALL VALUES (1, 2)`, and one set to `Parameter` ran the same
   where EF runs `json_each(@p)`. The server now replaces the mark with EF's marker for its own mode
   (`CollectionParameterMark`), and a marker the caller wrote keeps the caller's mode.
-  `ServerParameterizationTest` compares both, in each mode, with plain EF Core.
+  `ServerParameterizationTest` compares both, in each mode, with plain EF Core. **Corrected a third
+  time 2026-09-22: an operator that CONSUMES the list was not marked.** The server evaluated a
+  compiled `ids.Count()` and ran `WHERE "b"."Id" < @p`, where plain EF Core runs
+  `json_array_length(@p)` in `Parameter` mode and throws `UnreachableException` in the other two
+  (dotnet/efcore#37370, fixed for EF Core 11 only). A list already marked, `ids.Skip(1).Count()`,
+  reached EF's statement or EF's failure. The owner chose EF's behaviour for both, so the client marks
+  a consuming operator too, and the failure is parked until EF 11. `ServerParameterizationTest`
+  compares the statement in `Parameter` mode and the failure in the other two.
 - **One test where EF's `ParameterTranslationMode` did not reach the server, now EF's on all
   three statements** (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked
   for constants and got parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation,
