@@ -161,6 +161,33 @@ map yourself with `HasDbFunction`. A store's own family, such as `SqliteDbFuncti
 a type this package cannot name, so name it on both halves: `AddInfoCarrierAllowedTypes(...)` on
 the server, `o.AllowTypes(...)` on the client.
 
+## Keys of your own types
+
+`GroupBy`, `Join`, `GroupJoin` and `DistinctBy` each take a key. When that key is a type you
+declared and have not named on both halves, this client cannot ask the server to group or join by
+it, so the server sends the rows and the grouping happens here. The answer is correct and the
+response is as large as the table.
+
+```csharp
+// The server reads every row of Orders, and this client groups them.
+orders.GroupBy(o => new PeriodKey(o.Placed.Year, o.Placed.Month))
+```
+
+Nothing reports it, because the query succeeds either way. Name the type on both halves and the
+same query runs in the database:
+
+```csharp
+services.AddInfoCarrierAllowedTypes(typeof(PeriodKey));                       // server
+optionsBuilder.UseInfoCarrier(client, o => o.AllowTypes(typeof(PeriodKey)));  // client
+```
+
+An anonymous key such as `new { o.Year, o.Month }` needs no registration.
+
+Naming a type moves the operator to the database, which is where EF Core decides whether it can
+translate it. A query this client answers locally can start to fail once the type is named, with
+the error EF Core gives for it without this provider. A named type means the query behaves as it
+would if you had written it against the server.
+
 ## Round trips and result size
 
 Every materialized query is a request, so a loop that queries per item makes one request per item.
