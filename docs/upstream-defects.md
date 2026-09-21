@@ -357,9 +357,10 @@ the correct answer.
 
 **Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
 overrides three core tests to assert that the query is refused. **This provider answered all three
-until 2026-09-15 and answers two now**, and its overrides assert the rows, so each carries
-`[StoreDefect("1.12", …)]` with the link to EF's refusal, and `[InfoCarrierDesign(6)]` for why this
-provider does not reach the defect.
+until 2026-09-15, two until 2026-09-20, and answers one now**, the `Convert` test. Its override
+asserts the rows, so it carries `[StoreDefect("1.12", …)]` with the link to EF's refusal, and
+`[InfoCarrierDesign(6)]` for why this provider does not reach the defect. This said "answers two
+now" until 2026-09-22.
 
 **Site.** Named by EF itself, on one of the three, in a comment at the `v10.0.1` tag: *"The array
 indexing is translated as a subquery over e.g. OPENJSON with LIMIT/OFFSET. Since there's a CAST over
@@ -380,10 +381,13 @@ rules when to do this."*
 their messages; EF says nothing about them, and nobody has read a fix, because none exists.
 
 **What it blocks.** Nothing. **Why this provider does not reach that state was established on
-2026-09-15**, from the server's SQL log, and it read *"not established"* until then. The two compiled
-queries reach the server with their parameters as values (ADR-006), so the server's EF evaluates
-`(string)parameters[0]` and `ints1.Skip(1).Union(ints2).Count() == 3` before translation and runs
-`WHERE "p"."String" = @p` and `WHERE @p`. The subquery EF cannot type is never built.
+2026-09-15**, from the server's SQL log, and it read *"not established"* until then. A compiled
+query's parameters reach the server as values (ADR-006), so the server's EF evaluates
+`(string)parameters[0]` before translation and runs `WHERE "p"."String" = @p`. The subquery EF cannot
+type is never built. **The `Union` test reaches EF's state since 2026-09-20.** It answered the same
+way, with `WHERE @p`, until #122 made the client mark `ints1.Skip(1)` as EF keeps it; it now raises
+EF's own `SetOperationsRequireAtLeastOneSideWithValidTypeMapping` and inherits EF's refusal. An array
+index is not an operator the client marks, which is why the `Convert` test still answers.
 **`Column_collection_equality_inline_collection_with_parameters` answered for a worse reason**: its
 two parameters reached SQLite as the literal `'[1,10]'`. That was a defect of this provider's, and the
 same rule sent `new[] { i, j }.Contains(p.Id)` as `IN (2, 999)`. It is fixed, and that test now
