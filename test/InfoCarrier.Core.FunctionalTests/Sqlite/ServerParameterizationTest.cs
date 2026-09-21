@@ -2,6 +2,7 @@
 
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -128,6 +129,67 @@ public partial class ServerParameterizationTest
 
         return AssertSameStatementFor(context => Compile()(context, [1, 2, 3]), mode);
     }
+
+    /// <summary>
+    ///     A compiled query that consumes its list runs plain EF Core's statement.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The client did not mark a list that an operator consumes, until 2026-09-22.</b> The
+    ///         server evaluated <c>ids.Count()</c> and ran <c>WHERE "b"."Id" &lt; @p</c>, where plain
+    ///         EF Core runs <c>WHERE "b"."Id" &lt; json_array_length(@p)</c>. Neither has a literal or
+    ///         changes with the list; the owner chose EF's statement over a difference to explain.
+    ///     </para>
+    ///     <para>
+    ///         Only <c>Parameter</c> mode is here, because it is the only mode in which EF Core 10
+    ///         answers; the other two are the next test.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_compiled_query_consuming_a_list_matches_the_direct_query()
+        => AssertSameStatementFor(
+            context => CountBelowTheListSize()(context, [1, 2, 3]),
+            ParameterTranslationMode.Parameter);
+
+    /// <summary>
+    ///     A compiled query that consumes its list fails where plain EF Core 10 fails, and runs no
+    ///     statement.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This is EF's defect, dotnet/efcore#37370, and it is parked until EF Core 11</b> (the
+    ///         owner, 2026-09-22). EF has no element type mapping for a list that nothing compares with
+    ///         a column, and in these two modes it throws <c>UnreachableException</c>. dotnet/efcore#37372
+    ///         fixed it for EF Core 11 only.
+    ///     </para>
+    ///     <para>
+    ///         <b>Until 2026-09-22 this client answered here</b>, because it did not mark the list and
+    ///         the server evaluated <c>ids.Count()</c>. A list it did mark, <c>ids.Skip(1).Count()</c>,
+    ///         already failed the same way. The owner chose EF's behaviour for both.
+    ///     </para>
+    ///     <para>
+    ///         <b>This turns red when the server runs EF Core 11</b>, because the direct query answers
+    ///         then. The modes belong in the test above at that point; <c>docs/plans/v11/</c> records it.
+    ///     </para>
+    /// </remarks>
+    [ConditionalTheory]
+    [InlineData(ParameterTranslationMode.Constant)]
+    [InlineData(ParameterTranslationMode.MultipleParameters)]
+    public async Task A_compiled_query_consuming_a_list_fails_where_EF_Core_10_fails(ParameterTranslationMode mode)
+    {
+        (Exception overTheWire, string[] wireStatements, Exception directly) =
+            await RunFailingBothWays(context => CountBelowTheListSize()(context, [1, 2, 3]), mode);
+
+        Assert.IsType<UnreachableException>(directly);
+        Assert.IsType<UnreachableException>(overTheWire);
+        Assert.Empty(wireStatements);
+    }
+
+    // One compiled query per context: EF binds a compiled query to the first model it runs on, and
+    // the client's model is not the server's.
+    private static Func<DbContext, int[], Task<int>> CountBelowTheListSize()
+        => EF.CompileAsyncQuery(
+            (DbContext context, int[] ids) => context.Set<Blog>().Count(b => b.Id < ids.Count()));
 
     /// <summary>
     ///     A list the caller marks with <c>EF.MultipleParameters</c> keeps the caller's mode, whatever
@@ -843,6 +905,48 @@ public partial class ServerParameterizationTest
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> against the client context and again against the server
+    ///     context, for a query plain EF Core refuses, and returns what each threw and every statement
+    ///     the store saw for the client.
+    /// </summary>
+    private async Task<(Exception OverTheWire, string[] WireStatements, Exception Directly)> RunFailingBothWays(
+        Func<DbContext, Task> run,
+        ParameterTranslationMode collectionMode)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(collectionMode: collectionMode);
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" },
+                    new Blog { Id = 3, Title = "gamma" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        Exception overTheWire;
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            overTheWire = await Assert.ThrowsAnyAsync<Exception>(() => run(client));
+        }
+
+        string[] wireStatements = AllStatements(Drain());
+
+        Exception directly;
+        using (DbContext server = store.CreateDbContext())
+        {
+            directly = await Assert.ThrowsAnyAsync<Exception>(() => run(server));
+        }
+
+        return (overTheWire, wireStatements, directly);
     }
 
     private SqliteInfoCarrierBackendTestStore CreateStore(

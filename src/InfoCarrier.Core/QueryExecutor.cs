@@ -626,8 +626,8 @@ internal sealed class QueryExecutor<TElement>
         private bool _insideEFCall;
 
         /// <summary>
-        ///     Set while visiting a call that TRANSFORMS a collection parameter, where the parameter
-        ///     must stay a parameter on the far side rather than be folded into its result.
+        ///     Set while visiting a call over a collection parameter that the server could fold, where
+        ///     the parameter must stay a parameter on the far side rather than be folded into its result.
         /// </summary>
         /// <remarks>
         ///     <para>
@@ -654,9 +654,18 @@ internal sealed class QueryExecutor<TElement>
         ///         marker for the mode it is configured with.
         ///     </para>
         ///     <para>
-        ///         <b>Only a transforming operator counts.</b> <c>Skip</c>, <c>Take</c> and their
-        ///         siblings return a sequence; <c>Contains</c>, <c>Any</c> and <c>Count</c> consume
-        ///         one and are what remains in an ORDINARY query, where nothing must change.
+        ///         <b>An operator that consumes the list counts too, since 2026-09-22.</b> This said
+        ///         "Only a transforming operator counts. <c>Skip</c>, <c>Take</c> and their siblings
+        ///         return a sequence; <c>Contains</c>, <c>Any</c> and <c>Count</c> consume one and are
+        ///         what remains in an ORDINARY query, where nothing must change." In an ordinary query
+        ///         EF folds <c>ids.Count()</c> before this client captures, so it never arrives here;
+        ///         what the rule kept away was a compiled query's. The server then evaluated
+        ///         <c>ids.Count()</c> and sent one scalar, where plain EF Core runs
+        ///         <c>json_array_length(@ids)</c> in <c>Parameter</c> mode, and a list already marked,
+        ///         <c>ids.Skip(1).Count()</c>, reached EF's own statement or failure. The owner chose
+        ///         EF's behaviour. On EF Core 10 that includes dotnet/efcore#37370, an
+        ///         <c>UnreachableException</c> in <c>Constant</c> and <c>MultipleParameters</c> mode,
+        ///         fixed for EF Core 11; <c>ServerParameterizationTest</c> measures both.
         ///     </para>
         ///     <para>
         ///         <b>And only one the server could evaluate, since 2026-09-21.</b> The first
@@ -666,10 +675,10 @@ internal sealed class QueryExecutor<TElement>
         ///         The wrapper names a mode, and EF prefers a mode on one parameter to the server's
         ///         option, so a server configured with <c>Constant</c> ran parameters. An operator
         ///         that reads the row cannot be folded by anyone, so it needs no wrapper and gets
-        ///         none; see <see cref="TransformsACollectionParameter" />.
+        ///         none; see <see cref="IsAFoldableCallOverACollectionParameter" />.
         ///     </para>
         /// </remarks>
-        private bool _transformingACollectionParameter;
+        private bool _foldableCallOverACollectionParameter;
 
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
@@ -681,15 +690,15 @@ internal sealed class QueryExecutor<TElement>
         {
             if (node.Method.DeclaringType != typeof(EF) && node.Method.DeclaringType != typeof(EFExtensions))
             {
-                bool transforming = _transformingACollectionParameter;
-                _transformingACollectionParameter = TransformsACollectionParameter(node);
+                bool foldable = _foldableCallOverACollectionParameter;
+                _foldableCallOverACollectionParameter = IsAFoldableCallOverACollectionParameter(node);
                 try
                 {
                     return base.VisitMethodCall(node);
                 }
                 finally
                 {
-                    _transformingACollectionParameter = transforming;
+                    _foldableCallOverACollectionParameter = foldable;
                 }
             }
 
@@ -706,24 +715,31 @@ internal sealed class QueryExecutor<TElement>
         }
 
         /// <summary>
-        ///     Whether this call transforms a collection parameter, rather than consuming one, in a
-        ///     way the server's funcletizer could evaluate.
+        ///     Whether this call operates on a collection parameter in a way the server's funcletizer
+        ///     could evaluate, whether it returns a sequence or a scalar.
         /// </summary>
         /// <remarks>
-        ///     <b>A call that reads the row is not one</b> (2026-09-21):
-        ///     <c>ids.Where(y =&gt; y == x.Id)</c> reads <c>x</c>, so no funcletizer can fold it,
-        ///     and EF's own client leaves the collection's mode to the server. Wrapping it anyway
-        ///     replaced a server's <c>Constant</c> or <c>Parameter</c> mode with
-        ///     <c>MultipleParameters</c>; <c>ServerParameterizationTest</c> measures all three.
-        ///     The finder runs last, because the clauses before it reject almost every call.
+        ///     <para>
+        ///         <b>A call that reads the row is not one</b> (2026-09-21):
+        ///         <c>ids.Where(y =&gt; y == x.Id)</c> reads <c>x</c>, so no funcletizer can fold it,
+        ///         and EF's own client leaves the collection's mode to the server. Wrapping it anyway
+        ///         replaced a server's <c>Constant</c> or <c>Parameter</c> mode with
+        ///         <c>MultipleParameters</c>; <c>ServerParameterizationTest</c> measures all three.
+        ///         The finder runs last, because the clauses before it reject almost every call.
+        ///     </para>
+        ///     <para>
+        ///         <b>A call that returns a scalar is one, since 2026-09-22.</b> This was
+        ///         "transforms a collection parameter, rather than consuming one", with a clause that
+        ///         rejected a call whose result is not a sequence; see
+        ///         <see cref="_foldableCallOverACollectionParameter" /> for why it went.
+        ///     </para>
         /// </remarks>
-        private bool TransformsACollectionParameter(MethodCallExpression node)
+        private bool IsAFoldableCallOverACollectionParameter(MethodCallExpression node)
         {
             if (node.Arguments.Count == 0
                 || node.Arguments[0] is not QueryParameterExpression
                 || node.Method.DeclaringType is not { } declaring
-                || (declaring != typeof(Enumerable) && declaring != typeof(Queryable))
-                || SequenceElementType(node.Type) is null)
+                || (declaring != typeof(Enumerable) && declaring != typeof(Queryable)))
             {
                 return false;
             }
@@ -871,8 +887,8 @@ internal sealed class QueryExecutor<TElement>
             {
                 Expression boxed = Boxed(value, parameterType);
 
-                // Kept a parameter on purpose: see `_transformingACollectionParameter`.
-                return _transformingACollectionParameter ? CollectionParameterMark.Mark(boxed) : boxed;
+                // Kept a parameter on purpose: see `_foldableCallOverACollectionParameter`.
+                return _foldableCallOverACollectionParameter ? CollectionParameterMark.Mark(boxed) : boxed;
             }
 
             // J21: a **scalar** the wire does not carry as a primitive is boxed for the same reason

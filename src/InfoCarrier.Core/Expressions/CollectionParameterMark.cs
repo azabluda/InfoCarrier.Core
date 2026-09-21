@@ -13,12 +13,14 @@ namespace InfoCarrier.Core.Expressions;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The client writes it</b> where a compiled query transforms a collection parameter, as
-///         in <c>ids.Skip(1).Contains(x.Id)</c>. The parameter crosses the wire as a value in a
-///         <see cref="ParameterBox{T}" />, and without the mark the server's funcletizer evaluates
-///         the operator over it, so the statement changes with the number of values (#122). The mark
-///         is EF's own <c>EF.MultipleParameters</c>, the instruction EF has for "do not evaluate this
-///         collection".
+///         <b>The client writes it</b> where a compiled query applies an operator to a collection
+///         parameter, as in <c>ids.Skip(1).Contains(x.Id)</c>, and since 2026-09-22 also where the
+///         operator returns a scalar, as <c>ids.Count()</c> does; until then the text read "where a
+///         compiled query transforms a collection parameter". The parameter crosses the wire as a
+///         value in a <see cref="ParameterBox{T}" />, and without the mark the server's funcletizer
+///         evaluates the operator over it, so the statement changes with the number of values (#122).
+///         The mark is EF's own <c>EF.MultipleParameters</c>, the instruction EF has for "do not
+///         evaluate this collection".
 ///     </para>
 ///     <para>
 ///         <b>The server reads it</b>, because that instruction also names a collection mode, EF's
