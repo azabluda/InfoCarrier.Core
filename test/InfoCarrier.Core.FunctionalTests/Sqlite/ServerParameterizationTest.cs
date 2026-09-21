@@ -476,12 +476,12 @@ public partial class ServerParameterizationTest
     [ConditionalFact]
     public async Task A_registered_group_key_matches_the_direct_query()
     {
-        (string overTheWire, string directly) = await StatementsFor(
+        Run wire = await RunBothWays(
             [typeof(TitleKey)],
-            blogs => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => new { N = g.Count() }));
+            (blogs, _) => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => g.Count()));
 
-        Assert.Equal(directly, overTheWire);
-        Assert.Contains("GROUP BY", overTheWire, StringComparison.Ordinal);
+        Assert.Equal(wire.Directly, wire.OverTheWire);
+        Assert.Contains("GROUP BY", Assert.Single(wire.OverTheWire), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -514,22 +514,136 @@ public partial class ServerParameterizationTest
     [ConditionalFact]
     public async Task An_unregistered_group_key_reads_the_whole_table()
     {
-        (string overTheWire, string directly) = await StatementsFor(
+        Run wire = await RunBothWays(
             allowedTypes: null,
-            blogs => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => new { N = g.Count() }));
+            (blogs, _) => blogs.GroupBy(b => new TitleKey(b.Title)).Select(g => g.Count()));
 
-        Assert.Contains("GROUP BY", directly, StringComparison.Ordinal);
-        Assert.DoesNotContain("GROUP BY", overTheWire, StringComparison.Ordinal);
-        Assert.DoesNotContain("COUNT(", overTheWire, StringComparison.Ordinal);
+        Assert.Contains("GROUP BY", Assert.Single(wire.Directly), StringComparison.Ordinal);
+
+        string statement = Assert.Single(wire.OverTheWire);
+        Assert.DoesNotContain("GROUP BY", statement, StringComparison.Ordinal);
+        Assert.DoesNotContain("COUNT(", statement, StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     The one statement the store saw for <paramref name="query" /> over the wire, and the one
-    ///     it saw for the same query run directly against the server.
+    ///     An unregistered <em>join</em> key reads BOTH tables whole, and joins them here.
     /// </summary>
-    private async Task<(string OverTheWire, string Directly)> StatementsFor(
+    /// <remarks>
+    ///     <b>The same cause as the grouping key above, and the one #120 found by comparing the
+    ///     server's SQL with EF's.</b> <c>JoinKeyRewriter</c> closed the ANONYMOUS case by giving
+    ///     the key a <c>Tuple</c> the boundary already admits; a key of a type the application
+    ///     declared cannot be rewritten that way, because a class with its own <c>Equals</c> is not
+    ///     data. Registering it is what closes this one.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_unregistered_join_key_reads_both_tables()
+    {
+        Run wire = await RunBothWays(allowedTypes: null, JoinOnTitle);
+
+        Assert.Contains("INNER JOIN", Assert.Single(wire.Directly), StringComparison.Ordinal);
+        Assert.Equal(2, wire.OverTheWire.Length);
+        Assert.All(wire.OverTheWire, s => Assert.DoesNotContain("JOIN", s, StringComparison.Ordinal));
+    }
+
+    /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
+    [ConditionalFact]
+    public async Task A_registered_join_key_matches_the_direct_query()
+    {
+        Run wire = await RunBothWays([typeof(TitleKey)], JoinOnTitle);
+
+        Assert.Equal(wire.Directly, wire.OverTheWire);
+        Assert.Contains("INNER JOIN", Assert.Single(wire.OverTheWire), StringComparison.Ordinal);
+    }
+
+    /// <inheritdoc cref="An_unregistered_join_key_reads_both_tables" />
+    [ConditionalFact]
+    public async Task An_unregistered_group_join_key_reads_both_tables()
+    {
+        Run wire = await RunBothWays(allowedTypes: null, GroupJoinOnTitle);
+
+        Assert.Single(wire.Directly);
+        Assert.Equal(2, wire.OverTheWire.Length);
+    }
+
+    /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
+    [ConditionalFact]
+    public async Task A_registered_group_join_key_matches_the_direct_query()
+    {
+        Run wire = await RunBothWays([typeof(TitleKey)], GroupJoinOnTitle);
+
+        Assert.Equal(wire.Directly, wire.OverTheWire);
+    }
+
+    /// <summary>
+    ///     Registering a key type can turn an answer into EF's own refusal, and that is the
+    ///     behaviour to expect rather than a regression.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The most surprising half of "a registered type matches plain EF Core", and the
+    ///         reason to state it as a promise.</b> <c>DistinctBy</c> keyed on a declared type is
+    ///         one EF itself cannot translate: run directly against the server it raises
+    ///         <c>TranslationFailed</c>. Unregistered, the key keeps the operator on this client,
+    ///         the server sends every row and the caller gets an answer EF would have refused —
+    ///         the <c>limitations.md</c> category of queries this provider answers that other EF
+    ///         providers reject.
+    ///     </para>
+    ///     <para>
+    ///         <b>Registering the type moves the operator to the server, where EF refuses it.</b>
+    ///         So the registration that removes a whole-table read also removes the answer. Both
+    ///         halves are "match plain EF Core", and a caller who registers a type needs to know
+    ///         that is what they asked for.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_registered_key_makes_this_client_refuse_what_EF_refuses()
+    {
+        Run unregistered = await RunBothWays(allowedTypes: null, DistinctByTitle);
+
+        Assert.NotNull(unregistered.DirectError);
+        Assert.Null(unregistered.WireError);
+        Assert.DoesNotContain("DISTINCT", Assert.Single(unregistered.OverTheWire), StringComparison.Ordinal);
+
+        Run registered = await RunBothWays([typeof(TitleKey)], DistinctByTitle);
+
+        Assert.NotNull(registered.WireError);
+        Assert.NotNull(registered.DirectError);
+        Assert.Equal(registered.DirectError.GetType(), registered.WireError.GetType());
+        Assert.Empty(registered.OverTheWire);
+    }
+
+    private static IQueryable<int> JoinOnTitle(IQueryable<Blog> blogs, IQueryable<Post> posts)
+        => blogs.Join(
+            posts,
+            b => new TitleKey(b.Title),
+            p => new TitleKey(p.Heading),
+            (b, p) => b.Id + p.Id);
+
+    private static IQueryable<int> GroupJoinOnTitle(IQueryable<Blog> blogs, IQueryable<Post> posts)
+        => blogs.GroupJoin(
+            posts,
+            b => new TitleKey(b.Title),
+            p => new TitleKey(p.Heading),
+            (b, ps) => b.Id);
+
+    private static IQueryable<int> DistinctByTitle(IQueryable<Blog> blogs, IQueryable<Post> posts)
+        => blogs.DistinctBy(b => new TitleKey(b.Title)).Select(b => b.Id);
+
+    /// <summary>What the store saw for one query, run over the wire and again directly.</summary>
+    private readonly record struct Run(
+        string[] OverTheWire,
+        Exception? WireError,
+        string[] Directly,
+        Exception? DirectError);
+
+    /// <summary>
+    ///     Runs <paramref name="query" /> over the wire and again directly against the server, and
+    ///     reports every statement the store saw for each — and what each side threw, because a
+    ///     registered key type can move an operator to the server and meet EF's own refusal there.
+    /// </summary>
+    private async Task<Run> RunBothWays(
         Type[]? allowedTypes,
-        Func<IQueryable<Blog>, IQueryable<object>> query)
+        Func<IQueryable<Blog>, IQueryable<Post>, IQueryable<int>> query)
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(allowedTypes);
         await store.InitializeAsync(
@@ -541,11 +655,15 @@ public partial class ServerParameterizationTest
                     new Blog { Id = 1, Title = "alpha" },
                     new Blog { Id = 2, Title = "beta" },
                     new Blog { Id = 3, Title = "beta" });
+                context.AddRange(
+                    new Post { Id = 1, Heading = "alpha", BlogId = 1 },
+                    new Post { Id = 2, Heading = "beta", BlogId = 2 });
                 await context.SaveChangesAsync();
             });
 
         Drain();
 
+        Exception? wireError = null;
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>()
                 .UseInfoCarrier(
@@ -559,17 +677,32 @@ public partial class ServerParameterizationTest
                     })
                 .Options))
         {
-            _ = await query(client.Blogs).ToListAsync();
+            try
+            {
+                _ = await query(client.Blogs, client.Posts).ToListAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                wireError = ex;
+            }
         }
 
-        string overTheWire = SingleStatement(Drain());
+        string[] overTheWire = AllStatements(Drain());
 
+        Exception? directError = null;
         using (DbContext server = store.CreateDbContext())
         {
-            _ = await query(server.Set<Blog>()).ToListAsync();
+            try
+            {
+                _ = await query(server.Set<Blog>(), server.Set<Post>()).ToListAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                directError = ex;
+            }
         }
 
-        return (overTheWire, SingleStatement(Drain()));
+        return new Run(overTheWire, wireError, AllStatements(Drain()), directError);
     }
 
     /// <summary>
@@ -639,9 +772,15 @@ public partial class ServerParameterizationTest
     ///     the timing preamble dropped.
     /// </summary>
     private static string SingleStatement(string[] logged)
-    {
-        string entry = Assert.Single(logged);
+        => Normalize(Assert.Single(logged));
 
+    /// <summary>Every statement in <paramref name="logged" />, each normalized as one.</summary>
+    private static string[] AllStatements(string[] logged)
+        => [.. logged.Select(Normalize)];
+
+    /// <inheritdoc cref="SingleStatement" />
+    private static string Normalize(string entry)
+    {
         // The first two lines are the event header and the `Executed DbCommand (0ms) [...]`
         // preamble, whose elapsed time and parameter *names* both vary. The statement follows.
         string[] lines = entry.Split('\n');
