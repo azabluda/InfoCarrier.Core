@@ -5,7 +5,8 @@ until 2026-09-16, when the name stopped matching the file: an overhaul is an eve
 rule the suite runs on. Nothing about the rule changed with the move.
 
 **Status of the overhaul that produced it: done, 2026-09-15.** Every tier is converted, the suite is green (`FAILING: 0  TOTAL:
-29826`), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are deleted, and
+29837` on 2026-09-21), and the ratchet is gone: `eng/ratchet.sh` and both baseline files are
+deleted, and
 `eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
 and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
 
@@ -531,16 +532,21 @@ serially with the server SQL log on, and prints the disagreements grouped by kin
   decision recorded in a test is checked on every run and a decision recorded in a file is not;
 - **an artifact of EF's own harness** — nothing to write.
 
-**What the run of 2026-09-20 says**, on the whole tier: **791 tests paired, 788 identical, 3
-differing** (LITERAL 0, PARAMETER 1, VALUE 0, STRUCTURAL 3; one test is in both). It read 786 and 5
-on 2026-09-16, before the compiled-query fix below, and 784 and 7 before the join-key rewrite. The
-tier itself ran green in the same command: `Failed: 0, Passed: 19385, Skipped: 155, Total: 19540`.
-What is left is one query of ours, one deviation the owner accepted, and one upstream accident:
+**What the run of 2026-09-21 says**, on the whole tier: **791 tests paired, 790 identical, 1
+differing** (LITERAL 0, PARAMETER 0, VALUE 0, STRUCTURAL 1). It read 788 and 3 on 2026-09-20, 786
+and 5 on 2026-09-16, before the compiled-query fix below, and 784 and 7 before the join-key rewrite.
+The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skipped: 155, Total:
+19550`. What is left is one upstream accident, the last bullet.
 
-- **One test where an operator the type boundary leaves on the client reads a whole table**:
-  `NorthwindGroupBy.Odata_groupby_empty_key` reads every order and groups here, because its group key
-  is a class the caller declared, with its own `Equals`. Nothing can rewrite that, so the decision it
-  needs is the owner's: refuse, or keep and document.
+- **One test read a whole table, and the class it stands for is decided.**
+  `NorthwindGroupBy.Odata_groupby_empty_key` read every order and grouped here, because its group
+  key is a class EF's base declares, with its own `Equals`, and nothing had named it. The run of
+  2026-09-20 left "refuse, or keep and document" to the owner. **Kept and documented (2026-09-21):**
+  an application registers such a key type on both halves, and one it forgets is an edge case of a
+  configuration the documentation tells it how to avoid. The fixture registers that one type (#133),
+  so the test runs EF's statement. The unregistered case is measured in `ServerParameterizationTest`
+  (#130, #131), described in `website/docs/guide/querying.md` (#132), and named by the `QuerySplit`
+  event (#137).
 - **Two tests that used to be in this group are fixed.**
   `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition` and
   `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` each ran two full-table reads where EF
@@ -560,10 +566,10 @@ What is left is one query of ours, one deviation the owner accepted, and one ups
   and EF prefers it to the server's option, so a server set to `Constant` ran parameters. Only an
   operator the server could fold is marked now, and `ServerParameterizationTest` compares all three
   modes with plain EF Core.
-- **One test where EF's `ParameterTranslationMode` does not cross the wire**
-  (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked for constants and got
-  parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation, because no dangerous
-  SQL runs and the behaviour is right. **Since 2026-09-21 the fixture gives the mode to the server's
+- **One test where EF's `ParameterTranslationMode` did not reach the server, now EF's on all
+  three statements** (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked
+  for constants and got parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation,
+  because no dangerous SQL runs and the behaviour is right. **Since 2026-09-21 the fixture gives the mode to the server's
   builder**, as a real application configures its store, and the `Contains` statement is EF's
   `IN (1, 2, 3)`. The `Where(…).Any()` statement sent parameters until the client stopped wrapping
   that collection in `EF.MultipleParameters` the same day (the correction above), and it is EF's

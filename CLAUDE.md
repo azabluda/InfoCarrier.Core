@@ -476,8 +476,8 @@ spec-suite badge is still `main`-only**, because a badge is a claim about the tr
 
 ## Current state
 
-**`FAILING: 0  TOTAL: 29826`** (2026-09-17, `ef-like-compiled-collections`), across the two projects
-`measure.sh` runs: **0 of 29592** in the spec project and **0 of 234** in Tier D. **Every figure
+**`FAILING: 0  TOTAL: 29837`** (2026-09-21, `main-2026-09-21`), across the two projects
+`measure.sh` runs: **0 of 29603** in the spec project and **0 of 234** in Tier D. **Every figure
 comes out of the run's own summary block, and none of them is arithmetic** — one entry once carried
 `Skipped` over from an earlier run and derived `Passed` from it.
 
