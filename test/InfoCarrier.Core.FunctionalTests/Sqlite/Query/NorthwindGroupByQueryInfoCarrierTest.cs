@@ -30,10 +30,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         convergence with <c>NorthwindGroupByQuerySqliteTest</c>.
 ///     </para>
 ///     <para>
-///         <c>Final_GroupBy_nominal_type_entity</c> keeps the override the Tier A class carried,
-///         because its reason is store-independent: <c>GroupBy(c =&gt; new RandomClass { … })</c>
-///         keys the grouping on a type the server cannot name (ADR-010), so the query never
-///         reaches the store. EF's own SQLite class does not override it; this provider must.
+///         <b><c>Final_GroupBy_nominal_type_entity</c> runs EF's own test since 2026-09-22.</b> Until
+///         then it kept the override the Tier A class carried, and this read "its reason is
+///         store-independent: <c>GroupBy(c =&gt; new RandomClass { … })</c> keys the grouping on a
+///         type the server cannot name (ADR-010), so the query never reaches the store. EF's own
+///         SQLite class does not override it; this provider must." The reason was the fixture's,
+///         not the store's: the fixture now names <c>RandomClass</c> as an application names its
+///         own key type (<c>UpstreamKeyTypes</c>), and the owner chose EF's behaviour.
 ///     </para>
 /// </remarks>
 public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
@@ -92,23 +95,6 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
     public override Task Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(bool async)
         => AssertApplyNotSupported(
             () => base.Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(async));
-
-    /// <summary>
-    ///     The one member of the <c>Final_GroupBy</c> family whose key is a client-only type.
-    /// </summary>
-    /// <remarks>
-    ///     <c>GroupBy(c =&gt; new RandomClass { … })</c> keys the grouping on a type the server
-    ///     cannot name (ADR-010), so the query is refused before it reaches the store. Unlike its
-    ///     Tier A siblings this reason does not depend on the backend, so the override survives the
-    ///     move to Tier B.
-    /// </remarks>
-    [InfoCarrierDesign(
-        10,
-        Justification = "The grouping key is RandomClass, a client-only class without value equality. The server "
-            + "cannot construct it, and grouping by it on the client would give one group per row, so the query is "
-            + "refused with EF's TranslationFailed.")]
-    public override Task Final_GroupBy_nominal_type_entity(bool async)
-        => AssertTranslationFailed(() => base.Final_GroupBy_nominal_type_entity(async));
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

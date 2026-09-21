@@ -60,6 +60,11 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
                 // every order. See `UpstreamKeyTypes`, which resolves it and fails loudly.
                 UpstreamKeyTypes.NoGroupByWrapper(
                     typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
+
+                // The same, for `Final_GroupBy_nominal_type_entity`: without it the `GroupBy` stays
+                // here and is refused, where EF's own providers answer (2026-09-22).
+                UpstreamKeyTypes.RandomClass(
+                    typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
             ]);
 
     /// <summary>
