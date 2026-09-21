@@ -318,7 +318,11 @@ Both procedures below end at the same place, so the shared tail is written once.
 ### A minor from `main`
 
 1. Land the work on `main`, gates green.
-2. Update `website/docs/limitations.md` if the failure set moved.
+2. Update `website/docs/limitations.md` if the failure set moved, and write the suite's figure
+   there: the `Total tests: …` line of `eng/measure.sh`'s own summary, then
+   ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing
+   between two releases edits it** (2026-09-21): refreshed by hand after each run, the counts
+   drifted, and the landing page and this page disagreed.
 3. Tag on `main`: `git tag -a v10.2.0 -m "InfoCarrier.Core 10.2.0"`, `git push origin v10.2.0`.
 4. Continue at **After either**, and then cut the new line: `git checkout -b release/10.2 v10.2.0`
    and push it. **Raise `PackageValidationBaselineVersion` to `10.2.0` on that branch too**, for
