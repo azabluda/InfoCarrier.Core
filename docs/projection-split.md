@@ -185,6 +185,27 @@ so a downstream `OrderBy(x => x.City).Take(5)` *could* run server-side as
 `OrderBy(t => t.Item1).Take(5)`. It does not, in M2: the client applies it after receiving every
 row. Correct, potentially expensive, and tracked as a performance item (§7).
 
+**Amendment 2026-09-22 — three shapes push down now, and performance was not the reason.** The
+paragraph above still states the rule for an arbitrary downstream operator, and read alone it is
+now too strong. What moved it was correctness rather than cost: an operator that stays on the
+client makes this provider *answer* a query the server's EF would refuse, and the standing decision
+for this family is to behave as plain EF does on the same server. Each of these three therefore
+reaches the server, which gives EF's own answer:
+
+- **A projection of a captured value.** Parameter substitution opens an anonymous object into the
+  construction that built it, so `Select(c => new { f = flag }).OrderBy(e => (bool?)e.f)` reaches
+  the server and is refused there. The message names `@p.Item1` where EF names `@p.f`.
+- **`Distinct` over a rebuild.** `ProjectionRewriter.TryMoveDistinctBelowReassembly` moves it below
+  a rebuild that copies each slot into one member, onto the server's tuple.
+- **A `Select` over a rebuild.** `ProjectionRewriter.TryFuseSelectWithReassembly` fuses the two, so
+  a projection over a client-typed projection reaches the server as EF writes it.
+
+A fourth change of the same family is not pushdown and is recorded here beside them: an inner
+projection's values are collected against the parameters of every *enclosing* lambda, so a
+projected collection that reads its owner computes that read on the server.
+
+The general case stays deferred, and §7 still holds it.
+
 ### 3.5 Frontier and fallback
 
 Where a rewrite does not apply, the split is a plain cut. Take the **frontier**: the maximal

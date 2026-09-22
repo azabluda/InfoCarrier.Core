@@ -86,7 +86,14 @@ BUDGET = {
     # null parameter, and comparing or combining parameter collections. Both are cases this
     # provider answers and other providers do not, so leaving them out would break the
     # completeness claim the page opens with. Revisit if the suite stops adding to it.
-    "website/docs/limitations.md": 750,
+    #
+    # RAISED TO 800 ON 2026-09-22, and the page got SHORTER in scenarios while doing it. Two of
+    # the scenarios it named stopped being true that week: the inline collection of parameters
+    # now meets EF's refusal, and the converted list does too once the element type is named on
+    # both halves. Deleting the first is what a shrinking page looks like; the second cannot just
+    # be deleted, because it is still true unregistered, so the page has to say what makes the
+    # difference. A budget yields to a missing fact, which is that one.
+    "website/docs/limitations.md": 800,
 
     # Added to the 700 tier 2026-08-24. Same tier rule as the four above: it covers a whole
     # subject rather than one task (reads, writes, resolving the tenant on the server, and what
