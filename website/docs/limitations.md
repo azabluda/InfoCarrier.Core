@@ -102,10 +102,7 @@ EF Core provider.
 
 ### Queries this provider answers that other providers do not
 
-EF's suite has other scenarios that assert a provider either rejects the query or returns the wrong
-rows. This provider answers them correctly. A test suite you port will expect an exception, and
-LINQ that relies on this will not run unchanged elsewhere. Two of them:
-
+One scenario in EF's suite expects the provider to reject the query, and this provider answers it.
 Composing LINQ over a collection stored through a value converter:
 
 ```csharp
@@ -119,19 +116,16 @@ modelBuilder.Entity<Dashboard>()
 context.Dashboards
     .Select(d => new { d.Name, Heights = d.Layouts.Select(l => l.Height).ToList() })
     .ToList();
-// EF Core providers: throws.   This provider: returns the rows.
+// EF Core providers: throws.   This provider: reads the column and answers.
 ```
 
-Comparing a column collection against an inline collection of parameters, which relational
-providers leave without a type mapping:
+The inner lambda names `Layout`, which the model does not imply, so this client keeps that part of
+the query and the server sends the whole column. Name `Layout` on both halves, as
+[Keys of your own types](guide/querying.md#keys-of-your-own-types) describes for a `GroupBy` key,
+and the query reaches the server, which rejects it as every other provider does.
 
-```csharp
-var low = 1;
-var high = 9;
-
-context.Entities.Where(e => e.Ints == new[] { low, high }).ToList();
-// EF Core providers: throws.   This provider: returns the matching rows.
-```
+A test suite you port will expect the exception, and LINQ that relies on the answer will not run
+unchanged elsewhere.
 
 ## Consequences of the client having no database
 
