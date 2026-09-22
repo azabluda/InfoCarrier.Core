@@ -126,13 +126,35 @@ matching-text assertion alone would not catch.
 `GetType` test beside it cover the six cases, and both assert the statement *count* as well as the
 text.
 
-**Registration does not substitute for the entry today, which is what makes this a product decision
-rather than a configuration one.** With the entry removed and `typeof(Type)` registered through
-`AllowTypes` on both halves, the query was still refused; adding `System.RuntimeType` to the
-registration did not help either. Why registration does not reach this is not established, and it
-should be, because everything else in this file treats registration as the way an application takes
-a risk deliberately. Until it is, removing the entry would take the capability away with no way for
-an application to get it back.
+### 2 addendum (2) — why registration does not substitute for the clause
+
+**The clause admits three names, and the set can only express one at a time.** §2 says
+`System.Type` "and everything assignable to it", which reads like one entry. A `typeof(X)`
+constant makes the boundary ask about all three of these:
+
+| name | who asks, and why |
+|---|---|
+| `System.Type` | the constant's declared type, and the operand type of `==` |
+| `System.Reflection.TypeInfo` | `WireTypeCollector` reports the *value's* type through `TypeNodeMapper.Nameable`, which walks to the first **visible** base; `RuntimeType` is internal and `TypeInfo` is what it lands on |
+| `System.RuntimeType` | asked on the **server** side; internal, and an application can only name it as `typeof(int).GetType()` |
+
+`_allowed` is an exact-match set, so registering `System.Type` admits `System.Type` and nothing
+derived from it. The clause is `typeof(Type).IsAssignableFrom(type)`, a *rule*, and that is exactly
+the difference: a rule covers the subclasses, a set does not.
+
+**Measured by construction on 2026-09-22**, with the clause removed each time: `Type` alone was
+refused at `TypeInfo`; `Type` plus `RuntimeType` was still refused at `TypeInfo`; `TypeInfo` alone
+was refused at `Type`; `Type` plus `TypeInfo` reached the server and was refused there at
+`RuntimeType`; all three together shipped the query whole, with no split event and no refusal. The
+refused name came from instrumenting `TypeAllowlist.IsAllowed` and reading the stack, not from
+guessing.
+
+**So an opt-in design is possible but is not just a deletion.** It would have to keep the rule and
+gate it on the application having registered `System.Type` — "register the root, get its runtime
+subclasses" — because no application should be expected to name `System.RuntimeType`. Removing the
+clause and relying on `AllowTypes` as it stands would take the capability away in practice.
+`DeserializationHardeningTest.The_Type_clause_admits_the_three_names_a_typeof_value_reaches` pins
+the reach, so a future narrowing of the rule fails a test rather than a user's query.
 
 **Both readings above are from the statement text, not from a green test.** A differential test says
 "the same as EF", never "few columns", so a pass can sit on top of a full table crossing the wire

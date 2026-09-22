@@ -384,6 +384,43 @@ public class DeserializationHardeningTest
     }
 
     /// <summary>
+    ///     The <c>Type</c> clause admits three names, and a query naming a type needs all three.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>security-review.md</c> §2 admits <see cref="System.Type" /> "and everything
+    ///         assignable to it", which reads like one entry and is three. A
+    ///         <c>typeof(X)</c> constant makes the boundary ask about all of them:
+    ///         <see cref="System.Type" /> for the constant's declared type,
+    ///         <see cref="System.Reflection.TypeInfo" /> because <c>TypeNodeMapper.Nameable</c>
+    ///         maps the value's runtime type to its first <em>visible</em> base, and
+    ///         <c>System.RuntimeType</c> on the server, which is internal and reachable only as
+    ///         <c>typeof(int).GetType()</c>.
+    ///     </para>
+    ///     <para>
+    ///         <b>This is why registration cannot stand in for the clause</b>, measured
+    ///         2026-09-22: <c>_allowed</c> is an exact-match set and cannot express "and
+    ///         everything assignable to it", so an application registering
+    ///         <see cref="System.Type" /> alone still had its query refused. Registering all
+    ///         three restored it. §2's addendum carries the reading.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void The_Type_clause_admits_the_three_names_a_typeof_value_reaches()
+    {
+        TypeAllowlist allowlist = TypeAllowlist.ForModel(null);
+
+        Assert.True(allowlist.IsAllowed(typeof(System.Type)), "the constant's declared type");
+        Assert.True(allowlist.IsAllowed(typeof(TypeInfo)), "what Nameable reports for the value");
+        Assert.True(allowlist.IsAllowed(typeof(int).GetType()), "System.RuntimeType, on the server");
+
+        // The neighbours stay out, which is what makes this a clause about `Type` rather than
+        // about reflection: `MemberInfo` is `Type`'s own base and is refused.
+        Assert.False(allowlist.IsAllowed(typeof(MemberInfo)));
+        Assert.False(allowlist.IsAllowed(typeof(MethodInfo)));
+    }
+
+    /// <summary>
     ///     A property whose own CLR type is on the reflection invocation surface is admitted only
     ///     when the application registers it (<c>security-review.md</c> §2b).
     /// </summary>
