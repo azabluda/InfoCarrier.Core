@@ -103,6 +103,12 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     /// </remarks>
     public DbSet<Creature> Creatures => Set<Creature>();
 
+    /// <summary>The same hierarchy under TPT, so the probe covers more than one mapping.</summary>
+    public DbSet<Conveyance> Conveyances => Set<Conveyance>();
+
+    /// <summary>And under TPC.</summary>
+    public DbSet<Tool> Tools => Set<Tool>();
+
     /// <summary>
     ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
     /// </summary>
@@ -176,6 +182,17 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
         modelBuilder.Entity<Sparrow>();
         modelBuilder.Entity<Carp>();
 
+        // The same shape under the other two mapping strategies. `GetType()` translates very
+        // differently under each -- a discriminator test, a join over the leaf tables, a union --
+        // so one of them answering is no evidence about the others.
+        modelBuilder.Entity<Conveyance>().UseTptMappingStrategy();
+        modelBuilder.Entity<Sedan>();
+        modelBuilder.Entity<Lorry>();
+
+        modelBuilder.Entity<Tool>().UseTpcMappingStrategy();
+        modelBuilder.Entity<Hammer>();
+        modelBuilder.Entity<Saw>();
+
         // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
         // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
         // constraint branch, and R44 exists to measure that branch over the wire.
@@ -207,6 +224,46 @@ public class Sparrow : Creature
 public class Carp : Creature
 {
     public int Depth { get; set; }
+}
+
+/// <summary>The root of the TPT hierarchy.</summary>
+public abstract class Conveyance
+{
+    public int Id { get; set; }
+
+    public string? Model { get; set; }
+}
+
+/// <summary>A TPT leaf.</summary>
+public class Sedan : Conveyance
+{
+    public int Doors { get; set; }
+}
+
+/// <summary>The other TPT leaf.</summary>
+public class Lorry : Conveyance
+{
+    public int Axles { get; set; }
+}
+
+/// <summary>The root of the TPC hierarchy.</summary>
+public abstract class Tool
+{
+    public int Id { get; set; }
+
+    public string? Label { get; set; }
+}
+
+/// <summary>A TPC leaf.</summary>
+public class Hammer : Tool
+{
+    public int Weight { get; set; }
+}
+
+/// <summary>The other TPC leaf.</summary>
+public class Saw : Tool
+{
+    public int Teeth { get; set; }
 }
 
 /// <summary>

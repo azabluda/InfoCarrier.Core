@@ -104,6 +104,22 @@ type argument is an entity type and the declaring type is `Queryable`, so no `Ty
 Only the `GetType() == typeof(X)` spelling depends on the entry, and it is the spelling to avoid
 anyway. So a future opt-in design would cost the idiomatic query nothing.
 
+**Both spellings were measured under all three inheritance mappings, and the server discriminates
+in every one.** One statement each, matching plain EF's, with the statements read rather than the
+booleans trusted:
+
+| mapping | what the server runs for both spellings |
+|---|---|
+| TPH | filters on the discriminator column |
+| TPT | joins the leaf table and filters |
+| TPC | narrows to the one concrete table, with no union |
+
+Nothing reads a whole hierarchy and nothing runs a second statement, which is the failure a
+matching-text assertion alone would not catch.
+`ServerParameterizationTest.An_OfType_filter_matches_the_direct_query_under_every_mapping` and the
+`GetType` test beside it cover the six cases, and both assert the statement *count* as well as the
+text.
+
 **Registration does not substitute for the entry today, which is what makes this a product decision
 rather than a configuration one.** With the entry removed and `typeof(Type)` registered through
 `AllowTypes` on both halves, the query was still refused; adding `System.RuntimeType` to the

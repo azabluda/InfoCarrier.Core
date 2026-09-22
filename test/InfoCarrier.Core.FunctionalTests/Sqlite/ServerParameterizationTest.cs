@@ -673,12 +673,60 @@ public partial class ServerParameterizationTest
     ///     </para>
     /// </remarks>
     [ConditionalFact]
-    public Task A_predicate_naming_a_Type_matches_the_direct_query()
-        => AssertSameStatementFor(
-            static async context => _ = await context.Set<Creature>()
-                .Where(c => c.GetType() == typeof(Sparrow))
-                .ToListAsync(),
-            null);
+    public async Task A_predicate_naming_a_Type_matches_the_direct_query()
+    {
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Creature>().Where(x => x.GetType() == typeof(Sparrow)).ToListAsync());
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Conveyance>().Where(x => x.GetType() == typeof(Sedan)).ToListAsync());
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Tool>().Where(x => x.GetType() == typeof(Hammer)).ToListAsync());
+    }
+
+    /// <summary>
+    ///     <c>OfType&lt;T&gt;()</c> discriminates on the server under all three mappings, and needs
+    ///     no <see cref="System.Type" /> value to do it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The type argument is an entity type and the declaring type is <c>Queryable</c>, so
+    ///         nothing here depends on the allowlist entry the test above is about. Measured with
+    ///         that entry removed: the statement is unchanged.
+    ///     </para>
+    ///     <para>
+    ///         <b>Read from the statement, not from a green.</b> A differential test says "the same
+    ///         as EF" and is silent when both sides read everything, so the three mappings were
+    ///         each dumped and read: TPH filters on the discriminator, TPT joins the leaf table,
+    ///         and TPC narrows to the one concrete table with no union.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_OfType_filter_matches_the_direct_query_under_every_mapping()
+    {
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Creature>().OfType<Sparrow>().ToListAsync());
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Conveyance>().OfType<Sedan>().ToListAsync());
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Tool>().OfType<Hammer>().ToListAsync());
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> both ways and asserts the store saw <em>one</em> statement
+    ///     each and the same one.
+    /// </summary>
+    /// <remarks>
+    ///     The count is half the assertion. Matching text alone would still pass if this client
+    ///     sent the query and then a second read, and an inheritance query is exactly where a
+    ///     second read would hide.
+    /// </remarks>
+    private async Task AssertOneMatchingStatement(Func<DbContext, Task> run)
+    {
+        Run both = await RunBothWays(null, run);
+
+        Assert.Null(both.WireError);
+        Assert.Null(both.DirectError);
+        Assert.Single(both.Directly);
+        Assert.Single(both.OverTheWire);
+        Assert.Equal(both.Directly[0], both.OverTheWire[0]);
+    }
 
     /// <summary>
     ///     An ordering by a captured value the projection carries fails where plain EF Core fails,
