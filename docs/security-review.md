@@ -134,11 +134,38 @@ which is its own decision about that one type. Unregistered, the query keeps tod
 client reads the column and answers. `DeserializationHardeningTest.A_mapped_collection_propertys_element_type_is_admitted_only_when_registered`
 pins it with `FileInfo`, and `ServerParameterizationTest` measures both halves against plain EF.
 
-**Noted while writing this, and not changed here.** The property's own CLR type is admitted verbatim
-with no surface check, so a property mapped as `MethodInfo` through a converter would admit
-`MethodInfo` itself, and `Invoke` with it, since `ResolveMethod` finds inherited methods. §2a's
-guard covers only the bases. It is as unlikely as the case §2a guards against, and the same hole one
-step earlier.
+**Noted while writing this, and closed the same day in §2c.** The property's own CLR type was
+admitted verbatim with no surface check, so a property mapped as `MethodInfo` through a converter
+would admit `MethodInfo` itself, and `Invoke` with it, since `ResolveMethod` finds inherited
+methods. §2a's guard covered only the bases. It is as unlikely as the case §2a guards against, and
+the same hole one step earlier.
+
+## 2c. Amendment — every type inferred from the model goes through one guard (2026-09-22)
+
+**What raised it.** §2b's closing note, above, on the same day. A value converter maps any CLR type
+at all, so "the model names it" is a good reason to admit an *entity*, whose instances the model
+itself produces, and not a reason to admit an arbitrary type the application happened to write a
+converter for.
+
+**The fix is a single `Admit` helper, and every add inferred from the model now goes through it.**
+Not only the property type: the entity CLR type and its supertypes, the declaring type of a mapped
+member, a navigation's declared type and its generic arguments, a complex property's own type and
+the types of its members, and the class declaring a `HasDbFunction` method, which already carried
+the check and now shares it. **Registration deliberately does not go through it** — an application
+naming a type is its own decision (§4c), and telling that apart from inference is the whole purpose
+of the helper.
+
+**Why one helper rather than a check at each site.** The sites are the finding. `AddPropertyBaseTypes`
+had carried this guard since C53 while the line directly above it did not, and every neighbouring
+add was one more place to forget it next time. A reader now asks one question — is this add inferred
+from the model? — rather than eight.
+
+**Nothing legitimate is refused by it.** What the guard turns away is a type whose instances *are* a
+`MemberInfo` or an `Assembly`. An entity, a supertype, a navigation target or a complex member that
+is one of those is not a mapping this provider could serve in any case.
+
+`DeserializationHardeningTest.A_property_mapped_as_a_reflection_type_is_admitted_only_when_registered`
+pins both halves: refused by inference, admitted once the application registers it.
 
 ## 3. What is genuinely bounded
 
