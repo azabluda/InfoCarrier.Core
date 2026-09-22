@@ -1,6 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
@@ -1104,7 +1105,46 @@ internal sealed class QueryExecutor<TElement>
                 return Boxed(value, parameterType);
             }
 
+            // **An anonymous object is opened into its construction, since 2026-09-22.** EF's
+            // funcletizer lifts a projection that reads nothing from the row,
+            // `Select(c => new { f = flag })`, into ONE parameter holding the object, and then
+            // refuses `OrderBy(e => (bool?)e.f)` because it cannot order by a member of a
+            // parameter. Here the same parameter became a constant of a type the server's assembly
+            // does not have, so the split cut below the `Select`: the server read the whole table
+            // and the client ordered the rows, answering what EF refuses.
+            //
+            // Opened, it is an ordinary anonymous construction, which the split re-carries as a
+            // tuple like any other. Its arguments are closed, so the server's funcletizer lifts
+            // the tuple into one parameter, which is the decision EF's own client made, and the
+            // server's EF then answers or refuses as EF does. Each member is substituted by the
+            // rules above, so a captured value inside it stays a parameter.
+            if (value is not null && JoinKeyRewriter.IsAnonymous(parameterType))
+            {
+                return Opened(value, parameterType);
+            }
+
             return Expression.Constant(value, parameterType);
+        }
+
+        /// <summary>
+        ///     The construction that builds <paramref name="value" />, an instance of an anonymous
+        ///     type, with each member's value substituted as a parameter of its own.
+        /// </summary>
+        /// <remarks>
+        ///     The compiler gives an anonymous type one constructor, whose parameters are named and
+        ///     ordered as its properties are, so the constructor alone says which property each
+        ///     argument fills.
+        /// </remarks>
+        private Expression Opened(object value, Type anonymousType)
+        {
+            ConstructorInfo constructor = anonymousType.GetConstructors().Single();
+            PropertyInfo[] members =
+                [.. constructor.GetParameters().Select(p => anonymousType.GetProperty(p.Name!)!)];
+
+            return Expression.New(
+                constructor,
+                members.Select(m => Substitute(m.GetValue(value), m.PropertyType)),
+                members);
         }
 
         /// <summary>
