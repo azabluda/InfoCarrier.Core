@@ -629,6 +629,42 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     An ordering by a captured value the projection carries fails where plain EF Core fails,
+    ///     and runs no statement.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The projection reads nothing from the row, so EF's funcletizer lifts the whole
+    ///         anonymous object into one parameter, and the ordering reads a member of that
+    ///         parameter, <c>(bool?)@p.F</c>, which EF cannot translate.
+    ///         <c>NorthwindSelectQueryRelationalTestBase.Select_bool_closure_with_order_by_property_with_cast_to_nullable</c>
+    ///         is EF's own test of that.
+    ///     </para>
+    ///     <para>
+    ///         This client used to substitute that parameter as a constant of the anonymous type,
+    ///         which the server does not have, so the split cut below the <c>Select</c>: the server
+    ///         read the whole table and the client ordered the rows. The constant is now opened
+    ///         into its construction, and the server's EF names <c>@p.Item1</c> where EF names
+    ///         <c>@p.F</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_ordering_by_a_captured_value_fails_where_EF_fails()
+    {
+        bool flag = false;
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>()
+                .Select(b => new { F = flag })
+                .OrderBy(e => (bool?)e.F)
+                .ToListAsync());
+
+        Assert.IsType<InvalidOperationException>(run.DirectError);
+        Assert.IsType<InvalidOperationException>(run.WireError);
+        Assert.Empty(run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A projection over the elements of a list stored in one column fails where plain EF Core
     ///     fails, and runs no statement, once the application registers the element type.
     /// </summary>

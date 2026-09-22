@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
-using Microsoft.EntityFrameworkCore.TestModels.Northwind;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -226,33 +225,4 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             () => base
                 .SelectMany_with_collection_being_correlated_subquery_which_references_non_mapped_properties_from_inner_and_outer_entity(
                     async));
-
-    // -------------------------------------------------------------------------------------
-    // THIS PROVIDER ANSWERS A QUERY EF's RELATIONAL PROVIDERS REJECT.
-    // NorthwindSelectQueryRelationalTestBase turns this into AssertTranslationFailed: a
-    // relational provider cannot ORDER BY a client-side constant projection. This provider's
-    // split evaluates the ordering over the constant on the client (it is a no-op over a single
-    // distinct value) and the server runs the rest, so the query returns the correct rows.
-    // Restored to the core assertion — the answer is checked, and it is right. Same category as
-    // limitations.md's "queries this provider answers that other EF providers refuse".
-    // -------------------------------------------------------------------------------------
-    [InfoCarrierDesign(
-        10,
-        Justification = "The ordering follows a projection of a closure value, so it runs on the client over the rows "
-            + "the server returned, and the query is answered where EF's relational providers refuse to translate it.",
-        Repository = UpstreamRepository.EfCore,
-        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/NorthwindSelectQueryRelationalTestBase.cs",
-        UpstreamFirstLine = 11,
-        UpstreamLastLine = 12,
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = "The body is the core base's, which asserts the ordered rows.")]
-    public override async Task Select_bool_closure_with_order_by_property_with_cast_to_nullable(bool async)
-    {
-        var boolean = false;
-
-        await AssertQuery(
-            async,
-            ss => ss.Set<Customer>().Select(c => new { f = boolean }).OrderBy(e => (bool?)e.f),
-            assertOrder: true);
-    }
 }

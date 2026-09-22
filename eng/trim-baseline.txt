@@ -206,5 +206,23 @@
 #
 # `total` rises with ours, 1141 -> 1142: EFCore is unchanged at 864.
 
-ours=97
-total=1142
+# 2026-09-22, 97 -> 98 (an anonymous-object parameter is opened into its construction, one
+# diagnostic).
+#
+# EF's funcletizer lifts `Select(c => new { f = flag })` into ONE parameter holding the anonymous
+# object. The substitution left that value a constant of a type the server does not have, so the
+# split cut below the `Select` and this client ordered the rows of a query EF refuses
+# (`Select_bool_closure_with_order_by_property_with_cast_to_nullable`). It is now rebuilt as the
+# construction that made it, and the split re-carries that as a tuple like any other.
+#
+# The diagnostic is the IL2026 on `Expression.New(ConstructorInfo, IEnumerable<Expression>,
+# MemberInfo[])` in `QueryExecutor.SubstituteParametersExpressionVisitor.Opened`. THE MEMBER LIST
+# CANNOT BE LEFT OFF: `TransparentIdentifierRewriter` registers a construction as a carrier only when
+# it has one, and the overload without it is the one the trimmer does not mark. Calling it through
+# `TupleCarrier`'s own construction would have hidden the site from this count without making it any
+# more provable, so it is counted here instead.
+#
+# `total` rises with ours, 1142 -> 1143: EFCore is unchanged at 864.
+
+ours=98
+total=1143

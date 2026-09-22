@@ -142,7 +142,7 @@ internal sealed class JoinKeyRewriter : ExpressionVisitor
     ///     Whether the type is one the compiler generated for a <c>new { … }</c>, which is the only
     ///     kind of key this rewrites.
     /// </summary>
-    private static bool IsAnonymous(Type type)
+    internal static bool IsAnonymous(Type type)
         => type.IsGenericType
             && type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)
             && type.Name.Contains("AnonymousType", StringComparison.Ordinal);
