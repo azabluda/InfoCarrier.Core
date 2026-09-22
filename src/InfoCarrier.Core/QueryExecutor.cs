@@ -680,6 +680,12 @@ internal sealed class QueryExecutor<TElement>
         /// </remarks>
         private bool _foldableCallOverACollectionParameter;
 
+        /// <summary>
+        ///     Set while visiting an index into a collection parameter, where the parameter must stay
+        ///     one parameter on the far side; see <see cref="IsAnIndexIntoACollectionParameter" />.
+        /// </summary>
+        private bool _indexIntoACollectionParameter;
+
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
@@ -691,7 +697,9 @@ internal sealed class QueryExecutor<TElement>
             if (node.Method.DeclaringType != typeof(EF) && node.Method.DeclaringType != typeof(EFExtensions))
             {
                 bool foldable = _foldableCallOverACollectionParameter;
+                bool indexing = _indexIntoACollectionParameter;
                 _foldableCallOverACollectionParameter = IsAFoldableCallOverACollectionParameter(node);
+                _indexIntoACollectionParameter = IsAnIndexIntoACollectionParameter(node);
                 try
                 {
                     return base.VisitMethodCall(node);
@@ -699,6 +707,7 @@ internal sealed class QueryExecutor<TElement>
                 finally
                 {
                     _foldableCallOverACollectionParameter = foldable;
+                    _indexIntoACollectionParameter = indexing;
                 }
             }
 
@@ -735,18 +744,55 @@ internal sealed class QueryExecutor<TElement>
         ///     </para>
         /// </remarks>
         private bool IsAFoldableCallOverACollectionParameter(MethodCallExpression node)
-        {
-            if (node.Arguments.Count == 0
-                || node.Arguments[0] is not QueryParameterExpression
-                || node.Method.DeclaringType is not { } declaring
-                || (declaring != typeof(Enumerable) && declaring != typeof(Queryable)))
+            => node.Arguments.Count > 0
+                && node.Arguments[0] is QueryParameterExpression
+                && node.Method.DeclaringType is { } declaring
+                && (declaring == typeof(Enumerable) || declaring == typeof(Queryable))
+                && !ReadsTheRow(node);
+
+        /// <summary>
+        ///     Whether this node reads one element of a collection parameter by its index, in a way
+        ///     the server's funcletizer could evaluate: <c>ids[1]</c> over an array or over a list.
+        /// </summary>
+        /// <remarks>
+        ///     <b>Since 2026-09-22.</b> In a compiled query EF keeps the list and translates the index
+        ///     over it, <c>@ids -&gt;&gt; 1</c> on SQLite, and the server folded it to one value,
+        ///     <c>@p</c>. Where EF cannot type the element, as in
+        ///     <c>(string)parameters[0]</c>, EF refuses and this client answered.
+        ///     <c>ServerParameterizationTest</c> compares both with plain EF Core.
+        /// </remarks>
+        private bool IsAnIndexIntoACollectionParameter(Expression node)
+            => node switch
             {
-                return false;
+                BinaryExpression { NodeType: ExpressionType.ArrayIndex, Left: QueryParameterExpression } => !ReadsTheRow(node),
+                MethodCallExpression { Object: QueryParameterExpression, Method.Name: "get_Item" } => !ReadsTheRow(node),
+                _ => false,
+            };
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (node.NodeType != ExpressionType.ArrayIndex)
+            {
+                return base.VisitBinary(node);
             }
 
+            bool indexing = _indexIntoACollectionParameter;
+            _indexIntoACollectionParameter = IsAnIndexIntoACollectionParameter(node);
+            try
+            {
+                return base.VisitBinary(node);
+            }
+            finally
+            {
+                _indexIntoACollectionParameter = indexing;
+            }
+        }
+
+        private bool ReadsTheRow(Expression node)
+        {
             var finder = new OuterParameterFinder(_queryContext);
             finder.Visit(node);
-            return !finder.Found;
+            return finder.Found;
         }
 
         /// <summary>
@@ -887,8 +933,11 @@ internal sealed class QueryExecutor<TElement>
             {
                 Expression boxed = Boxed(value, parameterType);
 
-                // Kept a parameter on purpose: see `_foldableCallOverACollectionParameter`.
-                return _foldableCallOverACollectionParameter ? CollectionParameterMark.Mark(boxed) : boxed;
+                // Kept a parameter on purpose: see `_foldableCallOverACollectionParameter` and
+                // `_indexIntoACollectionParameter`.
+                return _indexIntoACollectionParameter ? CollectionParameterMark.MarkIndexed(boxed)
+                    : _foldableCallOverACollectionParameter ? CollectionParameterMark.Mark(boxed)
+                    : boxed;
             }
 
             // J21: a **scalar** the wire does not carry as a primitive is boxed for the same reason

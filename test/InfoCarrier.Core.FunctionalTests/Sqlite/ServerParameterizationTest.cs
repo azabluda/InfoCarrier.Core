@@ -192,6 +192,37 @@ public partial class ServerParameterizationTest
             (DbContext context, int[] ids) => context.Set<Blog>().Count(b => b.Id < ids.Count()));
 
     /// <summary>
+    ///     A compiled query that reads one element of its list by index runs plain EF Core's statement.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The server evaluated the index until 2026-09-22</b> and ran <c>WHERE "b"."Id" = @p</c>,
+    ///     where plain EF Core keeps the list and runs <c>WHERE "b"."Id" = @p -&gt;&gt; 1</c>, in all three
+    ///     modes. The same fold answered <c>(string)parameters[0]</c>, which EF refuses:
+    ///     <c>PrimitiveCollectionsQuerySqliteInfoCarrierTest</c> now inherits that refusal. The client
+    ///     marks the list with <c>EF.Parameter</c> here and not with the mode-named mark, because a
+    ///     server in <c>Constant</c> mode then inlined the list as <c>'[1,2,3]' -&gt;&gt; 1</c>.
+    /// </remarks>
+    [ConditionalTheory]
+    [InlineData(ParameterTranslationMode.Constant, false)]
+    [InlineData(ParameterTranslationMode.Parameter, false)]
+    [InlineData(ParameterTranslationMode.MultipleParameters, false)]
+    [InlineData(ParameterTranslationMode.Constant, true)]
+    [InlineData(ParameterTranslationMode.Parameter, true)]
+    [InlineData(ParameterTranslationMode.MultipleParameters, true)]
+    public Task A_compiled_query_indexing_a_list_matches_the_direct_query(ParameterTranslationMode mode, bool list)
+    {
+        // An array index is a `BinaryExpression` and a list index is a call to `get_Item`, so each
+        // is its own path through the client.
+        Func<DbContext, Task<int>> run = list
+            ? context => EF.CompileAsyncQuery(
+                (DbContext c, List<int> ids) => c.Set<Blog>().Count(b => b.Id == ids[1]))(context, [1, 2, 3])
+            : context => EF.CompileAsyncQuery(
+                (DbContext c, int[] ids) => c.Set<Blog>().Count(b => b.Id == ids[1]))(context, [1, 2, 3]);
+
+        return AssertSameStatementFor(run, mode);
+    }
+
+    /// <summary>
     ///     A list the caller marks with <c>EF.MultipleParameters</c> keeps the caller's mode, whatever
     ///     the server is configured with.
     /// </summary>

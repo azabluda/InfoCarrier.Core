@@ -37,8 +37,10 @@ At the EF 11 tag:
 **Written 2026-09-21.** EF refuses three tests of `PrimitiveCollectionsQueryRelationalTestBase`, two
 of them compiled queries, and EF's own comment on the first says *"We should apply the default type
 mapping to the parameter, but need to figure out the exact rules when to do this"*. The fix for
-#37370 applies the default mapping in one such place. **Read the three tests at the EF 11 tag**: if
-EF answers one of them now, an override that cites §1.12 for it has lost its reason.
+#37370 applies the default mapping in one such place. **Read the three tests at the EF 11 tag.**
+Since 2026-09-22 all three inherit EF's refusal here and no override cites §1.12, so if EF 11 answers
+one of them, EF's own base changes with it and this suite follows; §1.12 is then corrected in
+place.
 
 ## dotnet/efcore#19749: evaluating a compiled query's parameters
 
