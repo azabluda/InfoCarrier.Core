@@ -54,8 +54,14 @@ Neither is a hole, and the reason is precise and load-bearing:
 > `Type.InvokeMember` takes a `System.Reflection.Binder`; `MethodInfo.Invoke` and
 > `ConstructorInfo.Invoke` live on declaring types that are not admitted; `Activator`,
 > `Assembly` and `AppDomain` are not admitted at all. `ResolveMethod` resolves a method's
-> **parameter** types through the same allowlist, so an unadmitted parameter type fails the
-> signature lookup before `Admit` is consulted.
+> **parameter types and its return type** through the same allowlist, so either one unadmitted
+> fails the signature lookup before `Admit` is consulted.
+
+**The return-type half was added to this paragraph on 2026-09-22, and it widens the bound rather
+than narrowing it.** The sentence credited only the parameter check until then, which understated
+the guard: `Type.GetMethod("Start")` takes a `string` and would have passed a parameters-only
+check, and it is stopped instead by its `MethodInfo` return. Read in `ResolveMethod`, which
+resolves `node.ReturnType` before it looks at any candidate.
 
 So the safety of stage 6 is not one check but a **conjunction across several**, and it would be
 broken by adding any of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`,
