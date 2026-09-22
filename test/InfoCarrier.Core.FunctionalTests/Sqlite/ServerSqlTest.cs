@@ -60,6 +60,44 @@ FROM "Tickets" AS "t"
 """);
 
     /// <summary>
+    ///     A projected collection whose element reads nothing from the row asks the store for one
+    ///     constant, and for no column of that collection.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Shown to fail by reverting the change it is about.</b> Before the carrier learned
+    ///         to hold a constant (2026-09-22), the same call read every column of <c>Seats</c>:
+    ///         the element yields no fragment, so the rewrite gave up and the seat travelled whole.
+    ///     </para>
+    ///     <para>
+    ///         <b>A promise and not a comparison, because one constant remains.</b> Plain EF Core
+    ///         projects the two keys and nothing else here, since the element is a parameter to it.
+    ///         This client projects <c>1</c> as well: the carrier has to hold something, and a
+    ///         member-less tuple is neither on the allowlist nor buildable by
+    ///         <see cref="TupleCarrier" />. A literal in a projection list reads no column and
+    ///         changes no plan, so it is priced and accepted rather than chased.
+    ///         <c>ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query</c>
+    ///         is the unnested shape, which does equal EF's statement.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_projected_collection_reading_no_column_sends_one_constant()
+    {
+        bool flag = true;
+
+        return AssertServerRuns(
+            client => client.Tickets
+                .Select(t => new { t.Subject, Flags = t.Seats.Select(s => new { F = flag }).ToList() })
+                .ToListAsync(),
+            """
+SELECT "t"."Subject", "t"."Id", 1, "s"."Id"
+FROM "Tickets" AS "t"
+LEFT JOIN "Seats" AS "s" ON "t"."Id" = "s"."TicketId"
+ORDER BY "t"."Id"
+""");
+    }
+
+    /// <summary>
     ///     A terminal operator above a projection this client reassembles still bounds the rows at
     ///     the server.
     /// </summary>
