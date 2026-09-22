@@ -365,6 +365,25 @@ public class DeserializationHardeningTest
     }
 
     /// <summary>
+    ///     The element type of a mapped collection property is admitted only when the application
+    ///     registers it (<c>security-review.md</c> §2b).
+    /// </summary>
+    /// <remarks>
+    ///     A list stored in one column through a converter names nothing about its element that the
+    ///     application vouched for. Admitting the element by inference made every public method of
+    ///     a framework type such as <see cref="FileInfo" /> reachable from a payload, and the server
+    ///     evaluates a closed subtree before it translates the query.
+    /// </remarks>
+    [Fact]
+    public void A_mapped_collection_propertys_element_type_is_admitted_only_when_registered()
+    {
+        using var context = new FileListContext();
+
+        Assert.False(TypeAllowlist.ForModel(context.Model).IsAllowed(typeof(FileInfo)));
+        Assert.True(TypeAllowlist.ForModel(context.Model, [typeof(FileInfo)]).IsAllowed(typeof(FileInfo)));
+    }
+
+    /// <summary>
     ///     The conjunction from <c>security-review.md</c> §2 still holds under a
     ///     <em>model-derived</em> allowlist, which is the one a server actually runs. The theory
     ///     earlier in this file checks the model-free list, which C53 does not touch — so without
@@ -414,5 +433,26 @@ public class DeserializationHardeningTest
             => modelBuilder.Entity<BaseChainEntity>()
                 .Property(e => e.Leaf)
                 .HasConversion(v => v.Name, v => new LeafThing { Name = v });
+    }
+
+    private sealed class FileListEntity
+    {
+        public int Id { get; set; }
+
+        public List<FileInfo> Files { get; set; } = [];
+    }
+
+    private sealed class FileListContext : Microsoft.EntityFrameworkCore.DbContext
+    {
+        protected override void OnConfiguring(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder optionsBuilder)
+            => Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions
+                .UseInMemoryDatabase(optionsBuilder, "hardening-file-list");
+
+        protected override void OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder)
+            => modelBuilder.Entity<FileListEntity>()
+                .Property(e => e.Files)
+                .HasConversion(
+                    v => string.Join("|", v.Select(f => f.FullName)),
+                    v => v.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(p => new FileInfo(p)).ToList());
     }
 }

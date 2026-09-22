@@ -629,6 +629,58 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     A projection over the elements of a list stored in one column fails where plain EF Core
+    ///     fails, and runs no statement, once the application registers the element type.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF raises <c>TranslationFailed</c> for the inner lambda, and
+    ///         <c>CustomConvertersTestBase.Composition_over_collection_of_complex_mapped_as_scalar</c>
+    ///         is its own test of that. The lambda names the element type, so it travels only when the
+    ///         type is registered on both halves, and the server's EF then refuses it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Registration and not inference, the owner's decision of 2026-09-22.</b> Admitting the
+    ///         element of every mapped collection property made framework types such as
+    ///         <c>FileInfo</c> nameable by a payload (<c>security-review.md</c> §2b).
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_over_a_converted_list_of_a_registered_type_fails_where_EF_fails()
+    {
+        Run registered = await RunBothWays([typeof(Tile)], ProjectTiles);
+
+        Assert.IsType<InvalidOperationException>(registered.DirectError);
+        Assert.IsType<InvalidOperationException>(registered.WireError);
+        Assert.Empty(registered.OverTheWire);
+    }
+
+    /// <summary>
+    ///     An <em>unregistered</em> element type reads the whole column here, and the client answers
+    ///     a query EF refuses. This records it rather than fixing it.
+    /// </summary>
+    /// <remarks>
+    ///     The same decision as <see cref="An_unregistered_group_key_reads_the_whole_table" />: a
+    ///     type the application has not named keeps the operator on this client.
+    ///     <see cref="A_projection_over_a_converted_list_of_a_registered_type_fails_where_EF_fails" />
+    ///     is the other half.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_over_a_converted_list_of_an_unregistered_type_reads_the_whole_column()
+    {
+        Run unregistered = await RunBothWays(allowedTypes: null, ProjectTiles);
+
+        Assert.IsType<InvalidOperationException>(unregistered.DirectError);
+        Assert.Null(unregistered.WireError);
+        Assert.Contains("\"Tiles\"", Assert.Single(unregistered.OverTheWire), StringComparison.Ordinal);
+    }
+
+    private static async Task ProjectTiles(DbContext context)
+        => _ = await context.Set<Panel>()
+            .Select(p => new { p.Id, Tiles = p.Tiles.Select(t => new { H = t.Height, W = t.Width }).ToList() })
+            .ToListAsync();
+
+    /// <summary>
     ///     A grouping key of a type the application declares — the shape a real application writes,
     ///     and the one the specification suite's <c>NorthwindGroupBy.Odata_groupby_empty_key</c> is
     ///     an example of.
@@ -824,9 +876,17 @@ public partial class ServerParameterizationTest
     ///     reports every statement the store saw for each — and what each side threw, because a
     ///     registered key type can move an operator to the server and meet EF's own refusal there.
     /// </summary>
-    private async Task<Run> RunBothWays(
+    private Task<Run> RunBothWays(
         Type[]? allowedTypes,
         Func<IQueryable<Blog>, IQueryable<Post>, IQueryable<int>> query)
+        => RunBothWays(allowedTypes, async context => _ = await query(context.Set<Blog>(), context.Set<Post>()).ToListAsync());
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> against the client context and again against the server
+    ///     context, for a query that needs more of the model than blogs and posts.
+    /// </summary>
+    /// <inheritdoc cref="RunBothWays(Type[], Func{IQueryable{Blog}, IQueryable{Post}, IQueryable{int}})" />
+    private async Task<Run> RunBothWays(Type[]? allowedTypes, Func<DbContext, Task> run)
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(allowedTypes);
         await store.InitializeAsync(
@@ -862,7 +922,7 @@ public partial class ServerParameterizationTest
         {
             try
             {
-                _ = await query(client.Blogs, client.Posts).ToListAsync();
+                await run(client);
             }
             catch (InvalidOperationException ex)
             {
@@ -877,7 +937,7 @@ public partial class ServerParameterizationTest
         {
             try
             {
-                _ = await query(server.Set<Blog>(), server.Set<Post>()).ToListAsync();
+                await run(server);
             }
             catch (InvalidOperationException ex)
             {

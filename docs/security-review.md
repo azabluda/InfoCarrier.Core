@@ -110,6 +110,36 @@ the new cases the widening would have been unpinned exactly where it applies.
 Harmless (abstract, constructs nothing) and unrelated to C53, but it was mistaken for C53's doing
 on first reading, so it is written down.
 
+## 2b. Amendment — the element type of a mapped collection property is registered, never inferred (2026-09-22)
+
+**What raised it.** `ForModel` admits a mapped property's CLR type verbatim, and a list stored in
+one column through a value converter is such a property: `List<Layout>` is admitted and `Layout` is
+not. A query over the list's elements names `Layout` in its lambda, so the client cannot send it.
+The server reads the whole column and the client runs the inner `Select`, which answers a query
+every EF provider refuses (`CustomConvertersTestBase.Composition_over_collection_of_complex_mapped_as_scalar`).
+
+**Inferring the element was tried and withdrawn the same day, and the reason is this document's.**
+The first version of #147 admitted the element of every mapped collection property, stopping only at
+§2a's reflection surface and the categories, and argued that the element's methods "are the
+application's code". That is true of `Layout` and false of a framework type. A model that maps
+`List<FileInfo>` through a converter would have admitted `FileInfo`, whose public methods §3's
+method rule then makes callable, and the server evaluates a closed subtree before it translates the
+query: `new FileInfo(path).CopyTo(target)` in a payload is file-system access. That is a reading of
+§3 and §4a, the path the `Regex` denial of service takes, and was not run as a probe. §2a's rule does not
+widen method reach because a base's methods were already reachable through the subclass; an
+element's methods were not reachable at all.
+
+**So the element type is admitted only when the application registers it** (§4c), on both halves,
+which is its own decision about that one type. Unregistered, the query keeps today's behaviour: the
+client reads the column and answers. `DeserializationHardeningTest.A_mapped_collection_propertys_element_type_is_admitted_only_when_registered`
+pins it with `FileInfo`, and `ServerParameterizationTest` measures both halves against plain EF.
+
+**Noted while writing this, and not changed here.** The property's own CLR type is admitted verbatim
+with no surface check, so a property mapped as `MethodInfo` through a converter would admit
+`MethodInfo` itself, and `Invoke` with it, since `ResolveMethod` finds inherited methods. §2a's
+guard covers only the bases. It is as unlikely as the case §2a guards against, and the same hole one
+step earlier.
+
 ## 3. What is genuinely bounded
 
 - **Node kinds** (C36). Not a wire field: `ExpressionNode.Kind` is `[JsonIgnore]` and answered by

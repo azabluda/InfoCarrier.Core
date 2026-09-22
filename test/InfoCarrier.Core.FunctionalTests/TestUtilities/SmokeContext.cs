@@ -87,6 +87,8 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
 
     public DbSet<Located> Located => Set<Located>();
 
+    public DbSet<Panel> Panels => Set<Panel>();
+
     /// <summary>
     ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
     /// </summary>
@@ -141,6 +143,19 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
         // carry only if it knows the entity type, so a projection whose shape went unresolved
         // dropped it silently while the public members beside it survived.
         modelBuilder.Entity<Located>().OwnsOne(e => e.Address, b => b.IndexerProperty<string>("Line"));
+
+        // A list of objects stored in one column, the shape of EF's own
+        // `CustomConvertersTestBase.Dashboard`. To EF the list is a scalar, so a query over its
+        // elements is one EF cannot translate.
+        modelBuilder.Entity<Panel>()
+            .Property(e => e.Tiles)
+            .HasConversion(
+                v => Tile.Serialize(v),
+                v => Tile.Deserialize(v),
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<Tile>>(
+                    (a, b) => a!.SequenceEqual(b!),
+                    v => v.Count,
+                    v => new List<Tile>(v)));
 
         // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
         // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
@@ -286,6 +301,38 @@ public class LocatedAddress
             _line = (string?)value;
         }
     }
+}
+
+/// <summary>
+///     An entity with a list of objects stored in one column through a value converter.
+/// </summary>
+public class Panel
+{
+    public int Id { get; set; }
+
+    public List<Tile> Tiles { get; set; } = [];
+}
+
+/// <summary>
+///     One element of <see cref="Panel.Tiles" />, which is not an entity type.
+/// </summary>
+public class Tile
+{
+    public int Height { get; set; }
+
+    public int Width { get; set; }
+
+    internal static string Serialize(List<Tile> tiles)
+        => string.Join(";", tiles.Select(t => FormattableString.Invariant($"{t.Height},{t.Width}")));
+
+    internal static List<Tile> Deserialize(string value)
+        => [.. value.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Split(','))
+            .Select(p => new Tile
+            {
+                Height = int.Parse(p[0], System.Globalization.CultureInfo.InvariantCulture),
+                Width = int.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture),
+            })];
 }
 
 /// <summary>
