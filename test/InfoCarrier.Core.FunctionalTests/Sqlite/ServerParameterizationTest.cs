@@ -649,6 +649,38 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A predicate that names <see cref="System.Type" /> reaches the server, and the server
+    ///     runs the statement plain EF Core runs for it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This is the evidence behind <c>security-review.md</c> §2's open recommendation.</b>
+    ///         That recommendation says <c>typeof(Type)</c> earns its place on the allowlist only if
+    ///         payloads genuinely carry <see cref="System.Type" /> values, and the suite could not
+    ///         answer it: removing both admission sites on 2026-09-22 left the whole suite green
+    ///         except the hardening test that asserts the pivot's own premise.
+    ///     </para>
+    ///     <para>
+    ///         <c>GetType()</c> is where an ordinary query carries one: its return type is
+    ///         <see cref="System.Type" /> and <c>typeof(Sparrow)</c> is a constant of it, so the
+    ///         boundary needs the entry for a predicate EF translates to a discriminator test.
+    ///     </para>
+    ///     <para>
+    ///         <b>The hierarchy is load-bearing, and the first version of this test did without
+    ///         it.</b> Over a single mapped type the comparison is constant, EF folds it before
+    ///         anything reaches the wire, and the test passed with the entry removed just as
+    ///         happily as with it there. A probe that cannot fail measures nothing.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_predicate_naming_a_Type_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async context => _ = await context.Set<Creature>()
+                .Where(c => c.GetType() == typeof(Sparrow))
+                .ToListAsync(),
+            null);
+
+    /// <summary>
     ///     An ordering by a captured value the projection carries fails where plain EF Core fails,
     ///     and runs no statement.
     /// </summary>

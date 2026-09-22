@@ -72,6 +72,35 @@ carry `Type` values. If a later audit finds they do not, removing it collapses t
 single clause and is worth doing. Removing it now is a change with a full-suite cost and no
 demonstrated benefit, so it is recorded rather than made.
 
+### 2 addendum — the audit was run on 2026-09-22, and the recommendation is closed as *keep it*
+
+**Payloads do carry `Type` values, and `GetType()` is where.** `c.GetType() == typeof(Sparrow)` is
+an ordinary query that EF translates to a discriminator test. Its captured tree names
+`System.Type` twice, as the method's return type and as the constant's, so the client's boundary
+needs the entry to ship the predicate at all.
+
+**The suite could not have told us this, and it is worth saying why.** Both admission sites were
+removed and the whole suite run: **1 test failed of 29 860**, and it was
+`DeserializationHardeningTest.The_Type_GetType_then_InvokeMember_pivot_is_refused`, which asserts
+the *premise* of §2's own pivot rather than any query. No spec test in either project carries a
+`Type` value. On that evidence alone the recommendation looked ready to close the other way.
+
+**The first probe written for it was wrong, and the error is the instructive part.** It asked the
+question over `Blog`, a type with no hierarchy, where the comparison is constant and EF folds it
+away before anything reaches the wire. It passed with the entry and passed again without it. A
+probe that cannot fail measures nothing, and this one would have closed the recommendation on a
+false green. The test now uses a TPH hierarchy, which is what gives `GetType()` something to
+discriminate.
+
+**What removal would actually cost**, measured on that test: the client refuses the predicate, the
+server runs `SELECT … FROM "Creatures"` with no `WHERE`, and the whole table crosses the wire for
+the client to filter. **Right answer, silently wrong cost** — the failure mode #111 exists to find,
+and one no answer-checking test can see.
+
+So the entry stays, the conjunction stays the bound, and
+`ServerParameterizationTest.A_predicate_naming_a_Type_matches_the_direct_query` is the pin. Anyone
+proposing the removal again should read this addendum first: the cost is not in the suite.
+
 ## 2a. Amendment — C53's base-class rule, and why it does not widen the surface
 
 Reviewed **2026-08-10**, two commits after §2 was written, because C53 admits the **base classes
