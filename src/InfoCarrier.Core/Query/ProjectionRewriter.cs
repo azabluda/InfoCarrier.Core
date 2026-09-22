@@ -61,6 +61,18 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         .GetMethods(BindingFlags.Public | BindingFlags.Static)
         .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
 
+    /// <summary>
+    ///     The single slot a projection gets when its body reads nothing from the row: the server
+    ///     is being asked which rows exist, and for no column of them.
+    /// </summary>
+    /// <remarks>
+    ///     <c>1</c> rather than anything of the entity's, because EF's own client writes
+    ///     <c>SELECT 1</c> for the same projection, and this carrier is what the server's EF
+    ///     translates. Nothing reads the slot: the reassembly rebuilds a body that never mentioned
+    ///     the row.
+    /// </remarks>
+    private static readonly Expression RowPresence = Expression.Constant(1);
+
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
@@ -253,15 +265,23 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         CollectFragments(selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], fragments, guards);
-        if (fragments.Count == 0)
-        {
-            // A body that reads nothing from the row — leave it to the plain cut.
-            return call;
-        }
 
         IReadOnlySet<Expression> consumed = Consumed(selector.Body);
 
-        Expression tuple = TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))]);
+        // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
+        //
+        // This returned `call` until 2026-09-22, on the ground that there was nothing for the
+        // server to compute. True, and it left the plain cut to ship the maximal `ServerOk`
+        // subtree, which is the query root: `Select(b => new { F = flag })` read every column the
+        // entity has, where EF's own client writes `SELECT 1`. Both answers are right, so nothing
+        // in the suite could see it and only a comparison with EF's statement did
+        // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
+        //
+        // So the carrier holds one constant instead, and the reassembly below reads none of it.
+        // What the server is asked for is the row count, which is what EF asks for.
+        Expression tuple = fragments.Count > 0
+            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))])
+            : TupleCarrier.New([RowPresence]);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
