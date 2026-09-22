@@ -87,10 +87,10 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///     <para>
     ///         <b>The server's EF refuses it, as EF does, since 2026-09-22.</b> Until then the server
     ///         read the whole <c>Layouts</c> column and the client ran the inner <c>Select</c>, which
-    ///         answered a query every EF provider refuses. The allowlist admitted
-    ///         <c>List&lt;Layout&gt;</c> and not <c>Layout</c>, so the lambda over an element could not
-    ///         travel. <c>ServerParameterizationTest.A_projection_over_a_converted_list_fails_where_EF_fails</c>
-    ///         compares the two refusals directly.
+    ///         answered a query every EF provider refuses. The lambda over an element names
+    ///         <c>Layout</c>, which the model does not imply, so the fixture registers it.
+    ///         <c>ServerParameterizationTest</c> compares the two refusals directly, and pins what an
+    ///         unregistered element type does.
     ///     </para>
     ///     <para>
     ///         The message names the tuple that carries the anonymous type, where EF names the
@@ -142,7 +142,13 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
                 SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                // The element of `Dashboard.Layouts`, a list stored in one column. Unregistered, the
+                // inner `Select` of `Composition_over_collection_of_complex_mapped_as_scalar` stays on
+                // this client, which answers a query EF refuses. The model does not imply the type,
+                // by the owner's decision of 2026-09-22 (`security-review.md` §2b), so the fixture
+                // names it as an application would.
+                allowedTypes: [typeof(Layout)]);
 
         public override bool StrictEquality => false;
 

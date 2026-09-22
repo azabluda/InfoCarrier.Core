@@ -198,9 +198,9 @@ public sealed class TypeAllowlist
     }
 
     /// <summary>
-    ///     Builds the allowlist for a model: every entity CLR type, every mapped property type and
-    ///     the element type of one that is a collection, every type <em>declaring</em> a mapped
-    ///     member, and any types the application registers explicitly.
+    ///     Builds the allowlist for a model: every entity CLR type, every mapped property type,
+    ///     every type <em>declaring</em> a mapped member, and any types the application registers
+    ///     explicitly.
     /// </summary>
     /// <remarks>
     ///     The declaring type is not always the entity type. A mapped member may be inherited from
@@ -231,7 +231,6 @@ public sealed class TypeAllowlist
                 {
                     allowed.Add(property.ClrType);
                     AddPropertyBaseTypes(property.ClrType, allowed);
-                    AddPropertyElementType(property.ClrType, allowed);
                 }
 
                 // A complex type is part of the model but is not an entity type, so neither loop
@@ -356,74 +355,13 @@ public sealed class TypeAllowlist
 
             allowed.Add(super);
         }
-    }
 
-    /// <summary>
-    ///     A type that names a kind of thing rather than a thing, which no inferred rule admits (C23).
-    /// </summary>
-    private static bool IsCategory(Type type)
-        => type == typeof(ValueType)
-            || type == typeof(Enum)
-            || type == typeof(Array)
-            || type == typeof(Delegate)
-            || type == typeof(MulticastDelegate);
-
-    /// <summary>
-    ///     Admits the element type of a mapped property whose CLR type is a collection.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>A list stored in one column is a scalar to EF, and a query over its elements
-    ///         names the element type.</b> <c>CustomConvertersTestBase.Dashboard.Layouts</c> is a
-    ///         <c>List&lt;Layout&gt;</c> behind a value converter, and the list type was admitted
-    ///         verbatim while <c>Layout</c> was not. So <c>d.Layouts.Select(l =&gt; new { l.Height })</c>
-    ///         could not travel, the server read the whole column, and the client ran the inner
-    ///         <c>Select</c> and answered a query EF refuses. The server has to see the operator to
-    ///         give EF's answer.
-    ///     </para>
-    ///     <para>
-    ///         <b>It is <c>security-review.md</c> §2a's argument again, and §2b records it.</b> The
-    ///         element is reachable only through a value the model produced, and the application's
-    ///         own converter already constructs it on the server. The same two stops apply: never
-    ///         the reflection invocation surface, and never a category.
-    ///     </para>
-    ///     <para>
-    ///         <b>One level, and a generic element is not refused.</b> <c>Layout</c> is nested in the
-    ///         generic <c>CustomConvertersTestBase&lt;TFixture&gt;</c>, so it is itself a constructed
-    ///         generic type, and a first version that skipped generic elements left the spec test
-    ///         answering. The element is admitted verbatim, as <see cref="ForModel" /> admits an
-    ///         entity type, so its generic arguments are not admitted with it.
-    ///     </para>
-    ///     <para>
-    ///         <c>IsAssignableFrom</c> rather than a walk over <c>GetInterfaces()</c>, which costs a
-    ///         trim warning for a question that needs no reflection over the model's type.
-    ///     </para>
-    /// </remarks>
-    private static void AddPropertyElementType(Type clrType, HashSet<Type> allowed)
-    {
-        if (clrType == typeof(string))
-        {
-            return;
-        }
-
-        Type[] candidates = clrType.IsArray
-            ? [clrType.GetElementType()!]
-            : clrType.IsConstructedGenericType
-                ? clrType.GetGenericArguments()
-                : [];
-
-        foreach (Type element in candidates)
-        {
-            if (element == typeof(object)
-                || IsCategory(element)
-                || IsReflectionInvocationSurface(element)
-                || !typeof(IEnumerable<>).MakeGenericType(element).IsAssignableFrom(clrType))
-            {
-                continue;
-            }
-
-            allowed.Add(element);
-        }
+        static bool IsCategory(Type type)
+            => type == typeof(ValueType)
+                || type == typeof(Enum)
+                || type == typeof(Array)
+                || type == typeof(Delegate)
+                || type == typeof(MulticastDelegate);
     }
 
     /// <summary>

@@ -365,26 +365,22 @@ public class DeserializationHardeningTest
     }
 
     /// <summary>
-    ///     The element type of a mapped property's collection type is admitted, and a type on the
-    ///     reflection invocation surface is not, even as an element (<c>security-review.md</c> §2b).
+    ///     The element type of a mapped collection property is admitted only when the application
+    ///     registers it (<c>security-review.md</c> §2b).
     /// </summary>
     /// <remarks>
-    ///     A list stored in one column through a converter is a scalar to EF, and a query over its
-    ///     elements names the element type in its lambda. EF refuses such a query, and the server
-    ///     cannot refuse what the client cannot send.
+    ///     A list stored in one column through a converter names nothing about its element that the
+    ///     application vouched for. Admitting the element by inference made every public method of
+    ///     a framework type such as <see cref="FileInfo" /> reachable from a payload, and the server
+    ///     evaluates a closed subtree before it translates the query.
     /// </remarks>
     [Fact]
-    public void A_mapped_propertys_element_type_is_admitted_but_the_reflection_surface_is_not()
+    public void A_mapped_collection_propertys_element_type_is_admitted_only_when_registered()
     {
-        using (var context = new BaseChainContext())
-        {
-            Assert.True(TypeAllowlist.ForModel(context.Model).IsAllowed(typeof(ElementThing)));
-        }
+        using var context = new FileListContext();
 
-        using (var context = new SurfaceElementContext())
-        {
-            Assert.False(TypeAllowlist.ForModel(context.Model).IsAllowed(typeof(MethodInfo)));
-        }
+        Assert.False(TypeAllowlist.ForModel(context.Model).IsAllowed(typeof(FileInfo)));
+        Assert.True(TypeAllowlist.ForModel(context.Model, [typeof(FileInfo)]).IsAllowed(typeof(FileInfo)));
     }
 
     /// <summary>
@@ -425,13 +421,6 @@ public class DeserializationHardeningTest
         public int Id { get; set; }
 
         public LeafThing Leaf { get; set; } = new();
-
-        public List<ElementThing> Elements { get; set; } = [];
-    }
-
-    private sealed class ElementThing
-    {
-        public string Name { get; set; } = string.Empty;
     }
 
     private sealed class BaseChainContext : Microsoft.EntityFrameworkCore.DbContext
@@ -441,35 +430,29 @@ public class DeserializationHardeningTest
                 .UseInMemoryDatabase(optionsBuilder, "hardening-base-chain");
 
         protected override void OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<BaseChainEntity>()
+            => modelBuilder.Entity<BaseChainEntity>()
                 .Property(e => e.Leaf)
                 .HasConversion(v => v.Name, v => new LeafThing { Name = v });
-
-            modelBuilder.Entity<BaseChainEntity>()
-                .Property(e => e.Elements)
-                .HasConversion(
-                    v => string.Join(",", v.Select(e => e.Name)),
-                    v => v.Split(',', StringSplitOptions.None).Select(n => new ElementThing { Name = n }).ToList());
-        }
     }
 
-    private sealed class SurfaceElementEntity
+    private sealed class FileListEntity
     {
         public int Id { get; set; }
 
-        public List<MethodInfo> Methods { get; set; } = [];
+        public List<FileInfo> Files { get; set; } = [];
     }
 
-    private sealed class SurfaceElementContext : Microsoft.EntityFrameworkCore.DbContext
+    private sealed class FileListContext : Microsoft.EntityFrameworkCore.DbContext
     {
         protected override void OnConfiguring(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder optionsBuilder)
             => Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions
-                .UseInMemoryDatabase(optionsBuilder, "hardening-surface-element");
+                .UseInMemoryDatabase(optionsBuilder, "hardening-file-list");
 
         protected override void OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder)
-            => modelBuilder.Entity<SurfaceElementEntity>()
-                .Property(e => e.Methods)
-                .HasConversion(v => v.Count, v => new List<MethodInfo>());
+            => modelBuilder.Entity<FileListEntity>()
+                .Property(e => e.Files)
+                .HasConversion(
+                    v => string.Join("|", v.Select(f => f.FullName)),
+                    v => v.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(p => new FileInfo(p)).ToList());
     }
 }
