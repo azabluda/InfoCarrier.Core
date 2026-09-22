@@ -82,78 +82,43 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
             CoreStrings.TranslationFailed("")[47..],
             Assert.Throws<InvalidOperationException>(() => base.Value_conversion_on_enum_collection_contains()).Message);
 
-    /// <summary>
-    ///     Runs the base's query against seeded data and asserts the <em>answer</em>, which the
-    ///     base, an assertion of EF's refusal, never could.
-    /// </summary>
+    /// <inheritdoc />
     /// <remarks>
     ///     <para>
-    ///         <b>The base test is an <c>Assert.Throws</c> over an empty table.</b> EF's fixture
-    ///         seeds no <c>Dashboard</c> at all — the base only ever asserted that the query is
-    ///         refused, so EF never needed a row. A probe measured
-    ///         <c>rows=0 expectedRows=0 REMOTED=(empty) EXPECTED=(empty)</c>, which means "no
-    ///         exception was thrown" was being observed over nothing and said nothing about
-    ///         whether this provider's answer is right. Classifying it as A28 — a spec test
-    ///         asserting a limitation this provider does not have — requires evidence that the
-    ///         answer <em>is</em> right, and there was no answer to check.
+    ///         <b>The server's EF refuses it, as EF does, since 2026-09-22.</b> Until then the server
+    ///         read the whole <c>Layouts</c> column and the client ran the inner <c>Select</c>, which
+    ///         answered a query every EF provider refuses. The allowlist admitted
+    ///         <c>List&lt;Layout&gt;</c> and not <c>Layout</c>, so the lambda over an element could not
+    ///         travel. <c>ServerParameterizationTest.A_projection_over_a_converted_list_fails_where_EF_fails</c>
+    ///         compares the two refusals directly.
     ///     </para>
     ///     <para>
-    ///         <see cref="CustomConvertersInfoCarrierFixture.SeedAsync" /> now seeds two
-    ///         dashboards with <b>different numbers of layouts</b> and no two integers alike, so
-    ///         four distinct wrong answers are distinguishable from the right one: a row lost, the
-    ///         layouts of one row given to the other, a truncated list, and <c>H</c>/<c>W</c>
-    ///         transposed (the serializer writes <c>(Height,Width)</c>, so a transposition is
-    ///         silent unless the two differ). That is the non-vacuity bar
-    ///         <c>Collection_enum_as_string_Contains</c> was held to in J2.
-    ///     </para>
-    ///     <para>
-    ///         The query body is copied byte-for-byte from the base and <b>not</b> ordered inside
-    ///         the query — ordering is applied to the materialized result — so what crosses the
-    ///         wire is exactly the tree the base builds.
-    ///     </para>
-    ///     <para>
-    ///         <b>Until 2026-09-15 this was a companion test,
-    ///         <c>Composition_over_collection_of_complex_mapped_as_scalar_returns_the_right_answer</c>,
-    ///         beside a spec test left red</b>, because a companion kept the spec test reporting. With
-    ///         a green suite the override is the place for the answer, so the companion became it.
+    ///         The message names the tuple that carries the anonymous type, where EF names the
+    ///         anonymous type.
     ///     </para>
     /// </remarks>
     [InfoCarrierDesign(
         10,
-        Justification = "The nested Select over Layouts builds an anonymous type, so the client reassembles it from the "
-            + "Layouts value the server returns. EF's providers try to translate it and refuse.",
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = "The rows are asserted over two seeded dashboards with no two values alike.")]
+        Justification = "The anonymous type in the inner Select crosses the wire as a ValueTuple, so the server's EF "
+            + "refuses the lambda it received and prints the tuple.",
+        Deviation = DeviationKind.QueryWrittenOut | DeviationKind.Other,
+        DeviationNote = "The same refusal of the same lambda, printed with the tuple. The base asserts the message inside "
+            + "its own Assert.Throws, so its query is written out.")]
     public override void Composition_over_collection_of_complex_mapped_as_scalar()
     {
         using DbContext context = CreateContext();
 
-        var result = context.Set<Dashboard>().AsNoTracking().Select(d => new
-        {
-            d.Id,
-            d.Name,
-            Layouts = d.Layouts.Select(l => new { H = l.Height, W = l.Width }).ToList()
-        }).ToList();
-
-        Assert.Collection(
-            result.OrderBy(r => r.Id),
-            first =>
-            {
-                Assert.Equal(CompositionSeedFirstId, first.Id);
-                Assert.Equal("Dashboard one", first.Name);
-                Assert.Equal([(11, 12), (13, 14)], first.Layouts.Select(l => (l.H, l.W)));
-            },
-            second =>
-            {
-                Assert.Equal(CompositionSeedSecondId, second.Id);
-                Assert.Equal("Dashboard two", second.Name);
-                Assert.Equal([(21, 22), (23, 24), (25, 26)], second.Layouts.Select(l => (l.H, l.W)));
-            });
+        Assert.Equal(
+            CoreStrings.TranslationFailed("l => new ValueTuple<int, int>(    Item1 = l.Height,     Item2 = l.Width)"),
+            Assert.Throws<InvalidOperationException>(
+                    () => context.Set<Dashboard>().AsNoTracking().Select(d => new
+                    {
+                        d.Id,
+                        d.Name,
+                        Layouts = d.Layouts.Select(l => new { H = l.Height, W = l.Width }).ToList()
+                    }).ToList())
+                .Message.Replace("\r", string.Empty).Replace("\n", string.Empty));
     }
-
-    private const int CompositionSeedFirstId = 4001;
-
-    private const int CompositionSeedSecondId = 4002;
 
     // REVERSED BY R72, and the reason the earlier measurement disproved it is now known.
     // `Value_conversion_on_enum_collection_contains` -- EF's other behavioural SQLite override --
@@ -194,54 +159,5 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
         public override DateTime DefaultDateTime => new();
 
         public override bool PreservesDateTimeKind => true;
-
-        /// <summary>
-        ///     Seeds the <c>Dashboard</c> set EF's own fixture leaves empty.
-        /// </summary>
-        /// <remarks>
-        ///     <para>
-        ///         Nothing in <c>CustomConvertersTestBase</c> reads <c>Dashboard</c> except
-        ///         <see cref="Composition_over_collection_of_complex_mapped_as_scalar" /> and the
-        ///         test above, so this adds data to one otherwise-unused set and can change no
-        ///         other result. It runs against the <b>server</b> context — <see cref="TestStore" />
-        ///         hands the seed the backend's context, not the client's — so the rows are written
-        ///         through the backing store's own model and the converter, and the read side is
-        ///         then the only thing under test.
-        ///     </para>
-        ///     <para>
-        ///         The base test still fails, and its message is unchanged: it asserts a throw, and
-        ///         seeding cannot make a query that answers start refusing. What seeding changes is
-        ///         that the <em>answer</em> is now observable.
-        ///     </para>
-        /// </remarks>
-        protected override async Task SeedAsync(PoolableDbContext context)
-        {
-            await base.SeedAsync(context);
-
-            context.Set<Dashboard>().AddRange(
-                new Dashboard
-                {
-                    Id = CompositionSeedFirstId,
-                    Name = "Dashboard one",
-                    Layouts =
-                    [
-                        new Layout { Height = 11, Width = 12 },
-                        new Layout { Height = 13, Width = 14 },
-                    ],
-                },
-                new Dashboard
-                {
-                    Id = CompositionSeedSecondId,
-                    Name = "Dashboard two",
-                    Layouts =
-                    [
-                        new Layout { Height = 21, Width = 22 },
-                        new Layout { Height = 23, Width = 24 },
-                        new Layout { Height = 25, Width = 26 },
-                    ],
-                });
-
-            await context.SaveChangesAsync();
-        }
     }
 }

@@ -110,6 +110,33 @@ the new cases the widening would have been unpinned exactly where it applies.
 Harmless (abstract, constructs nothing) and unrelated to C53, but it was mistaken for C53's doing
 on first reading, so it is written down.
 
+## 2b. Amendment — the element type of a mapped collection property (2026-09-22)
+
+**What forced it.** `ForModel` admits a mapped property's CLR type verbatim, and a list stored in one
+column through a value converter is such a property: `List<Layout>` was admitted and `Layout` was
+not. A query over the list's elements names `Layout` in its lambda, so the client could not send
+it. The server read the whole column and the client ran the inner `Select`, which answered a query
+every EF provider refuses (`CustomConvertersTestBase.Composition_over_collection_of_complex_mapped_as_scalar`).
+`TypeAllowlist.AddPropertyElementType` now admits the element, one level deep.
+
+**The argument is §2a's.** The element is reachable only through a value the model produced, and the
+application's own converter already constructs it on the server.
+
+| Added | Bound |
+|---|---|
+| the element may be **named** (a lambda parameter, the declaring type of a member read) | a type the application declared as the element of a property it mapped |
+| the element may be **constructed**, and its public methods called | **not nil, unlike §2a**, and bounded the same way an entity type's own methods are: they are the application's code |
+
+**What it cannot add** is enforced as §2a's rule is: no element on the reflection invocation surface,
+no category, and not `object`. `DeserializationHardeningTest.A_mapped_propertys_element_type_is_admitted_but_the_reflection_surface_is_not`
+pins it against a model-derived allowlist.
+
+**Noted while writing this, and not changed here.** The property's own CLR type is admitted verbatim
+with no surface check, so a property mapped as `MethodInfo` through a converter would admit
+`MethodInfo` itself, and `Invoke` with it, since `ResolveMethod` finds inherited methods. §2a's
+guard covers only the bases. It is as absurd as the case §2a guards against, and it is the same
+hole one step earlier.
+
 ## 3. What is genuinely bounded
 
 - **Node kinds** (C36). Not a wire field: `ExpressionNode.Kind` is `[JsonIgnore]` and answered by

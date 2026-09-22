@@ -629,6 +629,30 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     A projection over the elements of a list stored in one column fails where plain EF Core
+    ///     fails, and runs no statement.
+    /// </summary>
+    /// <remarks>
+    ///     <b>This client answered it until 2026-09-22.</b> The server read the whole column and the
+    ///     client ran the inner <c>Select</c> over each list, where EF raises <c>TranslationFailed</c>
+    ///     for the inner lambda. <c>CustomConvertersTestBase.Composition_over_collection_of_complex_mapped_as_scalar</c>
+    ///     is EF's own test of the refusal.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_over_a_converted_list_fails_where_EF_fails()
+    {
+        (Exception overTheWire, string[] wireStatements, Exception directly) =
+            await RunFailingBothWays(
+                static context => context.Set<Panel>()
+                    .Select(p => new { p.Id, Tiles = p.Tiles.Select(t => new { H = t.Height, W = t.Width }).ToList() })
+                    .ToListAsync());
+
+        Assert.IsType<InvalidOperationException>(directly);
+        Assert.IsType<InvalidOperationException>(overTheWire);
+        Assert.Empty(wireStatements);
+    }
+
+    /// <summary>
     ///     A grouping key of a type the application declares — the shape a real application writes,
     ///     and the one the specification suite's <c>NorthwindGroupBy.Odata_groupby_empty_key</c> is
     ///     an example of.
@@ -945,7 +969,7 @@ public partial class ServerParameterizationTest
     /// </summary>
     private async Task<(Exception OverTheWire, string[] WireStatements, Exception Directly)> RunFailingBothWays(
         Func<DbContext, Task> run,
-        ParameterTranslationMode collectionMode)
+        ParameterTranslationMode? collectionMode = null)
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(collectionMode: collectionMode);
         await store.InitializeAsync(
