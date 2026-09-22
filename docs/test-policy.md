@@ -637,6 +637,18 @@ reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read
   its seeding of `HasData` rows, one batch with `SELECT changes()` between the statements. Nothing
   of that crosses this wire.
 
+**The `Kiwi` and `Coke` reads are classified rather than re-read, from 2026-09-23.** Under TPC each
+concrete type has its own table, so the table *is* the filter and the missing `WHERE` belongs to
+the schema rather than to this provider. The report now holds that control itself: a flagged TPC
+read is looked up in the **same test method** of its TPH and TPT siblings, and a sibling that
+**narrows** the same columns makes the shape `MAPPING-BOUND` with its own statement printed beside
+it. The bullet above was rebuilt by hand every time the report was read. On the 2026-09-22 log
+those two shapes are the whole of the unbounded extras and both are now controlled; over the whole
+log `--survey` reclassifies six shapes and leaves 484 flagged, which is the ratio to want from a
+narrow fact about one mapping. **Each of the three conditions was measured against that log**, and
+the docstring of `mapping_control` says what dropping one costs — dropping the method alone excused
+162 statements across 75 tests, on nothing better than a shared column list.
+
 **So the sampling verdict holds, and it is now a reading rather than a sample.** The remainder
 contains one thing of ours, and it was already on the list. Re-run it with
 `bash eng/ef-sql-compare.sh --keep` and then `--extras` on the log it names.
