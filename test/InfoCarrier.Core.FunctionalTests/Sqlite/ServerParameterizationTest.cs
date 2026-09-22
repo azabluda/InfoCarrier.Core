@@ -705,6 +705,41 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A projected collection whose elements read the enclosing row through a navigation fails
+    ///     where plain EF Core fails, with EF's own message, and runs no statement.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF evaluates <c>p.Blog.Title</c> inside the correlated collection, which needs
+    ///         <c>APPLY</c>, and SQLite has none: EF raises <c>ApplyNotSupported</c>.
+    ///         <c>ComplexNavigationsCollectionsQuerySqliteTest.Projecting_collection_after_optional_reference_correlated_with_parent</c>
+    ///         is EF's own test of that.
+    ///     </para>
+    ///     <para>
+    ///         This client kept the enclosing read out of the inner tuple and carried it in a slot of
+    ///         the outer one, so the server joined the tables without <c>APPLY</c> and the client
+    ///         answered.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projected_collection_reading_the_enclosing_row_fails_where_EF_fails()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Post>()
+                .Select(p => new
+                {
+                    p.Id,
+                    Siblings = p.Blog!.Posts.Select(s => new { s.Id, p.Blog.Title }).ToList(),
+                })
+                .ToListAsync());
+
+        Assert.Contains("APPLY", Assert.IsType<InvalidOperationException>(run.DirectError).Message, StringComparison.Ordinal);
+        Assert.Equal(run.DirectError.Message, Assert.IsType<InvalidOperationException>(run.WireError).Message);
+        Assert.Empty(run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A projection over the elements of a list stored in one column fails where plain EF Core
     ///     fails, and runs no statement, once the application registers the element type.
     /// </summary>

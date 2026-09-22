@@ -101,6 +101,27 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private Expression? _preserved;
 
     /// <summary>
+    ///     The parameters of every lambda that encloses the node being visited, outermost first.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A value of an inner projection may read an enclosing row, since 2026-09-22.</b>
+    ///         <c>p.Blog.Posts.Select(s =&gt; new { s.Id, p.Blog.Title })</c> read only <c>s</c> into
+    ///         the inner tuple, so <c>p.Blog.Title</c> stayed in the client-side rebuild, and the outer
+    ///         rewrite then carried it in a slot of its own. The server never had to evaluate it inside
+    ///         the collection, which on SQLite is the <c>APPLY</c> it cannot run, and this client
+    ///         answered a query plain EF Core refuses with <c>ApplyNotSupported</c>.
+    ///     </para>
+    ///     <para>
+    ///         An enclosing row is in scope wherever the inner projection runs, because the inner
+    ///         call reaches the server only as part of the outer one. So the value goes into the
+    ///         inner tuple, the server's EF sees the correlation EF's own client sees, and it
+    ///         answers or refuses as EF does.
+    ///     </para>
+    /// </remarks>
+    private readonly List<ParameterExpression> _enclosing = [];
+
+    /// <summary>
     ///     The client's model, used for one question: is this call a function the model maps to
     ///     the store? See <see cref="CallsMappedFunction" />.
     /// </summary>
@@ -150,6 +171,19 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         return result;
     }
 
+    protected override Expression VisitLambda<T>(Expression<T> node)
+    {
+        _enclosing.AddRange(node.Parameters);
+        try
+        {
+            return base.VisitLambda(node);
+        }
+        finally
+        {
+            _enclosing.RemoveRange(_enclosing.Count - node.Parameters.Count, node.Parameters.Count);
+        }
+    }
+
     protected override Expression VisitMethodCall(MethodCallExpression node)
     {
         // Checked before descending, because this shape has to *replace* the in-place rewrite
@@ -158,6 +192,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         {
             return hoisted;
         }
+
+        // Taken before descending, while it still names only the lambdas around this call.
+        ParameterExpression[] enclosing = [.. _enclosing];
 
         // Innermost first: rewriting an inner projection can turn its result into something the
         // outer one can then be measured against.
@@ -202,7 +239,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        CollectFragments(selector.Body, bodyAnalysis, selector.Parameters, fragments, guards);
+        CollectFragments(selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], fragments, guards);
         if (fragments.Count == 0)
         {
             // A body that reads nothing from the row — leave it to the plain cut.

@@ -156,16 +156,29 @@ public class ComplexNavigationsQueryInfoCarrierTest(ComplexNavigationsQueryInfoC
 ///         database has no such limitation and all seven are gone.
 ///     </para>
 ///     <para>
-///         <b>One of EF's SQLite overrides is deliberately absent.</b>
-///         <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> passes
-///         here: the projection split reassembles that collection on the client, so the query
-///         never asks SQLite for <c>APPLY</c>. This provider answers it where EF's SQLite provider
-///         refuses, so the base's own answer-check stands.
+///         <b>Until 2026-09-22 one of EF's SQLite overrides was deliberately absent.</b>
+///         <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> passed
+///         here, because the collection's read of its parent was carried outside it and the query
+///         never asked SQLite for <c>APPLY</c>. The read now stays inside the collection, as in
+///         EF's own query, and the override is EF's.
 ///     </para>
 /// </remarks>
 public class ComplexNavigationsCollectionsQueryInfoCarrierTest(ComplexNavigationsQueryInfoCarrierFixture fixture)
     : ComplexNavigationsCollectionsQueryRelationalTestBase<ComplexNavigationsQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the collection reads its parent, which needs <c>APPLY</c>. It answered here
+    ///     until 2026-09-22, when the parent read stayed out of the collection; see
+    ///     <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsQuerySqliteTest.cs", 150, 154,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Projecting_collection_after_optional_reference_correlated_with_parent(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Projecting_collection_after_optional_reference_correlated_with_parent(async));
+
     /// <inheritdoc />
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsQuerySqliteTest.cs", 13, 18,
@@ -381,14 +394,27 @@ public class ComplexNavigationsCollectionsQueryInfoCarrierTest(ComplexNavigation
 ///         split class does not override them either. <b>An override of ours that EF does not have
 ///         is a workaround to delete once the limitation goes</b>, and this is that.
 ///     <para>
-///         <b>One of EF's overrides is deliberately absent</b>, as in the unsplit class:
-///         <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> passes
-///         here, because the projection split reassembles that collection on the client.
+///         <b>Until 2026-09-22 one of EF's overrides was deliberately absent</b>, as in the
+///         unsplit class: <c>Projecting_collection_after_optional_reference_correlated_with_parent</c>
+///         passed here. It is EF's now, for the reason the unsplit class gives.
 ///     </para>
 /// </remarks>
 public class ComplexNavigationsCollectionsSplitQueryInfoCarrierTest(ComplexNavigationsQueryInfoCarrierFixture fixture)
     : ComplexNavigationsCollectionsSplitQueryRelationalTestBase<ComplexNavigationsQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the collection reads its parent, which needs <c>APPLY</c>. It answered here
+    ///     until 2026-09-22, when the parent read stayed out of the collection; see
+    ///     <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitQuerySqliteTest.cs", 126, 130,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Projecting_collection_after_optional_reference_correlated_with_parent(bool async)
+        => ComplexNavigationsQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Projecting_collection_after_optional_reference_correlated_with_parent(async));
+
     /// <inheritdoc />
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitQuerySqliteTest.cs", 121, 124,

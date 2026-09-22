@@ -81,15 +81,17 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     // -------------------------------------------------------------------------------------
     // STORE LIMITATION -- SQLite has no APPLY. EF's own NorthwindMiscellaneousQuerySqliteTest
-    // overrides all seven, six of them with this same assertion. The seventh,
-    // SelectMany_correlated_subquery_hard, EF disables outright by returning a null Task; the
-    // query fails here for the reason its six siblings do, and saying so is more informative
-    // than copying a skip.
+    // overrides all eight, six of them with this same assertion. The other two,
+    // SelectMany_correlated_subquery_hard and
+    // Complex_nested_query_doesnt_try_binding_to_grandparent_when_parent_returns_complex_result, EF
+    // disables outright by returning a null Task; each query fails here for the reason its six
+    // siblings do, and saying so is more informative than copying a skip.
     //
-    // This said "all five" until 2026-09-22. The two
-    // Correlated_collection_with_distinct_without_default_identifiers_* tests answered here while
-    // their Distinct ran on the client; ProjectionRewriter now moves it onto the server, and
-    // SQLite refuses the APPLY it needs, as EF's own class asserts.
+    // This said "all five" until 2026-09-22, and three more answered here until then. The two
+    // Correlated_collection_with_distinct_without_default_identifiers_* tests ran their Distinct
+    // on the client, and Complex_nested_query_* carried its read of the outer row outside the
+    // inner collection. ProjectionRewriter now sends both to the server as EF writes them, and
+    // SQLite refuses the APPLY each needs.
     // -------------------------------------------------------------------------------------
 
     /// <inheritdoc />
@@ -129,6 +131,16 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
         Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_recursive_trivial(bool async)
         => AssertApplyNotSupported(() => base.Select_subquery_recursive_trivial(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 318, 319,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.UpstreamAssertsNothing,
+        DeviationNote = "EF's override returns null, which xUnit runs as a pass.")]
+    public override Task Complex_nested_query_doesnt_try_binding_to_grandparent_when_parent_returns_complex_result(bool async)
+        => AssertApplyNotSupported(
+            () => base.Complex_nested_query_doesnt_try_binding_to_grandparent_when_parent_returns_complex_result(async));
 
     /// <inheritdoc />
     [StoreLimit(

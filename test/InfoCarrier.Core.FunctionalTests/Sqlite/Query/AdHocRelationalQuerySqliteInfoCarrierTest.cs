@@ -224,11 +224,11 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 ///         surfaces is that string character for character.
 ///     </para>
 ///     <para>
-///         <b>EF overrides a third that is left alone deliberately.</b>
+///         <b>EF overrides a third, and it was left alone deliberately until 2026-09-22.</b>
 ///         <c>SelectMany_and_collection_in_projection_in_FirstOrDefault</c> is
-///         <c>ApplyNotSupported</c> in EF's SQLite suite and <em>passes</em> here, so adopting
-///         that override would turn a green test red. It joins the small set of queries this
-///         provider answers that other EF providers reject.
+///         <c>ApplyNotSupported</c> in EF's SQLite suite and <em>passed</em> here, because the
+///         inner collection's read of the outer row was carried outside it. That read now stays
+///         inside, as in EF's own query, and the override is EF's.
 ///     </para>
 /// </remarks>
 public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
@@ -259,9 +259,9 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
             shouldLogCategory, createTestStore, usePooling, useServiceProvider);
     }
 
-    // --- SQLite has no APPLY. Both overrides are EF's own AdHocNavigationsQuerySqliteTest, and
-    // the message this provider surfaces is `SqliteStrings.ApplyNotSupported` character for
-    // character. EF's third such override is not adopted: see the class remarks.
+    // --- SQLite has no APPLY. All three overrides are EF's own AdHocNavigationsQuerySqliteTest,
+    // and the message this provider surfaces is `SqliteStrings.ApplyNotSupported` character for
+    // character. The third was adopted on 2026-09-22: see the class remarks.
 
     /// <inheritdoc />
     [StoreLimit(
@@ -284,4 +284,15 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 base.Let_multiple_references_with_reference_to_outer)).Message);
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 34, 42,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.SqlNotAsserted)]
+    public override async Task SelectMany_and_collection_in_projection_in_FirstOrDefault()
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                base.SelectMany_and_collection_in_projection_in_FirstOrDefault)).Message);
 }
