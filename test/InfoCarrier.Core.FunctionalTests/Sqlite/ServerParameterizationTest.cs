@@ -629,6 +629,26 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     A projection that reads nothing from the row asks the store for no column, as plain
+    ///     EF Core asks for none.
+    /// </summary>
+    /// <remarks>
+    ///     EF's funcletizer lifts the whole anonymous object into one parameter and then needs the
+    ///     store for the row count alone, so it writes <c>SELECT 1</c>. This client shipped the
+    ///     table: the projection yields no fragment that reads the row, the rewrite gave up, and
+    ///     the plain cut sent every column the entity has. Both answers are right, which is why no
+    ///     test in the suite could see it.
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_projection_reading_no_column_matches_the_direct_query()
+    {
+        bool flag = true;
+
+        return AssertSameStatementFor(
+            async blogs => _ = await blogs.Select(b => new { F = flag }).ToListAsync());
+    }
+
+    /// <summary>
     ///     An ordering by a captured value the projection carries fails where plain EF Core fails,
     ///     and runs no statement.
     /// </summary>

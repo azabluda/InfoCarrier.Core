@@ -126,6 +126,14 @@ occupies a slot as an entity and materializes with full identity, exactly as tod
 **This is also wire-protocol W1.** The server returns only the values the projection needs; the
 minimal-column payload of requirements §3.3 is not a later optimization but the same mechanism.
 
+**One projection escaped that sentence until 2026-09-22**, and it is the one that needs no value at
+all. A body reading nothing from the row yields no fragment, so the rewrite gave up and the plain
+cut shipped the maximal `ServerOk` subtree, which is the query root: `Select(b => new { F = flag })`
+read every column the entity has, where EF's own client writes `SELECT 1`. The carrier now holds a
+single constant in that case and the reassembly reads none of it, so the sentence above is true of
+a projection that needs no value too. Both answers were always right, which is why the suite could
+not see it and only a comparison with EF's statement did.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:
