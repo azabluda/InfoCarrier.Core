@@ -97,6 +97,25 @@ server runs `SELECT … FROM "Creatures"` with no `WHERE`, and the whole table c
 the client to filter. **Right answer, silently wrong cost** — the failure mode #111 exists to find,
 and one no answer-checking test can see.
 
+**`OfType<T>()` needs no `Type` at all, and that bounds what removal would cost.** Measured the same
+day, with the entry removed: `Set<Creature>().OfType<Sparrow>()` still runs
+`… FROM "Creatures" WHERE "_"."Discriminator" = 'Sparrow'`, byte for byte what plain EF runs. The
+type argument is an entity type and the declaring type is `Queryable`, so no `Type` *value* crosses.
+Only the `GetType() == typeof(X)` spelling depends on the entry, and it is the spelling to avoid
+anyway. So a future opt-in design would cost the idiomatic query nothing.
+
+**Registration does not substitute for the entry today, which is what makes this a product decision
+rather than a configuration one.** With the entry removed and `typeof(Type)` registered through
+`AllowTypes` on both halves, the query was still refused; adding `System.RuntimeType` to the
+registration did not help either. Why registration does not reach this is not established, and it
+should be, because everything else in this file treats registration as the way an application takes
+a risk deliberately. Until it is, removing the entry would take the capability away with no way for
+an application to get it back.
+
+**Both readings above are from the statement text, not from a green test.** A differential test says
+"the same as EF", never "few columns", so a pass can sit on top of a full table crossing the wire
+when both sides do it. Each claim here was read out of the logged SQL.
+
 So the entry stays, the conjunction stays the bound, and
 `ServerParameterizationTest.A_predicate_naming_a_Type_matches_the_direct_query` is the pin. Anyone
 proposing the removal again should read this addendum first: the cost is not in the suite.
