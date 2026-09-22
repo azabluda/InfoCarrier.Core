@@ -11,12 +11,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>ONE TYPE, FOR ONE TEST, AND THIS IS NOT THE START OF A SWEEP (the owner,
+///         <b>ONE TYPE PER TEST, AND THIS IS NOT THE START OF A SWEEP (the owner,
 ///         2026-09-21).</b> Registering every private type an EF base declares would turn the
 ///         specification suite into a tuned configuration and hide the next genuine instance of a
 ///         type that cannot cross, which is the thing this suite is best at finding. Each entry
-///         here is added one at a time, because one named test's drift against EF's own SQL was
-///         worth removing, and the comparison exercise is what names it.
+///         here is added one at a time, on the owner's decision for that test. The heading read
+///         "ONE TYPE, FOR ONE TEST" until 2026-09-22, when the owner added the second:
+///         <see cref="RandomClass" />, which removed an override that lowered EF parity. The first
+///         was for a test's drift against EF's own SQL, found by the comparison exercise.
 ///     </para>
 ///     <para>
 ///         <b>Why a fixture registers a key type at all.</b> A <c>GroupBy</c> or <c>Join</c> key of
@@ -57,6 +59,22 @@ internal static class UpstreamKeyTypes
     /// <returns>The closed key type.</returns>
     public static Type NoGroupByWrapper(Type fixtureType)
         => Nested(typeof(NorthwindGroupByQueryTestBase<>), "NoGroupByWrapper", fixtureType);
+
+    /// <summary>
+    ///     The grouping key of <c>NorthwindGroupByQueryTestBase.Final_GroupBy_nominal_type_entity</c>,
+    ///     closed over <paramref name="fixtureType" />.
+    /// </summary>
+    /// <remarks>
+    ///     A final <c>GroupBy</c> keyed on a class with no value equality. EF's relational providers
+    ///     order by the key's members and group the rows as they read them, so the key's
+    ///     <c>Equals</c> is never asked. Unregistered, the boundary kept the <c>GroupBy</c> here and
+    ///     the query was refused, because grouping by reference equality gives one group per row.
+    ///     Added 2026-09-22, when the owner chose EF's behaviour for that test.
+    /// </remarks>
+    /// <param name="fixtureType">The fixture the base is closed over.</param>
+    /// <returns>The closed key type.</returns>
+    public static Type RandomClass(Type fixtureType)
+        => Nested(typeof(NorthwindGroupByQueryTestBase<>), "RandomClass", fixtureType);
 
     private static Type Nested(Type declaringDefinition, string name, Type fixtureType)
     {
