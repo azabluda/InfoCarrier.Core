@@ -740,6 +740,45 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A projection over a client-typed projection runs plain EF Core's one statement, and its
+    ///     subquery does not read a table of its own.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The second <c>Select</c> reads <c>x</c>, which only this client rebuilt, so it ran on
+    ///         the client: the server ran <c>SELECT DISTINCT "Title" FROM "Blogs"</c> and, for the
+    ///         subquery, the whole <c>Posts</c> table, where EF runs one <c>LEFT JOIN</c>. The two
+    ///         projections are fused now, and the statement is EF's.
+    ///     </para>
+    ///     <para>
+    ///         <b>One name differs and is mapped before the comparison.</b> The distinct subquery's
+    ///         column is named after the member that carries it, <c>Item1</c> of the tuple where EF
+    ///         has <c>Title</c> of the anonymous type. A column alias does not change the plan.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_over_a_client_typed_projection_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>()
+                .Select(b => new { b.Title })
+                .Distinct()
+                .Select(x => new
+                {
+                    x.Title,
+                    Posts = context.Set<Post>().Where(p => p.Heading == x.Title).Select(p => new { p.Id }).ToList(),
+                })
+                .ToListAsync());
+
+        Assert.Null(run.DirectError);
+        Assert.Null(run.WireError);
+        Assert.Equal(
+            Assert.Single(run.Directly),
+            Assert.Single(run.OverTheWire).Replace("\"Item1\"", "\"Title\"", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     A projection over the elements of a list stored in one column fails where plain EF Core
     ///     fails, and runs no statement, once the application registers the element type.
     /// </summary>

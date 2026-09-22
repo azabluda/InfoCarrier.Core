@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -47,6 +48,36 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Projecting_after_navigation_and_distinct(async))).Message);
+
+    // Answered here until 2026-09-22: every projection after the Distinct ran on the client, so
+    // the server never saw the correlated collection. See ProjectionRewriter.TryFuseSelectWithReassembly.
+    // The third is EF's relational refusal rather than APPLY, and EF's SQLite class asserts it.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 258, 262,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Correlated_collection_after_distinct_not_containing_original_identifier(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Correlated_collection_after_distinct_not_containing_original_identifier(async))).Message);
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 271, 276,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Correlated_collection_after_distinct_with_complex_projection_containing_original_identifier(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Correlated_collection_after_distinct_with_complex_projection_containing_original_identifier(async))).Message);
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 264, 269,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Correlated_collection_after_distinct_with_complex_projection_not_containing_original_identifier(bool async)
+        => Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Correlated_collection_after_distinct_with_complex_projection_not_containing_original_identifier(async))).Message);
 
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 308, 312,

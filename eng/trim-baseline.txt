@@ -239,5 +239,20 @@
 #
 # `total` rises with ours, 1143 -> 1144: EFCore is unchanged at 864.
 
-ours=99
-total=1144
+# 2026-09-22, 99 -> 100 (a `Select` fused with the rebuild below it, one diagnostic).
+#
+# `Blogs.Select(b => new { b.Title }).Distinct().Select(x => new { x.Title, Posts = ... })` ran the
+# second projection on the client, because it reads `x`, which only this client rebuilds. Its
+# subquery then read the whole `Posts` table, where EF's own client runs one `LEFT JOIN`, and the same
+# shape three levels deep answered a query every relational provider refuses.
+# `ProjectionRewriter.TryFuseSelectWithReassembly` now composes the two projections, which is what
+# `Select` means, and the fused one is rewritten like any other.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: the fused `Select` is instantiated for
+# the tuple, whose type the caller's projection decides. The premise again; the `MakeGenericType` for
+# the fused lambda's delegate type costs nothing of its own.
+#
+# `total` rises with ours, 1144 -> 1145: EFCore is unchanged at 864.
+
+ours=100
+total=1145
