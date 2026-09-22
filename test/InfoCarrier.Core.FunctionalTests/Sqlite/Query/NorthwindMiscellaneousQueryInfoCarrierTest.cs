@@ -81,10 +81,15 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
 
     // -------------------------------------------------------------------------------------
     // STORE LIMITATION -- SQLite has no APPLY. EF's own NorthwindMiscellaneousQuerySqliteTest
-    // overrides all five, four of them with this same assertion. The fifth,
+    // overrides all seven, six of them with this same assertion. The seventh,
     // SelectMany_correlated_subquery_hard, EF disables outright by returning a null Task; the
-    // query fails here for the reason its four siblings do, and saying so is more informative
+    // query fails here for the reason its six siblings do, and saying so is more informative
     // than copying a skip.
+    //
+    // This said "all five" until 2026-09-22. The two
+    // Correlated_collection_with_distinct_without_default_identifiers_* tests answered here while
+    // their Distinct ran on the client; ProjectionRewriter now moves it onto the server, and
+    // SQLite refuses the APPLY it needs, as EF's own class asserts.
     // -------------------------------------------------------------------------------------
 
     /// <inheritdoc />
@@ -124,6 +129,23 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
         Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_recursive_trivial(bool async)
         => AssertApplyNotSupported(() => base.Select_subquery_recursive_trivial(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 432, 436,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_without_default_identifiers_projecting_columns(bool async)
+        => AssertApplyNotSupported(
+            () => base.Correlated_collection_with_distinct_without_default_identifiers_projecting_columns(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 424, 430,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_without_default_identifiers_projecting_columns_with_navigation(
+        bool async)
+        => AssertApplyNotSupported(
+            () => base.Correlated_collection_with_distinct_without_default_identifiers_projecting_columns_with_navigation(async));
 
     // -------------------------------------------------------------------------------------
     // STORE LIMITATION -- SQLite's date handling. All three are EF's own, with its golden-SQL

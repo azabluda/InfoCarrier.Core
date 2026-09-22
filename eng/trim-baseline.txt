@@ -224,5 +224,20 @@
 #
 # `total` rises with ours, 1142 -> 1143: EFCore is unchanged at 864.
 
-ours=98
-total=1143
+# 2026-09-22, 98 -> 99 (a `Distinct` moved onto the server's tuple, one diagnostic).
+#
+# `g.Weapons.Select(w => new { w.Name, ... }).Distinct()` inside a projection became a server-side
+# tuple, a client-side rebuild, and a `Distinct` above the rebuild that ran here. The server joined
+# the weapons with no `DISTINCT` and this client answered a query every relational provider refuses
+# (`InsufficientInformationToIdentifyElementOfCollectionJoin`). `ProjectionRewriter` now moves the
+# `Distinct` below a rebuild that only copies each slot into one member, and the server's EF decides.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` in
+# `ProjectionRewriter.TryMoveDistinctBelowReassembly`: the `Distinct` is instantiated for the tuple,
+# whose type the caller's projection decides. That is the premise this file describes, and there is
+# no version of the move without it.
+#
+# `total` rises with ours, 1143 -> 1144: EFCore is unchanged at 864.
+
+ours=99
+total=1144

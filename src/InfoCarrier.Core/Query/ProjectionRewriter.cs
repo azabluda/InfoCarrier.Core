@@ -172,6 +172,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
+        if (TryMoveDistinctBelowReassembly(call) is { } moved)
+        {
+            return moved;
+        }
+
         if (!IsResultSelectorOperator(call, out LambdaExpression? selector))
         {
             return call;
@@ -261,6 +266,82 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         return reassembly;
+    }
+
+    /// <summary>
+    ///     Moves a <c>Distinct</c> from above a reassembly to below it, onto the tuple the server
+    ///     computes, when the reassembly only copies each slot into one member.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-22.</b> <c>g.Weapons.Select(w =&gt; new { w.Name, … }).Distinct()</c>
+    ///         inside a projection became a server-side tuple, a client-side rebuild, and a
+    ///         <c>Distinct</c> above the rebuild, which ran on the client. The server joined the
+    ///         weapons with no <c>DISTINCT</c> and this client removed the duplicates, answering a
+    ///         query every relational provider refuses:
+    ///         <c>InsufficientInformationToIdentifyElementOfCollectionJoin</c>, because a
+    ///         <c>Distinct</c> without the element's key leaves nothing to attribute the joined rows
+    ///         to their owner by. Moved, the <c>Distinct</c> reaches the server's EF, which decides.
+    ///     </para>
+    ///     <para>
+    ///         <b>Sound only for a rebuild that copies each slot into one member.</b> Tuple equality
+    ///         and anonymous-type equality are both member by member, so two rows are equal as
+    ///         tuples exactly when they are equal rebuilt, and removing duplicates before the rebuild
+    ///         removes the same rows as after it. A rebuild that computes from a slot, or drops one,
+    ///         can make two different tuples equal, and is left alone.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not over a collection slot</b>: <c>QuerySplitter</c> refuses a <c>Distinct</c> over
+    ///         such a reassembly with EF's own message, and moving it would bypass that.
+    ///     </para>
+    /// </remarks>
+    private MethodCallExpression? TryMoveDistinctBelowReassembly(MethodCallExpression call)
+    {
+        if (call.Method.Name != nameof(Queryable.Distinct)
+            || call.Arguments.Count != 1
+            || (call.Method.DeclaringType != typeof(Queryable) && call.Method.DeclaringType != typeof(Enumerable))
+            || call.Arguments[0] is not MethodCallExpression reassembly
+            || !_reassemblies.Contains(reassembly)
+            || _collectionReassemblies.Contains(reassembly)
+            || StripQuotes(reassembly.Arguments[1]) is not LambdaExpression { Parameters: [var row] } rebuild
+            || !CopiesEachSlotOnce(rebuild.Body, row))
+        {
+            return null;
+        }
+
+        MethodCallExpression distinct = Expression.Call(
+            call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type),
+            reassembly.Arguments[0]);
+        MethodCallExpression moved = reassembly.Update(reassembly.Object, [distinct, reassembly.Arguments[1]]);
+
+        _reassemblies.Remove(reassembly);
+        _reassemblies.Add(moved);
+        return moved;
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="body" /> constructs its result from the slots of
+    ///     <paramref name="row" />, each read once, in order, and nothing else.
+    /// </summary>
+    private static bool CopiesEachSlotOnce(Expression body, ParameterExpression row)
+    {
+        if (body is not NewExpression { Members: not null } construction
+            || construction.Arguments.Count == 0
+            || TupleCarrier.MakeType([.. construction.Arguments.Select(a => a.Type)]) != row.Type)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < construction.Arguments.Count; i++)
+        {
+            if (!Microsoft.EntityFrameworkCore.Query.ExpressionEqualityComparer.Instance.Equals(
+                    construction.Arguments[i], TupleCarrier.Read(row, i)))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
