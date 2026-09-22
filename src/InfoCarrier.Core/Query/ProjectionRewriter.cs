@@ -197,8 +197,21 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         ParameterExpression[] enclosing = [.. _enclosing];
 
         // Innermost first: rewriting an inner projection can turn its result into something the
-        // outer one can then be measured against.
-        if (base.VisitMethodCall(node) is not MethodCallExpression call)
+        // outer one can then be measured against. A plain Select visits its source first, because a
+        // source that comes back as a rebuild is fused with the selector BEFORE the selector is
+        // visited: see TryFuseSelectWithReassembly.
+        MethodCallExpression call;
+        if (IsPlainSelect(node))
+        {
+            Expression source = Visit(node.Arguments[0]);
+            call = TryFuseSelectWithReassembly(node, source)
+                ?? node.Update(node.Object, [source, Visit(node.Arguments[1])]);
+        }
+        else if (base.VisitMethodCall(node) is MethodCallExpression visited)
+        {
+            call = visited;
+        }
+        else
         {
             return node;
         }
@@ -355,6 +368,78 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         _reassemblies.Add(moved);
         return moved;
     }
+
+    /// <summary>
+    ///     Fuses a <c>Select</c> with the reassembly below it, when the reassembly only copies each
+    ///     slot into one member, so that the projection reads the server's tuple directly.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-22.</b> <c>Blogs.Select(b =&gt; new { b.Title }).Distinct()</c>
+    ///         followed by <c>Select(x =&gt; new { x.Title, Posts = posts.Where(p =&gt; p.Heading ==
+    ///         x.Title).ToList() })</c> ran the second projection on the client, because it reads
+    ///         <c>x</c>, which only the client rebuilds. Its subquery could not ship with it, so the
+    ///         server read the whole <c>Posts</c> table in a statement of its own, where EF's own
+    ///         client runs one <c>LEFT JOIN</c>. The same shape three levels deep is
+    ///         <c>Correlated_collection_after_distinct_3_levels_without_original_identifiers</c>,
+    ///         which every relational provider refuses and this client answered.
+    ///     </para>
+    ///     <para>
+    ///         <c>Select(Select(server, rebuild), f)</c> is <c>Select(server, row =&gt;
+    ///         f(rebuild(row)))</c> by the definition of <c>Select</c>, so the answer cannot change.
+    ///         EF's <see cref="Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor" /> does
+    ///         the substitution and folds <c>new { Title = row.Item1 }.Title</c> back to
+    ///         <c>row.Item1</c>, which is what leaves the fused projection nothing client-typed to
+    ///         read. It is then an ordinary projection over a server source, and the rewrite that
+    ///         follows splits it as it splits any other.
+    ///     </para>
+    ///     <para>
+    ///         <b>The selector is visited AFTER the fusion, and that is load-bearing.</b> Visited
+    ///         first, a subquery inside it that reads <c>x.Title</c> has a source the server cannot
+    ///         name, so its own projection is never rewritten; after the fusion that source reads
+    ///         <c>row.Item1</c>, ships, and the server returned every column of every post where EF
+    ///         reads one. Measured with <c>ServerParameterizationTest</c>.
+    ///     </para>
+    ///     <para>
+    ///         Only over a rebuild that copies each slot into one member, and never over a collection
+    ///         slot, for the reasons <see cref="TryMoveDistinctBelowReassembly" /> gives.
+    ///     </para>
+    /// </remarks>
+    /// <param name="node">The <c>Select</c>, not yet visited.</param>
+    /// <param name="source">Its source, already visited.</param>
+    private MethodCallExpression? TryFuseSelectWithReassembly(MethodCallExpression node, Expression source)
+    {
+        if (source is not MethodCallExpression reassembly
+            || !_reassemblies.Contains(reassembly)
+            || _collectionReassemblies.Contains(reassembly)
+            || StripQuotes(reassembly.Arguments[1]) is not LambdaExpression { Parameters: [var row] } rebuild
+            || !CopiesEachSlotOnce(rebuild.Body, row)
+            || StripQuotes(node.Arguments[1]) is not LambdaExpression { Parameters: [var element] } selector)
+        {
+            return null;
+        }
+
+        Expression body = Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+            element, rebuild.Body, selector.Body);
+        LambdaExpression fused = Expression.Lambda(
+            typeof(Func<,>).MakeGenericType(row.Type, selector.ReturnType), body, row);
+
+        _reassemblies.Remove(reassembly);
+        return Expression.Call(
+            node.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type, selector.ReturnType),
+            reassembly.Arguments[0],
+            Visit(node.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote } ? Expression.Quote(fused) : fused));
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="node" /> is <c>Select(source, x =&gt; …)</c> of
+    ///     <see cref="Queryable" /> or <see cref="Enumerable" />, without the index overload.
+    /// </summary>
+    private static bool IsPlainSelect(MethodCallExpression node)
+        => node.Method.Name == nameof(Queryable.Select)
+            && node.Arguments.Count == 2
+            && (node.Method.DeclaringType == typeof(Queryable) || node.Method.DeclaringType == typeof(Enumerable))
+            && StripQuotes(node.Arguments[1]) is LambdaExpression { Parameters.Count: 1 };
 
     /// <summary>
     ///     Whether <paramref name="body" /> constructs its result from the slots of

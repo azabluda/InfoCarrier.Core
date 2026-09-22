@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
-using Microsoft.EntityFrameworkCore.TestModels.GearsOfWarModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -34,28 +33,28 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         cause.
 ///     </para>
 ///     <para>
-///         <b>21 since 2026-09-22.</b> Six more came red with EF's own <c>ApplyNotSupported</c>, and
+///         <b>22 since 2026-09-22.</b> Seven more came red with EF's own <c>ApplyNotSupported</c>, and
 ///         until then this provider answered each of them without anything here recording it. The
 ///         two <c>Correlated_collection_with_distinct_*_identifier_column</c> tests ran their
 ///         <c>Distinct</c> on the client. The four whose inner collection reads an outer element
 ///         (<c>*_references_outer_qsre*</c>, <c>*_references_element_two_levels_up</c>) carried that
 ///         read outside the collection, so the server never needed <c>APPLY</c>.
+///         <c>Correlated_collection_after_distinct_3_levels</c> ran every projection after its
+///         first <c>Distinct</c> on the client.
 ///     </para>
 ///     <para>
-///         <b>One more override per class is NOT EF's, and there were two until 2026-09-22.</b>
-///         The relational base asserts that a correlated collection with <c>Distinct</c> must be
-///         refused, and this provider answers it, because the projection split reassembles on
-///         the client. The override carries EF's <em>core</em> assertion instead —
-///         <c>AssertQuery</c>, row by row — which is a stronger statement than the refusal it
-///         displaces, not a weaker one. See the remarks on
-///         <see cref="TPTGearsOfWarQueryInfoCarrierTest.Correlated_collection_after_distinct_3_levels_without_original_identifiers" />.
+///         <b>No override here is this provider's own since 2026-09-22.</b> Two per class used to
+///         replace the relational base's refusal of a correlated collection after <c>Distinct</c>
+///         with the core base's row-by-row answer, because the projection split reassembled that
+///         collection on the client. <c>ProjectionRewriter</c> now moves such a <c>Distinct</c>
+///         onto the server and fuses a projection with the rebuild below it, so the server's EF
+///         refuses both queries with EF's own message and both tests inherit EF's assertion.
 ///     </para>
 ///     <para>
-///         <b>The sibling <c>Correlated_collection_with_distinct_3_levels</c> is deliberately NOT
-///         treated this way</b>, and it lives in <c>GearsOfWarQueryInfoCarrierTest</c> on Tier A.
-///         C64 proved its assertion cannot be satisfied by any answer, so an override there would
-///         be green because the assertion is broken. <c>docs/upstream-defects.md</c> §1.4 carries
-///         it.
+///         <b>The Tier A <c>Correlated_collection_with_distinct_3_levels</c> is a different
+///         matter</b>, and it lives in <c>GearsOfWarQueryInfoCarrierTest</c>. C64 proved its
+///         assertion cannot be satisfied by any answer. <c>docs/upstream-defects.md</c> §1.4
+///         carries it.
 ///     </para>
 /// </remarks>
 public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTestBase<TPTGearsOfWarQueryInfoCarrierFixture>
@@ -266,104 +265,17 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(async));
 
-    /// <summary>
-    ///     A query EF's relational base asserts a refusal for, and this provider answers.
-    /// </summary>
+    /// <inheritdoc />
     /// <remarks>
-    ///     <para>
-    ///         <b>Not EF's override, and it asserts MORE rather than less.</b>
-    ///         <c>GearsOfWarQueryRelationalTestBase</c> asserts
-    ///         <c>RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin</c>,
-    ///         because <c>Distinct</c> drops the columns that say which owner a projected
-    ///         collection element belongs to, and a relational provider has to attribute rows after
-    ///         a join. <b>This provider never builds that join</b>: the server returns rows and the
-    ///         projection is reassembled on the client, so the query is answered and the rows are
-    ///         right.
-    ///     </para>
-    ///     <para>
-    ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
-    ///         suppressing a red test. This replaces <em>"must throw"</em> with
-    ///         <em>"must return exactly these rows"</em> — EF's core <c>AssertQuery</c>, checking
-    ///         every row against the in-memory expected result — which fails if the answer ever
-    ///         becomes wrong, where the refusal assertion would keep failing whatever the rows
-    ///         were. <b>The query body is EF's own, copied</b>, because C# cannot call a
-    ///         grandparent's implementation and the relational base sits between. The copy is the
-    ///         real cost: an edit to EF's base will not reach it.
-    ///     </para>
-    ///     <para>
-    ///         <b>This said "Two queries" until 2026-09-22.</b> The other was
-    ///         <c>Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions</c>,
-    ///         whose <c>Distinct</c> sits directly on a rebuilt projection. <c>ProjectionRewriter</c>
-    ///         now moves such a <c>Distinct</c> onto the server's tuple, the server's EF refuses the
-    ///         query with EF's own message, and the test inherits EF's assertion.
-    ///     </para>
-    ///     <para>
-    ///         <b>Note what this does NOT do.</b> The sibling
-    ///         <c>Correlated_collection_with_distinct_3_levels</c> was left red here until 2026-09-15:
-    ///         C64 proved its assertion cannot be satisfied by <em>any</em> answer. Its Tier A
-    ///         override now compares the collection as a sequence instead, which is the assertion
-    ///         the base meant. See <c>docs/upstream-defects.md</c> §1.4.
-    ///     </para>
+    ///     EF's own: a correlated collection after <c>Distinct</c> needs <c>APPLY</c>. It answered
+    ///     here until 2026-09-22, when every projection after the first <c>Distinct</c> ran on the
+    ///     client; see <c>ProjectionRewriter.TryFuseSelectWithReassembly</c>.
     /// </remarks>
-    [InfoCarrierDesign(
-        10,
-        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
-        Repository = UpstreamRepository.EfCore,
-        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
-        UpstreamFirstLine = 152,
-        UpstreamLastLine = 156,
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
-    public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
-        => AssertQuery(
-            async,
-            ss => ss.Set<Squad>()
-                .Select(s => new { s.Name.Length })
-                .Distinct()
-                .Select(x => new
-                {
-                    x.Length,
-                    Subquery1 = (from g in ss.Set<Gear>()
-                                 where g.Nickname.Length == x.Length
-                                 select new { g.HasSoulPatch, g.CityOfBirthName })
-                        .Distinct()
-                        .Select(xx => new
-                        {
-                            xx.HasSoulPatch,
-                            Subquery2 = (from w in ss.Set<Weapon>()
-                                         where w.OwnerFullName == xx.CityOfBirthName
-                                         select new
-                                         {
-                                             w.Id,
-                                             x.Length,
-                                             xx.HasSoulPatch
-                                         }).ToList()
-                        })
-                        .ToList()
-                }),
-            elementSorter: e => e.Length,
-            elementAsserter: (e, a) =>
-            {
-                Assert.Equal(e.Length, a.Length);
-                AssertCollection(
-                    e.Subquery1,
-                    a.Subquery1,
-                    elementSorter: ee => ee.HasSoulPatch,
-                    elementAsserter: (ee, aa) =>
-                    {
-                        Assert.Equal(ee.HasSoulPatch, aa.HasSoulPatch);
-                        AssertCollection(
-                            ee.Subquery2,
-                            aa.Subquery2,
-                            elementSorter: eee => eee.Id,
-                            elementAsserter: (eee, aaa) =>
-                            {
-                                Assert.Equal(eee.Id, aaa.Id);
-                                Assert.Equal(eee.Length, aaa.Length);
-                                Assert.Equal(eee.HasSoulPatch, aaa.HasSoulPatch);
-                            });
-                    });
-            });
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 153, 156,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_after_distinct_3_levels(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
 }
 
 /// <inheritdoc cref="TPTGearsOfWarQueryInfoCarrierTest" />
@@ -575,70 +487,17 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(async));
 
-    /// <summary>
-    ///     TPC's copy of the override described on <see cref="TPTGearsOfWarQueryInfoCarrierTest" />:
-    ///     EF's relational base asserts a refusal, this provider answers, and the assertion is
-    ///     replaced by EF's own row-by-row one rather than removed.
-    /// </summary>
-    [InfoCarrierDesign(
-        10,
-        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
-        Repository = UpstreamRepository.EfCore,
-        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
-        UpstreamFirstLine = 152,
-        UpstreamLastLine = 156,
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
-    public override Task Correlated_collection_after_distinct_3_levels_without_original_identifiers(bool async)
-        => AssertQuery(
-            async,
-            ss => ss.Set<Squad>()
-                .Select(s => new { s.Name.Length })
-                .Distinct()
-                .Select(x => new
-                {
-                    x.Length,
-                    Subquery1 = (from g in ss.Set<Gear>()
-                                 where g.Nickname.Length == x.Length
-                                 select new { g.HasSoulPatch, g.CityOfBirthName })
-                        .Distinct()
-                        .Select(xx => new
-                        {
-                            xx.HasSoulPatch,
-                            Subquery2 = (from w in ss.Set<Weapon>()
-                                         where w.OwnerFullName == xx.CityOfBirthName
-                                         select new
-                                         {
-                                             w.Id,
-                                             x.Length,
-                                             xx.HasSoulPatch
-                                         }).ToList()
-                        })
-                        .ToList()
-                }),
-            elementSorter: e => e.Length,
-            elementAsserter: (e, a) =>
-            {
-                Assert.Equal(e.Length, a.Length);
-                AssertCollection(
-                    e.Subquery1,
-                    a.Subquery1,
-                    elementSorter: ee => ee.HasSoulPatch,
-                    elementAsserter: (ee, aa) =>
-                    {
-                        Assert.Equal(ee.HasSoulPatch, aa.HasSoulPatch);
-                        AssertCollection(
-                            ee.Subquery2,
-                            aa.Subquery2,
-                            elementSorter: eee => eee.Id,
-                            elementAsserter: (eee, aaa) =>
-                            {
-                                Assert.Equal(eee.Id, aaa.Id);
-                                Assert.Equal(eee.Length, aaa.Length);
-                                Assert.Equal(eee.HasSoulPatch, aaa.HasSoulPatch);
-                            });
-                    });
-            });
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: a correlated collection after <c>Distinct</c> needs <c>APPLY</c>. It answered
+    ///     here until 2026-09-22, when every projection after the first <c>Distinct</c> ran on the
+    ///     client; see <c>ProjectionRewriter.TryFuseSelectWithReassembly</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 153, 156,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_after_distinct_3_levels(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
 }
 
 /// <summary>
@@ -652,15 +511,6 @@ internal static class GearsOfWarSqliteAssertions
             SqliteStrings.ApplyNotSupported,
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 
-    /// <summary>Why the two correlated-collection overrides answer what EF's relational base refuses.</summary>
-    internal const string AnsweredWithoutCollectionJoin =
-        "The server returns rows and the client reassembles the projected collection, so no collection join needs "
-        + "the identifying columns Distinct drops, and the query is answered.";
-
-    /// <summary>How those two overrides differ from the upstream test they replace.</summary>
-    internal const string CoreBodyNotRelationalRefusal =
-        "EF's relational base asserts InsufficientInformationToIdentifyElementOfCollectionJoin. This override is the "
-        + "core base's query with its row-by-row assertion, copied because C# cannot call a grandparent.";
 
     internal static async Task StoreRefuses(Func<Task> query)
     {
