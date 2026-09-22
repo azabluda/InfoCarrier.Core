@@ -138,14 +138,27 @@ public class ComplexNavigationsSharedTypeQueryInfoCarrierTest(ComplexNavigations
 ///     The relational base adds one override of its own, for the join-key ambiguity a relational
 ///     provider reports; every override below is
 ///     <c>ComplexNavigationsCollectionsSharedTypeQuerySqliteTest</c>'s. As in the non-shared-type
-///     sibling, <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> is
-///     deliberately absent, because it passes here.
+///     sibling, <c>Projecting_collection_after_optional_reference_correlated_with_parent</c> was
+///     deliberately absent until 2026-09-22, because it passed here, and it is EF's now.
 /// </remarks>
 public class ComplexNavigationsCollectionsSharedTypeQueryInfoCarrierTest(
     ComplexNavigationsSharedTypeQueryInfoCarrierFixture fixture)
     : ComplexNavigationsCollectionsSharedTypeQueryRelationalTestBase<
         ComplexNavigationsSharedTypeQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the collection reads its parent, which needs <c>APPLY</c>. It answered here
+    ///     until 2026-09-22, when the parent read stayed out of the collection; see
+    ///     <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 134, 138,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Projecting_collection_after_optional_reference_correlated_with_parent(bool async)
+        => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Projecting_collection_after_optional_reference_correlated_with_parent(async));
+
     /// <inheritdoc />
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSharedTypeQuerySqliteTest.cs", 13, 18,
@@ -329,6 +342,19 @@ public class ComplexNavigationsCollectionsSplitSharedTypeQueryInfoCarrierTest(
     : ComplexNavigationsCollectionsSplitSharedTypeQueryRelationalTestBase<
         ComplexNavigationsSharedTypeQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the collection reads its parent, which needs <c>APPLY</c>. It answered here
+    ///     until 2026-09-22, when the parent read stayed out of the collection; see
+    ///     <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 110, 114,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Projecting_collection_after_optional_reference_correlated_with_parent(bool async)
+        => ComplexNavigationsSharedTypeQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Projecting_collection_after_optional_reference_correlated_with_parent(async));
+
     /// <inheritdoc />
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexNavigationsCollectionsSplitSharedTypeQuerySqliteTest.cs", 41, 45,

@@ -37,6 +37,17 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // These do NOT carry over to Tier C (SQL Server, roadmap M7), which supports APPLY.
     // -------------------------------------------------------------------------------------
 
+    // Answered here until 2026-09-22: the inner collection's read of the outer row was carried
+    // outside it, so the server never needed APPLY. See ProjectionRewriter._enclosing.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 242, 245,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Projecting_after_navigation_and_distinct(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Projecting_after_navigation_and_distinct(async))).Message);
+
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 308, 312,
         Justification = Upstream.GaveNoReason)]

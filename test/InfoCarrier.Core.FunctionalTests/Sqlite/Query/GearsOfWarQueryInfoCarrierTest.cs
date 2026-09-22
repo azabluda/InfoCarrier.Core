@@ -34,10 +34,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         cause.
 ///     </para>
 ///     <para>
-///         <b>17 since 2026-09-22.</b> The two <c>Correlated_collection_with_distinct_*_identifier_column</c>
-///         tests came red with EF's own <c>ApplyNotSupported</c> once their <c>Distinct</c> reached
-///         the server. Until then this provider answered them, because the <c>Distinct</c> ran on
-///         the client, and nothing here recorded that it did.
+///         <b>21 since 2026-09-22.</b> Six more came red with EF's own <c>ApplyNotSupported</c>, and
+///         until then this provider answered each of them without anything here recording it. The
+///         two <c>Correlated_collection_with_distinct_*_identifier_column</c> tests ran their
+///         <c>Distinct</c> on the client. The four whose inner collection reads an outer element
+///         (<c>*_references_outer_qsre*</c>, <c>*_references_element_two_levels_up</c>) carried that
+///         read outside the collection, so the server never needed <c>APPLY</c>.
 ///     </para>
 ///     <para>
 ///         <b>One more override per class is NOT EF's, and there were two until 2026-09-22.</b>
@@ -215,6 +217,54 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_with_distinct_projecting_identifier_column(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 103, 107,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_inner_collection_references_element_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_inner_collection_references_element_two_levels_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 35, 39,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_inner_subquery_selector_references_outer_qsre(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_selector_references_outer_qsre(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 41, 45,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 47, 51,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(async));
 
     /// <summary>
     ///     A query EF's relational base asserts a refusal for, and this provider answers.
@@ -476,6 +526,54 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_with_distinct_projecting_identifier_column(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 103, 107,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_inner_collection_references_element_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_inner_collection_references_element_two_levels_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 35, 39,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_inner_subquery_selector_references_outer_qsre(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_selector_references_outer_qsre(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 41, 45,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: the inner collection reads an outer element, which needs <c>APPLY</c>. It
+    ///     answered here until 2026-09-22, when that read was carried outside the collection;
+    ///     see <c>ProjectionRewriter._enclosing</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 47, 51,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(async));
 
     /// <summary>
     ///     TPC's copy of the override described on <see cref="TPTGearsOfWarQueryInfoCarrierTest" />:
