@@ -649,6 +649,86 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A predicate that names <see cref="System.Type" /> reaches the server, and the server
+    ///     runs the statement plain EF Core runs for it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>This is the evidence behind <c>security-review.md</c> §2's open recommendation.</b>
+    ///         That recommendation says <c>typeof(Type)</c> earns its place on the allowlist only if
+    ///         payloads genuinely carry <see cref="System.Type" /> values, and the suite could not
+    ///         answer it: removing both admission sites on 2026-09-22 left the whole suite green
+    ///         except the hardening test that asserts the pivot's own premise.
+    ///     </para>
+    ///     <para>
+    ///         <c>GetType()</c> is where an ordinary query carries one: its return type is
+    ///         <see cref="System.Type" /> and <c>typeof(Sparrow)</c> is a constant of it, so the
+    ///         boundary needs the entry for a predicate EF translates to a discriminator test.
+    ///     </para>
+    ///     <para>
+    ///         <b>The hierarchy is load-bearing, and the first version of this test did without
+    ///         it.</b> Over a single mapped type the comparison is constant, EF folds it before
+    ///         anything reaches the wire, and the test passed with the entry removed just as
+    ///         happily as with it there. A probe that cannot fail measures nothing.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_predicate_naming_a_Type_matches_the_direct_query()
+    {
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Creature>().Where(x => x.GetType() == typeof(Sparrow)).ToListAsync());
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Conveyance>().Where(x => x.GetType() == typeof(Sedan)).ToListAsync());
+        await AssertOneMatchingStatement(
+            async c => _ = await c.Set<Tool>().Where(x => x.GetType() == typeof(Hammer)).ToListAsync());
+    }
+
+    /// <summary>
+    ///     <c>OfType&lt;T&gt;()</c> discriminates on the server under all three mappings, and needs
+    ///     no <see cref="System.Type" /> value to do it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The type argument is an entity type and the declaring type is <c>Queryable</c>, so
+    ///         nothing here depends on the allowlist entry the test above is about. Measured with
+    ///         that entry removed: the statement is unchanged.
+    ///     </para>
+    ///     <para>
+    ///         <b>Read from the statement, not from a green.</b> A differential test says "the same
+    ///         as EF" and is silent when both sides read everything, so the three mappings were
+    ///         each dumped and read: TPH filters on the discriminator, TPT joins the leaf table,
+    ///         and TPC narrows to the one concrete table with no union.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_OfType_filter_matches_the_direct_query_under_every_mapping()
+    {
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Creature>().OfType<Sparrow>().ToListAsync());
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Conveyance>().OfType<Sedan>().ToListAsync());
+        await AssertOneMatchingStatement(async c => _ = await c.Set<Tool>().OfType<Hammer>().ToListAsync());
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> both ways and asserts the store saw <em>one</em> statement
+    ///     each and the same one.
+    /// </summary>
+    /// <remarks>
+    ///     The count is half the assertion. Matching text alone would still pass if this client
+    ///     sent the query and then a second read, and an inheritance query is exactly where a
+    ///     second read would hide.
+    /// </remarks>
+    private async Task AssertOneMatchingStatement(Func<DbContext, Task> run)
+    {
+        Run both = await RunBothWays(null, run);
+
+        Assert.Null(both.WireError);
+        Assert.Null(both.DirectError);
+        Assert.Single(both.Directly);
+        Assert.Single(both.OverTheWire);
+        Assert.Equal(both.Directly[0], both.OverTheWire[0]);
+    }
+
+    /// <summary>
     ///     An ordering by a captured value the projection carries fails where plain EF Core fails,
     ///     and runs no statement.
     /// </summary>

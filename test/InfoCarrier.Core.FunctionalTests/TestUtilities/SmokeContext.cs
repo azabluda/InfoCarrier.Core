@@ -90,6 +90,26 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
     public DbSet<Panel> Panels => Set<Panel>();
 
     /// <summary>
+    ///     A TPH hierarchy, so that a query can name a <see cref="System.Type" /> the server has
+    ///     to act on.
+    /// </summary>
+    /// <remarks>
+    ///     <c>c.GetType() == typeof(Sparrow)</c> is the one ordinary query shape that puts a
+    ///     <see cref="System.Type" /> value on the wire, and it needs a hierarchy: with a single
+    ///     mapped type the comparison is constant and EF folds it away, which is exactly how a
+    ///     first version of that probe passed with the type admitted and again with it removed.
+    ///     <c>ServerParameterizationTest.A_predicate_naming_a_Type_matches_the_direct_query</c> is
+    ///     the test, and <c>docs/security-review.md</c> §2 is the question it answers.
+    /// </remarks>
+    public DbSet<Creature> Creatures => Set<Creature>();
+
+    /// <summary>The same hierarchy under TPT, so the probe covers more than one mapping.</summary>
+    public DbSet<Conveyance> Conveyances => Set<Conveyance>();
+
+    /// <summary>And under TPC.</summary>
+    public DbSet<Tool> Tools => Set<Tool>();
+
+    /// <summary>
     ///     A store function mapped as an <em>instance</em> method on the context, for R89's pin.
     /// </summary>
     /// <remarks>
@@ -157,6 +177,22 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
                     v => v.Count,
                     v => new List<Tile>(v)));
 
+        // Both leaves, so the hierarchy has a discriminator to compare against. EF discovers a
+        // derived type only where the model reaches it, and `DbSet<Creature>` reaches neither.
+        modelBuilder.Entity<Sparrow>();
+        modelBuilder.Entity<Carp>();
+
+        // The same shape under the other two mapping strategies. `GetType()` translates very
+        // differently under each -- a discriminator test, a join over the leaf tables, a union --
+        // so one of them answering is no evidence about the others.
+        modelBuilder.Entity<Conveyance>().UseTptMappingStrategy();
+        modelBuilder.Entity<Sedan>();
+        modelBuilder.Entity<Lorry>();
+
+        modelBuilder.Entity<Tool>().UseTpcMappingStrategy();
+        modelBuilder.Entity<Hammer>();
+        modelBuilder.Entity<Saw>();
+
         // An alternate key, which SQLite renders as a UNIQUE table constraint. It is the only
         // thing in this model that reaches CommandBatchPreparer.AddUniqueValueEdges' unique-
         // constraint branch, and R44 exists to measure that branch over the wire.
@@ -166,6 +202,68 @@ public class SqliteSmokeContext(DbContextOptions<SqliteSmokeContext> options) : 
             b.HasAlternateKey(e => e.Code);
         });
     }
+}
+
+/// <summary>
+///     The root of a TPH hierarchy, so that <c>GetType()</c> has something to discriminate.
+/// </summary>
+public abstract class Creature
+{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+}
+
+/// <summary>One leaf of <see cref="Creature" />.</summary>
+public class Sparrow : Creature
+{
+    public double Wingspan { get; set; }
+}
+
+/// <summary>The other leaf, so the discriminator has two values.</summary>
+public class Carp : Creature
+{
+    public int Depth { get; set; }
+}
+
+/// <summary>The root of the TPT hierarchy.</summary>
+public abstract class Conveyance
+{
+    public int Id { get; set; }
+
+    public string? Model { get; set; }
+}
+
+/// <summary>A TPT leaf.</summary>
+public class Sedan : Conveyance
+{
+    public int Doors { get; set; }
+}
+
+/// <summary>The other TPT leaf.</summary>
+public class Lorry : Conveyance
+{
+    public int Axles { get; set; }
+}
+
+/// <summary>The root of the TPC hierarchy.</summary>
+public abstract class Tool
+{
+    public int Id { get; set; }
+
+    public string? Label { get; set; }
+}
+
+/// <summary>A TPC leaf.</summary>
+public class Hammer : Tool
+{
+    public int Weight { get; set; }
+}
+
+/// <summary>The other TPC leaf.</summary>
+public class Saw : Tool
+{
+    public int Teeth { get; set; }
 }
 
 /// <summary>

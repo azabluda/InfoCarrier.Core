@@ -54,8 +54,14 @@ Neither is a hole, and the reason is precise and load-bearing:
 > `Type.InvokeMember` takes a `System.Reflection.Binder`; `MethodInfo.Invoke` and
 > `ConstructorInfo.Invoke` live on declaring types that are not admitted; `Activator`,
 > `Assembly` and `AppDomain` are not admitted at all. `ResolveMethod` resolves a method's
-> **parameter** types through the same allowlist, so an unadmitted parameter type fails the
-> signature lookup before `Admit` is consulted.
+> **parameter types and its return type** through the same allowlist, so either one unadmitted
+> fails the signature lookup before `Admit` is consulted.
+
+**The return-type half was added to this paragraph on 2026-09-22, and it widens the bound rather
+than narrowing it.** The sentence credited only the parameter check until then, which understated
+the guard: `Type.GetMethod("Start")` takes a `string` and would have passed a parameters-only
+check, and it is stopped instead by its `MethodInfo` return. Read in `ResolveMethod`, which
+resolves `node.ReturnType` before it looks at any candidate.
 
 So the safety of stage 6 is not one check but a **conjunction across several**, and it would be
 broken by adding any of `Binder`, `MethodBase`, `MethodInfo`, `ConstructorInfo`, `PropertyInfo`,
@@ -71,6 +77,92 @@ a convenience type to a list.
 carry `Type` values. If a later audit finds they do not, removing it collapses the conjunction to a
 single clause and is worth doing. Removing it now is a change with a full-suite cost and no
 demonstrated benefit, so it is recorded rather than made.
+
+### 2 addendum — the audit was run on 2026-09-22, and the recommendation is closed as *keep it*
+
+**Payloads do carry `Type` values, and `GetType()` is where.** `c.GetType() == typeof(Sparrow)` is
+an ordinary query that EF translates to a discriminator test. Its captured tree names
+`System.Type` twice, as the method's return type and as the constant's, so the client's boundary
+needs the entry to ship the predicate at all.
+
+**The suite could not have told us this, and it is worth saying why.** Both admission sites were
+removed and the whole suite run: **1 test failed of 29 860**, and it was
+`DeserializationHardeningTest.The_Type_GetType_then_InvokeMember_pivot_is_refused`, which asserts
+the *premise* of §2's own pivot rather than any query. No spec test in either project carries a
+`Type` value. On that evidence alone the recommendation looked ready to close the other way.
+
+**The first probe written for it was wrong, and the error is the instructive part.** It asked the
+question over `Blog`, a type with no hierarchy, where the comparison is constant and EF folds it
+away before anything reaches the wire. It passed with the entry and passed again without it. A
+probe that cannot fail measures nothing, and this one would have closed the recommendation on a
+false green. The test now uses a TPH hierarchy, which is what gives `GetType()` something to
+discriminate.
+
+**What removal would actually cost**, measured on that test: the client refuses the predicate, the
+server runs `SELECT … FROM "Creatures"` with no `WHERE`, and the whole table crosses the wire for
+the client to filter. **Right answer, silently wrong cost** — the failure mode #111 exists to find,
+and one no answer-checking test can see.
+
+**`OfType<T>()` needs no `Type` at all, and that bounds what removal would cost.** Measured the same
+day, with the entry removed: `Set<Creature>().OfType<Sparrow>()` still runs
+`… FROM "Creatures" WHERE "_"."Discriminator" = 'Sparrow'`, byte for byte what plain EF runs. The
+type argument is an entity type and the declaring type is `Queryable`, so no `Type` *value* crosses.
+Only the `GetType() == typeof(X)` spelling depends on the entry, and it is the spelling to avoid
+anyway. So a future opt-in design would cost the idiomatic query nothing.
+
+**Both spellings were measured under all three inheritance mappings, and the server discriminates
+in every one.** One statement each, matching plain EF's, with the statements read rather than the
+booleans trusted:
+
+| mapping | what the server runs for both spellings |
+|---|---|
+| TPH | filters on the discriminator column |
+| TPT | joins the leaf table and filters |
+| TPC | narrows to the one concrete table, with no union |
+
+Nothing reads a whole hierarchy and nothing runs a second statement, which is the failure a
+matching-text assertion alone would not catch.
+`ServerParameterizationTest.An_OfType_filter_matches_the_direct_query_under_every_mapping` and the
+`GetType` test beside it cover the six cases, and both assert the statement *count* as well as the
+text.
+
+### 2 addendum (2) — why registration does not substitute for the clause
+
+**The clause admits three names, and the set can only express one at a time.** §2 says
+`System.Type` "and everything assignable to it", which reads like one entry. A `typeof(X)`
+constant makes the boundary ask about all three of these:
+
+| name | who asks, and why |
+|---|---|
+| `System.Type` | the constant's declared type, and the operand type of `==` |
+| `System.Reflection.TypeInfo` | `WireTypeCollector` reports the *value's* type through `TypeNodeMapper.Nameable`, which walks to the first **visible** base; `RuntimeType` is internal and `TypeInfo` is what it lands on |
+| `System.RuntimeType` | asked on the **server** side; internal, and an application can only name it as `typeof(int).GetType()` |
+
+`_allowed` is an exact-match set, so registering `System.Type` admits `System.Type` and nothing
+derived from it. The clause is `typeof(Type).IsAssignableFrom(type)`, a *rule*, and that is exactly
+the difference: a rule covers the subclasses, a set does not.
+
+**Measured by construction on 2026-09-22**, with the clause removed each time: `Type` alone was
+refused at `TypeInfo`; `Type` plus `RuntimeType` was still refused at `TypeInfo`; `TypeInfo` alone
+was refused at `Type`; `Type` plus `TypeInfo` reached the server and was refused there at
+`RuntimeType`; all three together shipped the query whole, with no split event and no refusal. The
+refused name came from instrumenting `TypeAllowlist.IsAllowed` and reading the stack, not from
+guessing.
+
+**So an opt-in design is possible but is not just a deletion.** It would have to keep the rule and
+gate it on the application having registered `System.Type` — "register the root, get its runtime
+subclasses" — because no application should be expected to name `System.RuntimeType`. Removing the
+clause and relying on `AllowTypes` as it stands would take the capability away in practice.
+`DeserializationHardeningTest.The_Type_clause_admits_the_three_names_a_typeof_value_reaches` pins
+the reach, so a future narrowing of the rule fails a test rather than a user's query.
+
+**Both readings above are from the statement text, not from a green test.** A differential test says
+"the same as EF", never "few columns", so a pass can sit on top of a full table crossing the wire
+when both sides do it. Each claim here was read out of the logged SQL.
+
+So the entry stays, the conjunction stays the bound, and
+`ServerParameterizationTest.A_predicate_naming_a_Type_matches_the_direct_query` is the pin. Anyone
+proposing the removal again should read this addendum first: the cost is not in the suite.
 
 ## 2a. Amendment — C53's base-class rule, and why it does not widen the surface
 
