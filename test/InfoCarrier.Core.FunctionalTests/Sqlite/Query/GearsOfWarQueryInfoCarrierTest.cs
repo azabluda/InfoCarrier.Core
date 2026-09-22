@@ -34,14 +34,19 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         cause.
 ///     </para>
 ///     <para>
-///         <b>Two more overrides per class were added in V12, and they are NOT EF's.</b> Both
-///         classes used to leave a family red with "no exception was thrown": the relational base
-///         asserts that a correlated collection with <c>Distinct</c> must be refused, and this
-///         provider answers it, because the projection split reassembles on the client. Those two
-///         now carry EF's <em>core</em> assertion instead — <c>AssertQuery</c>, row by row —
-///         which is a stronger statement than the refusal it displaces, not a weaker one. See the
-///         remarks on
-///         <see cref="TPTGearsOfWarQueryInfoCarrierTest.Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />.
+///         <b>17 since 2026-09-22.</b> The two <c>Correlated_collection_with_distinct_*_identifier_column</c>
+///         tests came red with EF's own <c>ApplyNotSupported</c> once their <c>Distinct</c> reached
+///         the server. Until then this provider answered them, because the <c>Distinct</c> ran on
+///         the client, and nothing here recorded that it did.
+///     </para>
+///     <para>
+///         <b>One more override per class is NOT EF's, and there were two until 2026-09-22.</b>
+///         The relational base asserts that a correlated collection with <c>Distinct</c> must be
+///         refused, and this provider answers it, because the projection split reassembles on
+///         the client. The override carries EF's <em>core</em> assertion instead —
+///         <c>AssertQuery</c>, row by row — which is a stronger statement than the refusal it
+///         displaces, not a weaker one. See the remarks on
+///         <see cref="TPTGearsOfWarQueryInfoCarrierTest.Correlated_collection_after_distinct_3_levels_without_original_identifiers" />.
 ///     </para>
 ///     <para>
 ///         <b>The sibling <c>Correlated_collection_with_distinct_3_levels</c> is deliberately NOT
@@ -187,15 +192,39 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
 
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-22, when the <c>Distinct</c> stayed on the client; see
+    ///     <c>ProjectionRewriter.TryMoveDistinctBelowReassembly</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 140, 144,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_not_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-22, when the <c>Distinct</c> stayed on the client; see
+    ///     <c>ProjectionRewriter.TryMoveDistinctBelowReassembly</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 134, 138,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_projecting_identifier_column(async));
+
     /// <summary>
-    ///     Two queries EF's relational base asserts a refusal for, and this provider answers.
+    ///     A query EF's relational base asserts a refusal for, and this provider answers.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>Not EF's overrides, and they assert MORE rather than less.</b>
+    ///         <b>Not EF's override, and it asserts MORE rather than less.</b>
     ///         <c>GearsOfWarQueryRelationalTestBase</c> asserts
-    ///         <c>RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin</c> for
-    ///         both, because <c>Distinct</c> drops the columns that say which owner a projected
+    ///         <c>RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin</c>,
+    ///         because <c>Distinct</c> drops the columns that say which owner a projected
     ///         collection element belongs to, and a relational provider has to attribute rows after
     ///         a join. <b>This provider never builds that join</b>: the server returns rows and the
     ///         projection is reassembled on the client, so the query is answered and the rows are
@@ -203,13 +232,20 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///     </para>
     ///     <para>
     ///         <b>Why this is not the override CLAUDE.md forbids.</b> That guardrail is about
-    ///         suppressing a red test. Each of these replaces <em>"must throw"</em> with
+    ///         suppressing a red test. This replaces <em>"must throw"</em> with
     ///         <em>"must return exactly these rows"</em> — EF's core <c>AssertQuery</c>, checking
     ///         every row against the in-memory expected result — which fails if the answer ever
     ///         becomes wrong, where the refusal assertion would keep failing whatever the rows
-    ///         were. <b>The query bodies are EF's own, copied</b>, because C# cannot call a
+    ///         were. <b>The query body is EF's own, copied</b>, because C# cannot call a
     ///         grandparent's implementation and the relational base sits between. The copy is the
     ///         real cost: an edit to EF's base will not reach it.
+    ///     </para>
+    ///     <para>
+    ///         <b>This said "Two queries" until 2026-09-22.</b> The other was
+    ///         <c>Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions</c>,
+    ///         whose <c>Distinct</c> sits directly on a rebuilt projection. <c>ProjectionRewriter</c>
+    ///         now moves such a <c>Distinct</c> onto the server's tuple, the server's EF refuses the
+    ///         query with EF's own message, and the test inherits EF's assertion.
     ///     </para>
     ///     <para>
     ///         <b>Note what this does NOT do.</b> The sibling
@@ -219,44 +255,6 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
     ///         the base meant. See <c>docs/upstream-defects.md</c> §1.4.
     ///     </para>
     /// </remarks>
-    [InfoCarrierDesign(
-        10,
-        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
-        Repository = UpstreamRepository.EfCore,
-        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
-        UpstreamFirstLine = 23,
-        UpstreamLastLine = 30,
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
-    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
-        bool async)
-        => AssertQuery(
-            async,
-            ss => ss.Set<Gear>()
-                .Select(g => new
-                {
-                    Key = g.Nickname,
-                    Subquery = g.Weapons
-                        .Select(w => new { w.Name, w.IsAutomatic, w.OwnerFullName!.Length })
-                        .Distinct().ToList()
-                }),
-            elementSorter: e => e.Key,
-            elementAsserter: (e, a) =>
-            {
-                Assert.Equal(e.Key, a.Key);
-                AssertCollection(
-                    e.Subquery,
-                    a.Subquery,
-                    elementSorter: ee => ee.Name,
-                    elementAsserter: (ee, aa) =>
-                    {
-                        Assert.Equal(ee.Name, aa.Name);
-                        Assert.Equal(ee.IsAutomatic, aa.IsAutomatic);
-                        Assert.Equal(ee.Length, aa.Length);
-                    });
-            });
-
-    /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
     [InfoCarrierDesign(
         10,
         Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
@@ -455,49 +453,35 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
     public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
         => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
 
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-22, when the <c>Distinct</c> stayed on the client; see
+    ///     <c>ProjectionRewriter.TryMoveDistinctBelowReassembly</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 140, 144,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_not_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-22, when the <c>Distinct</c> stayed on the client; see
+    ///     <c>ProjectionRewriter.TryMoveDistinctBelowReassembly</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 134, 138,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_projecting_identifier_column(async));
+
     /// <summary>
-    ///     TPC's copy of the two overrides described on <see cref="TPTGearsOfWarQueryInfoCarrierTest" />:
+    ///     TPC's copy of the override described on <see cref="TPTGearsOfWarQueryInfoCarrierTest" />:
     ///     EF's relational base asserts a refusal, this provider answers, and the assertion is
     ///     replaced by EF's own row-by-row one rather than removed.
     /// </summary>
-    [InfoCarrierDesign(
-        10,
-        Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,
-        Repository = UpstreamRepository.EfCore,
-        UpstreamPath = "test/EFCore.Relational.Specification.Tests/Query/GearsOfWarQueryRelationalTestBase.cs",
-        UpstreamFirstLine = 23,
-        UpstreamLastLine = 30,
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = GearsOfWarSqliteAssertions.CoreBodyNotRelationalRefusal)]
-    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions(
-        bool async)
-        => AssertQuery(
-            async,
-            ss => ss.Set<Gear>()
-                .Select(g => new
-                {
-                    Key = g.Nickname,
-                    Subquery = g.Weapons
-                        .Select(w => new { w.Name, w.IsAutomatic, w.OwnerFullName!.Length })
-                        .Distinct().ToList()
-                }),
-            elementSorter: e => e.Key,
-            elementAsserter: (e, a) =>
-            {
-                Assert.Equal(e.Key, a.Key);
-                AssertCollection(
-                    e.Subquery,
-                    a.Subquery,
-                    elementSorter: ee => ee.Name,
-                    elementAsserter: (ee, aa) =>
-                    {
-                        Assert.Equal(ee.Name, aa.Name);
-                        Assert.Equal(ee.IsAutomatic, aa.IsAutomatic);
-                        Assert.Equal(ee.Length, aa.Length);
-                    });
-            });
-
-    /// <inheritdoc cref="Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions" />
     [InfoCarrierDesign(
         10,
         Justification = GearsOfWarSqliteAssertions.AnsweredWithoutCollectionJoin,

@@ -665,6 +665,46 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A <c>Distinct</c> over a projected collection that drops the element's key fails where
+    ///     plain EF Core fails, with EF's own message, and runs no statement.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A relational provider attributes the rows of a collection to their owner after a
+    ///         join, and <c>Distinct</c> over a projection without the key leaves it nothing to
+    ///         attribute them by: EF raises <c>InsufficientInformationToIdentifyElementOfCollectionJoin</c>.
+    ///         <c>GearsOfWarQueryRelationalTestBase.Correlated_collection_with_distinct_not_projecting_identifier_column_also_projecting_complex_expressions</c>
+    ///         is EF's own test of that.
+    ///     </para>
+    ///     <para>
+    ///         This client rebuilt the inner projection on the client, so the <c>Distinct</c> above
+    ///         the rebuild ran here: the server joined the posts with no <c>DISTINCT</c> and the
+    ///         client removed the duplicates.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_Distinct_over_a_projected_collection_without_its_key_fails_where_EF_fails()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>()
+                .Select(b => new
+                {
+                    Key = b.Title,
+                    Headings = b.Posts.Select(p => new { p.Heading, p.Heading!.Length }).Distinct().ToList(),
+                })
+                .ToListAsync());
+
+        Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            Assert.IsType<InvalidOperationException>(run.DirectError).Message);
+        Assert.Equal(
+            RelationalStrings.InsufficientInformationToIdentifyElementOfCollectionJoin,
+            Assert.IsType<InvalidOperationException>(run.WireError).Message);
+        Assert.Empty(run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A projection over the elements of a list stored in one column fails where plain EF Core
     ///     fails, and runs no statement, once the application registers the element type.
     /// </summary>
