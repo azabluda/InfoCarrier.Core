@@ -224,12 +224,12 @@ public sealed class TypeAllowlist
         {
             foreach (IEntityType entityType in model.GetEntityTypes())
             {
-                allowed.Add(entityType.ClrType);
+                Admit(entityType.ClrType, allowed);
                 AddSupertypes(entityType.ClrType, allowed);
 
                 foreach (IProperty property in entityType.GetProperties())
                 {
-                    allowed.Add(property.ClrType);
+                    Admit(property.ClrType, allowed);
                     AddPropertyBaseTypes(property.ClrType, allowed);
                 }
 
@@ -241,12 +241,12 @@ public sealed class TypeAllowlist
                 {
                     if (member.PropertyInfo?.DeclaringType is { } fromProperty)
                     {
-                        allowed.Add(fromProperty);
+                        Admit(fromProperty, allowed);
                     }
 
                     if (member.FieldInfo?.DeclaringType is { } fromField)
                     {
-                        allowed.Add(fromField);
+                        Admit(fromField, allowed);
                     }
 
                     // A navigation need not be spelled as the entity type it targets.
@@ -270,18 +270,19 @@ public sealed class TypeAllowlist
         // WHY THIS IS NOT A WIDENING `security-review.md` §2 HAS TO RE-EXAMINE. It is model-derived,
         // like every entity type and property type above: the application named these methods in
         // its own `OnModelCreating`, and a payload that names one reaches a method the model maps
-        // and nothing else. §2a's argument for C53 applies word for word, and the same guard is
-        // applied for the same reason -- a declaring type on the reflection invocation surface is
-        // refused rather than trusted, so the conjunction does not depend on nobody ever mapping
-        // a function onto one.
+        // and nothing else. §2a's argument for C53 applies word for word, and this add goes
+        // through `Admit` like every other inferred one, so the conjunction does not depend on
+        // nobody ever mapping a function onto the reflection invocation surface.
         foreach (MethodInfo function in Metadata.ModelDbFunctions.ForModel(model))
         {
-            if (function.DeclaringType is { } declaring && !IsReflectionInvocationSurface(declaring))
+            if (function.DeclaringType is { } declaring)
             {
-                allowed.Add(declaring);
+                Admit(declaring, allowed);
             }
         }
 
+        // Deliberately NOT through `Admit`. Registering a type is the application saying this one
+        // in particular, which is the one thing `Admit` exists to distinguish inference from.
         foreach (Type type in registeredTypes ?? [])
         {
             allowed.Add(type);
@@ -365,6 +366,31 @@ public sealed class TypeAllowlist
     }
 
     /// <summary>
+    ///     Adds a type the model named, unless it is on the reflection invocation surface.
+    ///     Returns <see langword="true" /> when the type was newly added.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Every add inferred from the model goes through here, and nothing else does.</b>
+    ///         "The model names it" is a good reason to admit an <em>entity</em>, whose instances
+    ///         the model itself produces. It is not a reason to admit an arbitrary CLR type,
+    ///         because a value converter maps any type at all: a property declared as
+    ///         <see cref="MethodInfo" /> is as mappable as one declared as <see cref="int" />,
+    ///         and admitting it puts <c>Invoke</c> within reach of a payload, since
+    ///         <c>ResolveMethod</c> finds inherited methods.
+    ///     </para>
+    ///     <para>
+    ///         One helper rather than a check at each site, because the sites are the whole
+    ///         point: <c>AddPropertyBaseTypes</c> refused this surface from C53 onward while the
+    ///         property type one line above it did not, and each of the adds around it was one
+    ///         more place to forget. Registration stays outside — an application naming a type is
+    ///         its own decision, and the distinction between that and inference is what this is.
+    ///     </para>
+    /// </remarks>
+    private static bool Admit(Type type, HashSet<Type> allowed)
+        => !IsReflectionInvocationSurface(type) && allowed.Add(type);
+
+    /// <summary>
     ///     The types that would turn an admitted <see cref="Type" /> into an invocation
     ///     (<c>docs/security-review.md</c> §2). Never admitted by inference — only ever by an
     ///     application registering one explicitly, which is its own decision.
@@ -383,14 +409,14 @@ public sealed class TypeAllowlist
     {
         foreach (Type @interface in clrType.GetInterfaces())
         {
-            allowed.Add(@interface);
+            Admit(@interface, allowed);
         }
 
         // `object` is a built-in already, and stopping there keeps the set to types the
         // application declared.
         for (Type? super = clrType.BaseType; super is not null && super != typeof(object); super = super.BaseType)
         {
-            allowed.Add(super);
+            Admit(super, allowed);
         }
     }
 
@@ -424,8 +450,9 @@ public sealed class TypeAllowlist
     private static void AddDeclaredType(Type type, HashSet<Type> allowed)
     {
         // Already present means already descended — and a self-referencing navigation would
-        // otherwise recur forever.
-        if (!allowed.Add(type) || !type.IsConstructedGenericType)
+        // otherwise recur forever. A refusal reads the same way here on purpose: a type `Admit`
+        // will not name is not one to walk into either.
+        if (!Admit(type, allowed) || !type.IsConstructedGenericType)
         {
             return;
         }
@@ -452,12 +479,12 @@ public sealed class TypeAllowlist
         {
             // Both, because they differ for a collection: the property is a `List<T>` and the
             // complex type is `T`.
-            allowed.Add(complexProperty.ClrType);
-            allowed.Add(complexProperty.ComplexType.ClrType);
+            Admit(complexProperty.ClrType, allowed);
+            Admit(complexProperty.ComplexType.ClrType, allowed);
 
             foreach (IProperty property in complexProperty.ComplexType.GetProperties())
             {
-                allowed.Add(property.ClrType);
+                Admit(property.ClrType, allowed);
             }
 
             AddComplexTypes(complexProperty.ComplexType, allowed);

@@ -384,6 +384,34 @@ public class DeserializationHardeningTest
     }
 
     /// <summary>
+    ///     A property whose own CLR type is on the reflection invocation surface is admitted only
+    ///     when the application registers it (<c>security-review.md</c> §2b).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A value converter can map any CLR type, <see cref="MethodInfo" /> included, so
+    ///         "the model named it" is not by itself a reason to admit a type. It is the reason
+    ///         to admit an <em>entity</em>, whose instances the model produces; a converted
+    ///         property type is whatever the application wrote a converter for, and the payload
+    ///         gets to name it afterwards. <c>ResolveMethod</c> finds inherited methods, so
+    ///         admitting <see cref="MethodInfo" /> would put <c>Invoke</c> within reach.
+    ///     </para>
+    ///     <para>
+    ///         <c>AddPropertyBaseTypes</c> has stopped at this surface since C53 — the base chain
+    ///         <c>MethodBase</c>, <c>MemberInfo</c> was already refused while the property type
+    ///         itself was not.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void A_property_mapped_as_a_reflection_type_is_admitted_only_when_registered()
+    {
+        using var context = new MethodPropertyContext();
+
+        Assert.False(TypeAllowlist.ForModel(context.Model).IsAllowed(typeof(MethodInfo)));
+        Assert.True(TypeAllowlist.ForModel(context.Model, [typeof(MethodInfo)]).IsAllowed(typeof(MethodInfo)));
+    }
+
+    /// <summary>
     ///     The conjunction from <c>security-review.md</c> §2 still holds under a
     ///     <em>model-derived</em> allowlist, which is the one a server actually runs. The theory
     ///     earlier in this file checks the model-free list, which C53 does not touch — so without
@@ -454,5 +482,26 @@ public class DeserializationHardeningTest
                 .HasConversion(
                     v => string.Join("|", v.Select(f => f.FullName)),
                     v => v.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(p => new FileInfo(p)).ToList());
+    }
+
+    private sealed class MethodPropertyEntity
+    {
+        public int Id { get; set; }
+
+        public MethodInfo Method { get; set; } = typeof(object).GetMethod(nameof(ToString))!;
+    }
+
+    private sealed class MethodPropertyContext : Microsoft.EntityFrameworkCore.DbContext
+    {
+        protected override void OnConfiguring(Microsoft.EntityFrameworkCore.DbContextOptionsBuilder optionsBuilder)
+            => Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions
+                .UseInMemoryDatabase(optionsBuilder, "hardening-method-property");
+
+        protected override void OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder)
+            => modelBuilder.Entity<MethodPropertyEntity>()
+                .Property(e => e.Method)
+                .HasConversion(
+                    v => v.Name,
+                    v => typeof(object).GetMethod(v)!);
     }
 }
