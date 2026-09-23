@@ -614,6 +614,17 @@ read once however many tests run it, every extra belongs to a group, and the gro
 unbounded reads first, because a table crossing the wire is what this instrument exists to find.
 `--survey` is the same reading with nothing subtracted, for a tier upstream gives no baseline for.
 
+**The totals below are one run's, and the statement total is not comparable with another run's.**
+The remainder counts each run's fixture **seeding**, and which fixtures seed is a property of the
+machine rather than of the product: the Tier B store is file-backed and is not deleted on disposal,
+so a fixture whose `.db` survives the startup sweep reads it instead of seeding it. Measured across
+two serial runs of the same tier, 2026-09-22 and 2026-09-23, over the same 19 419 and 19 420 tests
+— **4157 statements against 3002, a 28% fall that says nothing at all.** Of the 2344 statements
+that differ, in both directions, **every one is a write**: `INSERT`s into the many-to-many join
+tables in one run and into the conference planner's in the other. The **read** shapes are
+identical, 0 gained and 0 lost. So compare the reads, and read the write total as "what this
+machine happened to seed".
+
 **The whole remainder, on the run of 2026-09-20: 2683 statements in 280 shapes** — 4 unbounded
 reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read group by group:
 

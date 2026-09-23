@@ -74,6 +74,16 @@ It remains a claim about one statement. A filter dropped on BOTH sides looks cle
 that is not this report's question: the comparison against EF's own `AssertSql` above is what
 reports a filter that went missing.
 
+DO NOT COMPARE THE EXTRAS TOTAL BETWEEN TWO RUNS. It counts each run's fixture SEEDING, and which
+fixtures seed is a property of the machine rather than of the product: the Tier B store is
+file-backed and is not deleted on disposal, so a fixture whose `.db` survives the startup sweep
+reads it instead of seeding it. Measured on two serial runs of the same tier, 2026-09-22 and
+2026-09-23, over the same 19 419 and 19 420 tests: 4157 statements against 3002, a 28% fall that
+says nothing at all. Of the 2344 statements that differ, in both directions, EVERY ONE IS A WRITE
+-- `INSERT`s into the many-to-many join tables in one run, into the conference planner's in the
+other -- and the READ shapes are identical, 0 gained and 0 lost. So compare the reads, which is
+what this instrument is for, and read the write total as "what this machine happened to seed".
+
 Each of those four conditions was measured, and `mapping_control` says what dropping it costs.
 On 2026-09-22 the two false positives were the whole of the run's unbounded extras: `FROM "Kiwi"`
 and `FROM "Coke"` in `TPCInheritanceBulkUpdates`. Over the whole log `--survey` reclassifies six
