@@ -42,6 +42,24 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         looks at server SQL: <c>InfoCarrierTestStoreFactory</c>'s <c>TestSqlLoggerFactory</c>
 ///         belongs to the client, which has no database and emits none.
 ///     </para>
+///     <para>
+///         <b>A PASS HERE IS NOT EVIDENCE ABOUT WHAT THE SERVER READ, and every statement in this
+///         class was read on 2026-09-23 because of it</b> (the owner, 2026-09-22). A differential
+///         test says "the same statement as plain EF" and stays silent when both sides read
+///         everything, so the green of a test whose name promises a narrow query proves only that
+///         the middleman changed nothing. The tests added on 2026-09-22 had their SQL read as they
+///         were written; the 34 older ones had not, and the reading found nothing wrong: every one
+///         carries the predicate, limit or join its name is about. The three statements with no
+///         predicate are the query's own — a projection over every blog, a <c>GroupJoin</c> whose
+///         result selector discards the group so EF itself writes <c>SELECT "Id" FROM "Blogs"</c>,
+///         and the <c>An_unregistered_…</c> family, whose names say they read the table and whose
+///         assertions already say so.
+///     </para>
+///     <para>
+///         <b>That reading needed a fix first, and it is the one in <c>CreateStore</c>.</b> This
+///         class was invisible to <c>INFOCARRIER_SERVER_SQL</c>, so <c>eng/ef-sql-diff.py</c> could
+///         not see the one class whose whole subject is the statement. See the comment there.
+///     </para>
 /// </remarks>
 public partial class ServerParameterizationTest
 {
@@ -646,6 +664,52 @@ public partial class ServerParameterizationTest
 
         return AssertSameStatementFor(
             async blogs => _ = await blogs.Select(b => new { F = flag }).ToListAsync());
+    }
+
+    /// <summary>
+    ///     A <c>SelectMany</c> whose inner projection reads no column fails where plain EF Core
+    ///     fails, with EF's own message, and runs no statement on either side.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The question this was written to ask, and the answer it gave instead.</b>
+    ///         <c>TryHoistCollectionProjection</c> has a "no fragment" exit of its own, on the
+    ///         same condition <see cref="A_projection_reading_no_column_matches_the_direct_query" />
+    ///         is about one level up — and that one was a real defect, because the plain cut
+    ///         shipped every column where EF writes <c>SELECT 1</c> (#155). So: does giving up
+    ///         here strand the <c>SelectMany</c> on the client and ship <c>Blogs</c> whole?
+    ///     </para>
+    ///     <para>
+    ///         <b>This query never reaches that exit, which is the finding.</b> Instrumented
+    ///         2026-09-23: the hoist declines earlier, at <em>the body is <c>ServerOk</c></em>,
+    ///         because EF's funcletizer lifts the whole <c>new { F = flag }</c> into one parameter.
+    ///         The same run over the whole suite reached the "no fragment" exit 7 times and never
+    ///         with 0 fragments. <c>ProjectionRewriter</c> carries the reading at the guard.
+    ///     </para>
+    ///     <para>
+    ///         <b>What is left is still worth pinning</b>, and it is not what the name of the
+    ///         defect above would suggest: both halves raise <c>InvalidOperationException</c> with
+    ///         EF Core 10's own <c>'queryContext' could not be translated</c>, and the store sees
+    ///         nothing from either side. There is no answer to lose and no table to ship. If the
+    ///         hoist ever starts answering this, or starts reading a table to answer it, this test
+    ///         says so.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_hoisted_projection_reading_no_column_fails_where_EF_fails()
+    {
+        bool flag = true;
+
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>()
+                .SelectMany(b => b.Posts.Select(p => new { F = flag })).ToListAsync());
+
+        Assert.Equal(
+            Assert.IsType<InvalidOperationException>(run.DirectError).Message,
+            Assert.IsType<InvalidOperationException>(run.WireError).Message);
+        Assert.Empty(run.OverTheWire);
+        Assert.Empty(run.Directly);
     }
 
     /// <summary>
@@ -1310,8 +1374,24 @@ public partial class ServerParameterizationTest
                         new SqliteDbContextOptionsBuilder(b).UseParameterizedCollectionMode(mode);
                     }
 
+                    // AND FORWARD TO `ServerSqlLog`, because `LogTo` KEEPS ONE SINK and a second
+                    // call replaces the first. `InfoCarrierBackendTestStore` wires the log with
+                    // `LogTo` too, and this hook runs after it, so every statement this class ran
+                    // was dropped from `INFOCARRIER_SERVER_SQL`: measured 2026-09-23, a run of the
+                    // whole class wrote 57 test markers and 0 statements. That is the one class
+                    // whose whole subject is the statement, and `eng/ef-sql-diff.py` could not see
+                    // it. The same trap cost the recorder once before, which is why THAT is an
+                    // interceptor (see `InfoCarrierBackendTestStore`, 2026-09-16).
                     return b.LogTo(
-                        line => { lock (_sink) { _sink.Add(line); } },
+                        line =>
+                        {
+                            lock (_sink) { _sink.Add(line); }
+
+                            if (ServerSqlLog.IsEnabled)
+                            {
+                                ServerSqlLog.Write(line);
+                            }
+                        },
                         [RelationalEventId.CommandExecuted]);
                 },
             });
