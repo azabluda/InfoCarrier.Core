@@ -57,10 +57,18 @@ exists to find -- so "no predicate under TPC" must never be read as "fine".
 The report carries the control itself rather than leaving the next reader to rebuild it by hand.
 A flagged TPC read is looked up in the SAME TEST METHOD of its TPH and TPT siblings, and the
 shape is reported MAPPING-BOUND, with the sibling's statement printed beside it, only when a
-sibling NARROWS the same columns AND its predicate is the type test and nothing else -- absent,
-one `col = literal` or `col IN (...)`, or any number of `col IS NOT NULL`. A sibling carrying a
-business filter next to its discriminator disqualifies itself, which is what keeps the paragraph
-above honest. A shape keeps UNBOUNDED unless EVERY one of its occurrences found such a sibling.
+sibling NARROWS the same columns AND its predicate is the type test and nothing else. A shape
+keeps UNBOUNDED unless EVERY one of its occurrences found such a sibling.
+
+"THE TYPE TEST AND NOTHING ELSE" HAS TO RULE OUT A BUSINESS FILTER STANDING BOTH BESIDE THE TYPE
+TEST AND IN PLACE OF IT, and the two need different answers. Beside it is a count: `WHERE
+"Discriminator" = 'Kiwi' AND "Name" = 'x'` has a conjunct too many. In place of it is not, since
+`WHERE "Name" = 'x'` alone is the same SHAPE as a discriminator test -- so the column is asked
+whose it is. A discriminator names a column the TPC leaf table does NOT have, which is what TPC
+means; a dropped filter names one it does. TPT's `IS NOT NULL` terms name the leaf's own key
+columns and so cannot use that rule: each must appear in a JOIN's `ON`, which is what makes it
+the join's key test rather than a filter on it. See SINGLE_TABLE below, including the simpler
+rule that was tried first and is wrong.
 
 It remains a claim about one statement. A filter dropped on BOTH sides looks clean to both, and
 that is not this report's question: the comparison against EF's own `AssertSql` above is what
@@ -147,8 +155,57 @@ NARROWING = re.compile(r'\b(WHERE|INNER JOIN)\b', re.I)
 # is not this report's question: the comparison half against EF's own `AssertSql` is what reports
 # a filter that went missing.
 WHERE_CLAUSE = re.compile(r'\bWHERE\b(.*?)(?:\bGROUP BY\b|\bORDER BY\b|\bHAVING\b|\bLIMIT\b|$)', re.I)
-TYPE_EQUALITY = re.compile(r'^"_"\."[^"]+" (?:=|IN) (?:\'(?:[^\']|\'\')*\'|\d+|\([^()]*\))$')
-TYPE_PRESENCE = re.compile(r'^"_"\."[^"]+" IS NOT NULL$')
+TYPE_EQUALITY = re.compile(r'^"_"\."([^"]+)" (?:=|IN) (?:\'(?:[^\']|\'\')*\'|\d+|\([^()]*\))$')
+TYPE_PRESENCE = re.compile(r'^"_"\."([^"]+)" IS NOT NULL$')
+JOIN_ON = re.compile(r'\bON\b(.*?)(?:\bWHERE\b|\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)', re.I)
+
+# AND ONE CONJUNCT IS NOT ENOUGH ON ITS OWN: it has to be the TYPE. `WHERE "Discriminator" =
+# 'Kiwi'` and `WHERE "Name" = 'x'` are the same shape, and the second one, standing where the
+# first should, would mean the TPC read had dropped a filter rather than never had one. The two
+# are told apart by asking whose column it is:
+#
+#   * a DISCRIMINATOR names a column the TPC leaf table does not have -- that is what TPC means;
+#   * a DROPPED FILTER names one it does.
+#
+# A table's columns are taken from the log itself, as every column ever projected by a
+# single-table read of it. Measured 2026-09-23: `Kiwi`, `Coke`, `Officers`, `LocustHordes` and
+# `Leaves` carry no `Discriminator`, while `Animals` and `Drinks` do.
+#
+# An earlier and simpler rule was tried first and is recorded because it LOOKS right: "a column
+# the TPC test class never mentions". It fails outright -- `Discriminator` appears 63 times in
+# `TPCInheritance` statements and 532 in `TPCGearsOfWar`, because one context holds several
+# hierarchies and only some are TPC.
+#
+# TPT's `IS NOT NULL` terms are a different test and cannot use this rule, since they name the
+# leaf's own key columns, which the TPC table certainly has. They must appear in a JOIN's `ON`
+# instead, which is what makes them the join's key test rather than a filter on it.
+SINGLE_TABLE = re.compile(r'^SELECT (?:DISTINCT )?(.*?) FROM "([^"]+)"(?: WHERE| ORDER BY| LIMIT|$)')
+FROM_TABLE = re.compile(r'\bFROM "([^"]+)"')
+ANY_COLUMN = re.compile(r'"_"\."([^"]+)"')
+
+_TABLE_COLUMNS = {}
+
+
+def table_columns(sections):
+    """table -> the columns any single-table read of it projects, over the whole log.
+
+    Memoized per `sections`, because it is one pass over every statement and the answer is a
+    property of the log rather than of the statement being classified.
+    """
+    cached = _TABLE_COLUMNS.get(id(sections))
+    if cached is not None:
+        return cached
+
+    columns = collections.defaultdict(set)
+    for cases in sections.values():
+        for case in cases:
+            for statement in case:
+                read = SINGLE_TABLE.match(canon(statement))
+                if read:
+                    columns[read.group(2)].update(ANY_COLUMN.findall(read.group(1)))
+
+    _TABLE_COLUMNS[id(sections)] = columns
+    return columns
 
 
 def canon(sql):
@@ -368,11 +425,13 @@ def projection(sql):
     return frozenset(COLUMN.findall(head.group(1))) - {'Discriminator'}
 
 
-def type_test_only(sql):
-    """Whether a statement's predicate is the mapping's type test and nothing else.
+def type_test_only(sql, leaf, sections):
+    """Whether a statement's predicate is the type test of `leaf`'s mapping and nothing else.
 
-    See WHERE_CLAUSE above for why this clause exists: without it a sibling carrying a business
-    filter alongside its discriminator test would excuse a TPC read that had dropped that filter.
+    See WHERE_CLAUSE and SINGLE_TABLE above for why this exists and how the two halves are told
+    apart: without the first a sibling carrying a business filter ALONGSIDE its discriminator test
+    would excuse a TPC read that had dropped that filter, and without the second a sibling
+    carrying one INSTEAD of a discriminator test would.
     """
     text = canon(sql)
     if len(re.findall(r'\bSELECT\b', text, re.I)) > 1 or re.search(r'\bOR\b', text, re.I):
@@ -383,8 +442,19 @@ def type_test_only(sql):
         return True
 
     terms = [t.strip() for t in re.split(r'\bAND\b', where.group(1), flags=re.I)]
-    return all(TYPE_PRESENCE.match(t) for t in terms) or (
-        len(terms) == 1 and TYPE_EQUALITY.match(terms[0]) is not None)
+
+    # TPT: one `IS NOT NULL` per key column of the joined leaf, and each must be a column the
+    # join keys on. Anything else with that shape is a filter on the join, not the join's own test.
+    presence = [TYPE_PRESENCE.match(t) for t in terms]
+    if all(presence):
+        keys = set(ANY_COLUMN.findall(' '.join(m.group(1) for m in JOIN_ON.finditer(text))))
+        return bool(keys) and all(m.group(1) in keys for m in presence)
+
+    # TPH: one equality, on a column the leaf table does not have. See SINGLE_TABLE above.
+    if len(terms) != 1:
+        return False
+    equality = TYPE_EQUALITY.match(terms[0])
+    return equality is not None and equality.group(1) not in table_columns(sections)[leaf]
 
 
 def mapping_control(statement, k, sections):
@@ -410,11 +480,13 @@ def mapping_control(statement, k, sections):
     claim would be "a TPC read with no predicate is fine", which is false the moment the query
     carries an ordinary filter: `FROM "Kiwi"` bare is then a DROPPED FILTER and a whole-table
     transfer, and a sibling's `WHERE "Discriminator" = 'Kiwi' AND "Name" = 'x'` would have
-    excused it as readily as a bare discriminator test.
+    excused it as readily as a bare discriminator test -- as would `WHERE "Name" = 'x'` on its
+    own, which is why the column is asked whose it is and not merely counted.
     """
     class_name, method = k
     wanted = projection(statement)
-    if not TPC.match(class_name) or wanted is None:
+    leaf = FROM_TABLE.search(canon(statement))
+    if not TPC.match(class_name) or wanted is None or leaf is None:
         return None
 
     for other in SIBLINGS:
@@ -423,7 +495,7 @@ def mapping_control(statement, k, sections):
             for candidate in case:
                 if WRITE.match(candidate) or not NARROWING.search(canon(candidate)):
                     continue
-                if projection(candidate) == wanted and type_test_only(candidate):
+                if projection(candidate) == wanted and type_test_only(candidate, leaf.group(1), sections):
                     return f'{other}.{method}', candidate
     return None
 

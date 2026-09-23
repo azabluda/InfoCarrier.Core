@@ -648,10 +648,24 @@ be read as "fine".**
 So the report holds the control itself, under four conditions. A flagged TPC read is looked up in
 the **same test method** of its TPH and TPT siblings, and the shape becomes `MAPPING-BOUND`, with
 the sibling's statement printed beside it, only when that sibling **narrows** the same columns
-**and its predicate is the type test and nothing else** — absent, one `col = literal` or
-`col IN (…)`, or any number of `col IS NOT NULL`. A sibling carrying a business filter next to its
-discriminator disqualifies itself, which is what keeps the paragraph above honest. The bullet above
-was rebuilt by hand every time the report was read.
+**and its predicate is the type test and nothing else**. The bullet above was rebuilt by hand every
+time the report was read.
+
+**That last condition has to rule out a business filter standing both *beside* the type test and
+*in place of* it, and the two need different answers.** Beside it is a count — `WHERE
+"Discriminator" = 'Kiwi' AND "Name" = 'x'` has a conjunct too many. In place of it is not, because
+`WHERE "Name" = 'x'` alone is the same *shape* as a discriminator test. So the column is asked
+whose it is: **a discriminator names a column the TPC leaf table does not have, which is what TPC
+means; a dropped filter names one it does.** Measured 2026-09-23 from the log itself — `Kiwi`,
+`Coke`, `Officers`, `LocustHordes` and `Leaves` carry no `Discriminator`, while `Animals` and
+`Drinks` do. TPT's `IS NOT NULL` terms name the leaf's own key columns and cannot use that rule, so
+each must appear in a `JOIN … ON`, which is what makes it the join's key test rather than a filter
+on it. Seventeen cases pin the whole of it.
+
+**A simpler rule was tried first and is recorded in the script because it looks right**: "a column
+the TPC test class never mentions". It fails outright — `Discriminator` appears 63 times in
+`TPCInheritance` statements and 532 in `TPCGearsOfWar`, because one context holds several
+hierarchies and only some of them are TPC.
 
 On the 2026-09-22 log those two shapes are the whole of the unbounded extras and both are now
 controlled; over the whole log `--survey` reclassifies six shapes and leaves 484 flagged, which is
