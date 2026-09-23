@@ -388,8 +388,8 @@ public class DeserializationHardeningTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>security-review.md</c> §2 admits <see cref="System.Type" /> "and everything
-    ///         assignable to it", which reads like one entry and is three. A
+    ///         <c>security-review.md</c> §2 named <see cref="System.Type" /> "and everything
+    ///         assignable to it" until 2026-09-23, which reads like one entry and is three. A
     ///         <c>typeof(X)</c> constant makes the boundary ask about all of them:
     ///         <see cref="System.Type" /> for the constant's declared type,
     ///         <see cref="System.Reflection.TypeInfo" /> because <c>TypeNodeMapper.Nameable</c>
@@ -399,10 +399,10 @@ public class DeserializationHardeningTest
     ///     </para>
     ///     <para>
     ///         <b>This is why registration cannot stand in for the clause</b>, measured
-    ///         2026-09-22: <c>_allowed</c> is an exact-match set and cannot express "and
-    ///         everything assignable to it", so an application registering
-    ///         <see cref="System.Type" /> alone still had its query refused. Registering all
-    ///         three restored it. §2's addendum carries the reading.
+    ///         2026-09-22: <c>_allowed</c> is an exact-match set and admits one name per entry,
+    ///         so an application registering <see cref="System.Type" /> alone still had its
+    ///         query refused. Registering all three restored it, and one of the three can only
+    ///         be written <c>typeof(int).GetType()</c>. §2's addendum (2) carries the reading.
     ///     </para>
     /// </remarks>
     [Fact]
@@ -418,6 +418,17 @@ public class DeserializationHardeningTest
         // about reflection: `MemberInfo` is `Type`'s own base and is refused.
         Assert.False(allowlist.IsAllowed(typeof(MemberInfo)));
         Assert.False(allowlist.IsAllowed(typeof(MethodInfo)));
+
+        // AND THE RUNTIME TYPE-BUILDING FAMILY STAYS OUT, WHICH IS WHAT "THE THREE" BUYS.
+        // The clause read `typeof(Type).IsAssignableFrom(type)` until 2026-09-23, and a rule is
+        // wider than a list: every one of these derives from `TypeInfo`, so every one was
+        // admissible as a NAME. Never a hole — a payload cannot obtain one, because each route
+        // runs through `ModuleBuilder` or `AssemblyBuilder` and both are refused — but §2's
+        // bound is a conjunction, and this is one clause it no longer has to lean on.
+        Assert.False(allowlist.IsAllowed(typeof(System.Reflection.Emit.TypeBuilder)));
+        Assert.False(allowlist.IsAllowed(typeof(System.Reflection.Emit.EnumBuilder)));
+        Assert.False(allowlist.IsAllowed(typeof(System.Reflection.Emit.GenericTypeParameterBuilder)));
+        Assert.False(allowlist.IsAllowed(typeof(TypeDelegator)));
     }
 
     /// <summary>

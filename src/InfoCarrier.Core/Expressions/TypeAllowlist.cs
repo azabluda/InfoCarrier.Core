@@ -31,6 +31,9 @@ namespace InfoCarrier.Core.Expressions;
 /// </remarks>
 public sealed class TypeAllowlist
 {
+    // `System.RuntimeType` is internal, so it can only be named through an instance of it.
+    private static readonly Type RuntimeTypeItself = typeof(int).GetType();
+
     private static readonly HashSet<Type> BuiltInTypes =
     [
         typeof(object), typeof(void), typeof(string), typeof(decimal), typeof(Guid),
@@ -566,7 +569,7 @@ public sealed class TypeAllowlist
 
         // `typeof(X)` arrives as the runtime subclass RuntimeType, not Type itself. A Type
         // value is a name, not an instantiable payload.
-        if (typeof(Type).IsAssignableFrom(type))
+        if (type == typeof(Type) || type == typeof(TypeInfo) || type == RuntimeTypeItself)
         {
             return true;
         }

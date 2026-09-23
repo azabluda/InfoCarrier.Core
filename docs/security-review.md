@@ -33,10 +33,12 @@ Stages 1, 4, 5, 7 and 8 were closed during M5 (C36, C37, C30, and the type allow
 
 `TypeAllowlist` admits more than one might expect, and two entries deserve to be named:
 
-- **`System.Type`, and everything assignable to it.** A payload may therefore call
-  `Type.GetType("System.Diagnostics.Process")` — a *public* method on an *admitted* type — and
-  obtain, **at run time on the server, after every deserialization-time check has passed**, a type
-  the allowlist never saw.
+- **`System.Type`, `System.Reflection.TypeInfo` and `System.RuntimeType`.** A payload may
+  therefore call `Type.GetType("System.Diagnostics.Process")` — a *public* method on an
+  *admitted* type — and obtain, **at run time on the server, after every deserialization-time
+  check has passed**, a type the allowlist never saw. **This read "`System.Type`, and everything
+  assignable to it" until 2026-09-23**, which was the clause as written; addendum (3) says what
+  the rule admitted beyond those three and why narrowing it changes nothing about this finding.
 - **Every enum**, by the `type.IsEnum` clause of `Evaluate`. So `BindingFlags` is admissible.
   **That clause used to be the closing line, and it was reached less often than this sentence
   claimed** (R72, 2026-09-01): a type *nested in a generic type* is itself a constructed generic
@@ -138,9 +140,13 @@ constant makes the boundary ask about all three of these:
 | `System.Reflection.TypeInfo` | `WireTypeCollector` reports the *value's* type through `TypeNodeMapper.Nameable`, which walks to the first **visible** base; `RuntimeType` is internal and `TypeInfo` is what it lands on |
 | `System.RuntimeType` | asked on the **server** side; internal, and an application can only name it as `typeof(int).GetType()` |
 
-`_allowed` is an exact-match set, so registering `System.Type` admits `System.Type` and nothing
-derived from it. The clause is `typeof(Type).IsAssignableFrom(type)`, a *rule*, and that is exactly
-the difference: a rule covers the subclasses, a set does not.
+`_allowed` is an exact-match set, so registering `System.Type` admits `System.Type` and none of
+the other two. The clause names all three at once, and that is exactly the difference: one clause
+covers what three separate registrations would, and one of those three can only be written
+`typeof(int).GetType()`. **This read "the clause is `typeof(Type).IsAssignableFrom(type)`, a
+*rule* … a rule covers the subclasses, a set does not" until 2026-09-23**, when the rule was
+narrowed to those three names. The case against registration is unchanged, because it never
+turned on the subclasses.
 
 **Measured by construction on 2026-09-22**, with the clause removed each time: `Type` alone was
 refused at `TypeInfo`; `Type` plus `RuntimeType` was still refused at `TypeInfo`; `TypeInfo` alone
@@ -149,12 +155,14 @@ was refused at `Type`; `Type` plus `TypeInfo` reached the server and was refused
 refused name came from instrumenting `TypeAllowlist.IsAllowed` and reading the stack, not from
 guessing.
 
-**So an opt-in design is possible but is not just a deletion.** It would have to keep the rule and
-gate it on the application having registered `System.Type` — "register the root, get its runtime
-subclasses" — because no application should be expected to name `System.RuntimeType`. Removing the
+**So an opt-in design is possible but is not just a deletion.** It would have to keep the clause
+and gate it on the application having registered `System.Type` — "register the root, get the other
+two" — because no application should be expected to name `System.RuntimeType`. Removing the
 clause and relying on `AllowTypes` as it stands would take the capability away in practice.
 `DeserializationHardeningTest.The_Type_clause_admits_the_three_names_a_typeof_value_reaches` pins
-the reach, so a future narrowing of the rule fails a test rather than a user's query.
+the reach, so a narrowing fails a test rather than a user's query. **That stopped being
+hypothetical on 2026-09-23**: the narrowing in addendum (3) was written against this test, which
+stayed green while the clause it describes changed shape.
 
 **Both readings above are from the statement text, not from a green test.** A differential test says
 "the same as EF", never "few columns", so a pass can sit on top of a full table crossing the wire
@@ -163,6 +171,27 @@ when both sides do it. Each claim here was read out of the logged SQL.
 So the entry stays, the conjunction stays the bound, and
 `ServerParameterizationTest.A_predicate_naming_a_Type_matches_the_direct_query` is the pin. Anyone
 proposing the removal again should read this addendum first: the cost is not in the suite.
+
+### 2 addendum (3) — the clause is three names and not a rule, from 2026-09-23
+
+**A rule is wider than the list it was written for.** `typeof(Type).IsAssignableFrom(type)` admits
+every subclass of `Type`, and the runtime type-building family all derive from `TypeInfo`:
+`TypeBuilder`, `EnumBuilder`, `GenericTypeParameterBuilder` and `TypeDelegator` were each
+admissible **as a name**. The clause is now the exact set `{Type, TypeInfo, RuntimeType}`.
+
+**It was never a hole, which is why this is hygiene and not a fix.** A payload cannot obtain a
+`TypeBuilder`: every route to one runs through `ModuleBuilder` or `AssemblyBuilder`, and neither
+is admitted. But §2's bound is a conjunction, and this is one clause it no longer has to lean on.
+
+**Nothing an application can write is refused that was admitted before.** The three names are the
+whole of what a `typeof(X)` value reaches, measured by construction on 2026-09-22 and tabulated in
+addendum (2), and the ordinary case still never touches `AllowTypes`.
+
+**The suite is weak evidence here and the targeted tests are not.** No spec test in either project
+carries a `Type` value — the first addendum measured that by deleting both admission sites — so the
+suite stays green even with the clause gone outright. What holds this change are the six
+inheritance comparisons in `ServerParameterizationTest` and the hardening test, which now pins the
+four builders **out** as well as the three names **in**.
 
 ## 2a. Amendment — C53's base-class rule, and why it does not widen the surface
 
