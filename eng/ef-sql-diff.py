@@ -46,16 +46,27 @@ happens. The statements are grouped by SHAPE, so one shape is read once however 
 and every extra belongs to a group. Unbounded reads come first, because a table crossing the wire
 is what this instrument was built to find.
 
-A TPC READ WITH NO PREDICATE IS NOT LOOSE, BECAUSE THE TABLE IS THE PREDICATE. Under TPC each
-concrete type has its own table, so `FROM "Kiwi"` returns exactly the rows TPH reads as `FROM
-"Animals" WHERE "Discriminator" = 'Kiwi'` and TPT as `FROM "Animals" INNER JOIN "Birds"`. The
-missing `WHERE` is the store's schema, not a row this provider added. The report carries that
-control itself rather than leaving the next reader to rebuild it by hand: a flagged TPC read is
-looked up in the SAME TEST METHOD of its TPH and TPT siblings, and if one of them NARROWS the
-same columns the shape is reported MAPPING-BOUND with the sibling's statement printed beside it.
-A shape keeps UNBOUNDED unless EVERY one of its occurrences found such a sibling.
+UNDER TPC THE TABLE IS THE PREDICATE -- BUT ONLY THE *TYPE* PREDICATE, AND THAT DISTINCTION IS THE
+WHOLE OF THIS CLAUSE (the owner, 2026-09-23). Each concrete type has its own table, so `FROM
+"Kiwi"` returns exactly the rows TPH reads as `FROM "Animals" WHERE "Discriminator" = 'Kiwi'` and
+TPT as `FROM "Animals" INNER JOIN "Birds"`: that missing `WHERE` is the store's schema. **It says
+nothing about any other filter.** If the query also said `Where(k => k.Name == "x")`, then `FROM
+"Kiwi"` bare is a dropped filter and a whole-table transfer -- exactly the sign this instrument
+exists to find -- so "no predicate under TPC" must never be read as "fine".
 
-Each of those three conditions was measured, and `mapping_control` says what dropping it costs.
+The report carries the control itself rather than leaving the next reader to rebuild it by hand.
+A flagged TPC read is looked up in the SAME TEST METHOD of its TPH and TPT siblings, and the
+shape is reported MAPPING-BOUND, with the sibling's statement printed beside it, only when a
+sibling NARROWS the same columns AND its predicate is the type test and nothing else -- absent,
+one `col = literal` or `col IN (...)`, or any number of `col IS NOT NULL`. A sibling carrying a
+business filter next to its discriminator disqualifies itself, which is what keeps the paragraph
+above honest. A shape keeps UNBOUNDED unless EVERY one of its occurrences found such a sibling.
+
+It remains a claim about one statement. A filter dropped on BOTH sides looks clean to both, and
+that is not this report's question: the comparison against EF's own `AssertSql` above is what
+reports a filter that went missing.
+
+Each of those four conditions was measured, and `mapping_control` says what dropping it costs.
 On 2026-09-22 the two false positives were the whole of the run's unbounded extras: `FROM "Kiwi"`
 and `FROM "Coke"` in `TPCInheritanceBulkUpdates`. Over the whole log `--survey` reclassifies six
 shapes and leaves 484 flagged, which is the ratio to expect: this is a narrow fact about one
@@ -120,6 +131,24 @@ COLUMN = re.compile(r'"_"\."([^"]+)"')
 # those excused `FROM "LocustHordes"` against a `Factions LEFT JOIN LocustHordes`, which is not
 # the same rows in either direction.
 NARROWING = re.compile(r'\b(WHERE|INNER JOIN)\b', re.I)
+
+# AND THE SIBLING'S PREDICATE MUST BE THE TYPE TEST AND NOTHING ELSE (the owner, 2026-09-23).
+# "The table is the predicate" is true only of the TYPE. If the query also said
+# `Where(k => k.Name == "x")`, then `FROM "Kiwi"` bare is a DROPPED FILTER and a whole-table
+# transfer -- and without this clause the TPH sibling's
+# `WHERE "Discriminator" = 'Kiwi' AND "Name" = 'x'` would still have been accepted as a control
+# and excused it. So the sibling's WHERE must be absent, or one term of `col = literal` or
+# `col IN (...)`, or any number of `col IS NOT NULL` -- which are TPH's discriminator test and
+# TPT's outer-join key test, one per key column, and no business filter has that shape without
+# also adding a conjunct.
+#
+# Conservative where it cannot parse: an `OR` or a nested SELECT answers no. And it remains a
+# claim about THIS statement only. A filter dropped on both sides would look clean to both, which
+# is not this report's question: the comparison half against EF's own `AssertSql` is what reports
+# a filter that went missing.
+WHERE_CLAUSE = re.compile(r'\bWHERE\b(.*?)(?:\bGROUP BY\b|\bORDER BY\b|\bHAVING\b|\bLIMIT\b|$)', re.I)
+TYPE_EQUALITY = re.compile(r'^"_"\."[^"]+" (?:=|IN) (?:\'(?:[^\']|\'\')*\'|\d+|\([^()]*\))$')
+TYPE_PRESENCE = re.compile(r'^"_"\."[^"]+" IS NOT NULL$')
 
 
 def canon(sql):
@@ -339,11 +368,31 @@ def projection(sql):
     return frozenset(COLUMN.findall(head.group(1))) - {'Discriminator'}
 
 
+def type_test_only(sql):
+    """Whether a statement's predicate is the mapping's type test and nothing else.
+
+    See WHERE_CLAUSE above for why this clause exists: without it a sibling carrying a business
+    filter alongside its discriminator test would excuse a TPC read that had dropped that filter.
+    """
+    text = canon(sql)
+    if len(re.findall(r'\bSELECT\b', text, re.I)) > 1 or re.search(r'\bOR\b', text, re.I):
+        return False
+
+    where = WHERE_CLAUSE.search(text)
+    if not where:
+        return True
+
+    terms = [t.strip() for t in re.split(r'\bAND\b', where.group(1), flags=re.I)]
+    return all(TYPE_PRESENCE.match(t) for t in terms) or (
+        len(terms) == 1 and TYPE_EQUALITY.match(terms[0]) is not None)
+
+
 def mapping_control(statement, k, sections):
     """(where, statement) for a TPC read whose siblings NARROW the same columns, or None.
 
-    The control for "this read has no predicate because the mapping is the predicate". Three
-    things have to hold, and each was measured to matter on 2026-09-23 against the same log:
+    The control for "this read has no predicate because the mapping is the predicate" -- where
+    "the predicate" means THE TYPE and nothing else. Four things have to hold, and each was
+    measured to matter on 2026-09-23 against the same log:
 
     THE CLASS IS A TPC ONE, because only TPC gives a concrete type its own table. `FROM "Animals"`
     under TPH is the whole hierarchy, and excusing it against a TPT sibling's join reclassified
@@ -356,6 +405,12 @@ def mapping_control(statement, k, sections):
     coincidence of the column list, not a control.
 
     THE SIBLING'S READ NARROWS, per NARROWING above, rather than merely satisfying BOUND.
+
+    AND ITS PREDICATE IS THE TYPE TEST AND NOTHING ELSE, per `type_test_only`. Without this the
+    claim would be "a TPC read with no predicate is fine", which is false the moment the query
+    carries an ordinary filter: `FROM "Kiwi"` bare is then a DROPPED FILTER and a whole-table
+    transfer, and a sibling's `WHERE "Discriminator" = 'Kiwi' AND "Name" = 'x'` would have
+    excused it as readily as a bare discriminator test.
     """
     class_name, method = k
     wanted = projection(statement)
@@ -368,7 +423,7 @@ def mapping_control(statement, k, sections):
             for candidate in case:
                 if WRITE.match(candidate) or not NARROWING.search(canon(candidate)):
                     continue
-                if projection(candidate) == wanted:
+                if projection(candidate) == wanted and type_test_only(candidate):
                     return f'{other}.{method}', candidate
     return None
 

@@ -638,16 +638,31 @@ reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read
   of that crosses this wire.
 
 **The `Kiwi` and `Coke` reads are classified rather than re-read, from 2026-09-23.** Under TPC each
-concrete type has its own table, so the table *is* the filter and the missing `WHERE` belongs to
-the schema rather than to this provider. The report now holds that control itself: a flagged TPC
-read is looked up in the **same test method** of its TPH and TPT siblings, and a sibling that
-**narrows** the same columns makes the shape `MAPPING-BOUND` with its own statement printed beside
-it. The bullet above was rebuilt by hand every time the report was read. On the 2026-09-22 log
-those two shapes are the whole of the unbounded extras and both are now controlled; over the whole
-log `--survey` reclassifies six shapes and leaves 484 flagged, which is the ratio to want from a
-narrow fact about one mapping. **Each of the three conditions was measured against that log**, and
-the docstring of `mapping_control` says what dropping one costs — dropping the method alone excused
-162 statements across 75 tests, on nothing better than a shared column list.
+concrete type has its own table, so the table *is* the filter — **the *type* filter, and nothing
+else** (the owner, 2026-09-23). That distinction is the whole of the rule. A missing `WHERE` under
+TPC belongs to the schema only while the query had no other filter to lose; if it said
+`Where(k => k.Name == "x")`, then `FROM "Kiwi"` bare is a dropped filter and a whole-table
+transfer, which is the sign this instrument exists to find. **"No predicate under TPC" must never
+be read as "fine".**
+
+So the report holds the control itself, under four conditions. A flagged TPC read is looked up in
+the **same test method** of its TPH and TPT siblings, and the shape becomes `MAPPING-BOUND`, with
+the sibling's statement printed beside it, only when that sibling **narrows** the same columns
+**and its predicate is the type test and nothing else** — absent, one `col = literal` or
+`col IN (…)`, or any number of `col IS NOT NULL`. A sibling carrying a business filter next to its
+discriminator disqualifies itself, which is what keeps the paragraph above honest. The bullet above
+was rebuilt by hand every time the report was read.
+
+On the 2026-09-22 log those two shapes are the whole of the unbounded extras and both are now
+controlled; over the whole log `--survey` reclassifies six shapes and leaves 484 flagged, which is
+the ratio to want from a narrow fact about one mapping. **Each of the four conditions was measured
+against that log**, and the docstring of `mapping_control` says what dropping one costs — dropping
+the method alone excused 162 statements across 75 tests, on nothing better than a shared column
+list.
+
+**It stays a claim about one statement.** A filter dropped on *both* sides looks clean to both, and
+that is not this report's question: the comparison against EF's own `AssertSql` is what reports a
+filter that went missing.
 
 **So the sampling verdict holds, and it is now a reading rather than a sample.** The remainder
 contains one thing of ours, and it was already on the list. Re-run it with
