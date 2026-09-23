@@ -1119,3 +1119,34 @@ is about what a service *assumes*: neither `EntitySplittingConvention` nor `Rela
 decides anything the server owns, and both still fail. **The tell is different too.** R170's is
 visible by reading the convention; this one is invisible until the run, because the missing
 neighbour is named nowhere in the service you added.
+
+### A falsification that passes has falsified nothing (2026-09-23)
+
+**The standing "establish that the code *ran*" rule, in the form where the probe is a test and the
+reversal is the check.** The task was to measure `TryHoistCollectionProjection`'s
+`fragments.Count == 0` exit, the hoist's own copy of the condition #155 had found to be a defect one
+level up. A test was written for it — `SelectMany(b => b.Posts.Select(p => new { F = flag }))` — and
+it passed, showing both halves raising EF Core 10's own refusal with no statement on either side.
+
+**Then the guard it was about was deleted, and the test passed again.** Identical output. On the
+first reading that looks like the guard doing nothing; on the second it says the test never reached
+it. Instrumenting each exit with a file write settled it in one run: the hoist declines three lines
+earlier, at *the body is `ServerOk`*, because EF's funcletizer lifts the whole `new { F = flag }`
+into a single parameter, and the body it sees is therefore translatable.
+
+**Then the same probe was run over the whole suite**, 29 631 tests: the guard's line is reached
+**7 times, with 2 fragments twice and 3 five times, and never with 0.** It is defensive and
+unreached, and the two conditions that would reach it fight each other — a body with no row
+reference is closed, so EF funcletizes it and the earlier exit takes it; a body that reads the row
+bottoms out at a row parameter, which is itself a fragment.
+
+**Three rules, and the middle one is the new one.**
+
+- **A green test proves nothing about a branch until the branch is known to run.** The reversal
+  check is what asks that, and a reversal that changes nothing is the answer "wrong target", not
+  the answer "no effect".
+- **Unreached is worth writing down, at the code, with the count.** The alternative is that the
+  next reader repeats all of this, or worse, deletes the guard on the strength of a passing test.
+- **A test aimed at the wrong branch can still be worth keeping** — this one pins that the shape is
+  refused by both halves with EF's own message and no SQL — but its comment must say what it
+  reaches, not what it was aimed at.

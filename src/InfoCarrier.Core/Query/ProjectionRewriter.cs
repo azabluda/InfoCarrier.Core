@@ -616,6 +616,19 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         CollectFragments(innerSelector.Body, bodyAnalysis, rowParameters, fragments, guards);
+
+        // DEFENSIVE, AND MEASURED UNREACHED: a whole-suite run on 2026-09-23 reached this line 7
+        // times, with 2 fragments twice and 3 five times, and never with 0. The reason is that the
+        // two conditions fight each other. A body with NO row reference is closed, so EF's
+        // funcletizer lifts it into one parameter and `ServerOk` is true -- the exit above takes
+        // it, which is what `A_hoisted_projection_reading_no_column_fails_where_EF_fails` walks
+        // into. A body that DOES read the row bottoms out at a row parameter, which is itself a
+        // fragment. It stays because an empty tuple below would be a crash rather than a fallback,
+        // and because "unreached today" is not "unreachable".
+        //
+        // So it is NOT the `SELECT 1` case one level down (#155). That one was a real defect:
+        // there the plain cut shipped every column. Here there is no cut to make and no answer to
+        // lose, because the query never reaches a store on either side.
         if (fragments.Count == 0)
         {
             return null;
