@@ -83,6 +83,29 @@ def one_line(sql, width=240):
     return s if len(s) <= width else s[:width] + ' ...'
 
 
+def load_direct(path, failures_path):
+    """(class, method) -> Counter of plain EF's reads, and the methods whose direct run failed a case.
+
+    From a direct run's log, or from the TSV `--save-direct-reads` wrote from one. The TSV is what
+    the satellite branch keeps: a fix in src/ cannot change a run that has no InfoCarrier in it.
+    """
+    if path.endswith('.tsv'):
+        by = collections.defaultdict(collections.Counter)
+        failed = set()
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                cls, method, flag, n, stmt = line.rstrip('\n').split('\t', 4)
+                k = (cls, method)
+                if flag == 'failed':
+                    failed.add(k)
+                if stmt:
+                    by[k][stmt] += int(n)
+                else:
+                    by[k] = by[k]
+        return dict(by), failed
+    return {k: reads(v) for k, v in d.server_sections(path).items()}, load_failures(failures_path)
+
+
 def main(argv):
     p = argparse.ArgumentParser()
     p.add_argument('ic')
@@ -91,12 +114,23 @@ def main(argv):
     p.add_argument('--efcore', default=os.path.join(REPO, 'subrepos', 'efcore'))
     p.add_argument('--limit', type=int, default=40)
     p.add_argument('--dump')
+    p.add_argument('--save-direct-reads', help="write plain EF's reads per method to this TSV")
+    p.add_argument('--baseline', help='a suspect list from --save-baseline; prints what left and joined it')
+    p.add_argument('--save-baseline', help="write this run's suspect list (WHOLE-TABLE and LOOSER)")
     a = p.parse_args(argv)
 
-    ic = d.server_sections(a.ic)
-    direct = d.server_sections(a.direct)
-    dfail = load_failures(a.direct_failures)
+    ic = {k: reads(v) for k, v in d.server_sections(a.ic).items()}
+    direct, dfail = load_direct(a.direct, a.direct_failures)
     expected, _ = d.ef_expected(a.efcore)
+
+    if a.save_direct_reads:
+        with open(a.save_direct_reads, 'w', encoding='utf-8', newline='\n') as out:
+            for (c, m), counter in sorted(direct.items()):
+                flag = 'failed' if (c, m) in dfail else 'passed'
+                if not counter:
+                    out.write(f'{c}\t{m}\t{flag}\t0\t\n')
+                for stmt, n in sorted(counter.items()):
+                    out.write(f'{c}\t{m}\t{flag}\t{n}\t{stmt}\n')
 
     both = sorted(set(ic) & set(direct))
     print(f'test methods: IC log {len(ic)}, direct log {len(direct)}, in both {len(both)}, '
@@ -108,7 +142,7 @@ def main(argv):
     status = collections.Counter()
     per_test = {}
     for k in usable:
-        r_ic, r_d = reads(ic[k]), reads(direct[k])
+        r_ic, r_d = ic[k], direct[k]
         if r_ic == r_d:
             status['identical reads' if r_ic else 'no reads either side'] += 1
             continue
@@ -128,7 +162,7 @@ def main(argv):
 
     # The handoff's question: methods EF never asserts, that read a table unbounded through InfoCarrier.
     never = [k for k in usable if k not in expected]
-    with_unb = [k for k in never if any(d.unbounded(s) for s in reads(ic[k]))]
+    with_unb = [k for k in never if any(d.unbounded(s) for s in ic[k])]
     explained = [k for k in with_unb if k not in per_test or per_test[k][0] not in ('WHOLE-TABLE',)]
     print(f'\nmethods EF does not assert, whose IC reads include an unbounded read: {len(with_unb)}; '
           f'plain EF reads those tables unbounded too in {len(explained)}; '
@@ -154,6 +188,31 @@ def main(argv):
             print('    IC:     ', one_line(stmt))
             for other in minus[:2]:
                 print('    direct: ', one_line(other))
+
+    # Compared as a LIST, never as a count: a fix that removes four and adds four moves no count.
+    suspects = {k: v[0] for k, v in per_test.items() if v[0] in ('WHOLE-TABLE', 'LOOSER')}
+    if a.save_baseline:
+        with open(a.save_baseline, 'w', encoding='utf-8', newline='\n') as out:
+            for (c, m), worst in sorted(suspects.items()):
+                out.write(f'{c}\t{m}\t{worst}\n')
+    if a.baseline:
+        before = {}
+        with open(a.baseline, encoding='utf-8') as f:
+            for line in f:
+                c, m, worst = line.rstrip('\n').split('\t')
+                before[(c, m)] = worst
+        left = sorted(set(before) - set(suspects))
+        joined = sorted(set(suspects) - set(before))
+        moved = sorted(k for k in set(before) & set(suspects) if before[k] != suspects[k])
+        print(f'\n===== AGAINST THE BASELINE: {len(before)} suspects before, {len(suspects)} now; '
+              f'{len(left)} left the list, {len(joined)} joined it, {len(moved)} changed class')
+        for k in left:
+            now = per_test[k][0] if k in per_test else 'identical'
+            print(f'  LEFT    {before[k]:11} {k[0]}.{k[1]}  (now: {now})')
+        for k in joined:
+            print(f'  JOINED  {suspects[k]:11} {k[0]}.{k[1]}')
+        for k in moved:
+            print(f'  MOVED   {before[k]} -> {suspects[k]}  {k[0]}.{k[1]}')
 
     if a.dump:
         with open(a.dump, 'w', encoding='utf-8', newline='\n') as out:
