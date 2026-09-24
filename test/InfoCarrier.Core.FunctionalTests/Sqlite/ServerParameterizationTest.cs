@@ -56,9 +56,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         assertions already say so.
 ///     </para>
 ///     <para>
-///         <b>That reading needed a fix first, and it is the one in <c>CreateStore</c>.</b> This
-///         class was invisible to <c>INFOCARRIER_SERVER_SQL</c>, so <c>eng/ef-sql-diff.py</c> could
-///         not see the one class whose whole subject is the statement. See the comment there.
+///         <b>That reading needed a fix first.</b> This class was invisible to
+///         <c>INFOCARRIER_SERVER_SQL</c>, so <c>eng/ef-sql-diff.py</c> could not see the one class
+///         whose whole subject is the statement: its <c>LogTo</c> in <c>CreateStore</c> replaced
+///         the store's. This paragraph said the fix was "the one in <c>CreateStore</c>" from
+///         2026-09-23, when <c>CreateStore</c> forwarded each line to the log itself. Since
+///         2026-09-24 the store writes the log through <see cref="ServerSqlLogInterceptor" />,
+///         which no fixture's <c>LogTo</c> can displace, and the forward is gone.
 ///     </para>
 /// </remarks>
 public partial class ServerParameterizationTest
@@ -1374,24 +1378,10 @@ public partial class ServerParameterizationTest
                         new SqliteDbContextOptionsBuilder(b).UseParameterizedCollectionMode(mode);
                     }
 
-                    // AND FORWARD TO `ServerSqlLog`, because `LogTo` KEEPS ONE SINK and a second
-                    // call replaces the first. `InfoCarrierBackendTestStore` wires the log with
-                    // `LogTo` too, and this hook runs after it, so every statement this class ran
-                    // was dropped from `INFOCARRIER_SERVER_SQL`: measured 2026-09-23, a run of the
-                    // whole class wrote 57 test markers and 0 statements. That is the one class
-                    // whose whole subject is the statement, and `eng/ef-sql-diff.py` could not see
-                    // it. The same trap cost the recorder once before, which is why THAT is an
-                    // interceptor (see `InfoCarrierBackendTestStore`, 2026-09-16).
+                    // This class's own sink. It replaced the store's `ServerSqlLog` until
+                    // 2026-09-24, because `LogTo` keeps one sink; the log is an interceptor now.
                     return b.LogTo(
-                        line =>
-                        {
-                            lock (_sink) { _sink.Add(line); }
-
-                            if (ServerSqlLog.IsEnabled)
-                            {
-                                ServerSqlLog.Write(line);
-                            }
-                        },
+                        line => { lock (_sink) { _sink.Add(line); } },
                         [RelationalEventId.CommandExecuted]);
                 },
             });

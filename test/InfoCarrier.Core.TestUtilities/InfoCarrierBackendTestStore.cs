@@ -342,19 +342,17 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
         // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
         // file rather than output attached to a failing test.
+        //
+        // AN INTERCEPTOR TOO, since 2026-09-24, for the recorder's reason above. This was a
+        // `LogTo` until then, and any `OnAddOptions` below that called `LogTo` replaced it without
+        // a word: `ServerParameterizationTest` does, and the log held none of its statements. The
+        // interceptor writes the same text `LogTo` wrote, including a statement that FAILED, as the
+        // `LogTo` did for `CommandError` -- the statement a diagnosis most needs and the one
+        // `CommandExecuted` never carries, found while tracing the ManyToManyTracking foreign-key
+        // failure R35 uncovered.
         if (ServerSqlLog.IsEnabled)
         {
-            // CommandError as well as CommandExecuted. A statement that *failed* is the one a
-            // diagnostic most needs and the one CommandExecuted never carries, because it is
-            // logged only on success -- so the log used to stop at the last statement that
-            // worked and stay silent about the one that did not. Found while tracing the
-            // ManyToManyTracking foreign-key failure R35 uncovered.
-            builder = builder.LogTo(
-                ServerSqlLog.Write,
-                [
-                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted,
-                    Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandError,
-                ]);
+            builder = builder.AddInterceptors(new ServerSqlLogInterceptor());
         }
 
         return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;

@@ -1,5 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
+using System.Globalization;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
+
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
 /// <summary>
@@ -63,7 +68,11 @@ public static class ServerSqlLog
     /// <summary>
     ///     Records one statement.
     /// </summary>
-    /// <param name="line">The formatted log line, as <c>LogTo</c> supplies it.</param>
+    /// <param name="line">
+    ///     The formatted log line, in the text EF's own <c>LogTo</c> writes. It came from
+    ///     <c>LogTo</c> itself until 2026-09-24 and comes from <see cref="ServerSqlLogInterceptor" />
+    ///     now; see that class for why.
+    /// </param>
     public static void Write(string line)
     {
         lock (Gate)
@@ -120,4 +129,133 @@ public sealed class ServerSqlTestMarkerAttribute : Xunit.Sdk.BeforeAfterTestAttr
             ServerSqlLog.WriteTestMarker($"{methodUnderTest.ReflectedType?.FullName}.{methodUnderTest.Name}");
         }
     }
+}
+
+/// <summary>
+///     Writes every statement the server's context executes, and every one that fails, to
+///     <see cref="ServerSqlLog" /> in the text EF's own <c>LogTo</c> writes.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>An interceptor and not <c>LogTo</c>, since 2026-09-24, for the reason
+///         <see cref="ServerSqlRecordingInterceptor" /> is one.</b> <c>LogTo</c> keeps ONE sink,
+///         and a later call replaces it. The store wired this log with <c>LogTo</c>, and a fixture
+///         whose <see cref="SharedTestStoreProperties.OnAddOptions" /> called <c>LogTo</c> as well
+///         replaced it without a word. Measured 2026-09-24: a run of the whole of
+///         <c>ServerParameterizationTest</c>, which does exactly that, wrote 58 test markers and 0
+///         statements. <c>AddInterceptors</c> appends, so nothing a fixture adds can displace this
+///         one, and a fixture can still use <c>LogTo</c> for itself.
+///     </para>
+///     <para>
+///         <b>The text is <c>LogTo</c>'s, rebuilt from public members</b>, because
+///         <c>eng/ef-sql-diff.py</c> reads it: a header of level, local time, event id and category,
+///         then the message, which is <see cref="EventData.ToString" />, indented by six spaces. EF's
+///         own formatter is <c>FormattingDbContextLogger</c>, in an <c>Internal</c> namespace, and
+///         the format is short enough to state here. <c>ServerSqlLogTest</c> pins it against the
+///         script's own reading.
+///     </para>
+///     <para>
+///         <b>A failed statement is written too</b>, as <c>LogTo</c> wrote <c>CommandError</c>: it is
+///         the one a diagnosis needs most, and <c>CommandExecuted</c> never carries it.
+///     </para>
+/// </remarks>
+/// <param name="sink">Where each formatted entry goes.</param>
+public sealed class ServerSqlLogInterceptor(Action<string> sink) : DbCommandInterceptor
+{
+    private const string Padding = "      ";
+
+    /// <summary>
+    ///     Writes to <see cref="ServerSqlLog" />.
+    /// </summary>
+    public ServerSqlLogInterceptor()
+        : this(ServerSqlLog.Write)
+    {
+    }
+
+    /// <inheritdoc />
+    public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
+        => Log(eventData, base.ReaderExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<DbDataReader> ReaderExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        DbDataReader result,
+        CancellationToken cancellationToken = default)
+        => Log(eventData, base.ReaderExecutedAsync(command, eventData, result, cancellationToken));
+
+    /// <inheritdoc />
+    public override int NonQueryExecuted(DbCommand command, CommandExecutedEventData eventData, int result)
+        => Log(eventData, base.NonQueryExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<int> NonQueryExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        int result,
+        CancellationToken cancellationToken = default)
+        => Log(eventData, base.NonQueryExecutedAsync(command, eventData, result, cancellationToken));
+
+    /// <inheritdoc />
+    public override object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
+        => Log(eventData, base.ScalarExecuted(command, eventData, result));
+
+    /// <inheritdoc />
+    public override ValueTask<object?> ScalarExecutedAsync(
+        DbCommand command,
+        CommandExecutedEventData eventData,
+        object? result,
+        CancellationToken cancellationToken = default)
+        => Log(eventData, base.ScalarExecutedAsync(command, eventData, result, cancellationToken));
+
+    /// <inheritdoc />
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
+    {
+        Log(eventData);
+        base.CommandFailed(command, eventData);
+    }
+
+    /// <inheritdoc />
+    public override Task CommandFailedAsync(
+        DbCommand command,
+        CommandErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        Log(eventData);
+        return base.CommandFailedAsync(command, eventData, cancellationToken);
+    }
+
+    private T Log<T>(EventData eventData, T result)
+    {
+        Log(eventData);
+        return result;
+    }
+
+    private void Log(EventData eventData)
+    {
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        string name = eventData.EventId.Name ?? string.Empty;
+        int lastDot = name.LastIndexOf('.');
+        string category = lastDot > 0 ? $"({name[..lastDot]}) " : string.Empty;
+        string time = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
+
+        sink(
+            $"{Level(eventData.LogLevel)}: {time} {eventData.EventIdCode}[{eventData.EventId.Id}] {category}"
+            + Environment.NewLine
+            + Padding
+            + eventData.ToString().Replace(Environment.NewLine, Environment.NewLine + Padding, StringComparison.Ordinal));
+    }
+
+    private static string Level(LogLevel level)
+        => level switch
+        {
+            LogLevel.Trace => "trce",
+            LogLevel.Debug => "dbug",
+            LogLevel.Information => "info",
+            LogLevel.Warning => "warn",
+            LogLevel.Error => "fail",
+            LogLevel.Critical => "crit",
+            _ => "none",
+        };
 }
