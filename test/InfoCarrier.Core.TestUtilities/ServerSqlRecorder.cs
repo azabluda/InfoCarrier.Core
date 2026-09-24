@@ -76,8 +76,11 @@ public sealed class ServerSqlRecorder
 ///         while passing in an ordinary run.
 ///     </para>
 ///     <para>
-///         <c>AddInterceptors</c> appends, so this and the log coexist, and the log keeps the
-///         formatted text <c>eng/ef-sql-diff.py</c> reads.
+///         <c>AddInterceptors</c> appends, so this and the log coexist. This paragraph went on "and
+///         the log keeps the formatted text <c>eng/ef-sql-diff.py</c> reads" until 2026-09-24,
+///         because the log stayed on <c>LogTo</c> for that text. It was the same trap the other way
+///         round: a fixture's own <c>LogTo</c> displaced the log. The log is an interceptor too
+///         now, <see cref="ServerSqlLogInterceptor" />, and writes the same text.
 ///     </para>
 /// </remarks>
 public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : DbCommandInterceptor
