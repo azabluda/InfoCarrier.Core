@@ -38,7 +38,7 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
     ///     nowhere; on Tier B it is real, and an unenlisted context waits out SQLite's lock.
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <inheritdoc />
     protected override TestHelpers TestHelpers

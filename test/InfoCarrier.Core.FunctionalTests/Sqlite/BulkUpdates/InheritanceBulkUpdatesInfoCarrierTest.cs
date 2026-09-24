@@ -186,7 +186,7 @@ public class TPHInheritanceBulkUpdatesInfoCarrierFixture : TPHInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>
@@ -206,7 +206,7 @@ public class TPTInheritanceBulkUpdatesInfoCarrierFixture : TPTInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>
@@ -235,7 +235,7 @@ public class TPCInheritanceBulkUpdatesInfoCarrierFixture : TPCInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>

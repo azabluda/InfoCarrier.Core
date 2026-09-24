@@ -68,7 +68,7 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
     ///     </para>
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     // EF's own `GraphUpdatesSqliteTestBase` skips, one for one: SQLite cannot express the default
     // owned-collection pattern because of its composite key. Mirrored, not invented.
