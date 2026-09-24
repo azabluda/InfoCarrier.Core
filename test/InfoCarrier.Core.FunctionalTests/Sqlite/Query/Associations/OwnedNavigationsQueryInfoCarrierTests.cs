@@ -55,7 +55,7 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsRelationa
     ///     family; see <see cref="NavigationsQueryInfoCarrierFixture.UseTransaction" />.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 // The six OwnedNavigations facets (ADR-004). R26 adopted them bare and measured 8 red of 91;

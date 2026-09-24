@@ -65,7 +65,9 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     ///     is the whole guard. See the class remarks.
     /// </remarks>
     protected override DbConnection Connection
-        => throw new InvalidOperationException(
+        => DirectClient.IsEnabled
+            ? _backend.DirectClientConnection
+            : throw new InvalidOperationException(
             "The InfoCarrier client has no database of its own, so this test store exposes no "
             + "DbConnection. A test reaching for one would bypass the wire, and a green from that "
             + "would say nothing about this provider.");
@@ -88,7 +90,9 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
+        => DirectClient.IsEnabled
+            ? _backend.AddDirectClientOptions(builder)
+            : builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

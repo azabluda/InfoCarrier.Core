@@ -194,7 +194,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
         => Fixture.CreateContext();
 
     private static void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     public class InfoCarrierFixture : JsonUpdateFixtureBase
     {

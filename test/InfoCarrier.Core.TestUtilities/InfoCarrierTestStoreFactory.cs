@@ -109,6 +109,11 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     /// </remarks>
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
     {
+        if (DirectClient.IsEnabled)
+        {
+            return _tier.AddDirectClientServices(serviceCollection);
+        }
+
         serviceCollection = serviceCollection
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();

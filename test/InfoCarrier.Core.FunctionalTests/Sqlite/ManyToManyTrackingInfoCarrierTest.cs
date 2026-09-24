@@ -57,7 +57,7 @@ public class ManyToManyTrackingInfoCarrierTest(ManyToManyTrackingInfoCarrierTest
     ///     records. The tell was the base's own transaction strategy: 47 call sites.
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     public class InfoCarrierFixture : ManyToManyTrackingRelationalFixture, ITestSqlLoggerFactory
     {

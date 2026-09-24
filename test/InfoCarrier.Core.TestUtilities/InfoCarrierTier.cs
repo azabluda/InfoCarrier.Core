@@ -58,4 +58,12 @@ public abstract class InfoCarrierTier
     /// </remarks>
     public virtual ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
         => new(shouldLogCategory);
+
+    /// <summary>
+    ///     The provider services of a client that is plain EF Core on this tier's store, for a
+    ///     <see cref="DirectClient" /> run.
+    /// </summary>
+    public virtual Microsoft.Extensions.DependencyInjection.IServiceCollection AddDirectClientServices(
+        Microsoft.Extensions.DependencyInjection.IServiceCollection serviceCollection)
+        => throw new NotSupportedException($"'{GetType().Name}' has no direct-client run.");
 }

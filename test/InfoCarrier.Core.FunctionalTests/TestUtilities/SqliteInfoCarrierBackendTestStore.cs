@@ -163,6 +163,16 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => base.AddProviderOptions(builder).UseSqlite(_connectionString);
 
+    private SqliteConnection? _directClientConnection;
+
+    /// <inheritdoc />
+    public override System.Data.Common.DbConnection DirectClientConnection
+        => _directClientConnection ??= new SqliteConnection(_connectionString);
+
+    /// <inheritdoc />
+    public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => AddServerContextOptions(builder).UseSqlite(DirectClientConnection);
+
     /// <summary>
     ///     Whether the database at <see cref="_path" /> currently holds any table.
     /// </summary>
@@ -289,6 +299,13 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     ///         unaffected either way.
     ///     </para>
     /// </remarks>
-    public override ValueTask DisposeAsync()
-        => base.DisposeAsync();
+    public override async ValueTask DisposeAsync()
+    {
+        if (_directClientConnection is not null)
+        {
+            await _directClientConnection.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await base.DisposeAsync().ConfigureAwait(false);
+    }
 }

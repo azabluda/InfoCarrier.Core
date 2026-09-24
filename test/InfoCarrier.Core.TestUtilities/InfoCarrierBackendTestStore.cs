@@ -328,7 +328,30 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // the property type alone; the mechanism is EF's to find.
         //
         // The switch stays per fixture regardless, and this repository has nothing to fix.
-        builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+        return AddServerContextOptions(builder.UseInternalServiceProvider(ServiceProvider));
+    }
+
+    /// <summary>
+    ///     The options of a client that is plain EF Core on this store (<see cref="DirectClient" />):
+    ///     everything the server context gets except its service provider, which the fixture's own
+    ///     replaces, and on <see cref="DirectClientConnection" />.
+    /// </summary>
+    public virtual DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => throw new NotSupportedException($"'{GetType().Name}' has no direct-client run.");
+
+    /// <summary>
+    ///     The one connection every direct client context of this store shares, as EF's own relational
+    ///     test stores share one, so that one context can enlist in another's transaction.
+    /// </summary>
+    public virtual DbConnection DirectClientConnection
+        => throw new NotSupportedException($"'{GetType().Name}' has no direct-client run.");
+
+    /// <summary>
+    ///     What the server context and a direct client context both get.
+    /// </summary>
+    protected DbContextOptionsBuilder AddServerContextOptions(DbContextOptionsBuilder builder)
+    {
+        builder = builder.EnableSensitiveDataLogging();
 
         // Always recorded, and in memory: a test that asserts the server's SQL (#111) reads
         // `ServerSql` and compares it with EF's own text. One recorder per store, cleared by the

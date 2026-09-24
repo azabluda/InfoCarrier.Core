@@ -62,7 +62,7 @@ public class ComplexTableSplittingQueryInfoCarrierFixture : ComplexTableSplittin
     ///     <see cref="ComplexJsonQueryInfoCarrierFixture.UseTransaction" />.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 // The five ComplexTableSplitting facets (ADR-004). Five and not seven: EF ships no Collection or

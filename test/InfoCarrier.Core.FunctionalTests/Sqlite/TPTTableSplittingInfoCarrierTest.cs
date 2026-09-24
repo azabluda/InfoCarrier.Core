@@ -73,7 +73,7 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
 
         await TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
-            (facade, transaction) => facade.UseInfoCarrierTransaction(transaction),
+            (facade, transaction) => facade.UseTestTransaction(transaction),
             async context =>
             {
                 if (async)

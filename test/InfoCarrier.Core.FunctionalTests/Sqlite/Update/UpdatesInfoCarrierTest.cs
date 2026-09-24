@@ -40,7 +40,7 @@ public class UpdatesInfoCarrierTest(UpdatesInfoCarrierTest.UpdatesInfoCarrierFix
     ///     unreachable on a client with no database (ADR-013).
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <summary>
     ///     <c>UpdatesSqliteTest</c>'s: store-generated GUIDs are not supported on SQLite.
