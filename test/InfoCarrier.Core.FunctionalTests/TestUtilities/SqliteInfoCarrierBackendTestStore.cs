@@ -170,8 +170,18 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         => _directClientConnection ??= new SqliteConnection(_connectionString);
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The two settings EF's own SQLite suite uses, because the fixture's <c>AddOptions</c> turns
+    ///     every warning into an error on this client, where the server only logs it:
+    ///     <c>SqliteTestStore</c> sets <see cref="QuerySplittingBehavior.SingleQuery" />, which silences
+    ///     <c>MultipleCollectionIncludeWarning</c>, and <c>GraphUpdatesSqliteFixtureBase</c> ignores
+    ///     <c>CompositeKeyWithValueGeneration</c>. Without them 2676 tests of a direct run failed on
+    ///     the warning before running any statement.
+    /// </remarks>
     public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
-        => AddServerContextOptions(builder).UseSqlite(DirectClientConnection);
+        => AddServerContextOptions(builder)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.SqliteEventId.CompositeKeyWithValueGeneration))
+            .UseSqlite(DirectClientConnection, b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery));
 
     /// <summary>
     ///     Whether the database at <see cref="_path" /> currently holds any table.
