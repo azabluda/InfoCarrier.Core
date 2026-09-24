@@ -457,6 +457,17 @@ public partial class ServerParameterizationTest
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <summary>
+    ///     The same sequence written out of literals, which EF evaluates on the client into a
+    ///     constant of LINQ's own internal iterator type rather than into a parameter.
+    /// </summary>
+    [ConditionalFact]
+    public Task An_ordered_collection_of_literals_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs
+                .Where(b => new List<string> { "alpha", "gamma" }.Order().Contains(b.Title!))
+                .ToListAsync());
+
+    /// <summary>
     ///     An inline collection the caller writes out of captured values.
     /// </summary>
     /// <remarks>
