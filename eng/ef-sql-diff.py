@@ -74,6 +74,16 @@ It remains a claim about one statement. A filter dropped on BOTH sides looks cle
 that is not this report's question: the comparison against EF's own `AssertSql` above is what
 reports a filter that went missing.
 
+DO NOT COMPARE THE EXTRAS TOTAL BETWEEN TWO RUNS; COMPARE THE `reads:` LINE, which is why the
+header prints reads and writes apart, in statements as well as shapes. The writes include each
+run's fixture SEEDING, and which fixtures seed is a property of the machine rather than of the
+product: the Tier B store is file-backed and is not deleted on disposal, so a fixture whose `.db`
+survives the startup sweep reads it instead of seeding it. Measured on two serial runs of the same
+tier, 2026-09-22 and 2026-09-23, over the same 19 419 and 19 420 tests: the total fell from 4157
+statements to 3002, a 28% fall that says nothing at all, because the reads were 397 statements in
+59 shapes BOTH times and every statement of the difference was a write (3760 against 2605) --
+`INSERT`s into the many-to-many join tables in one run, into the conference planner's in the other.
+
 Each of those four conditions was measured, and `mapping_control` says what dropping it costs.
 On 2026-09-22 the two false positives were the whole of the run's unbounded extras: `FROM "Kiwi"`
 and `FROM "Coke"` in `TPCInheritanceBulkUpdates`. Over the whole log `--survey` reclassifies six
@@ -583,12 +593,23 @@ def report_groups(groups, limit, label):
         return (ORDER.index(flag_of(item[1])), -item[1][0])
 
     order = sorted(groups.items(), key=rank)
-    statements = sum(g[0] for g in groups.values())
-    flags = collections.Counter(flag_of(g) for g in groups.values())
+
+    # Reads and writes are counted apart, in statements as well as shapes, because only the reads
+    # are comparable between two runs. See "DO NOT COMPARE THE EXTRAS TOTAL" in the docstring.
+    statements = collections.Counter()
+    shapes = collections.Counter()
+    for group in groups.values():
+        statements[flag_of(group)] += group[0]
+        shapes[flag_of(group)] += 1
+    reads = ('UNBOUNDED', 'MAPPING-BOUND', 'READ')
+
     print()
-    print(f'{label}: {statements} statements in {len(groups)} shapes '
-          f'({flags["UNBOUNDED"]} unbounded reads, {flags["MAPPING-BOUND"]} bounded by the mapping, '
-          f'{flags["READ"]} other reads, {flags["WRITE"]} writes)')
+    print(f'{label}: {sum(statements.values())} statements in {len(groups)} shapes')
+    print(f'  reads:  {sum(statements[f] for f in reads)} statements in {sum(shapes[f] for f in reads)} shapes '
+          f'({shapes["UNBOUNDED"]} unbounded, {shapes["MAPPING-BOUND"]} bounded by the mapping, '
+          f'{shapes["READ"]} other)')
+    print(f'  writes: {statements["WRITE"]} statements in {shapes["WRITE"]} shapes '
+          f"(includes this machine's fixture seeding; compare the reads between runs, not this)")
 
     for _, group in order[:limit]:
         count, tests, example = group[0], group[1], group[2]
