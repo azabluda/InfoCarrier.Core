@@ -212,6 +212,17 @@ A fourth change of the same family is not pushdown and is recorded here beside t
 projection's values are collected against the parameters of every *enclosing* lambda, so a
 projected collection that reads its owner computes that read on the server.
 
+**Amendment 2026-09-24 — paging under a terminal operator pushes down too.** `Skip` and `Take` at
+the root already reached the server, because the re-carry puts the rebuild at the root. Under
+`First`, `Single` and their siblings the rebuild stays below them, and
+`Select(c => new { … }).Skip(1).First()` ran `Skip` on the client over every row the server sent.
+`QuerySplitter.WithRowLimitForTerminalOperator` now moves each `Skip` and `Take` between the
+operator and the rebuild onto the shipped query, in order, before the operator's own row limit.
+It is sound for the reason that limit is: the rebuild is row for row and keeps the order. Found by
+running Tier B a second time with InfoCarrier removed and comparing each test method's reads:
+`Multi_level_includes_are_applied_with_skip` had read every order of every customer whose key
+starts with "A".
+
 The general case stays deferred, and §7 still holds it.
 
 ### 3.5 Frontier and fallback
