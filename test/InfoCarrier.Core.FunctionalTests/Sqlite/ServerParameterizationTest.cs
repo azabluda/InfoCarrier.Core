@@ -701,6 +701,48 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).Take(2).FirstAsync());
 
     /// <summary>
+    ///     A split query keeps splitting when the row limit goes onto the shipped query.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The server puts the caller's <c>AsSplitQuery</c> back on the shipped query, and EF
+    ///         refuses the hint on a tuple, which is what a rebuilt projection ships. It looked one
+    ///         level down for an entity, and the limit put a <c>Take</c> in the way: the store ran
+    ///         one joined statement where EF's own client runs one per collection. The rows were
+    ///         bounded either way, so only the statements show it.
+    ///     </para>
+    ///     <para>
+    ///         Found beside the paging fix, whose <c>Skip</c> added a second level:
+    ///         <c>NorthwindSplitInclude.Multi_level_includes_are_applied_with_skip</c> went from
+    ///         three unbounded statements to one bounded one.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_split_First_over_a_client_projection_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            static async context => _ = await context.Set<Blog>().AsSplitQuery().OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Posts = b.Posts.ToList() }).FirstAsync());
+
+        Assert.Null(run.WireError);
+        Assert.Equal(run.Directly, run.OverTheWire);
+    }
+
+    /// <inheritdoc cref="A_split_First_over_a_client_projection_matches_the_direct_query" />
+    [ConditionalFact]
+    public async Task A_split_First_after_Skip_over_a_client_projection_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            static async context => _ = await context.Set<Blog>().AsSplitQuery().OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Posts = b.Posts.ToList() }).Skip(1).FirstAsync());
+
+        Assert.Null(run.WireError);
+        Assert.Equal(run.Directly, run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A projection that reads nothing from the row asks the store for no column, as plain
     ///     EF Core asks for none.
     /// </summary>
