@@ -80,10 +80,20 @@ public class TypeNodeMapper(IModel? model = null)
         //
         // Only this interface, and not a general "nearest public interface": an anonymous type has
         // none, which keeps C9's case out, and every other internal iterator is left as it was.
-        if (type.GetInterfaces().FirstOrDefault(
-                i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>)) is { } ordered)
+        //
+        // Found by the type's own generic arguments and not by `GetInterfaces`, which the trimmer
+        // cannot prove and which cost one IL2070: LINQ's ordered iterators all take the element
+        // type as a generic argument, and `IsAssignableFrom` needs no annotation.
+        if (type.IsGenericType)
         {
-            return ordered;
+            foreach (Type argument in type.GetGenericArguments())
+            {
+                Type ordered = typeof(IOrderedEnumerable<>).MakeGenericType(argument);
+                if (ordered.IsAssignableFrom(type))
+                {
+                    return ordered;
+                }
+            }
         }
 
         return type;
