@@ -1027,10 +1027,16 @@ public class DynamicValueMapper(
     ///     Rebuilds <paramref name="items" /> as <paramref name="type" /> via a single-argument
     ///     constructor that accepts a list — the shape of <see cref="System.Collections.ObjectModel.ReadOnlyCollection{T}" />,
     ///     <see cref="System.Collections.ObjectModel.Collection{T}" />, <see cref="HashSet{T}" />
-    ///     and friends. Returns <see langword="null" /> when the type offers no such way in,
-    ///     which is the case for interfaces like <c>IOrderedEnumerable&lt;T&gt;</c>; the caller
-    ///     then keeps the list.
+    ///     and friends. Returns <see langword="null" /> when the type offers no such way in; the
+    ///     caller then keeps the list.
     /// </summary>
+    /// <remarks>
+    ///     This said "which is the case for interfaces like <c>IOrderedEnumerable&lt;T&gt;</c>" until
+    ///     2026-09-24, and that made a captured <c>ids.Order()</c> unboxable: the parameter reached
+    ///     the server as a constant of a type the wire cannot carry, the <c>Where</c> reading it
+    ///     stayed on the client, and the server sent the whole table where EF's own client sends
+    ///     <c>IN (@p, @p)</c>. An ordered sequence is rebuilt now; see <see cref="Ordered{T}" />.
+    /// </remarks>
     private static object? ConstructCollection(Type type, Type elementType, IList items)
     {
         if (!type.IsInterface && !type.IsAbstract)
@@ -1056,15 +1062,39 @@ public class DynamicValueMapper(
 
         // A set interface — `ISet<T>`, `IReadOnlySet<T>` — is satisfied by a HashSet, without
         // hunting for a factory. (The sequence interfaces never reach here: a list already
-        // satisfies them.)
+        // satisfies them. `IOrderedEnumerable<T>` is the exception, and it is the next clause.)
         Type hashSet = typeof(HashSet<>).MakeGenericType(elementType);
         if (type.IsAssignableFrom(hashSet))
         {
             return Activator.CreateInstance(hashSet, items);
         }
 
+        // The lookup stays at the call site, not in a static field: the trimmer can see which
+        // method `MakeGenericMethod` instantiates only here, and a field cost one IL2060.
+        if (type == typeof(IOrderedEnumerable<>).MakeGenericType(elementType))
+        {
+            return typeof(DynamicValueMapper)
+                .GetMethod(nameof(Ordered), BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(elementType)
+                .Invoke(null, [items]);
+        }
+
         return CreateRange(type, elementType, items) ?? AddToNew(type, elementType, items);
     }
+
+    /// <summary>
+    ///     An <see cref="IOrderedEnumerable{TElement}" /> that enumerates <paramref name="items" /> in
+    ///     their own order.
+    /// </summary>
+    /// <remarks>
+    ///     The interface has no constructor and no factory, and a LINQ sort is the one thing that
+    ///     returns it. The key is a constant, so the rebuilt value enumerates exactly as the
+    ///     caller's did, because <c>OrderBy</c> is a stable sort, and no two elements are ever
+    ///     compared, so an element type with no order of its own rebuilds too. The caller's
+    ///     comparer does not cross and is not needed: the order it produced is in the list already.
+    /// </remarks>
+    private static IOrderedEnumerable<T> Ordered<T>(IList items)
+        => items.Cast<T>().ToList().OrderBy(static _ => 0);
 
     /// <summary>
     ///     Builds <paramref name="type" /> by constructing it empty and adding each element —

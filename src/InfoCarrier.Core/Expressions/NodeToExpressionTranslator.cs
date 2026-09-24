@@ -114,10 +114,11 @@ public class NodeToExpressionTranslator(
             ? _valueMapper.FromDynamicValue(node.DynamicValue)
             : CoercePrimitive(node.PrimitiveValue, valueType);
 
-        // Some declared types cannot be rebuilt exactly — `IOrderedEnumerable<T>` has no public
-        // way in, so the value comes back as a plain list. Widening the constant to what we
-        // actually hold keeps the tree buildable; every operator that reads such a constant
-        // (`Contains` and friends) takes it as `IEnumerable<T>` anyway.
+        // Some declared types cannot be rebuilt exactly, so the value comes back as a plain list.
+        // Widening the constant to what we actually hold keeps the tree buildable; every operator
+        // that reads such a constant (`Contains` and friends) takes it as `IEnumerable<T>` anyway.
+        // The example here was `IOrderedEnumerable<T>` until 2026-09-24, when
+        // `DynamicValueMapper.ConstructCollection` learned to rebuild it.
         if (value is not null && !type.IsInstanceOfType(value))
         {
             type = value.GetType();
