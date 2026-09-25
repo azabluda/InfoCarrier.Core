@@ -397,6 +397,43 @@ public partial class ServerParameterizationTest
             static (blogs, id) => blogs.Where(b => b.Id == id));
 
     /// <summary>
+    ///     <c>ToQueryString()</c> runs no statement over the wire, as it runs none in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's <c>ToQueryString()</c> calls the provider's synchronous <c>Execute</c> and asks the
+    ///         result for its text. This client ran the query inside that call, so the server read
+    ///         every matching row and the client threw them away, only to return EF's "not
+    ///         available" text. The synchronous path now fetches when the rows are first read, as
+    ///         the asynchronous one already did and as EF's own enumerables do.
+    ///     </para>
+    ///     <para>
+    ///         Found by running Tier B a second time with InfoCarrier removed and comparing each
+    ///         test method's reads: <c>NorthwindWhere.Where_simple_closure</c>,
+    ///         <c>FromSql.FromSqlRaw_queryable_with_parameters_and_closure</c> and
+    ///         <c>Sql.SqlQueryRaw_queryable_with_parameters_and_closure</c> each ran their statement
+    ///         twice per case.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task ToQueryString_runs_no_statement()
+    {
+        string title = "beta";
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            context =>
+            {
+                _ = context.Set<Blog>().Where(b => b.Title == title).ToQueryString();
+                return Task.CompletedTask;
+            });
+
+        Assert.Null(run.DirectError);
+        Assert.Null(run.WireError);
+        Assert.Empty(run.Directly);
+        Assert.Empty(run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A collection the box cannot hand back, category 3 of issue #62.
     /// </summary>
     /// <remarks>
