@@ -42,6 +42,9 @@ internal sealed class QueryExecutor<TElement>
     private readonly ClientResultMaterializer _materializer;
     private readonly bool _threadSafetyChecks;
 
+    /// <summary>What a synchronous execution fetched, once its first row was read.</summary>
+    private List<object?>? _fetched;
+
     /// <summary>
     ///     How this context recognises EF's relational raw-SQL query roots (#97).
     /// </summary>
@@ -152,6 +155,36 @@ internal sealed class QueryExecutor<TElement>
             return singleResult ? (object)FirstOrDefaultAsync(asyncEnum) : asyncEnum;
         }
 
+        if (singleResult)
+        {
+            return Rows(singleResult: true).FirstOrDefault()!;
+        }
+
+        // A SEQUENCE IS FETCHED WHEN ITS FIRST ROW IS READ, as the asynchronous path above and EF's
+        // own enumerables are. It was fetched here until 2026-09-25, and EF's `ToQueryString()`
+        // calls this method only to ask the result for its text: the server read every matching
+        // row and this client threw them away.
+        return Rows(singleResult: false);
+    }
+
+    /// <summary>
+    ///     The rows of a synchronous execution, fetched from the server when the first is read.
+    /// </summary>
+    /// <remarks>
+    ///     Fetched once: a second enumeration runs the residual again over the same results, as it
+    ///     did when the fetch happened in <see cref="Execute" />.
+    /// </remarks>
+    private IEnumerable<TElement> Rows(bool singleResult)
+    {
+        List<object?> results = _fetched ??= Fetch();
+        foreach (TElement row in Guarded(ApplyResidual(results, singleResult)))
+        {
+            yield return row;
+        }
+    }
+
+    private List<object?> Fetch()
+    {
         using IDisposable? criticalSection = CriticalSection();
 
         var results = new List<object?>(_split.ServerQueries.Count);
@@ -169,8 +202,7 @@ internal sealed class QueryExecutor<TElement>
             results.Add(Materialize(serverQuery, result));
         }
 
-        IEnumerable<TElement> mapped = Guarded(ApplyResidual(results, singleResult));
-        return singleResult ? mapped.FirstOrDefault()! : mapped;
+        return results;
     }
 
     /// <summary>
