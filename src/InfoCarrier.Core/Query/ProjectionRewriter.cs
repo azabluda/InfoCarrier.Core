@@ -340,7 +340,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
     /// <summary>
     ///     Moves a <c>Distinct</c> from above a reassembly to below it, onto the tuple the server
-    ///     computes, when the reassembly only copies each slot into one member.
+    ///     computes, when the reassembly only constructs its result from the slots.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -354,11 +354,16 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         to their owner by. Moved, the <c>Distinct</c> reaches the server's EF, which decides.
     ///     </para>
     ///     <para>
-    ///         <b>Sound only for a rebuild that copies each slot into one member.</b> Tuple equality
-    ///         and anonymous-type equality are both member by member, so two rows are equal as
-    ///         tuples exactly when they are equal rebuilt, and removing duplicates before the rebuild
-    ///         removes the same rows as after it. A rebuild that computes from a slot, or drops one,
-    ///         can make two different tuples equal, and is left alone.
+    ///         <b>Sound only for a rebuild that constructs its result from the slots, each read
+    ///         once.</b> Removing duplicates from the tuples is then what plain EF Core does: EF
+    ///         removes them by the columns a construction reads and never calls the type's
+    ///         <c>Equals</c>. Until 2026-09-25 this read "copies each slot into one member" and argued
+    ///         from equality alone: "tuple equality and anonymous-type equality are both member by
+    ///         member, so two rows are equal as tuples exactly when they are equal rebuilt". That
+    ///         still holds for an anonymous type. For a type with an <c>Equals</c> of its own the
+    ///         answer is EF's and not the type's, which is the answer every other provider gives. A
+    ///         rebuild that computes from a slot, or drops one, can make two different tuples equal,
+    ///         and is left alone.
     ///     </para>
     ///     <para>
     ///         <b>Not over a collection slot</b>: <c>QuerySplitter</c> refuses a <c>Distinct</c> over
@@ -390,8 +395,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     Fuses a <c>Select</c> with the reassembly below it, when the reassembly only copies each
-    ///     slot into one member, so that the projection reads the server's tuple directly.
+    ///     Fuses a <c>Select</c> with the reassembly below it, when the reassembly only constructs
+    ///     its result from the slots, so that the projection reads the server's tuple directly.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -421,8 +426,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         reads one. Measured with <c>ServerParameterizationTest</c>.
     ///     </para>
     ///     <para>
-    ///         Only over a rebuild that copies each slot into one member, and never over a collection
-    ///         slot, for the reasons <see cref="TryMoveDistinctBelowReassembly" /> gives.
+    ///         Only over a rebuild that constructs its result from the slots, each read once, and
+    ///         never over a collection slot, for the reasons
+    ///         <see cref="TryMoveDistinctBelowReassembly" /> gives.
     ///     </para>
     /// </remarks>
     /// <param name="node">The <c>Select</c>, not yet visited.</param>
@@ -465,21 +471,83 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     Whether <paramref name="body" /> constructs its result from the slots of
     ///     <paramref name="row" />, each read once, in order, and nothing else.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A construction is any <c>new</c>, with an initializer or without, and one nested in
+    ///         another, since 2026-09-25.</b> This accepted an anonymous type alone until then, so a
+    ///         <c>Distinct</c> over <c>new OrderCountDTO(o.CustomerID)</c> stayed on the client and
+    ///         the server sent every duplicate row, where plain EF Core runs
+    ///         <c>SELECT DISTINCT "CustomerID"</c>. EF removes duplicates by the columns a
+    ///         construction reads and never calls the type's <c>Equals</c>, so for any construction
+    ///         the tuple is exactly what EF compares.
+    ///     </para>
+    ///     <para>
+    ///         A construction that reads no slot is built over <see cref="RowPresence" />, the only
+    ///         tuple this rewrite makes for a body with no fragment. Its one slot is the same constant
+    ///         in every row, and EF writes <c>SELECT DISTINCT 1</c> for it.
+    ///     </para>
+    /// </remarks>
     private static bool CopiesEachSlotOnce(Expression body, ParameterExpression row)
     {
-        if (body is not NewExpression { Members: not null } construction
-            || construction.Arguments.Count == 0
-            || TupleCarrier.MakeType([.. construction.Arguments.Select(a => a.Type)]) != row.Type)
+        List<Expression> values = [];
+        if (!CollectConstructedValues(body, values))
         {
             return false;
         }
 
-        for (int i = 0; i < construction.Arguments.Count; i++)
+        if (values.Count == 0)
+        {
+            return true;
+        }
+
+        if (TupleCarrier.MakeType([.. values.Select(v => v.Type)]) != row.Type)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < values.Count; i++)
         {
             if (!Microsoft.EntityFrameworkCore.Query.ExpressionEqualityComparer.Instance.Equals(
-                    construction.Arguments[i], TupleCarrier.Read(row, i)))
+                    values[i], TupleCarrier.Read(row, i)))
             {
                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Adds what <paramref name="node" /> is constructed from to <paramref name="values" />, in
+    ///     order, reading through every construction nested in it; <see langword="false" /> when
+    ///     <paramref name="node" /> is not a construction.
+    /// </summary>
+    private static bool CollectConstructedValues(Expression node, List<Expression> values)
+    {
+        IEnumerable<Expression> parts;
+        switch (node)
+        {
+            case NewExpression construction:
+                parts = construction.Arguments;
+                break;
+
+            case MemberInitExpression initialization
+                when initialization.Bindings.All(b => b.BindingType == MemberBindingType.Assignment):
+                parts = [
+                    .. initialization.NewExpression.Arguments,
+                    .. initialization.Bindings.Cast<MemberAssignment>().Select(a => a.Expression),
+                ];
+                break;
+
+            default:
+                return false;
+        }
+
+        foreach (Expression part in parts)
+        {
+            if (!CollectConstructedValues(part, values))
+            {
+                values.Add(part);
             }
         }
 
