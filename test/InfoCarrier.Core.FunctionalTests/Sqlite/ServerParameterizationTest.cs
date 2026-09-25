@@ -408,9 +408,9 @@ public partial class ServerParameterizationTest
     ///         and the only way to know is to read the statement.
     ///     </para>
     ///     <para>
-    ///         <c>IOrderedEnumerable&lt;T&gt;</c> is deliberately absent. Boxing it broke eight
-    ///         <c>Contains_with_local_ordered_enumerable_*</c> tests, and that carve-out is
-    ///         documented in <c>Substitute</c> itself.
+    ///         <c>IOrderedEnumerable&lt;T&gt;</c> has a test of its own below. This said it was
+    ///         "deliberately absent", because boxing it broke eight
+    ///         <c>Contains_with_local_ordered_enumerable_*</c> tests, until 2026-09-24.
     ///     </para>
     /// </remarks>
     [ConditionalFact]
@@ -431,6 +431,29 @@ public partial class ServerParameterizationTest
     public Task A_ReadOnlyCollection_parameter_matches_the_direct_query()
         => AssertSameStatement(
             new ReadOnlyCollection<string>(["alpha", "gamma"]),
+            static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
+
+    /// <summary>
+    ///     A collection whose declared type has no constructor and no factory.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Until 2026-09-24 nothing on the far side could rebuild an
+    ///         <c>IOrderedEnumerable&lt;T&gt;</c>, so <c>Substitute</c> did not box it. The value
+    ///         crossed as a constant of a type the wire cannot carry, the boundary kept the
+    ///         <c>Where</c> on the client, and the store ran <c>SELECT … FROM "Blogs"</c> with no
+    ///         <c>WHERE</c>. EF's own <c>Contains_with_local_ordered_enumerable_*</c> tests stayed
+    ///         green throughout, because they compare answers.
+    ///     </para>
+    ///     <para>
+    ///         Found by running Tier B again with InfoCarrier removed and comparing each test
+    ///         method's reads with the reads through the wire.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task An_ordered_enumerable_parameter_matches_the_direct_query()
+        => AssertSameStatement(
+            new[] { "alpha", "gamma" }.Order(),
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <summary>

@@ -911,9 +911,10 @@ internal sealed class QueryExecutor<TElement>
                 && SequenceElementType(parameterType) is { } elementType
 
                 // Box only where the wire can give the box's property back what it declares. A
-                // collection is materialized on the far side as a `List<T>`, so a parameter typed
-                // `IOrderedEnumerable<T>` cannot be handed one — the server rebuilt the value and
+                // collection is materialized on the far side as a `List<T>`, and a parameter typed
+                // `IOrderedEnumerable<T>` could not be handed one — the server rebuilt the value and
                 // then failed to assign it, eight `Contains_with_local_ordered_enumerable_*` deep.
+                // The far side rebuilds that interface itself since 2026-09-24; see below.
                 //
                 // **`DynamicValueMapper.CanRebuildCollection` is the third clause, and it is the
                 // #62 fix.** The first two ask whether a `List<T>` satisfies the declared type,
@@ -924,8 +925,15 @@ internal sealed class QueryExecutor<TElement>
                 // reached the store as `IN ('alpha', 'gamma')` where EF's own client sends
                 // `IN (@p, @p)` — measured by `ServerParameterizationTest` against the SQL the
                 // server ran, not argued. The clause asks the rebuilder itself rather than
-                // restating its rules, so the two sides cannot drift; `IOrderedEnumerable<T>` is
-                // still refused, because nothing in `ConstructCollection` can produce one.
+                // restating its rules, so the two sides cannot drift.
+                //
+                // **`IOrderedEnumerable<T>` passes this clause since 2026-09-24.** This said "is
+                // still refused, because nothing in `ConstructCollection` can produce one", and the
+                // refusal was not harmless: the value fell through to a constant of a type the wire
+                // cannot carry, so the boundary kept the `Where` reading it on the client and the
+                // server sent the whole table, where EF's own client sends `IN (@p, @p)`. The eight
+                // tests stayed green, because they compare answers. `ConstructCollection` builds the
+                // interface now, and `ServerParameterizationTest` compares the statement.
                 && (parameterType.IsArray
                     || parameterType.IsAssignableFrom(typeof(List<>).MakeGenericType(elementType))
                     || DynamicValueMapper.CanRebuildCollection(parameterType, elementType));
@@ -962,13 +970,12 @@ internal sealed class QueryExecutor<TElement>
             // `IEnumerable<byte>`** — that is what it is named for. So "not a collection" is not a
             // property of the value at all here.
             //
-            // Dropping that guard instead would box `IOrderedEnumerable<T>`, which the collection
-            // branch above excludes on purpose, and would re-break the eight
-            // `Contains_with_local_ordered_enumerable_*` tests its comment names. Asking the model
-            // separates them cleanly and for the right reason: a mapped property's CLR type is a
-            // *value* the caller stores, and EF's own providers carry it as a parameter with the
-            // property's converter applied. `IOrderedEnumerable<T>` is never a property type, and
-            // neither is an anonymous type.
+            // Asking the model is also the right reason on its own: a mapped property's CLR type
+            // is a *value* the caller stores, and EF's own providers carry it as a parameter with
+            // the property's converter applied. An anonymous type is never a property type. This
+            // paragraph began "Dropping that guard instead would box `IOrderedEnumerable<T>`, which
+            // the collection branch above excludes on purpose" until 2026-09-24, when that branch
+            // began boxing it, so that value no longer reaches this clause at all.
             // **A wire primitive is boxed too, since 2026-08-27 (issue #59), and this reverses
             // §6's original rule rather than narrowing it.** §6 said a scalar becomes a plain
             // constant. Measured on the SQLite tier by logging the *server's*
@@ -1001,8 +1008,9 @@ internal sealed class QueryExecutor<TElement>
             // The J21 clauses below are kept as they were, and each still excludes a type the box
             // cannot carry: `object` (whose real type differs per value), an entity type (which EF
             // expands to a key comparison itself), and anything the model does not store as a
-            // property — an anonymous type is the case that matters, and `IOrderedEnumerable<T>`
-            // is already excluded by the collection branch above.
+            // property — an anonymous type is the case that matters. This went on "and
+            // `IOrderedEnumerable<T>` is already excluded by the collection branch above" until
+            // 2026-09-24; that branch boxes it now.
             // **An `object`-typed parameter is boxed too, since 2026-08-27 (issue #59), and it is
             // not an edge case: it is `Find()`.** EF's `ExpressionExtensions.BuildPredicate` builds
             // a key lookup as `EF.Property<object>(e, name) == keyValues[i]` whenever the key is a

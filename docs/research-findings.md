@@ -200,6 +200,22 @@ never produces): Block/Loop/Try/Goto/Switch/Label/DebugInfo/Throw/Dynamic. EF ex
 > `ServerParameterizationTest` is the differential test that can: same query over the wire and
 > directly against the server, statements compared after normalizing parameter names.
 
+> ⚠️ **Superseded for `IOrderedEnumerable<T>`, 2026-09-24.** The C88 guard above left a parameter
+> of that type alone because the far side could only hand back a `List<T>`, and boxing it broke
+> eight `Contains_with_local_ordered_enumerable_*` tests. The eight stayed green without the box,
+> and that hid the price: the value then crossed as a constant of a type the wire cannot carry, so
+> the boundary kept the `Where` reading it on the client, and **the server sent every customer**
+> where EF's own client sends `WHERE "CustomerID" IN (@p, @p)`. A test compares answers, and the
+> answers were right.
+>
+> Found by running Tier B a second time with InfoCarrier removed and comparing the reads of each
+> test method, which gives a plain-EF baseline for the methods EF's own `AssertSql` never covers.
+> The far side now rebuilds the interface itself (`DynamicValueMapper.Ordered<T>`, a stable sort on
+> a constant key, so the order is the caller's and no two elements are compared), the guard asks
+> the rebuilder as it has since #62, and the box goes through.
+> `An_ordered_enumerable_parameter_matches_the_direct_query` failed before the change and passes
+> after it; the eight spec tests stay green.
+
 v1's bug: wrapping parameter values in a custom generic struct `ValueWrapper<T>` as a tree
 constant broke translation. **Rule:** substitute compiled-query parameters as **plain
 `ConstantExpression` of the runtime value** (typed to the parameter's type), resolved from
