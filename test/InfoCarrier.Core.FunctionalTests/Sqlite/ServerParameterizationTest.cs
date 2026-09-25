@@ -685,6 +685,98 @@ public partial class ServerParameterizationTest
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
 
     /// <summary>
+    ///     Paging above a projection this client reassembles.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A <c>Skip</c> or <c>Take</c> the caller writes after the projection stayed above the
+    ///         client's rebuild, so the server sent every row and the client dropped the ones it
+    ///         skipped. EF's own client writes <c>LIMIT</c> and <c>OFFSET</c>.
+    ///         <c>Multi_level_includes_are_applied_with_skip</c> read every order of every customer
+    ///         whose key starts with "A" that way, and passed, because it compares answers.
+    ///     </para>
+    ///     <para>
+    ///         Found by running Tier B again with InfoCarrier removed and comparing each test
+    ///         method's reads with the reads through the wire.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_Skip_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).ToListAsync());
+
+    /// <inheritdoc cref="A_Skip_over_a_client_projection_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_Take_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Take(2).ToListAsync());
+
+    /// <summary>
+    ///     A terminal operator after paging above a projection this client reassembles, which is
+    ///     the shape of <c>Multi_level_includes_are_applied_with_skip</c>.
+    /// </summary>
+    /// <remarks>
+    ///     The <c>Skip</c> between the two used to hide the projection from the rule that sends
+    ///     <c>First</c>'s row limit with the shipped query, so neither the offset nor the limit
+    ///     reached the server.
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_First_after_Skip_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).FirstAsync());
+
+    /// <summary>
+    ///     Both paging operators between the terminal operator and the projection move, in the
+    ///     order they were written.
+    /// </summary>
+    [ConditionalFact]
+    public Task A_First_after_Skip_and_Take_over_a_client_projection_matches_the_direct_query()
+        => AssertSameStatementFor(
+            static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).Take(2).FirstAsync());
+
+    /// <summary>
+    ///     A split query keeps splitting when the row limit goes onto the shipped query.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The server puts the caller's <c>AsSplitQuery</c> back on the shipped query, and EF
+    ///         refuses the hint on a tuple, which is what a rebuilt projection ships. It looked one
+    ///         level down for an entity, and the limit put a <c>Take</c> in the way: the store ran
+    ///         one joined statement where EF's own client runs one per collection. The rows were
+    ///         bounded either way, so only the statements show it.
+    ///     </para>
+    ///     <para>
+    ///         Found beside the paging fix, whose <c>Skip</c> added a second level:
+    ///         <c>NorthwindSplitInclude.Multi_level_includes_are_applied_with_skip</c> went from
+    ///         three unbounded statements to one bounded one.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_split_First_over_a_client_projection_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            static async context => _ = await context.Set<Blog>().AsSplitQuery().OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Posts = b.Posts.ToList() }).FirstAsync());
+
+        Assert.Null(run.WireError);
+        Assert.Equal(run.Directly, run.OverTheWire);
+    }
+
+    /// <inheritdoc cref="A_split_First_over_a_client_projection_matches_the_direct_query" />
+    [ConditionalFact]
+    public async Task A_split_First_after_Skip_over_a_client_projection_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            static async context => _ = await context.Set<Blog>().AsSplitQuery().OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Posts = b.Posts.ToList() }).Skip(1).FirstAsync());
+
+        Assert.Null(run.WireError);
+        Assert.Equal(run.Directly, run.OverTheWire);
+    }
+
+    /// <summary>
     ///     A projection that reads nothing from the row asks the store for no column, as plain
     ///     EF Core asks for none.
     /// </summary>

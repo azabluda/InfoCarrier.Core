@@ -315,6 +315,16 @@ public class ServerQueryExecutor(
     ///         still a queryable, the hint goes there instead, which is where the caller wrote it.
     ///     </para>
     ///     <para>
+    ///         <b>As far down the sources as it takes, since 2026-09-24.</b> This looked one level
+    ///         down and no further, and a rebuilt projection ships tuples, which the hint cannot
+    ///         name. <c>Select(b =&gt; new { b.Id, Posts = b.Posts.ToList() }).First()</c> reached
+    ///         the server as <c>Take(Select(…tuple…), 1)</c>: both levels were tuples, the hint was
+    ///         dropped, and the store ran one joined statement where EF's own client runs one per
+    ///         collection. A <c>Skip</c> moved under the limit added a third level. Position does
+    ///         not matter, as the first paragraph says, so the first source down the chain that
+    ///         names a class carries it.
+    ///     </para>
+    ///     <para>
     ///         <b>Only where the store is relational.</b> <c>AsSplitQuery</c> means nothing to a
     ///         non-relational provider, and this provider's whole point is that the server runs
     ///         whatever provider it references. A hint from a client whose backing store turned out
@@ -328,20 +338,25 @@ public class ServerQueryExecutor(
             return query;
         }
 
-        if (HintableElementType(query.Type) is { } elementType)
-        {
-            return Expression.Call(HintMethod(behavior.Value, elementType), query);
-        }
+        return Hinted(query, behavior.Value) ?? query;
 
-        if (query is MethodCallExpression { Arguments.Count: > 0 } call
-            && HintableElementType(call.Arguments[0].Type) is { } sourceElementType)
+        static Expression? Hinted(Expression node, QuerySplittingBehavior behavior)
         {
-            Expression[] arguments = [.. call.Arguments];
-            arguments[0] = Expression.Call(HintMethod(behavior.Value, sourceElementType), arguments[0]);
-            return call.Update(call.Object, arguments);
-        }
+            if (HintableElementType(node.Type) is { } elementType)
+            {
+                return Expression.Call(HintMethod(behavior, elementType), node);
+            }
 
-        return query;
+            if (node is MethodCallExpression { Arguments.Count: > 0 } call
+                && Hinted(call.Arguments[0], behavior) is { } source)
+            {
+                Expression[] arguments = [.. call.Arguments];
+                arguments[0] = source;
+                return call.Update(call.Object, arguments);
+            }
+
+            return null;
+        }
 
         // `GetElementType` is this class's own walker and is already counted by the trim ratchet;
         // a second one of the same shape would have added an IL2070 for nothing. It answers the

@@ -321,7 +321,7 @@ public sealed class QuerySplitter
         // which is row for row, so no filtering stands between the rows the limit bounds and the row
         // the operator returns. The operator still runs on the client over the rows that arrive, so
         // an empty result and a second row raise EF's own exceptions, with EF's own wording.
-        augmented = WithRowLimitForTerminalOperator(residualBody, parameters, augmented);
+        (residualBody, augmented) = WithRowLimitForTerminalOperator(residualBody, parameters, augmented);
 
         // Only here, never on the pass-through return above: a query the server runs whole has
         // nothing to report and must stay as cheap as it is.
@@ -433,7 +433,25 @@ public sealed class QuerySplitter
     ///     Bounds the shipped rows when the whole query is a terminal operator over client-side
     ///     projections of one shipped subtree, as EF's own client bounds them.
     /// </summary>
-    private static IReadOnlyList<Expression> WithRowLimitForTerminalOperator(
+    /// <remarks>
+    ///     <para>
+    ///         <b>Paging between the operator and the projections moves to the server too, since
+    ///         2026-09-24.</b> <c>Select(c =&gt; new { … }).Skip(1).First()</c> leaves the rebuild
+    ///         below the <c>Skip</c>, because the projection is not the query's root, and the walk
+    ///         down stopped at the <c>Skip</c>: the server sent every row, and neither the offset
+    ///         nor the limit reached it. <c>Multi_level_includes_are_applied_with_skip</c> read
+    ///         every order of every customer whose key starts with "A" that way. Found by running
+    ///         Tier B again with InfoCarrier removed and comparing each test method's reads.
+    ///     </para>
+    ///     <para>
+    ///         Sound for the reason the limit is: the projections are row for row and keep the
+    ///         order, so <c>Select(f).Skip(n)</c> and <c>Skip(n).Select(f)</c> are the same rows.
+    ///         Each <c>Skip</c> and <c>Take</c> goes onto the shipped query in the order it was
+    ///         written and leaves the client's remainder, and only one whose count reads nothing
+    ///         of the rows can go.
+    ///     </para>
+    /// </remarks>
+    private static (Expression Residual, IReadOnlyList<Expression> Augmented) WithRowLimitForTerminalOperator(
         Expression residual,
         IReadOnlyList<ParameterExpression> parameters,
         IReadOnlyList<Expression> augmented)
@@ -442,18 +460,32 @@ public sealed class QuerySplitter
             || declaring != typeof(Queryable)
             || !RowsForTerminalOperator.TryGetValue(terminal.Method.Name, out int rows))
         {
-            return augmented;
+            return (residual, augmented);
         }
 
-        // Down through the client's own projections, which are all it may run.
+        // Down through the client's own projections, which are all it may run, and the paging
+        // written among them, outermost first.
+        var paging = new List<MethodCallExpression>();
         Expression source = terminal.Arguments[0];
-        while (source is MethodCallExpression
-               {
-                   Method: { DeclaringType: var selectDeclaring, Name: nameof(Queryable.Select) }, Arguments.Count: 2,
-               } projection
-               && selectDeclaring == typeof(Queryable))
+        while (source is MethodCallExpression { Method.DeclaringType: var operatorDeclaring } call
+               && operatorDeclaring == typeof(Queryable)
+               && call.Arguments.Count == 2)
         {
-            source = projection.Arguments[0];
+            if (call.Method.Name == nameof(Queryable.Select))
+            {
+                source = call.Arguments[0];
+            }
+            else if (call.Method.Name is nameof(Queryable.Skip) or nameof(Queryable.Take)
+                     && call.Arguments[1].Type == typeof(int)
+                     && !ParameterFinder.Contains(call.Arguments[1]))
+            {
+                paging.Add(call);
+                source = call.Arguments[0];
+            }
+            else
+            {
+                break;
+            }
         }
 
         // The residual reads each shipped subtree through the parameter of the same position, and
@@ -462,16 +494,59 @@ public sealed class QuerySplitter
         {
             if (ReferenceEquals(parameters[i], source) && typeof(IQueryable).IsAssignableFrom(augmented[i].Type))
             {
+                Type element = ElementTypeOf(augmented[i].Type);
+                Expression shipped = augmented[i];
+                for (int j = paging.Count - 1; j >= 0; j--)
+                {
+                    shipped = Expression.Call(
+                        paging[j].Method.GetGenericMethodDefinition().MakeGenericMethod(element),
+                        shipped,
+                        paging[j].Arguments[1]);
+                }
+
                 var limited = new List<Expression>(augmented);
                 limited[i] = Expression.Call(
-                    TakeMethod.MakeGenericMethod(ElementTypeOf(augmented[i].Type)),
-                    augmented[i],
+                    TakeMethod.MakeGenericMethod(element),
+                    shipped,
                     Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), Expression.Constant(rows)));
-                return limited;
+
+                return (new UnpagingVisitor(paging).Visit(residual)!, limited);
             }
         }
 
-        return augmented;
+        return (residual, augmented);
+    }
+
+    /// <summary>
+    ///     Removes the paging calls that moved onto the shipped query, and keeps descending, so a
+    ///     <c>Skip</c> over a <c>Take</c> loses both.
+    /// </summary>
+    private sealed class UnpagingVisitor(IReadOnlyCollection<MethodCallExpression> paging) : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+            => paging.Contains(node) ? Visit(node.Arguments[0])! : base.VisitMethodCall(node);
+    }
+
+    /// <summary>
+    ///     Whether an expression reads any lambda or residual parameter, which a count moved onto the
+    ///     shipped query must not.
+    /// </summary>
+    private sealed class ParameterFinder : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Contains(Expression expression)
+        {
+            var finder = new ParameterFinder();
+            finder.Visit(expression);
+            return finder._found;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            _found = true;
+            return node;
+        }
     }
 
     private static ServerQuery ToServerQuery(Expression query)
