@@ -33,7 +33,7 @@ change that deserves attention. The slow mode that produces the files runs rarel
 | 4 | Which tiers? | B and C together from the start | B first, C later |
 | 5 | Is a merge step needed? | No: each run commits its own raw files | One run writes, a merge step combines |
 | 6 | Where do the files go? | Next to the test class's `.cs` file | A separate `Sql/` tree |
-| 7 | Where do the labels go? | A typed attribute on the test method, in a pass-through override where the test is inherited | One central file; an attribute on the class |
+| 7 | How is a difference labelled? | The existing InfoCarrier reasons on the test method, with a new `DeviationKind.SqlDiffers` flag, in a pass-through override where the test is inherited | A central file; a new attribute type on the class or the method |
 | 8 | Row counts? | Recorded, never asserted, to be tried | Not recorded |
 | 9 | Parallel slow-mode runs? | No: two ordinary runs, one after the other | Both runs at once from two output folders |
 | 10 | The README badge? | One figure: a case counts only when its answer and its SQL both match plain EF | Two figures; a half weight for an SQL difference |
@@ -225,70 +225,53 @@ the other, over Tiers B and C. They do not depend on each other, and either can 
 
 ## 9. Labels, and the compliance tests
 
-A difference between a test case's `.wire.sql` and `.direct.sql` entries is labelled by a typed
-attribute on the test method, the same system as the override reasons of `docs/test-policy.md`
-(decision 7):
+A difference between a test case's `.wire.sql` and `.direct.sql` entries is labelled with the
+override reasons that exist today, on the test method (decision 7). No new attribute type is needed,
+only one new `DeviationKind` flag:
 
 ```csharp
-[SqlDeviation(SqlLabel.OpenDefect, Reason = "the Distinct stays above the client-side rebuild")]
-public override Task Select_DTO_distinct_translated_to_server(bool async)
-    => base.Select_DTO_distinct_translated_to_server(async);
+[InfoCarrierDesign("docs/test-policy.md", "parameter-translation-mode",
+    Deviation = DeviationKind.SqlDiffers,
+    Justification = "ParameterTranslationMode.Constant has no client builder")]
+public override Task Check_inlined_constants_redacting(bool async)
+    => base.Check_inlined_constants_redacting(async);
 ```
 
-| label | meaning |
+| the difference is | expressed by |
 |---|---|
-| `SqlLabel.OpenDefect` | InfoCarrier runs something worse than plain EF, and a fix is owed |
-| `SqlLabel.AcceptedDeviation` | a difference that runs no dangerous SQL, with the reason it is accepted |
-| no attribute | **unread**: a difference nobody has decided on yet |
+| accepted, on purpose | `[InfoCarrierDesign(adr)]` or `(document, heading)`. The decision has to be written down first, and `OverrideAudit` checks that its heading exists, which is stricter than a free-text reason. |
+| a known defect that stays open | `[InfoCarrierDefect(issue)]`, the last resort, only with an issue the owner filed, as `docs/test-policy.md` already rules |
+| open: unread, or read and not yet fixed | no attribute. The owner's rule is to fix first, as #164 to #169 did, so no separate label for an open defect exists. |
 
-- **A test inherited from EF's base gets a pass-through override** to carry the attribute, because
-  an attribute needs the method declared in our class. A test already overridden for a behaviour
-  reason gets the attribute beside that reason. `OverrideAudit` counts `SqlDeviation` as a reason of
-  its own kind, so its rule "every override has a reason" holds with no exemption, and it lists every
-  SQL label with the overrides.
-- **`Case` narrows a label to some test cases**, as it does for the existing reasons:
-  `Case = "async: True"`.
-- **The compiler checks the method name**, and a pass-through override goes away when its difference
-  does.
-- **The capture never edits C#.** A new difference enters the repository unread, and not silently:
-  the `.sql` diff in its PR shows it, the audit lists it, and the badge turns yellow (§12). A
-  compliance setting can forbid unread differences once the first round is done.
+- **`DeviationKind.SqlDiffers`** says "the answer is upstream's; the server's SQL differs from plain
+  EF's". Like `AnswerNotRefusal` and `RefusedEarlier`, it is legal only on an InfoCarrier reason. It
+  is what lets the audit tell a reason about the SQL from a reason about the answer, and so detect a
+  stale one. `SqlNotAsserted` leaves the enum as classes are adopted (§11), so the enum keeps its
+  size.
+- **A test inherited from EF's base gets a pass-through override** to carry the reason, because an
+  attribute needs the method declared in our class. A test already overridden for a behaviour reason
+  gets a second reason beside it, with its own `Case` where the two need telling apart.
+- **`Case` narrows a reason to some test cases**, as it does today: `Case = "async: True"`.
+- **The compiler checks the method name**, and a pass-through override goes away with its
+  difference.
+- **The capture never edits C#.** A new difference enters the repository open, and not silently: the
+  `.sql` diff in its PR shows it, the audit lists it, and the badge turns yellow (§12). The cost of
+  having no label for "open" is that unread and "read, not yet fixed" look the same, and the audit
+  lists them as one group. A compliance setting can forbid open differences once the first round is
+  done.
 
 Two compliance tests run in every normal run:
 
-- **Every `SqlDeviation` names a real difference.** When a fix removes a difference, the test fails
-  until its attribute, and with it a pass-through override, is deleted, so the labels cannot go
-  stale.
+- **Every reason with `SqlDiffers` covers a real difference.** When a fix removes a difference, the
+  test fails until the reason, and with it a pass-through override, is deleted.
 - **Every entry names a method that exists on its class.** An entry left behind by a test that EF
   renamed or deleted fails it. It works like `InfoCarrierComplianceTest`.
 
 With `INFOCARRIER_OVERRIDE_REASONS` set, the first of them also writes every test case whose two
-entries differ, with its label or none, to `<assembly>.sql-differences.tsv` beside
+entries differ, with its reason or none, to `<assembly>.sql-differences.tsv` beside
 `override-reasons.tsv`. That list is the overview of every open gap with plain EF, as
 `test/known-failures.txt` once listed every failing test, and the badge reads it (§12). One C#
 reader of the `.sql` format serves the assertion, the compliance tests and the badge.
-
-## 12. The README badge
-
-The badge keeps one figure, and it now counts statements as well as answers (decision 10).
-`eng/spec-parity.py` scores each test case that ran through InfoCarrier:
-
-- **1** when no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason covers it **and**, in Tiers B
-  and C, its `.wire.sql` entry is exactly its `.direct.sql` entry;
-- **0** otherwise.
-
-The figure is the mean, rounded down as today.
-
-- **The label does not change the score.** An open defect, an accepted deviation and an unread
-  difference all count 0. That is the rule `spec-parity.py` already states, "relabelling a defect as
-  a design lowers it just the same", so no relabel can raise the figure.
-- **The colour:** red when the suite fails; yellow while an `[InfoCarrierDefect]` override, an
-  `SqlLabel.OpenDefect` or an unread difference exists; green otherwise.
-- **Published only after the first round** (§13, step 6). Before it, the SQL half would cover only
-  the adopted classes, and the figure would read better than the truth.
-- **A rough estimate from the prototype:** about 400 differing cases of about 29,600 would take the
-  figure from 99.86% to about 98.5%. Normalization will remove some text differences, so the real
-  figure should be higher.
 
 ## 10. The plain-EF client
 
@@ -327,7 +310,7 @@ therefore plain EF plus the one correction that Firebird needs to parse the stat
 **`DeviationKind.SqlNotAsserted`** means "upstream also asserts the SQL here, and this override leaves
 it out". 65 overrides carry it. When a class is adopted, its `.wire.sql` file asserts the SQL of
 every test, so the flag goes from that class's overrides, and the enum member goes with the last
-class. **No override exists for SQL today**: there are 480 (measured 2026-09-26, 434 in Tier B), each
+class, leaving `SqlDiffers` (§9) in its place. **No override exists for SQL today**: there are 480 (measured 2026-09-26, 434 in Tier B), each
 for a behaviour reason. The labels of §9 add a pass-through override for each labelled test that is
 inherited, and each goes away with its difference.
 
@@ -342,6 +325,29 @@ inherited, and each goes away with its difference.
   words";
 - a sweep for every comment that argues against golden text, per `CLAUDE.md`'s rule for a reversal:
   correct the reason, quote what it said with the date.
+
+## 12. The README badge
+
+The badge keeps one figure, and it now counts statements as well as answers (decision 10).
+`eng/spec-parity.py` scores each test case that ran through InfoCarrier:
+
+- **1** when no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason covers it **and**, in Tiers B
+  and C, its `.wire.sql` entry is exactly its `.direct.sql` entry;
+- **0** otherwise.
+
+The figure is the mean, rounded down as today.
+
+- **Nothing new is needed for the reasons.** `spec-parity.py` already scores 0 for a case an
+  InfoCarrier reason covers, whether the reason is about the answer or carries `SqlDiffers`, and an
+  SQL difference scores 0 with or without a reason. So a label never changes the score: that is the
+  rule `spec-parity.py` already states, "relabelling a defect as a design lowers it just the same".
+- **The colour:** red when the suite fails; yellow while an `[InfoCarrierDefect]` exists, as today,
+  or while an SQL difference has no reason; green otherwise.
+- **Published only after the first round** (§13, step 6). Before it, the SQL half would cover only
+  the adopted classes, and the figure would read better than the truth.
+- **A rough estimate from the prototype:** about 400 differing cases of about 29,600 would take the
+  figure from 99.86% to about 98.5%. Normalization will remove some text differences, so the real
+  figure should be higher.
 
 ## 13. Order of work
 
