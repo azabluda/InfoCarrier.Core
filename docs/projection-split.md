@@ -204,7 +204,14 @@ reaches the server, which gives EF's own answer:
   construction that built it, so `Select(c => new { f = flag }).OrderBy(e => (bool?)e.f)` reaches
   the server and is refused there. The message names `@p.Item1` where EF names `@p.f`.
 - **`Distinct` over a rebuild.** `ProjectionRewriter.TryMoveDistinctBelowReassembly` moves it below
-  a rebuild that copies each slot into one member, onto the server's tuple.
+  a rebuild that constructs its result from the slots, each read once, onto the server's tuple.
+  Until 2026-09-25 this said "a rebuild that copies each slot into one member", which only an
+  anonymous type passed, so `Select(o => new OrderCountDTO(o.CustomerID)).Distinct()` kept its
+  `Distinct` on the client and the server sent every duplicate row. A constructor, one with an
+  initializer, a construction nested in another and one that reads no column now pass too, because
+  EF removes duplicates by the columns a construction reads and never calls the type's `Equals`.
+  Found by the second Tier B run with InfoCarrier removed: five `NorthwindMiscellaneous.Select_DTO_*`
+  methods, two of which read the whole `Orders` table for a projected collection.
 - **A `Select` over a rebuild.** `ProjectionRewriter.TryFuseSelectWithReassembly` fuses the two, so
   a projection over a client-typed projection reaches the server as EF writes it.
 

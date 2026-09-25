@@ -1073,6 +1073,116 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A <c>Distinct</c> over a result type the caller constructs runs plain EF Core's
+    ///     <c>SELECT DISTINCT</c>, and no duplicate row crosses the wire.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This client rebuilds the type from a tuple the server computes, and moved a
+    ///         <c>Distinct</c> above the rebuild onto the tuple only for an anonymous type. Over a
+    ///         constructor, one with an initializer, or a construction nested in an anonymous type,
+    ///         the <c>Distinct</c> ran here, and the server sent every row. EF removes duplicates by
+    ///         the columns a construction reads and never calls the type's <c>Equals</c>, which
+    ///         <see cref="TitleCard" /> leaves as reference equality to show.
+    ///     </para>
+    ///     <para>
+    ///         An initializer alone, <c>new TitleCard { Title = b.Title }</c>, already reached the
+    ///         server by another route: the re-carry of <c>TransparentIdentifierRewriter</c> turns it
+    ///         into a tuple before this rewrite runs. It cannot do that for a constructor, whose
+    ///         arguments name no member.
+    ///     </para>
+    ///     <para>
+    ///         Found by running Tier B a second time with InfoCarrier removed and comparing each
+    ///         test method's reads: <c>NorthwindMiscellaneous.Select_DTO_constructor_distinct_translated_to_server</c>
+    ///         and four siblings.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public Task A_Distinct_over_a_constructed_type_matches_the_direct_query()
+        => AssertSameStatementFor(
+            async blogs => _ = await blogs.Select(b => new TitleCard(b.Title)).Distinct().ToListAsync());
+
+    /// <inheritdoc cref="A_Distinct_over_a_constructed_type_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_Distinct_over_a_constructed_and_initialized_type_matches_the_direct_query()
+        => AssertSameStatementFor(
+            async blogs => _ = await blogs.Select(b => new TitleCard(b.Title) { Id = b.Id }).Distinct().ToListAsync());
+
+    /// <inheritdoc cref="A_Distinct_over_a_constructed_type_matches_the_direct_query" />
+    [ConditionalFact]
+    public Task A_Distinct_over_a_type_nested_in_an_anonymous_type_matches_the_direct_query()
+        => AssertSameStatementFor(
+            async blogs => _ = await blogs
+                .Select(b => new { Card = new TitleCard(b.Title), b.Id })
+                .Distinct()
+                .ToListAsync());
+
+    /// <summary>
+    ///     A <c>Distinct</c> over a constructed type that reads no column runs plain EF Core's
+    ///     <c>SELECT DISTINCT 1</c>.
+    /// </summary>
+    [ConditionalFact]
+    public Task A_Distinct_over_a_constructed_type_reading_no_column_matches_the_direct_query()
+        => AssertSameStatementFor(
+            async blogs => _ = await blogs.Select(b => new TitleCard()).Distinct().ToListAsync());
+
+    /// <summary>
+    ///     A projected collection over a <c>Distinct</c> of a constructed type runs plain EF Core's
+    ///     one statement, and does not read the table of its own.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>NorthwindMiscellaneous.Select_DTO_constructor_distinct_with_collection_projection_translated_to_server</c>
+    ///         read the whole <c>Orders</c> table in a statement of its own, where EF runs one
+    ///         <c>LEFT JOIN</c>: the <c>Distinct</c> stayed above the rebuild, so the <c>Select</c>
+    ///         above it could not be fused with the rebuild either.
+    ///     </para>
+    ///     <para>
+    ///         The distinct subquery's column is named <c>Item1</c> where EF names it <c>Title</c>,
+    ///         and is mapped before the comparison, as in
+    ///         <see cref="A_projection_over_a_client_typed_projection_matches_the_direct_query" />.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projected_collection_over_a_Distinct_of_a_constructed_type_matches_the_direct_query()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>()
+                .Select(b => new { Card = new TitleCard(b.Title), b.Title })
+                .Distinct()
+                .Select(x => new
+                {
+                    x.Card,
+                    Posts = context.Set<Post>().Where(p => p.Heading == x.Title).Select(p => new { p.Id }).ToList(),
+                })
+                .ToListAsync());
+
+        Assert.Null(run.DirectError);
+        Assert.Null(run.WireError);
+        Assert.Equal(
+            Assert.Single(run.Directly),
+            Assert.Single(run.OverTheWire).Replace("\"Item1\"", "\"Title\"", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     A result type the caller constructs, which the server cannot name. Its equality is
+    ///     reference equality, because plain EF Core never calls it: EF removes duplicates by the
+    ///     columns a construction reads.
+    /// </summary>
+    private sealed class TitleCard(string? title)
+    {
+        public TitleCard()
+            : this(null)
+        {
+        }
+
+        public string? Title { get; set; } = title;
+
+        public int Id { get; set; }
+    }
+
+    /// <summary>
     ///     A projection over the elements of a list stored in one column fails where plain EF Core
     ///     fails, and runs no statement, once the application registers the element type.
     /// </summary>
