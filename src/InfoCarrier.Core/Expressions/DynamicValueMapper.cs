@@ -437,7 +437,19 @@ public class DynamicValueMapper(
                 items.Add(ToDynamicValue(item, item?.GetType() ?? elementType, declared, complexType));
             }
 
-            return new DynamicValueNode { Id = id, Type = typeNode, Items = items };
+            // `Nameable`, since 2026-09-24, so that a collection is named as the constant holding it
+            // is named. LINQ's sort result is internal, and `Nameable` reports the
+            // `IOrderedEnumerable<T>` it implements: `ExpressionToNodeTranslator.VisitConstant`
+            // named the constant that way and this line still named the value by its runtime
+            // type, which the server's allowlist refused. A public collection type is named as
+            // before. A non-public one was sent under a name the server could never resolve, and
+            // now goes under its nearest public base or, for LINQ's sort, that interface.
+            return new DynamicValueNode
+            {
+                Id = id,
+                Type = _typeMapper.ToTypeNode(TypeNodeMapper.Nameable(type)),
+                Items = items,
+            };
         }
 
         // Object shape: public readable properties *and* public fields (records/anonymous/DTOs

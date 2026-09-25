@@ -1315,9 +1315,14 @@ public sealed class QuerySplitter
             if (node.Value is not System.Collections.IEnumerable sequence
                 || node.Value.GetType() is not { IsArray: false } runtime
                 // Unspeakable, so the caller cannot have named it and no round trip can preserve
-                // it. `OrderedEnumerable<T>` is not on the allowlist either and is *not* this:
-                // rewriting one to an array cost `Contains_with_local_ordered_enumerable_inline`,
-                // which is about the ordering that array would have thrown away.
+                // it. LINQ's sort result is not on the allowlist either and is *not* this:
+                // rewriting one to an array cost `Contains_with_local_ordered_enumerable_inline`.
+                // This said the test "is about the ordering that array would have thrown away"
+                // until 2026-09-24, and the order is not what broke: an array made from a sorted
+                // sequence keeps its order. EF wraps the constant in a conversion to
+                // `IOrderedEnumerable<T>`, and the server failed to evaluate that cast on an array.
+                // `TypeNodeMapper.Nameable` names the value by that interface instead, and the
+                // far side rebuilds one.
                 || !runtime.Name.StartsWith('<')
                 || allowlist.IsAllowed(runtime)
                 || ServerBoundaryAnalyzer.SequenceElementType(runtime) is not { } element

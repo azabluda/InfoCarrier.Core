@@ -44,10 +44,12 @@ public class TypeNodeMapper(IModel? model = null)
     ///         and a second unrelated rewrite upstream fought it (C23, `c23-widening-reverted`).
     ///     </para>
     ///     <para>
-    ///         So the two call sites are exact: the <em>constant</em> branch of
-    ///         <c>WireTypeCollector</c>, and the value-mapper branch of
-    ///         <c>DynamicValueMapper.MapToNode</c> — which every entity, proxy, primitive and
-    ///         <see cref="Type" /> value has already returned before.
+    ///         So the call sites are exact: the <em>constant</em> branch of
+    ///         <c>WireTypeCollector</c> and of <c>ExpressionToNodeTranslator</c>, which must agree,
+    ///         and the value-mapper and collection branches of <c>DynamicValueMapper.MapToNode</c>
+    ///         — which every entity, proxy, primitive and <see cref="Type" /> value has already
+    ///         returned before. This named "the two call sites" until 2026-09-24, when the
+    ///         collection branch joined them for LINQ's sort result; see the interface clause below.
     ///     </para>
     /// </remarks>
     public static Type Nameable(Type type)
@@ -64,6 +66,33 @@ public class TypeNodeMapper(IModel? model = null)
             if (super.IsVisible)
             {
                 return super;
+            }
+        }
+
+        // No public base, but a public INTERFACE the far side can rebuild, since 2026-09-24. LINQ's
+        // sort returns an internal `OrderedEnumerable<TElement, TKey>` whose bases are all
+        // internal, so `new List<string> { … }.Order()` written inline reached the boundary as a
+        // constant of a type nothing could name: the `Where` reading it stayed on the client, and
+        // the server sent the whole table where EF's own client sends `IN ('ABCDE', 'ALFKI')`.
+        // An array does not help, because EF wraps the constant in a conversion to
+        // `IOrderedEnumerable<T>` and the server then evaluates that cast. The interface is what
+        // the caller's code declared, and `DynamicValueMapper.ConstructCollection` rebuilds it.
+        //
+        // Only this interface, and not a general "nearest public interface": an anonymous type has
+        // none, which keeps C9's case out, and every other internal iterator is left as it was.
+        //
+        // Found by the type's own generic arguments and not by `GetInterfaces`, which the trimmer
+        // cannot prove and which cost one IL2070: LINQ's ordered iterators all take the element
+        // type as a generic argument, and `IsAssignableFrom` needs no annotation.
+        if (type.IsGenericType)
+        {
+            foreach (Type argument in type.GetGenericArguments())
+            {
+                Type ordered = typeof(IOrderedEnumerable<>).MakeGenericType(argument);
+                if (ordered.IsAssignableFrom(type))
+                {
+                    return ordered;
+                }
             }
         }
 
