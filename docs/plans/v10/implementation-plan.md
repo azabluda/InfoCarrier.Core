@@ -7003,3 +7003,386 @@ chosen; it does not mean this comes before Y.
       moment to sweep the prose that argued for it: the disposal premise above, and "the cost is
       bounded by CONCURRENCY rather than by tier size", which serializing the starts ended. Growth
       now costs about 600 ms per class in wall clock; memory is still bounded by concurrency.
+
+## Phase H — every test's server SQL, beside plain EF Core's (#167)
+
+**Not a milestone.** The spec is [`docs/sql-capture.md`](../../sql-capture.md), agreed with the owner on
+2026-09-26. This phase implements it in the spec's order of work (§13). Read the spec first: this
+plan argues from it and does not repeat its reasons.
+
+The letter is H because D, H, O and P are the letters with no `Step` commits in the history. D names
+Tier D and O reads as zero.
+
+**Goal.** Capture the server SQL of every Tier B and Tier C test into committed files, one pair per
+test class, beside plain EF Core's statements for the same test. Then assert the captured statements
+in every normal run.
+
+**Architecture.** A test-framework wrapper puts the running test in an async-local, and the server's
+command interceptor reads it, so each statement is filed under its test in a parallel run. One
+variable, `INFOCARRIER_SQL_CAPTURE`, selects a slow mode that writes `<Class>.wire.sql` (InfoCarrier)
+or `<Class>.direct.sql` (plain EF Core on the server's options). A normal run compares each test's
+statements with its `.wire.sql` entry in a `BeforeAfterTestAttribute.After` hook. Two compliance
+tests keep the labels and the files honest, and `eng/spec-parity.py` counts an SQL difference in the
+one badge figure.
+
+**Tech stack.** xUnit 2.9.3 extensibility (`XunitTestFramework`, `IXunitTestCase`, `IMessageBus`,
+`BeforeAfterTestAttribute`), EF Core 10 `DbCommandInterceptor`, bash and Python under `eng/`.
+
+### Global constraints
+
+- xUnit stays v2. `Microsoft.EntityFrameworkCore.Specification.Tests` 10.0.1 depends on
+  `xunit.core` 2.9.3.
+- The new harness types live in `test/InfoCarrier.Core.TestUtilities`, at the 10.0.1 floor, with no
+  `VersionOverride`, and name no store.
+- Only Tiers B and C get files. Tier A runs no SQL, and Tier D is a project of its own.
+- One variable, `INFOCARRIER_SQL_CAPTURE`, with the values `direct` and `wire`. Unset means a normal
+  run, which asserts.
+- Never recorded: parameter values, the rows themselves, and a statement with no current test.
+- Row counts are recorded and never asserted (decision 8).
+- The capture never edits C#.
+- No step changes `src/`, so the gates are `CI=true dotnet build InfoCarrier.Core.slnx
+  --configuration Release`, with the changed test projects shown rebuilding, and `eng/measure.sh`.
+  A step that finds it must touch `src/` stops and says so.
+- One substep per commit, prefixed `Step H<n>:`, with its checkbox ticked in the same commit.
+- Results are reported as `Passed: N, Failed: M, Total: T`, read out of the run's own summary.
+- Symbol questions about `.cs` files go to `roslyn-codelens`, never to a text search.
+
+### Review focus
+
+The five inputs the spec implies and no task would otherwise test, most likely first. Each has its
+test in the task named.
+
+1. **Two test cases of one class that xUnit prints alike**, for example rows of a theory that xUnit
+   cannot serialize, with equal `ToString()`. Expected: separate entries `#2`, `#3`, stable from run
+   to run. Test in H1d.
+2. **A statement that a test class runs in `Dispose` or `DisposeAsync`**, after `After`. Expected:
+   absent from both files alike, and never an error. Test in H1a.
+3. **A capture with `--filter` that runs part of a class.** Expected: the entries of the tests that
+   did not run stay byte-for-byte. Test in H1c.
+4. **A string literal or a `TagWith` comment that contains `AS "x"`, `@name` or a double quote.**
+   Expected: the normalizer leaves it unchanged. Test in H1b.
+5. **A display name that contains a line break or `--`**, from a theory argument. Expected: its
+   header stays one line, and the file reads back to the same name. Test in H1c.
+
+### Pull requests
+
+Each is its own pull request against `main`, "Part of #167", and the last one closes the issue.
+
+| PR | Steps | What a normal run asserts after it |
+|---|---|---|
+| 1 | the spec, this plan, H0, H1 | nothing new: no class has a file |
+| 2 | H2 | nothing new |
+| 3 | H3 | `NorthwindWhereQuerySqliteInfoCarrierTest` |
+| 4 | H4 | the same |
+| 5 | H5 | every class of Tiers B and C |
+| 6 | H6 | the same, and the badge counts it. `Closes #167` |
+
+**H0 and H1 are written out in full. H2 to H6 name their files, interfaces and tests, and each one is
+written out when the step before it closes**, which is this file's rule for rolling detail: H0 can
+change what H1 builds on.
+
+---
+
+- [ ] **H0. Spike: the running test reaches the server's interceptor in a parallel run.** Nothing
+      of H1 starts before this passes (spec §4.1, §14).
+
+      **Files.** Create `test/InfoCarrier.Core.TestUtilities/CurrentTest.cs` (the async-local and
+      the test framework). Create `test/InfoCarrier.Core.FunctionalTests/CurrentTestAssemblyInfo.cs`
+      (the assembly attribute). Create `test/InfoCarrier.Core.FunctionalTests/Sqlite/CurrentTestTest.cs`
+      (the pins). The probe is temporary and never committed.
+
+      **Produces.**
+
+      ```csharp
+      public sealed class CurrentTest
+      {
+          public static CurrentTest? Value { get; }  // null outside a test: a fixture's seeding, a class fixture's constructor
+          public string DisplayName { get; }         // ITest.DisplayName: "Ns.Class.Method(async: True)"
+          public Type TestClass { get; }             // the class xUnit runs, not the base that declares the method
+          public string MethodName { get; }
+      }
+
+      // [assembly: TestFramework("InfoCarrier.Core.FunctionalTests.TestUtilities.CurrentTestFramework",
+      //                          "InfoCarrier.Core.TestUtilities")]
+      public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFramework(messageSink);
+      ```
+
+      **The mechanism, and why it is the message bus.** The executor wraps each test case, and each
+      wrapper wraps the `IMessageBus` it is handed:
+
+      ```csharp
+      // CurrentTestFramework.CreateExecutor returns an executor that overrides:
+      protected override void RunTestCases(
+          IEnumerable<IXunitTestCase> testCases, IMessageSink executionMessageSink, ITestFrameworkExecutionOptions executionOptions)
+          => base.RunTestCases(testCases.Select(t => (IXunitTestCase)new CurrentTestCase(t)), executionMessageSink, executionOptions);
+
+      // CurrentTestCase delegates every member of IXunitTestCase, and RunAsync wraps the bus:
+      public Task<RunSummary> RunAsync(IMessageSink d, IMessageBus bus, object[] args, ExceptionAggregator a, CancellationTokenSource c)
+          => inner.RunAsync(d, new CurrentTestMessageBus(bus), args, a, c);
+
+      // CurrentTestMessageBus.QueueMessage:
+      if (message is ITestStarting starting)
+      {
+          CurrentTest.Set(new CurrentTest(starting.Test));
+      }
+      return inner.QueueMessage(message);
+      ```
+
+      `TestRunner<T>.RunAsync` queues `TestStarting` synchronously, and then awaits the test class's
+      constructor, `Before`, the method, `After` and the disposal in the same async flow. So a value
+      set inside `QueueMessage` holds for exactly one `ITest`, and the runner's own async method
+      restores the old value when it returns. **Each row of a theory that xUnit cannot serialize is
+      its own `ITest` with its own display name**, so the spec's `[row n]` counter may be
+      unnecessary. This step measures that.
+
+      - [ ] **H0.1 Write the pins, and see them fail to compile.** `CurrentTestTest`, in the
+            Sqlite namespace because one pin needs a server:
+            - `A_fact_sees_its_own_display_name`: `CurrentTest.Value?.DisplayName` equals
+              `$"{typeof(CurrentTestTest).FullName}.{nameof(A_fact_sees_its_own_display_name)}"`.
+            - `A_serializable_row_sees_its_arguments(int row)`, rows 1 and 2: the display name ends
+              with `(row: {row})`.
+            - `A_row_xunit_cannot_serialize_sees_its_own_arguments(Opaque value)`, two rows of a
+              class that xUnit cannot serialize, with `ToString()` "opaque 1" and "opaque 2": the
+              display name ends with `(value: {value})`.
+            - `A_class_fixture_is_built_outside_any_test`: the class fixture's constructor stored
+              `CurrentTest.Value`, and it is null.
+            - `A_statement_the_server_runs_carries_the_display_name`: a query over the wire runs
+              one statement, and an interceptor that the fixture's `OnAddOptions` adds to the server
+              recorded `CurrentTest.Value?.DisplayName` for it, equal to the test's own.
+      - [ ] **H0.2 Implement.** `CurrentTest.cs` and the assembly attribute. Run
+            `dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~CurrentTestTest"`.
+            Expected: every pin passes.
+      - [ ] **H0.3 The baseline for the test explorer.** Before the probe, with the assembly
+            attribute commented out, run Tiers B and C in parallel with `--logger trx` into
+            `artifacts/sql-capture/h0-baseline/`. The filter is
+            `FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite|FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird`.
+      - [ ] **H0.4 The probe (temporary).** With `INFOCARRIER_CURRENT_TEST_PROBE` naming a
+            directory, the bus wrapper writes a line for each `ITestStarting` and `ITestFinished`:
+            the class, the test's display name, the test case's display name, and the test case's
+            type. `ServerSqlRecordingInterceptor` writes a line for each statement: the async-local
+            display name, the display name of the test that a process-wide marker says is running
+            (set at start, cleared at finish), a number for the store, and the command text.
+      - [ ] **H0.5 The serial run.** Tiers B and C, with the probe, and
+            `-- xUnit.ParallelizeTestCollections=false`. **Check: for every statement, the
+            async-local name equals the marker's name**, both empty between a finish and the next
+            start. Expected: no statement where they differ.
+      - [ ] **H0.6 The parallel run.** Tiers B and C, with the probe, default settings, and
+            `--logger trx` into `artifacts/sql-capture/h0-parallel/`. **Check: for each display
+            name, the sequence of statements equals the serial run's.** Check also that the TRX
+            holds the same test names with the same outcomes as the H0.3 baseline. Expected: no
+            difference.
+      - [ ] **H0.7 Count the theories whose rows run inside one test case**, from the probe's
+            start lines: test cases with more than one `ITest`, and how many of their rows share a
+            display name within their class.
+      - [ ] **H0.8 Record and commit.** Remove the probe. Write the figures under this step, and
+            amend spec §4.1 and §14 with the finding, dated. Gates: the Release build, then
+            `eng/measure.sh h0 to-query-string`. Commit `Step H0: …`.
+
+- [ ] **H1. Capture: the tagged recorder, the normalizer, the file, the assertion hook, and the
+      compliance tests.** No class is adopted, so a normal run asserts nothing new.
+
+      - [ ] **H1a. Each statement is filed under its test, with its outcome.**
+            **Files.** Modify `CurrentTest.cs` and `ServerSqlRecorder.cs`. Test in
+            `test/InfoCarrier.Core.FunctionalTests/Sqlite/SqlCaptureTest.cs`.
+            **Produces.**
+
+            ```csharp
+            public sealed class CapturedCommand
+            {
+                public string Text { get; }              // the raw command text; normalized when written or compared
+                public CapturedCommandKind Kind { get; } // Reader, NonQuery, Scalar
+                public int? Count { get; }               // Reader: EF's ReadCount. NonQuery: rows affected. Scalar: null
+                public bool Failed { get; }
+            }
+            public IReadOnlyList<CapturedCommand> CurrentTest.Commands { get; }
+            public void CurrentTest.Close();             // After calls it; a later statement is not recorded
+            ```
+
+            `ServerSqlRecordingInterceptor` appends to `CurrentTest.Value` beside its existing
+            `recorder.Add`, which stays for `ServerSqlTest`. **The count of a reader is EF's own**:
+            `DataReaderDisposingEventData.ReadCount`, matched to the command by `CommandId`. EF
+            counts every `Read()` call, including the last one that returns false, so the file
+            calls it `reads` and not `rows`. No wrapping `DbDataReader` is needed, and so no
+            provider can meet a reader of the wrong type. `CommandFailed` marks the command
+            failed. The same commit amends spec §4.2 and §5 from `rows` to `reads`, dated.
+            **Tests.** Through the wire, on a store of this class's own fixture:
+            - a query that returns three rows gives one `Reader` command, `Count` 4, not failed;
+            - `First()` gives `Count` 1;
+            - a `SaveChanges` that violates a unique index gives a failed command;
+            - after `CurrentTest.Value!.Close()`, a query adds no command (review focus 2);
+            - no command is recorded while the class fixture seeds.
+      - [ ] **H1b. The normalizer.**
+            **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlNormalizer.cs`. Test in
+            `test/InfoCarrier.Core.FunctionalTests/SqlNormalizerTest.cs`, which runs no store.
+            **Produces.** `public static string SqlNormalizer.Normalize(string commandText)`.
+            **The rules**, which refine spec §4.3 for one fact found while writing this plan:
+            1. Tokens: a quoted identifier `"…"` with `""` inside, a string literal `'…'` with `''`
+               inside, a line comment `--…`, a parameter `@name`, words, punctuation, whitespace.
+               Literals and comments pass through unchanged.
+            2. Each distinct parameter name becomes `@p0`, `@p1`, … in order of first appearance.
+            3. A **table alias** is a quoted identifier after `AS` where the clause at that
+               parenthesis depth is `FROM`, `JOIN`, `APPLY` or `UPDATE`. Each becomes `"t0"`,
+               `"t1"`, … in order of first appearance, as alias or as qualifier (`"c".`).
+            4. A **column alias**, after `AS` where the clause at that depth is `SELECT` or
+               `RETURNING`, is removed. **EF omits `AS` when the alias equals the column's own
+               name**, so InfoCarrier's `"c"."Id" AS "Item1"` is plain EF's `"c"."Id"`, and
+               positional names cannot pair an alias with no alias.
+            5. A column read through a **derived table** (`"s"."Title"`, where `"s"` aliases a
+               subquery or a function call such as `json_each`) is renamed per alias, `"c0"`,
+               `"c1"`, … in order of first appearance. A column of a base table keeps its name.
+            6. Line breaks stay. Trailing whitespace goes, CRLF becomes LF, and an empty line goes
+               (the file format uses an empty line to end an entry).
+            The same commit amends spec §4.3 with rules 4 and 5, dated.
+            **Tests**, each one input and the expected output:
+            - `@city` and `@Value` in the same position both give `@p0`; a repeated name keeps its
+              number;
+            - `FROM "Customers" AS "c" WHERE "c"."City" = @city` gives
+              `FROM "Customers" AS "t0" WHERE "t0"."City" = @p0`;
+            - `"c"."Id" AS "Item1"` and `"c"."Id"` give the same text;
+            - a subquery `SELECT "c"."Name" AS "Title" … ) AS "s"` read as `"s"."Title"`, and the
+              same with `Item1`, give the same text;
+            - `"c"."City"` against `"c"."Region"` still differ, and so do `= 'London'` against
+              `= @city`;
+            - `'a "x" AS "y" @z'` and `-- AS "q" @w` are unchanged (review focus 4);
+            - `(SELECT COUNT(*) FROM "Orders" AS "o") AS "n"` in a select list: the alias `"n"`
+              goes, and `"o"` becomes a table alias;
+            - `CAST("c"."X" AS TEXT)` is unchanged;
+            - `UPDATE "Customers" AS "c" SET …` and `LEFT JOIN LATERAL (…) AS "s" ON TRUE`
+              rename their aliases;
+            - a batch `INSERT …; SELECT …` numbers its parameters across the whole command.
+      - [ ] **H1c. The file: one reader and one writer.**
+            **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCaptureFile.cs`. Test in
+            `test/InfoCarrier.Core.FunctionalTests/SqlCaptureFileTest.cs`.
+            **Produces.**
+
+            ```csharp
+            public sealed record SqlCaptureCase(string Name, int Ordinal); // Name without "Ns.Class."; Ordinal 1 unless two cases print alike
+            public sealed record SqlCaptureCommand(string Text, string Outcome); // Outcome: "reads 4", "rows 1", "scalar" or "failed"
+            public sealed class SqlCaptureFile
+            {
+                public static SqlCaptureFile Read(string path);   // a missing file reads as empty
+                public IEnumerable<SqlCaptureCase> Cases { get; }
+                public IReadOnlyList<SqlCaptureCommand>? Find(SqlCaptureCase testCase);
+                public bool DirectRunFailed(SqlCaptureCase testCase);
+                public void Set(SqlCaptureCase testCase, IReadOnlyList<SqlCaptureCommand> commands, bool directRunFailed);
+                public void Write(string path);                   // UTF-8 without BOM, LF
+            }
+            ```
+
+            **The format** is spec §5, made exact: an entry is its header lines, `-- <name>` or
+            `-- <name> #2`, then `-- direct run failed` if it applies, then for each command
+            `-- #n <outcome>` and its text. Entries end with an empty line. A header escapes `\`,
+            CR and LF as `\\`, `\r` and `\n`. A `TagWith` comment inside a command cannot pass
+            for a header, because headers come only before `-- #1`.
+            **Tests:**
+            - a round trip: `Read` of `Write` gives the same cases and commands;
+            - two cases with the same commands share one entry, and sorting is ordinal by the
+              first name;
+            - `Set` on one case leaves every other entry byte-for-byte (review focus 3);
+            - a changed case leaves its old group, and the group splits;
+            - a case with no commands is written as headers alone, which differs from a missing
+              case;
+            - a name with `\n` and `--` stays one header line and reads back (review focus 5).
+      - [ ] **H1d. The capture and the assertion.**
+            **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCapture.cs` and its
+            `SqlCaptureAttribute : BeforeAfterTestAttribute`. Create
+            `test/InfoCarrier.Core.FunctionalTests/SqlCaptureAssemblyInfo.cs`:
+            `[assembly: SqlCapture("InfoCarrier.Core.FunctionalTests.Sqlite", "InfoCarrier.Core.FunctionalTests.Firebird")]`.
+            Modify `CurrentTest.cs`: the executor counts the test cases of each class, and a
+            wrapper reports the class's end when its last case returns.
+            **Produces.**
+
+            ```csharp
+            public enum SqlCaptureMode { Assert, Wire, Direct } // from INFOCARRIER_SQL_CAPTURE; any other value throws
+            public static class SqlCapture
+            {
+                public static SqlCaptureMode Mode { get; }
+                public static string? FileFor(Type testClass, SqlCaptureMode side); // null outside the captured namespaces
+                public static string? Compare(IReadOnlyList<SqlCaptureCommand>? expected, IReadOnlyList<CapturedCommand> actual, string testClassName);
+            }
+            ```
+
+            **The flow.** At `ITestStarting` the case gets its ordinal: the count of earlier cases
+            of the class with the same name, plus one. `After` closes the test's commands. In
+            `Assert` mode it then compares them with the class's `.wire.sql` entry, if the class
+            has that file: text and the failure mark, never counts. A missing entry or a
+            difference throws with the expected text, the actual text, and
+            `eng/sql-capture.sh --filter <Class>`. In `Wire` and `Direct` mode, `ITestFinished`
+            stores the entry in the class's in-memory file, with `-- direct run failed` when an
+            `ITestFailed` came first. The class's end writes the file, and process exit writes any
+            file left. The folder comes from the namespace below the project; a folder that does
+            not exist fails the test with the class and the namespace named.
+            **Tests:**
+            - `FileFor` gives `test/InfoCarrier.Core.FunctionalTests/Sqlite/Query/NorthwindWhereQuerySqliteInfoCarrierTest.wire.sql`
+              for that class, the outer class in the name for a nested one, and null for a Tier A
+              class;
+            - `Compare` gives null for equal text with different counts, and a message naming the
+              command for a changed statement, an extra one, a missing one, and a missing entry;
+            - two rows of one class that print alike get ordinals 1 and 2 (review focus 1).
+      - [ ] **H1e. `DeviationKind.SqlDiffers` and the two compliance tests.**
+            **Files.** Modify `OverrideReasonAttributes.cs`: `SqlDiffers = 1 << 8`, with spec §9's
+            meaning. Modify `OverrideAudit.cs`: `SqlDiffers` is legal only on an InfoCarrier
+            reason, as `AnswerNotRefusal` is. Create
+            `test/InfoCarrier.Core.FunctionalTests/SqlCaptureComplianceTest.cs`.
+            **Produces.** Two checks, each a function of the test assembly and a root folder that
+            returns its violations, so each can be tested on a folder the test builds:
+            - every InfoCarrier reason with `SqlDiffers` names a method whose class has both files,
+              and one of whose cases (narrowed by `Case`) differs between them;
+            - every entry of every `.wire.sql` and `.direct.sql` names a test method of its class,
+              inherited ones included.
+            **Tests.** Each check on a temporary folder: a file naming `NoSuchMethod` gives one
+            violation; a `SqlDiffers` reason on a class with no file gives one; a reason whose
+            case is the same on both sides gives one. Over the real repository, both give none.
+
+- [ ] **H2. The plain-EF client on `main`, for Tiers B and C** (spec §10).
+      **Files**, from the satellite commits `10b4873` and `d6c2ffa`: `DirectClient.cs`, whose
+      `IsEnabled` becomes `SqlCapture.Mode == SqlCaptureMode.Direct`;
+      `InfoCarrierBackendTestStore.AddServerContextOptions`, `AddDirectClientOptions` and
+      `DirectClientConnection`; `InfoCarrierTestStore`, `InfoCarrierTestStoreFactory`,
+      `InfoCarrierTier.AddDirectClientServices`, `RelationalInfoCarrierTestStore`,
+      `SqliteInfoCarrierBackendTestStore` with EF's two SQLite warning settings,
+      `SqliteInfoCarrierTier`; and `facade.UseTestTransaction(transaction)` in each
+      `UseTransaction` override. **New:** the same overrides on `FirebirdInfoCarrierBackendTestStore`
+      and its tier, so Tier C's reference is plain EF plus `FirebirdLateralQuerySqlGenerator`.
+      `INFOCARRIER_DIRECT_CLIENT` goes away.
+      **Tests.** `INFOCARRIER_SQL_CAPTURE=direct` over `NorthwindWhereQuerySqliteInfoCarrierTest`
+      and one Firebird class writes their `.direct.sql` files, which are read and not committed. A
+      normal `eng/measure.sh` is unchanged.
+
+- [ ] **H3. `eng/sql-capture.sh`, and `NorthwindWhereQuerySqliteInfoCarrierTest` from end to end.**
+      **Files.** Create `eng/sql-capture.sh [--filter X]`: a `direct` run, then a `wire` run, over
+      Tiers B and C, with TRX and console output in `artifacts/sql-capture/`. Failures of the
+      `direct` run are data; failures of the `wire` run fail the script. Modify
+      `InfoCarrier.Core.FunctionalTests.csproj`: a `DependentUpon` rule that nests `X.wire.sql` and
+      `X.direct.sql` under `X.cs`. Commit the class's two files. Remove `SqlNotAsserted` from that
+      class's overrides. Add the script's row to the `eng/` table in `CLAUDE.md`.
+      **Tests.** A normal run of the class passes. One edited statement in its `.wire.sql` fails
+      the test with the capture command in the message; this is shown once and not committed.
+
+- [ ] **H4. The deletions and the documents** (spec §11).
+      **Files.** Delete `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`,
+      `ServerSqlTestMarkerAttribute`, `ServerSqlLogAssemblyInfo.cs`, `ServerSqlLog`,
+      `ServerSqlLogInterceptor`, `ServerSqlLogTest`, and the `INFOCARRIER_SERVER_SQL` branch of
+      `InfoCarrierBackendTestStore.AddProviderOptions`. Amend `docs/test-policy.md` for decision 1,
+      dated. Update `CLAUDE.md`: the `eng/` table and the paragraph "The SQL the server runs is
+      asserted in our own words". Sweep `src/` and `test/` for the comments that argue against golden
+      text: correct the reason, and quote what it said with the date. Delete the satellite branch
+      `experiment/direct-baseline`.
+      **Tests.** `find_references` finds nothing left for each deleted type, and `eng/doc-links.py`
+      passes.
+
+- [ ] **H5. The first round: every class of Tiers B and C** (spec §13, step 5).
+      Run `eng/sql-capture.sh` with no filter and commit every file. Remove `SqlNotAsserted` from
+      each adopted override, and the enum member with the last one. A normal `eng/measure.sh` is
+      green. A test whose statements differ between two normal runs is a flaky test, and becomes the
+      top priority. The differences enter unlabelled. Each defect found goes to its own pull request,
+      with its own differential test in `ServerParameterizationTest`.
+
+- [ ] **H6. The badge** (spec §12).
+      **Files.** `SqlCaptureComplianceTest` writes `<assembly>.sql-differences.tsv` beside
+      `override-reasons.tsv` when `INFOCARRIER_OVERRIDE_REASONS` names a directory: class, case,
+      and the reason labels or none. `eng/spec-parity.py` joins it: a case scores 1 only when no
+      InfoCarrier reason covers it and it is not in the list. Yellow while an `[InfoCarrierDefect]`
+      exists or a difference has no reason. `eng/suite-summary.sh` passes the new file.
+      **Tests.** A three-case fixture of TRX and TSV files scores 1, 0 and 0: equal, differing with
+      a reason, and differing without one.
