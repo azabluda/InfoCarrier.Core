@@ -19,7 +19,7 @@ those methods.
 **Goal 2: delete what reading EF's `AssertSql` needed** (§11).
 
 **Then: the captured statements are asserted in every normal run.** After the first round of
-capture (§12, step 5), each test of Tiers B and C checks its server SQL against a committed file. A
+capture (§13, step 5), each test of Tiers B and C checks its server SQL against a committed file. A
 later change in `src/` that changes a captured shape fails a test: it is a defect, or at least a
 change that deserves attention. The slow mode that produces the files runs rarely (§3).
 
@@ -33,9 +33,10 @@ change that deserves attention. The slow mode that produces the files runs rarel
 | 4 | Which tiers? | B and C together from the start | B first, C later |
 | 5 | Is a merge step needed? | No: each run commits its own raw files | One run writes, a merge step combines |
 | 6 | Where do the files go? | Next to the test class's `.cs` file | A separate `Sql/` tree |
-| 7 | Where do the labels go? | One central file for the project | One file per class |
+| 7 | Where do the labels go? | A typed attribute on the test method, in a pass-through override where the test is inherited | One central file; an attribute on the class |
 | 8 | Row counts? | Recorded, never asserted, to be tried | Not recorded |
 | 9 | Parallel slow-mode runs? | No: two ordinary runs, one after the other | Both runs at once from two output folders |
+| 10 | The README badge? | One figure: a case counts only when its answer and its SQL both match plain EF | Two figures; a half weight for an SQL difference |
 
 **On decision 1, and what it amends.** `docs/test-policy.md` decided on 2026-09-16 that "the
 promises are ours" and that the comparison with EF's text is "an investigation rather than a gate",
@@ -163,7 +164,6 @@ Next to the test class's `.cs` file (decision 6):
 
 ```
 test/InfoCarrier.Core.FunctionalTests/
-├── Sql.differences.tsv                                   the labels (§9)
 ├── Sqlite/Query/
 │   ├── NorthwindWhereQuerySqliteInfoCarrierTest.cs
 │   ├── NorthwindWhereQuerySqliteInfoCarrierTest.wire.sql       asserted by normal runs
@@ -225,23 +225,70 @@ the other, over Tiers B and C. They do not depend on each other, and either can 
 
 ## 9. Labels, and the compliance tests
 
-`Sql.differences.tsv` lists only the test cases whose `.wire.sql` and `.direct.sql` entries differ,
-one line each: class, test case, label, reason.
+A difference between a test case's `.wire.sql` and `.direct.sql` entries is labelled by a typed
+attribute on the test method, the same system as the override reasons of `docs/test-policy.md`
+(decision 7):
+
+```csharp
+[SqlDeviation(SqlLabel.OpenDefect, Reason = "the Distinct stays above the client-side rebuild")]
+public override Task Select_DTO_distinct_translated_to_server(bool async)
+    => base.Select_DTO_distinct_translated_to_server(async);
+```
 
 | label | meaning |
 |---|---|
-| `open defect` | InfoCarrier runs something worse than plain EF, and a fix is owed |
-| `accepted deviation` | a difference that runs no dangerous SQL, with the reason it is accepted |
-| `unread` | the first round's backlog (§12, step 5): a difference nobody has read yet |
+| `SqlLabel.OpenDefect` | InfoCarrier runs something worse than plain EF, and a fix is owed |
+| `SqlLabel.AcceptedDeviation` | a difference that runs no dangerous SQL, with the reason it is accepted |
+| no attribute | **unread**: a difference nobody has decided on yet |
+
+- **A test inherited from EF's base gets a pass-through override** to carry the attribute, because
+  an attribute needs the method declared in our class. A test already overridden for a behaviour
+  reason gets the attribute beside that reason. `OverrideAudit` counts `SqlDeviation` as a reason of
+  its own kind, so its rule "every override has a reason" holds with no exemption, and it lists every
+  SQL label with the overrides.
+- **`Case` narrows a label to some test cases**, as it does for the existing reasons:
+  `Case = "async: True"`.
+- **The compiler checks the method name**, and a pass-through override goes away when its difference
+  does.
+- **The capture never edits C#.** A new difference enters the repository unread, and not silently:
+  the `.sql` diff in its PR shows it, the audit lists it, and the badge turns yellow (§12). A
+  compliance setting can forbid unread differences once the first round is done.
 
 Two compliance tests run in every normal run:
 
-- **Every difference has a label, and every label names a difference.** When a fix removes a
-  difference, the test fails until its label is deleted, so the list cannot go stale. It is the one
-  place that shows every open gap with plain EF at once, as `test/known-failures.txt` once showed
-  every failing test.
+- **Every `SqlDeviation` names a real difference.** When a fix removes a difference, the test fails
+  until its attribute, and with it a pass-through override, is deleted, so the labels cannot go
+  stale.
 - **Every entry names a method that exists on its class.** An entry left behind by a test that EF
   renamed or deleted fails it. It works like `InfoCarrierComplianceTest`.
+
+With `INFOCARRIER_OVERRIDE_REASONS` set, the first of them also writes every test case whose two
+entries differ, with its label or none, to `<assembly>.sql-differences.tsv` beside
+`override-reasons.tsv`. That list is the overview of every open gap with plain EF, as
+`test/known-failures.txt` once listed every failing test, and the badge reads it (§12). One C#
+reader of the `.sql` format serves the assertion, the compliance tests and the badge.
+
+## 12. The README badge
+
+The badge keeps one figure, and it now counts statements as well as answers (decision 10).
+`eng/spec-parity.py` scores each test case that ran through InfoCarrier:
+
+- **1** when no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason covers it **and**, in Tiers B
+  and C, its `.wire.sql` entry is exactly its `.direct.sql` entry;
+- **0** otherwise.
+
+The figure is the mean, rounded down as today.
+
+- **The label does not change the score.** An open defect, an accepted deviation and an unread
+  difference all count 0. That is the rule `spec-parity.py` already states, "relabelling a defect as
+  a design lowers it just the same", so no relabel can raise the figure.
+- **The colour:** red when the suite fails; yellow while an `[InfoCarrierDefect]` override, an
+  `SqlLabel.OpenDefect` or an unread difference exists; green otherwise.
+- **Published only after the first round** (§13, step 6). Before it, the SQL half would cover only
+  the adopted classes, and the figure would read better than the truth.
+- **A rough estimate from the prototype:** about 400 differing cases of about 29,600 would take the
+  figure from 99.86% to about 98.5%. Normalization will remove some text differences, so the real
+  figure should be higher.
 
 ## 10. The plain-EF client
 
@@ -280,8 +327,9 @@ therefore plain EF plus the one correction that Firebird needs to parse the stat
 **`DeviationKind.SqlNotAsserted`** means "upstream also asserts the SQL here, and this override leaves
 it out". 65 overrides carry it. When a class is adopted, its `.wire.sql` file asserts the SQL of
 every test, so the flag goes from that class's overrides, and the enum member goes with the last
-class. **No override is added or removed**: there are 480 today (measured 2026-09-26, 434 in Tier B),
-each for a behaviour reason, and none for SQL.
+class. **No override exists for SQL today**: there are 480 (measured 2026-09-26, 434 in Tier B), each
+for a behaviour reason. The labels of §9 add a pass-through override for each labelled test that is
+inherited, and each goes away with its difference.
 
 **Kept:** `ServerSqlTest` and `ServerParameterizationTest`, our named promises, and
 `ServerSqlRecorder`, through which the first asserts.
@@ -295,7 +343,7 @@ each for a behaviour reason, and none for SQL.
 - a sweep for every comment that argues against golden text, per `CLAUDE.md`'s rule for a reversal:
   correct the reason, quote what it said with the date.
 
-## 12. Order of work
+## 13. Order of work
 
 0. **Spike.** Prove that the current test reaches `ServerSqlRecordingInterceptor` in a parallel run,
    through the test-framework wrapper. Count the theories of Tiers B and C whose data xUnit cannot
@@ -306,11 +354,13 @@ each for a behaviour reason, and none for SQL.
 2. **The plain-EF client on `main`**, for Tiers B and C (§10).
 3. **`eng/sql-capture.sh`, and one class adopted from end to end**: `NorthwindWhereQuerySqliteInfoCarrierTest`.
 4. **The deletions and the documents** (§11).
-5. **The first round:** every class of Tiers B and C. The prototype's list says about 200 differences
-   will need a label at once, so they enter as `unread`, and each defect found then goes to its own
-   PR, with its own differential test, as this session's did.
+5. **The first round:** every class of Tiers B and C. The prototype's list says about 200 methods
+   differ, so they enter unlabelled, which is unread, and each defect found then goes to its own PR,
+   with its own differential test, as this session's did.
+6. **The badge** (§12): `spec-parity.py` joins `sql-differences.tsv`, and the badge publishes the
+   one figure.
 
-## 13. Open points and risks
+## 14. Open points and risks
 
 - **The async-local may not reach the interceptor** on some path, for example a transport that queues
   work on a thread of its own. Step 0 exists for this. The fallback is the prototype's serial run
