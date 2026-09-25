@@ -91,7 +91,11 @@ public enum DeviationKind
     /// <summary>The body is upstream's.</summary>
     None = 0,
 
-    /// <summary>Upstream also asserts the SQL the store received. This client emits none, so that part is omitted (#111).</summary>
+    /// <summary>
+    ///     Upstream also asserts the SQL the store received. This client emits none, so that part is
+    ///     omitted. #111 tracked asserting it and was closed on 2026-09-25 in favour of #167, which
+    ///     compares every test's statements with plain EF Core instead.
+    /// </summary>
     SqlNotAsserted = 1 << 0,
 
     /// <summary>

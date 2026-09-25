@@ -299,8 +299,8 @@ functional tests, and compared the bodies with comments and `AssertSql` removed.
 only by a helper that asserts the same thing, or by `!` and `var`, the body counts as the same. The
 label came from EF's own words: an issue number in EF's comment is an `ISSUE`, a crash EF pins is a
 `DEFECT`, and the rest are `LIMIT`. Two deviations recur and are constants: EF also asserts SQL,
-which this client does not emit (tracked as #111), and a store exception crosses the wire as
-`InfoCarrierServerException`.
+which this client does not emit (tracked as #111 until 2026-09-25, now #167), and a store
+exception crosses the wire as `InfoCarrierServerException`.
 
 **The other 24 were read one by one**, and four findings came out of them.
 
