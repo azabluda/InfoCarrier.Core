@@ -7117,8 +7117,25 @@ claims a runtime difference. The amendment proposed:
       derived-table columns swapped in two places normalize equal, because columns are numbered in
       the order they are first read. Measure a normal run before and after.
 - [ ] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
-- [ ] **H3. The plain-EF client and the slow mode.** From the spike, with what the whole-tier run
-      found:
+- [x] **H3. The plain-EF client and the slow mode.**
+      Slow run of Tier B (`INFOCARRIER_LIVE_COMPARE=1`): **Passed: 19085, Failed: 367, Skipped:
+      155, Total: 19607** in 10 m 10 s, every failure a comparison red, in 187 methods: 157 whose
+      statements differ, 22 that plain EF on SQLite refuses and InfoCarrier answers, and 8 whose
+      InfoCarrier reason carries none of the three flags. The spike's other reds are gone: the 35
+      `GroupBy` counts, the 13 harness outcomes, the 118 methods of this repository's own classes
+      and the 6 reasons without a difference. Normal run, `eng/measure.sh h3 h0h1`: **FAILING 0,
+      TOTAL 29914**, FIXED none, BROKEN none, REASONS unchanged, 6.77 minutes.
+
+      Two things the whole-tier run found beyond the plan. **An outcome difference covers the
+      statements of its row**: when plain EF refuses and InfoCarrier answers, the statements differ
+      because the outcomes do, so an outcome reason is what such a row needs. **The plain-EF
+      connection opens once the store is initialized, and closes around a rebuild**: a pooled
+      context factory asks for it before initialization, and an open connection keeps
+      `EnsureDeleted` from deleting the file, which failed `TPTTableSplitting` and all 34 tests of
+      `OptimisticConcurrency`, whose fixture rebuilds its store through
+      `InfoCarrierBackendTestStore.RecreateAsync` now.
+
+      From the spike, with what the whole-tier run found:
       - the plain-EF client copies EF's own `SqliteTestStore`: one connection per store, opened when
         the store starts, EF's SQLite warning settings and `SingleQuery`. The spike kept the
         connection closed, so `ToListAsync_with_canceled_token` got a `TaskCanceledException` where

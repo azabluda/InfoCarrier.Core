@@ -91,11 +91,16 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
-        => CreateClientStore(_tier.CreateBackend(storeName, shared: false, _props()));
+        => CreateClientStore(_tier.CreateBackend(SideName(storeName), shared: false, _props()));
 
     /// <inheritdoc />
     public virtual TestStore GetOrCreate(string storeName)
-        => CreateClientStore(_tier.CreateBackend(storeName, shared: true, _props()));
+        => CreateClientStore(_tier.CreateBackend(SideName(storeName), shared: true, _props()));
+
+    // The plain-EF half of a slow run gets a store of its own, so neither half sees what the other
+    // wrote (#167). Read here, when the store is created, and never again.
+    private static string SideName(string storeName)
+        => DirectClient.IsEnabled ? storeName + DirectClient.StoreSuffix : storeName;
 
     /// <inheritdoc />
     /// <remarks>
@@ -109,6 +114,11 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
     /// </remarks>
     public IServiceCollection AddProviderServices(IServiceCollection serviceCollection)
     {
+        if (DirectClient.IsEnabled)
+        {
+            return _tier.AddDirectClientServices(serviceCollection);
+        }
+
         serviceCollection = serviceCollection
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();

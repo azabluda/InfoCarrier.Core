@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -83,8 +84,17 @@ public sealed class CurrentTest
         }
     }
 
+    /// <summary>
+    ///     Whether a request crossed the wire during this test while <see cref="DirectClient" /> was
+    ///     set, which means its "plain EF" run was not plain EF (#167).
+    /// </summary>
+    internal bool UsedWire { get; private set; }
+
     internal static CurrentTest Start(ITest test)
         => Current.Value = new CurrentTest(test);
+
+    internal void NoteWire()
+        => UsedWire = true;
 
     internal void Add(CapturedCommand command)
     {
@@ -220,6 +230,13 @@ public sealed class CloseCurrentTestAttribute : BeforeAfterTestAttribute
 ///         <see cref="ITest" /> with its own display name, so each row is named here as well.
 ///     </para>
 ///     <para>
+///         <b>In a slow run it also runs each covered test case twice</b>
+///         (<see cref="LiveComparison" />, #167): first with plain EF Core, on a second set of class
+///         fixtures, and then as usual, when the bus judges each test as its result arrives. It
+///         counts each class's test cases, to dispose the second set after the last one, and each
+///         method's, to know the method's last row.
+///     </para>
+///     <para>
 ///         <b>When EF's specification packages move to xUnit v3, <c>TestContext.Current.Test</c>
 ///         replaces this class.</b> <c>Microsoft.EntityFrameworkCore.Specification.Tests</c> 10.0.1
 ///         depends on <c>xunit.core</c> 2.9.3, which is what keeps this suite on v2.
@@ -241,14 +258,42 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
             IEnumerable<IXunitTestCase> testCases,
             IMessageSink executionMessageSink,
             ITestFrameworkExecutionOptions executionOptions)
-            => base.RunTestCases(
-                [.. testCases.Select(testCase => (IXunitTestCase)new TestCase(testCase))],
+        {
+            IXunitTestCase[] cases = [.. testCases];
+
+            // The test cases of one class run one after another, and so do those of one method.
+            Dictionary<Type, StrongBox<int>> inClass = cases
+                .Select(ClassOf)
+                .OfType<Type>()
+                .GroupBy(type => type)
+                .ToDictionary(group => group.Key, group => new StrongBox<int>(group.Count()));
+            Dictionary<(Type, string), StrongBox<int>> inMethod = cases
+                .Where(testCase => ClassOf(testCase) is not null)
+                .GroupBy(testCase => (ClassOf(testCase)!, testCase.TestMethod.Method.Name))
+                .ToDictionary(group => group.Key, group => new StrongBox<int>(group.Count()));
+
+            base.RunTestCases(
+                [.. cases.Select(testCase => (IXunitTestCase)new TestCase(
+                    testCase,
+                    ClassOf(testCase) is { } type
+                        ? new Countdown(type, inClass[type], inMethod[(type, testCase.TestMethod.Method.Name)])
+                        : null))],
                 executionMessageSink,
                 executionOptions);
+        }
+
+        private static Type? ClassOf(IXunitTestCase testCase)
+            => (testCase.TestMethod.TestClass.Class as IReflectionTypeInfo)?.Type;
     }
 
-    /// <summary>The test case it wraps, in every member but one: the bus it runs on.</summary>
-    private sealed class TestCase(IXunitTestCase inner) : IXunitTestCase
+    /// <summary>A test case's class, and how many test cases of its class and of its method are left.</summary>
+    private sealed record Countdown(Type Class, StrongBox<int> InClass, StrongBox<int> InMethod);
+
+    /// <summary>
+    ///     The test case it wraps, in every member but one: the bus it runs on. In a slow run it runs
+    ///     the case with plain EF first.
+    /// </summary>
+    private sealed class TestCase(IXunitTestCase inner, Countdown? countdown) : IXunitTestCase
     {
         public string DisplayName => inner.DisplayName;
 
@@ -280,32 +325,91 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
         public void Serialize(IXunitSerializationInfo info)
             => inner.Serialize(info);
 
-        public Task<RunSummary> RunAsync(
+        public async Task<RunSummary> RunAsync(
             IMessageSink diagnosticMessageSink,
             IMessageBus messageBus,
             object[] constructorArguments,
             ExceptionAggregator aggregator,
             CancellationTokenSource cancellationTokenSource)
-            => inner.RunAsync(
-                diagnosticMessageSink,
-                new MessageBus(messageBus),
-                constructorArguments,
-                aggregator,
-                cancellationTokenSource);
+        {
+            bool slow = LiveComparison.IsEnabled && countdown is not null && LiveComparison.Covers(countdown.Class);
+            LiveComparison.DirectRun? direct = slow
+                ? await LiveComparison.RunDirectAsync(inner, countdown!.Class, diagnosticMessageSink, constructorArguments)
+                : null;
+
+            bool lastCaseOfMethod = countdown is not null && Interlocked.Decrement(ref countdown.InMethod.Value) == 0;
+            var bus = new MessageBus(messageBus, direct, lastCaseOfMethod);
+            RunSummary summary = await inner.RunAsync(
+                diagnosticMessageSink, bus, constructorArguments, aggregator, cancellationTokenSource);
+
+            // A pass the comparison turned red is a failure in the summary as well.
+            summary.Failed += bus.TurnedRed;
+
+            if (countdown is not null && Interlocked.Decrement(ref countdown.InClass.Value) == 0 && slow)
+            {
+                await LiveComparison.ClassFinishedAsync(countdown.Class);
+            }
+
+            return summary;
+        }
     }
 
-    /// <summary>The bus it wraps, which sets <see cref="CurrentTest" /> as each test starts.</summary>
-    private sealed class MessageBus(IMessageBus inner) : IMessageBus
+    /// <summary>
+    ///     The bus it wraps, which sets <see cref="CurrentTest" /> as each test starts, and in a slow
+    ///     run judges each test as its result arrives.
+    /// </summary>
+    /// <remarks>
+    ///     The result message is where the outcome is known, and where a pass can still be reported
+    ///     as a failure: <c>After</c> runs before it and cannot know whether the test passed.
+    /// </remarks>
+    private sealed class MessageBus(IMessageBus inner, LiveComparison.DirectRun? direct, bool lastCaseOfMethod) : IMessageBus
     {
+        private CurrentTest? _test;
+        private int _index;
+
+        /// <summary>How many passes the comparison reported as failures.</summary>
+        public int TurnedRed { get; private set; }
+
         public bool QueueMessage(IMessageSinkMessage message)
         {
-            if (message is ITestStarting starting)
+            switch (message)
             {
-                CurrentTest.Start(starting.Test);
+                case ITestStarting starting:
+                    _test = CurrentTest.Start(starting.Test);
+                    break;
+
+                case ITestPassed passed when Judge("passed") is { } red:
+                    TurnedRed++;
+                    message = new TestFailed(passed.Test, passed.ExecutionTime, passed.Output, new LiveComparisonException(red));
+                    break;
+
+                case ITestFailed failed:
+                    _ = Judge($"failed: {failed.ExceptionTypes.FirstOrDefault()}");
+                    break;
+
+                case ITestSkipped:
+                    _ = Judge("skipped");
+                    break;
+
+                case ITestFinished:
+                    _index++;
+                    _test = null;
+                    break;
             }
 
             return inner.QueueMessage(message);
         }
+
+        // A failed or skipped test is judged too, for its method's last row, and stays as it is.
+        private string? Judge(string outcome)
+            => direct is null || _test is null
+                ? null
+                : LiveComparison.Judge(
+                    _test,
+                    direct,
+                    _index,
+                    outcome,
+                    lastRowOfMethod: lastCaseOfMethod && _index >= direct.Results.Count - 1);
 
         // The bus belongs to the runner that handed it over, and that runner disposes it.
         public void Dispose()

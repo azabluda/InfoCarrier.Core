@@ -1,10 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -40,12 +38,6 @@ public class NorthwindKeylessEntitiesQueryInfoCarrierTest(NorthwindQueryInfoCarr
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindKeylessEntitiesQuerySqliteTest.cs", 22, 24,
         Justification = "FromSql mapping. Issue #21627.",
         Deviation = DeviationKind.StoreExceptionAsData)]
-    public override async Task KeylessEntity_with_nav_defining_query(bool async)
-    {
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(
-            () => base.KeylessEntity_with_nav_defining_query(async));
-
-        Assert.Equal(typeof(SqliteException).FullName, exception.ServerExceptionTypeName);
-        Assert.Contains("no such column", exception.Message);
-    }
+    public override Task KeylessEntity_with_nav_defining_query(bool async)
+        => SqliteStoreRefusal.AssertAsync(() => base.KeylessEntity_with_nav_defining_query(async), "no such column");
 }

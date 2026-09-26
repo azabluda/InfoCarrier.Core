@@ -43,7 +43,7 @@ public class NonSharedModelUpdatesInfoCarrierTest(NonSharedFixture fixture) : No
         Func<DbContext, Task>? nestedTestOperation3 = null)
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             contextFactory.CreateContext,
-            (facade, transaction) => facade.UseInfoCarrierTransaction(transaction),
+            (facade, transaction) => facade.UseTestTransaction(transaction),
             testOperation,
             nestedTestOperation1,
             nestedTestOperation2,

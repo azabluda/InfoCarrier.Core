@@ -1,12 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.BulkUpdates;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.BulkUpdates;
@@ -82,13 +80,8 @@ public class TPTInheritanceBulkUpdatesInfoCarrierTest(
     public override Task Update_base_type_with_OfType(bool async)
         => AssertStoreRefuses(() => base.Update_base_type_with_OfType(async));
 
-    internal static async Task AssertStoreRefuses(Func<Task> query)
-    {
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(query);
-
-        Assert.Equal(typeof(SqliteException).FullName, exception.ServerExceptionTypeName);
-        Assert.Contains("no such column", exception.Message);
-    }
+    internal static Task AssertStoreRefuses(Func<Task> query)
+        => SqliteStoreRefusal.AssertAsync(query, "no such column");
 }
 
 /// <inheritdoc cref="TPHInheritanceBulkUpdatesInfoCarrierTest" />
@@ -186,7 +179,7 @@ public class TPHInheritanceBulkUpdatesInfoCarrierFixture : TPHInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>
@@ -206,7 +199,7 @@ public class TPTInheritanceBulkUpdatesInfoCarrierFixture : TPTInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>
@@ -235,7 +228,7 @@ public class TPCInheritanceBulkUpdatesInfoCarrierFixture : TPCInheritanceBulkUpd
 
     /// <inheritdoc />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>

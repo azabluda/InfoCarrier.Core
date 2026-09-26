@@ -205,13 +205,8 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     ///         suppressed.
     ///     </para>
     /// </remarks>
-    private static async Task AssertStoreRefuses(Func<Task> query)
-    {
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(query);
-
-        Assert.Equal(typeof(SqliteException).FullName, exception.ServerExceptionTypeName);
-        Assert.Contains("no such column", exception.Message);
-    }
+    private static Task AssertStoreRefuses(Func<Task> query)
+        => SqliteStoreRefusal.AssertAsync(query, "no such column");
 
     /// <inheritdoc />
     /// <remarks>

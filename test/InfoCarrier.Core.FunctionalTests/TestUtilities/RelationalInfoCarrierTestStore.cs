@@ -58,14 +58,17 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     public InfoCarrierBackendTestStore Backend => _backend;
 
     /// <summary>
-    ///     Refused: the InfoCarrier client has no database of its own.
+    ///     Refused: the InfoCarrier client has no database of its own. The one exception is the
+    ///     plain-EF half of a slow run, whose client IS plain EF Core on the store (#167).
     /// </summary>
     /// <remarks>
     ///     Every relational member that would reach past the wire reads this one, so throwing here
     ///     is the whole guard. See the class remarks.
     /// </remarks>
     protected override DbConnection Connection
-        => throw new InvalidOperationException(
+        => _backend.IsDirect
+            ? _backend.DirectClientConnection
+            : throw new InvalidOperationException(
             "The InfoCarrier client has no database of its own, so this test store exposes no "
             + "DbConnection. A test reaching for one would bypass the wire, and a green from that "
             + "would say nothing about this provider.");
@@ -88,7 +91,9 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
+        => _backend.IsDirect
+            ? _backend.AddDirectClientOptions(builder)
+            : builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

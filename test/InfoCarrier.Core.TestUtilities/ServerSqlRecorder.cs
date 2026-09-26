@@ -92,7 +92,7 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
 {
     /// <inheritdoc />
     public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
-        => Record(command, eventData, count: null, base.ReaderExecuted(command, eventData, result));
+        => Record(command, eventData, count: null, Counted(base.ReaderExecuted(command, eventData, result)));
 
     /// <inheritdoc />
     public override ValueTask<DbDataReader> ReaderExecutedAsync(
@@ -100,7 +100,7 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
         CommandExecutedEventData eventData,
         DbDataReader result,
         CancellationToken cancellationToken = default)
-        => Record(command, eventData, count: null, base.ReaderExecutedAsync(command, eventData, result, cancellationToken));
+        => Record(command, eventData, count: null, new ValueTask<DbDataReader>(Counted(result)));
 
     /// <inheritdoc />
     public override int NonQueryExecuted(DbCommand command, CommandExecutedEventData eventData, int result)
@@ -147,14 +147,21 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
     }
 
     /// <summary>
-    ///     Gives a reader its count as EF disposes it: EF's own <c>ReadCount</c>, matched to the
-    ///     command by its correlation ID.
+    ///     Gives a reader its count as EF disposes it, matched to the command by its correlation ID:
+    ///     EF's own <c>ReadCount</c> in a normal run, and <see cref="CountingDataReader.Reads" /> in a
+    ///     slow run.
     /// </summary>
     /// <remarks>
-    ///     EF's count and not a wrapping <c>DbDataReader</c>, which the spec first planned: no
-    ///     provider then meets a reader of a type it did not create. EF counts every <c>Read()</c>,
-    ///     the last one that returns false included, which is why a capture calls it reads and not
-    ///     rows.
+    ///     <para>
+    ///         Both count every <c>Read()</c>, the last one that returns false included, which is
+    ///         why a capture calls it reads and not rows.
+    ///     </para>
+    ///     <para>
+    ///         <b>EF's count in a normal run</b>, so that no provider meets a reader of a type it did
+    ///         not create where nothing compares the count. <b>Ours in a slow run</b>, because EF's
+    ///         misses the rows a final <c>GroupBy</c> reads from the raw reader; see
+    ///         <see cref="CountingDataReader" />.
+    ///     </para>
     /// </remarks>
     public override InterceptionResult DataReaderDisposing(
         DbCommand command,
@@ -163,9 +170,15 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
     {
         ArgumentNullException.ThrowIfNull(eventData);
 
-        CurrentTest.Value?.SetReadCount(eventData.CommandId, eventData.ReadCount);
+        CurrentTest.Value?.SetReadCount(
+            eventData.CommandId,
+            eventData.DataReader is CountingDataReader counting ? counting.Reads : eventData.ReadCount);
         return base.DataReaderDisposing(command, eventData, result);
     }
+
+    // In a slow run every reader is counted by us, on both halves (#167).
+    private static DbDataReader Counted(DbDataReader reader)
+        => LiveComparison.IsEnabled ? new CountingDataReader(reader) : reader;
 
     private T Record<T>(DbCommand command, CommandEventData eventData, int? count, T result)
     {

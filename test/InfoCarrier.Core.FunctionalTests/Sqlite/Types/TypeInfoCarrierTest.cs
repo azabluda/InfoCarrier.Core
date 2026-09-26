@@ -84,7 +84,7 @@ public abstract class TypeInfoCarrierFixture<T> : RelationalTypeFixtureBase<T>
     ///     2026-08-30 amendment; <c>JsonUpdateTestBase</c>'s is not, and that base stays out.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture fixture)

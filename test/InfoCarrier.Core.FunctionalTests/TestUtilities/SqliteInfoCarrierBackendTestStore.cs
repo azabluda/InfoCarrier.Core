@@ -163,6 +163,79 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => base.AddProviderOptions(builder).UseSqlite(_connectionString);
 
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Closes the plain-EF half's connection first and opens it again after, because an open
+    ///     connection keeps <c>EnsureDeleted</c> from deleting the file:
+    ///     <c>OptimisticConcurrencyInfoCarrierTest</c> rebuilds its store before every test, and all
+    ///     34 of its tests failed that way in a slow run until this did (2026-09-26).
+    /// </remarks>
+    public override async Task RecreateAsync()
+    {
+        if (_directClientConnection is { State: System.Data.ConnectionState.Open } open)
+        {
+            await open.CloseAsync().ConfigureAwait(false);
+        }
+
+        await base.RecreateAsync().ConfigureAwait(false);
+
+        if (_directClientConnection is { } connection && _initialized)
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+        }
+    }
+
+    private SqliteConnection? _directClientConnection;
+    private bool _initialized;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>Open once the store is initialized, and kept open until it is disposed</b>, as EF's
+    ///         own <c>SqliteTestStore</c> keeps its connection. EF then never opens it itself, and
+    ///         that is visible to a test: <c>ToListAsync_with_canceled_token</c> expects exactly
+    ///         <see cref="OperationCanceledException" />, and a closed connection answered EF's
+    ///         <c>OpenAsync</c> with a cancelled token by a <see cref="TaskCanceledException" /> in the
+    ///         spike of 2026-09-26.
+    ///     </para>
+    ///     <para>
+    ///         <b>Not before</b>: a pooled context factory builds its options, and so asks for this
+    ///         connection, before the store is initialized, and an open connection keeps
+    ///         <c>EnsureDeleted</c> from deleting the file. Opening it here at once failed
+    ///         <c>TPTTableSplittingInfoCarrierTest.ExecuteUpdate_works_for_table_sharing</c> with an
+    ///         <see cref="IOException" />. So it is created closed, and
+    ///         <see cref="InitializeAsync(Func{DbContext}, Func{DbContext, Task}?, Func{DbContext, Task}?)" />
+    ///         opens it at its end.
+    ///     </para>
+    /// </remarks>
+    public override System.Data.Common.DbConnection DirectClientConnection
+    {
+        get
+        {
+            _directClientConnection ??= new SqliteConnection(_connectionString);
+            if (_initialized && _directClientConnection.State != System.Data.ConnectionState.Open)
+            {
+                _directClientConnection.Open();
+            }
+
+            return _directClientConnection;
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The two settings EF's own SQLite suite uses, because the fixture's <c>AddOptions</c> turns
+    ///     every warning into an error on this client, where the server only logs it:
+    ///     <c>SqliteTestStore</c> sets <see cref="QuerySplittingBehavior.SingleQuery" />, which silences
+    ///     <c>MultipleCollectionIncludeWarning</c>, and <c>GraphUpdatesSqliteFixtureBase</c> ignores
+    ///     <c>CompositeKeyWithValueGeneration</c>. Without them 2676 tests of a direct run failed on
+    ///     the warning before running any statement.
+    /// </remarks>
+    public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => AddServerContextOptions(builder)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.SqliteEventId.CompositeKeyWithValueGeneration))
+            .UseSqlite(DirectClientConnection, b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery));
+
     /// <summary>
     ///     Whether the database at <see cref="_path" /> currently holds any table.
     /// </summary>
@@ -259,6 +332,13 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         finally
         {
             gate.Release();
+            _initialized = true;
+        }
+
+        // The plain-EF half of a slow run, once the file is there to stay: see DirectClientConnection.
+        if (_directClientConnection is { State: not System.Data.ConnectionState.Open } connection)
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
         }
     }
 
@@ -289,6 +369,13 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     ///         unaffected either way.
     ///     </para>
     /// </remarks>
-    public override ValueTask DisposeAsync()
-        => base.DisposeAsync();
+    public override async ValueTask DisposeAsync()
+    {
+        if (_directClientConnection is not null)
+        {
+            await _directClientConnection.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await base.DisposeAsync().ConfigureAwait(false);
+    }
 }

@@ -62,4 +62,9 @@ public sealed class SqliteInfoCarrierTier : InfoCarrierTier
     /// </remarks>
     public override ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
         => new TestSqlLoggerFactory(shouldLogCategory);
+
+    /// <inheritdoc />
+    public override Microsoft.Extensions.DependencyInjection.IServiceCollection AddDirectClientServices(
+        Microsoft.Extensions.DependencyInjection.IServiceCollection serviceCollection)
+        => Microsoft.Extensions.DependencyInjection.SqliteServiceCollectionExtensions.AddEntityFrameworkSqlite(serviceCollection);
 }

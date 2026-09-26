@@ -58,7 +58,7 @@ public class OwnedTableSplittingQueryInfoCarrierFixture : OwnedTableSplittingRel
     ///     family; see <see cref="NavigationsQueryInfoCarrierFixture.UseTransaction" />.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 // The four OwnedTableSplitting facets (ADR-004). EF ships no BulkUpdate, Collection or
