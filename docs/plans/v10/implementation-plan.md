@@ -7006,8 +7006,9 @@ chosen; it does not mean this comes before Y.
 
 ## Phase H — each test compared with plain EF Core, live (#167)
 
-**PROPOSED 2026-09-26, and no step starts before the owner's yes** (`CLAUDE.md`, guardrail 4: this
-plan adds a concept to every normal run). ADR-014 is the decision; this is its order of work. The
+**Approved by the owner on 2026-09-26**, after it was proposed with its whole footprint (`CLAUDE.md`,
+guardrail 4: this plan adds a concept to every normal run). The approval covers the amendment to
+ADR-014 below. ADR-014 is the decision; this is its order of work. The
 superseded spec and the first Phase H stay on the branch `sql-capture` (PR #170, a draft), under a
 dated note.
 
@@ -7097,8 +7098,18 @@ claims a runtime difference. The amendment proposed:
 
 ### Steps
 
-- [ ] **H0/H1. The test identity and the command capture.** H0, H1a and H1b from `sql-capture`,
-      without the files: no `SqlCaptureFile`, no folder check, no `SqlCaptureAttribute` assertion.
+- [x] **H0/H1. The test identity and the command capture.**
+      `eng/measure.sh h0h1 to-query-string`: **FAILING 0, TOTAL 29914**, FIXED none, BROKEN none,
+      REASONS unchanged; the spec project **Passed: 29442, Skipped: 238, Total: 29680** in 6.84
+      minutes against 6.27 before, inside the 6.3 to 7.6 minutes the same suite took in earlier
+      runs. The 31 new tests pass, and the `DisposeAsync` pin was seen red with
+      `[assembly: CloseCurrentTest]` removed. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed:
+      0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+
+      H0, H1a and H1b from `sql-capture`, without the files: no `SqlCaptureFile`, no folder check,
+      no `SqlCaptureAttribute` assertion. `After` closes the test through
+      `[assembly: CloseCurrentTest]`, which is all that attribute did that goes forward, and the
+      capture's tests are `CommandCaptureTest`, a name that no longer points at the files.
       `Ordinal` and `SqlCapture.NextOrdinal` go, because the slow run matches a wire test with its
       plain-EF run by position inside the test case, which ends the review's "ordinals are never
       reset" minor. New pins: a statement in a test class's `DisposeAsync` is filed under no test,

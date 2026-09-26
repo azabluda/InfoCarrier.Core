@@ -66,7 +66,8 @@ that shows it, and a control class that needs no override must stay green withou
 
 **`test/InfoCarrier.Core.TestUtilities` is the store-neutral half of the harness** — the client and
 server shells, the store factory, the fixture properties, the in-process transport, the geometry
-mapper, the server SQL log, the culture pin and `OverrideAudit`. It sits at the repository's 10.0.1
+mapper, the server SQL log, the culture pin, `OverrideAudit`, and `CurrentTest` with the xUnit test
+framework that sets it for every test of the spec project (#167). It sits at the repository's 10.0.1
 floor and carries no `VersionOverride`, because .NET binds an assembly by name and a higher version
 satisfies a lower reference: compile-low/run-high works and the reverse does not. **Anything that
 names a store stays in `FunctionalTests/TestUtilities/`** — the tier classes, their backend stores,
@@ -538,8 +539,8 @@ phase lands in is decided on the issue rather than in the plan. **Phase Y is the
 preparation** — the letter is Y and not W because W1 to W6 are M5's requirement labels, used
 throughout `roadmap.md`. **Phase Z is #54's idle timeout for a server-held transaction**, the first
 of that issue's three separable properties. **Phase H is #167's live comparison with plain EF
-(ADR-014), PROPOSED on 2026-09-26: no step of it starts before the owner's yes.** Query, projection
-split, `SaveChanges` and lazy loading all work end-to-end.
+(ADR-014)**, approved by the owner on 2026-09-26; its triage is deferred, so a slow run is red by
+design until then. Query, projection split, `SaveChanges` and lazy loading all work end-to-end.
 
 ### What may and may not be claimed
 
