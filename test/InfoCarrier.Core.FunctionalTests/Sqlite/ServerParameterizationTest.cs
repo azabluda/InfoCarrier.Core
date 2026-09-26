@@ -921,6 +921,78 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, keyed on an anonymous type, groups at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The groups are the result, so their key is a type the server does not have. The
+    ///         <c>GroupBy</c> stayed on the client, over every row in the store's own order; plain EF
+    ///         orders the rows by the key and reads the groups off them.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Final_GroupBy_multiple_properties_entity</c>
+    ///         and <c>Final_GroupBy_complex_key_entity</c>.
+    ///     </para>
+    ///     <para>
+    ///         The key leaves out <c>Id</c> because plain EF Core 10 throws
+    ///         <c>ArgumentNullException</c> in <c>SelectExpression.ApplyProjection</c> for a final
+    ///         <c>GroupBy</c> of this model whose key holds the primary key, <c>GroupBy(b =&gt; b.Id)</c>
+    ///         included. The wire now meets the same exception there, where the client used to group.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_on_an_anonymous_key_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { b.Title, Inner = new { Length = b.Title!.Length, Constant = 1 } })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, whose element selector builds an anonymous type,
+    ///     reads only what the element needs, at the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own
+    ///     <c>Final_GroupBy_property_anonymous_type_element_selector</c>: the element selector stayed
+    ///     on the client with the <c>GroupBy</c>, so every column of every customer travelled, where
+    ///     plain EF reads three.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_building_its_elements_reads_only_their_columns()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => b.Title, b => new { b.Id })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, over a projection into a client type, groups at
+    ///     the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own <c>Final_GroupBy_property_anonymous_type</c> and the
+    ///     three <c>Final_GroupBy_property_entity_projecting_collection</c> methods.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_over_a_client_type_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .GroupBy(c => c.Title)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

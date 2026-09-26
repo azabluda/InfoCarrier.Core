@@ -305,5 +305,20 @@
 #
 # `total` rises with ours, 1149 -> 1150: EFCore is unchanged at 864.
 
-ours=105
-total=1150
+# 2026-09-27, 105 -> 106 (#167 step H16: a final `GroupBy` of a client type runs at the server, one
+# diagnostic).
+#
+# A `GroupBy` that ends the query returns its groups, so a key or an element of a client type kept
+# it on the client with its element selector: `GroupBy(c => c.City, c => new { c.ContactName,
+# c.ContactTitle })` read every column of every customer, unordered, where EF orders by the key and
+# reads three. `ProjectionRewriter.TryGroupAtTheStore` now groups at the server over the values it
+# can carry and rebuilds each group on the client with `WireGrouping.Rebuilt`.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: the `GroupBy`, the `Select` and the
+# rebuild are instantiated for the key and element types the caller's query decides. The premise
+# again. The three `MethodInfo`s come from delegates, so the lookups cost nothing.
+#
+# `total` rises with ours, 1150 -> 1151: EFCore is unchanged at 864.
+
+ours=106
+total=1151

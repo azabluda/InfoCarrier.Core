@@ -3,6 +3,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using InfoCarrier.Core.Expressions;
 
 namespace InfoCarrier.Core.Query;
 
@@ -72,6 +73,19 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         .Single(m => m.Name == nameof(Enumerable.Where)
             && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
             && second.GetGenericArguments().Length == 2);
+
+    // From delegates, which the trimmer follows at no cost (R149). See TryGroupAtTheStore.
+    private static readonly MethodInfo QueryableGroupBy =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, IQueryable<IGrouping<object, object>>>)Queryable.GroupBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo QueryableGroupByElement =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, Expression<Func<object, object>>, IQueryable<IGrouping<object, object>>>)Queryable.GroupBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo RebuiltGroup =
+        ((Func<IGrouping<object, object>, Func<object, object>, Func<object, object>, IGrouping<object, object>>)WireGrouping.Rebuilt)
+            .Method.GetGenericMethodDefinition();
 
     /// <summary>
     ///     The scalar types a guarded slot can travel as the nullable type of, each with that type.
@@ -199,6 +213,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     /// </summary>
     private Expression? _preserved;
 
+    /// <summary>The query as it was handed in, whose result is what the caller receives.</summary>
+    private Expression? _root;
+
     /// <summary>
     ///     The parameters of every lambda that encloses the node being visited, outermost first.
     /// </summary>
@@ -261,6 +278,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var rewriter = new ProjectionRewriter(analyzer)
         {
             _preserved = alreadyReassembled,
+            _root = query,
             _read = MemberReadCollector.Find(query),
             _singleResultSources = SingleResultSourceFinder.Find(query),
             _model = model,
@@ -338,6 +356,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return below;
         }
 
+        if (ReferenceEquals(node, _root) && TryGroupAtTheStore(call) is { } grouped)
+        {
+            return grouped;
+        }
+
         if (!IsResultSelectorOperator(call, out LambdaExpression? selector))
         {
             return call;
@@ -361,41 +384,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
-        List<Expression> fragments = [];
-        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        CollectFragments(selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], fragments, guards);
-
-        if (TranslatableLeaves(selector.Body, fragments, bodyAnalysis) is { } leaves)
-        {
-            fragments = leaves;
-        }
-
-        IReadOnlySet<Expression> consumed = Consumed(selector.Body);
-
-        // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
-        //
-        // This returned `call` until 2026-09-22, on the ground that there was nothing for the
-        // server to compute. True, and it left the plain cut to ship the maximal `ServerOk`
-        // subtree, which is the query root: `Select(b => new { F = flag })` read every column the
-        // entity has, where EF's own client writes `SELECT 1`. Both answers are right, so nothing
-        // in the suite could see it and only a comparison with EF's statement did
-        // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
-        //
-        // So the carrier holds one constant instead, and the reassembly below reads none of it.
-        // What the server is asked for is the row count, which is what EF asks for.
-        bool nullable = _singleResultSources.Contains(node);
-        Expression tuple = fragments.Count > 0
-            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
-            : TupleCarrier.New([RowPresence], nullable);
-        ParameterExpression row = Expression.Parameter(tuple.Type, "row");
-
-        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        for (int i = 0; i < fragments.Count; i++)
-        {
-            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
-        }
-
-        Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(selector.Body)!;
+        (Expression tuple, ParameterExpression row, Expression clientBody, bool carriesACollection) = Carry(
+            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node));
         if (selector.Parameters.Any(p => ReferencesParameter(clientBody, p)))
         {
             // A row value the server could not carry — a parameter of a type it does not know.
@@ -435,12 +425,211 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
                     typeof(Func<,>).MakeGenericType(row.Type, selector.ReturnType), clientBody, row)));
 
         _reassemblies.Add(reassembly);
-        if (fragments.Any(f => CarriesACollection(f, consumed)))
+        if (carriesACollection)
         {
             _collectionReassemblies.Add(reassembly);
         }
 
         return reassembly;
+    }
+
+    /// <summary>
+    ///     The tuple the server computes for <paramref name="body" />, the row parameter that reads
+    ///     it, and the body rebuilt from that row on the client.
+    /// </summary>
+    /// <param name="body">A body the server cannot run as written.</param>
+    /// <param name="analysis">The analysis of the lambda <paramref name="body" /> is from.</param>
+    /// <param name="rowParameters">The rows a value may read to be carried in the tuple.</param>
+    /// <param name="nullable">Whether the tuple is the reference-typed family.</param>
+    private (Expression Tuple, ParameterExpression Row, Expression ClientBody, bool CarriesACollection) Carry(
+        Expression body,
+        BoundaryAnalysis analysis,
+        IReadOnlyCollection<ParameterExpression> rowParameters,
+        bool nullable = false)
+    {
+        List<Expression> fragments = [];
+        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        CollectFragments(body, analysis, rowParameters, fragments, guards);
+
+        if (TranslatableLeaves(body, fragments, analysis) is { } leaves)
+        {
+            fragments = leaves;
+        }
+
+        IReadOnlySet<Expression> consumed = Consumed(body);
+
+        // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
+        //
+        // This returned `call` until 2026-09-22, on the ground that there was nothing for the
+        // server to compute. True, and it left the plain cut to ship the maximal `ServerOk`
+        // subtree, which is the query root: `Select(b => new { F = flag })` read every column the
+        // entity has, where EF's own client writes `SELECT 1`. Both answers are right, so nothing
+        // in the suite could see it and only a comparison with EF's statement did
+        // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
+        //
+        // So the carrier holds one constant instead, and the reassembly below reads none of it.
+        // What the server is asked for is the row count, which is what EF asks for.
+        Expression tuple = fragments.Count > 0
+            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
+            : TupleCarrier.New([RowPresence], nullable);
+        ParameterExpression row = Expression.Parameter(tuple.Type, "row");
+
+        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < fragments.Count; i++)
+        {
+            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
+        }
+
+        return (
+            tuple,
+            row,
+            new SlotSubstitutingVisitor(slots).Visit(body)!,
+            fragments.Any(f => CarriesACollection(f, consumed)));
+    }
+
+    /// <summary>
+    ///     Runs a <c>GroupBy</c> that ends the query at the store when its key or its element is a
+    ///     type the server does not have, over values it can carry, and rebuilds each group on the
+    ///     client.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-27, found by #167's slow run.</b> A <c>GroupBy</c> at the root returns
+    ///         its groups, so a key or an element of a client type, an anonymous one above all, made
+    ///         the result a type the server cannot send. The <c>GroupBy</c> stayed on the client, with
+    ///         everything it read: <c>GroupBy(c =&gt; c.City, c =&gt; new { c.ContactName,
+    ///         c.ContactTitle })</c> read every column of every customer, where EF reads three.
+    ///         EF runs a final <c>GroupBy</c> by ordering the rows by the key and reading the groups
+    ///         off the ordered rows, so the groups came back in a different order as well. Seven
+    ///         methods of <c>NorthwindGroupByQueryTestBase</c> showed it.
+    ///     </para>
+    ///     <para>
+    ///         The server now groups by a key it can carry, over elements it can carry. Each is the
+    ///         value itself when the server has its type, and otherwise the tuple of the values it is
+    ///         built from, as a projection is split (<see cref="Carry" />). Over a reassembly the key
+    ///         and the element read the rebuilt row, so they are fused with the rebuild first, as a
+    ///         filter is (<see cref="Fuse" />), and an element with no selector is the rebuild itself.
+    ///         The server's EF orders, groups and sends the groups as for any final <c>GroupBy</c>,
+    ///         and the client rebuilds the key and every element of each group
+    ///         (<see cref="WireGrouping.Rebuilt" />).
+    ///     </para>
+    ///     <para>
+    ///         <b>Only at the root</b>, where the groups are the result. A <c>GroupBy</c> an operator
+    ///         reads is an aggregate EF translates whole, and its key never crosses the wire.
+    ///     </para>
+    /// </remarks>
+    private MethodCallExpression? TryGroupAtTheStore(MethodCallExpression call)
+    {
+        if (call.Method.DeclaringType != typeof(Queryable)
+            || call.Method.Name != nameof(Queryable.GroupBy)
+            || call.Arguments.Count is not (2 or 3)
+            || StripQuotes(call.Arguments[1]) is not LambdaExpression { Parameters: [var keyed] } key
+            || (call.Arguments.Count == 3 && StripQuotes(call.Arguments[2]) is not LambdaExpression { Parameters: [_] }))
+        {
+            return null;
+        }
+
+        var elementSelector = call.Arguments.Count == 3 ? (LambdaExpression)StripQuotes(call.Arguments[2]) : null;
+        Type[] grouping = ServerBoundaryAnalyzer.SequenceElementType(call.Type)!.GetGenericArguments();
+
+        Expression source = call.Arguments[0];
+        ParameterExpression row = keyed;
+        MethodCallExpression? below = null;
+        LambdaExpression? rebuild = null;
+        if (source is MethodCallExpression reassembly
+            && _reassemblies.Contains(reassembly)
+            && StripQuotes(reassembly.Arguments[1]) is LambdaExpression { Parameters: [var tuple] } rebuilt)
+        {
+            below = reassembly;
+            rebuild = rebuilt;
+            source = reassembly.Arguments[0];
+            row = tuple;
+        }
+
+        Expression Read(LambdaExpression lambda)
+            => MemberReadFolder.Fold(Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+                lambda.Parameters[0], rebuild?.Body ?? row, lambda.Body));
+
+        if (!analyzer.Analyze(source).FactsFor(source).ServerOk)
+        {
+            return null;
+        }
+
+        (Expression Server, LambdaExpression? Client)? carriedElement = elementSelector is null && rebuild is not null
+            ? (row, rebuild)
+            : Carried(elementSelector is null ? row : Read(elementSelector), grouping[1]);
+        if (Carried(Read(key), grouping[0]) is not (var serverKey, var clientKey)
+            || carriedElement is not (var serverElement, var clientElement)
+            || (clientKey is null && clientElement is null))
+        {
+            return null;
+        }
+
+        MethodCallExpression grouped = ReferenceEquals(serverElement, row)
+            ? Expression.Call(
+                QueryableGroupBy.MakeGenericMethod(row.Type, serverKey.Type),
+                source,
+                Expression.Quote(Expression.Lambda(serverKey, row)))
+            : Expression.Call(
+                QueryableGroupByElement.MakeGenericMethod(row.Type, serverKey.Type, serverElement.Type),
+                source,
+                Expression.Quote(Expression.Lambda(serverKey, row)),
+                Expression.Quote(Expression.Lambda(serverElement, row)));
+
+        Type serverGroup = ServerBoundaryAnalyzer.SequenceElementType(grouped.Type)!;
+        Type clientGroup = ServerBoundaryAnalyzer.SequenceElementType(call.Type)!;
+        ParameterExpression group = Expression.Parameter(serverGroup, "group");
+        MethodCallExpression regrouped = Expression.Call(
+            QueryableSelect.MakeGenericMethod(serverGroup, clientGroup),
+            grouped,
+            Expression.Quote(
+                Expression.Lambda(
+                    typeof(Func<,>).MakeGenericType(serverGroup, clientGroup),
+                    Expression.Call(
+                        RebuiltGroup.MakeGenericMethod(serverKey.Type, serverElement.Type, grouping[0], grouping[1]),
+                        group,
+                        clientKey ?? Identity(serverKey.Type),
+                        clientElement ?? Identity(serverElement.Type)),
+                    group)));
+
+        if (below is not null)
+        {
+            Forget(below);
+        }
+
+        _reassemblies.Add(regrouped);
+        return regrouped;
+
+        // The value as it is when the server can run it, else the tuple of its values and its
+        // rebuild from that tuple; or nothing when some of it cannot travel at all.
+        (Expression Server, LambdaExpression? Client)? Carried(Expression body, Type type)
+        {
+            if (SequenceSlotFinder.Reads(body, row))
+            {
+                return null;
+            }
+
+            LambdaExpression lambda = Expression.Lambda(body, row);
+            BoundaryAnalysis analysis = analyzer.Analyze(lambda);
+            if (analysis.FactsFor(body).ServerOk)
+            {
+                return (body, null);
+            }
+
+            (Expression tuple, ParameterExpression slotted, Expression clientBody, _) = Carry(body, analysis, [row]);
+            return ReferencesParameter(clientBody, row)
+                ? null
+                : (tuple, Expression.Lambda(
+                    typeof(Func<,>).MakeGenericType(slotted.Type, type),
+                    clientBody.Type == type ? clientBody : Expression.Convert(clientBody, type),
+                    slotted));
+        }
+
+        static LambdaExpression Identity(Type type)
+        {
+            ParameterExpression value = Expression.Parameter(type, "value");
+            return Expression.Lambda(value, value);
+        }
     }
 
     /// <summary>

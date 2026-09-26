@@ -167,4 +167,19 @@ internal static class WireGrouping
 
         return true;
     }
+
+    /// <summary>
+    ///     A group the server formed over the values it could carry, with its key and its elements
+    ///     rebuilt into the types the caller's query names.
+    /// </summary>
+    /// <remarks>
+    ///     Runs on the client only, inside the reassembly of a final <c>GroupBy</c> whose key or
+    ///     element is a type the server does not have (<c>ProjectionRewriter.TryGroupAtTheStore</c>).
+    ///     It is never on the wire.
+    /// </remarks>
+    internal static IGrouping<TKey, TElement> Rebuilt<TServerKey, TServerElement, TKey, TElement>(
+        IGrouping<TServerKey, TServerElement> group,
+        Func<TServerKey, TKey> key,
+        Func<TServerElement, TElement> element)
+        => new WireGrouping<TKey, TElement> { Key = key(group.Key), Items = [.. group.Select(element)] };
 }

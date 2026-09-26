@@ -7437,6 +7437,38 @@ claims a runtime difference. The amendment proposed:
       in a member that already carried its diagnostic. `InfoCarrier.Core.TransportTests` **Passed:
       28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+- [x] **H16. A final `GroupBy` of a client type runs at the server.** On the branch
+      `live-comparison-final-groupby`, on top of H15. A `GroupBy` that ends the query returns its
+      groups, so a key or an element of a client type kept it on the client with its element
+      selector: the server sent every column of every row, unordered, where EF orders by the key and
+      reads only what the element needs. Seven `Final_GroupBy_*` methods of
+      `NorthwindGroupByQueryTestBase`.
+
+      1. **Three promises in `ServerParameterizationTest`, seen red first**:
+         `A_final_GroupBy_on_an_anonymous_key_groups_at_the_store`,
+         `A_final_GroupBy_building_its_elements_reads_only_their_columns` and
+         `A_final_GroupBy_over_a_client_type_groups_at_the_store`.
+      2. **The fix**: `ProjectionRewriter.TryGroupAtTheStore` groups at the server by the key's values
+         and over the element's values, a tuple of each where the type is the client's, and the
+         client rebuilds the key and every element of each group with the new
+         `WireGrouping.Rebuilt`. Over a rebuild, the key is fused with it first. The split of a body
+         into a tuple and its rebuild moved out of `VisitMethodCall` into `Carry`, which both paths
+         use. `docs/projection-split.md` §3.4 records it, with H15.
+      3. **The next slow run**: `Passed: 19395, Failed: 80, Skipped: 155, Total: 19630`, against
+         `Failed: 94`. **7 methods left the red list and none joined it**, and none of the 43 that
+         stayed red changed its verdict or its read counts.
+
+      **Found on the way, and recorded as `docs/upstream-defects.md` §1.13**: plain EF Core throws
+      `ArgumentNullException` for a final `GroupBy` whose key holds the whole primary key,
+      `GroupBy(b => b.Id)` included. Such a query now meets EF's exception over the wire, where
+      this client used to group the rows itself.
+
+      Every class with `GroupBy` in its name, all tiers: **Passed: 1055, Failed: 0, Skipped: 23,
+      Total: 1078**. Normal run, `eng/measure.sh final-groupby selectmany-rebuild`: **FAILING 0,
+      TOTAL 29937**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106,
+      a deliberate rise of one recorded in `eng/trim-baseline.txt`.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

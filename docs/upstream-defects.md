@@ -395,6 +395,25 @@ two parameters reached SQLite as the literal `'[1,10]'`. That was a defect of th
 same rule sent `new[] { i, j }.Contains(p.Id)` as `IN (2, 999)`. It is fixed, and that test now
 passes with EF's own refusal.
 
+### 1.13 A final `GroupBy` whose key holds the whole primary key throws `ArgumentNullException`
+
+**Recorded 2026-09-27, found while writing #167's step H16.** Plain EF Core 10.0.1 on SQLite throws
+`ArgumentNullException: Value cannot be null. (Parameter 'collection')` for
+`Set<Blog>().GroupBy(b => b.Id).ToList()`, and for every key tried that holds `Id`: an anonymous type,
+a `ValueTuple`, a `Tuple`, nested or not. A key without it, `new { b.Title, L = b.Title.Length }`,
+runs. No test of EF's own groups a final `GroupBy` by a key that holds the primary key.
+
+**Site.** `SelectExpression.ApplyGrouping` saves the identifier in `_preGroupByIdentifier` only when
+some identifier column is not a grouping term (`if (!_identifier.All(e => _groupBy.Contains(e.Column)))`).
+`SelectExpression.ApplyProjection` then restores it for the final `GroupBy`'s shaper with
+`_identifier.AddRange(_preGroupByIdentifier!)`, and the field is still null.
+
+**What it blocks.** Nothing in InfoCarrier. Since step H16 a final `GroupBy` whose key is a client type
+runs at the server, so such a query now meets the same exception over the wire, where this client
+used to group the rows itself. That is EF's behaviour, which the owner prefers to this client's
+answer. `ServerParameterizationTest.A_final_GroupBy_on_an_anonymous_key_groups_at_the_store` leaves
+`Id` out of its key for this reason.
+
 ## 2. Already reported
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a

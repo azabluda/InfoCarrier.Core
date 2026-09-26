@@ -261,6 +261,17 @@ of a cross join where EF reads two. `ProjectionRewriter.TryMoveBelowReassembly` 
   reference-typed `Tuple` family, so that "no row" reads as `null`, and the client rebuilds the one
   row it gets. Before, the whole collection travelled in a slot and the client kept its first
   element: `Lift_projection_mapping_when_pushing_down_subquery` read 134 rows where EF reads 24.
+- A `SelectMany` whose collection selector returns a rebuild flattens the server's tuples, and the
+  rebuild goes above it (2026-09-27, H15). Inside a projection the rebuild kept the `SelectMany` on
+  the client, and the outer projection carried every inner row the filter under it was about to
+  drop: `SelectMany_with_client_eval_with_constructor` read 70 rows where EF reads 66.
+- A `GroupBy` that ends the query runs at the server when its key or its element is a client type
+  (`TryGroupAtTheStore`, 2026-09-27, H16). The server groups by the key's values and over the
+  element's values, a tuple of each where the type is the client's, and the client rebuilds the key
+  and every element of each group (`WireGrouping.Rebuilt`). Over a rebuild, the key is fused with it
+  first, and the element is the rebuild. Before, the `GroupBy` and its element selector stayed on
+  the client: the server sent every column of every row, unordered, where EF orders by the key and
+  reads only what the element needs.
 
 **What stays on the client** is an operator whose lambda still needs the rebuild or client code,
 and one whose fused lambda reads a slot that holds a sequence. The second is §6a's lesson: a slot
