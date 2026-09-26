@@ -155,6 +155,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private IReadOnlySet<(Type, string)> _read = new HashSet<(Type, string)>();
 
     /// <summary>
+    ///     The projections inside a lambda that a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
+    ///     reads one row of. Their tuple is the reference-typed family, so that no row reads as
+    ///     <see langword="null" />. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private IReadOnlySet<Expression> _singleResultSources = new HashSet<Expression>();
+
+    /// <summary>
     ///     A client-side rebuild another pass already produced. Rewriting it would only wrap one
     ///     carrier in another.
     /// </summary>
@@ -223,6 +230,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         {
             _preserved = alreadyReassembled,
             _read = MemberReadCollector.Find(query),
+            _singleResultSources = SingleResultSourceFinder.Find(query),
             _model = model,
         };
         Expression result = rewriter.Visit(query);
@@ -338,9 +346,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         //
         // So the carrier holds one constant instead, and the reassembly below reads none of it.
         // What the server is asked for is the row count, which is what EF asks for.
+        bool nullable = _singleResultSources.Contains(node);
         Expression tuple = fragments.Count > 0
-            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))])
-            : TupleCarrier.New([RowPresence]);
+            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
+            : TupleCarrier.New([RowPresence], nullable);
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
@@ -577,6 +586,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         if (call.Arguments.Count == 1)
         {
+            if (name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
+                && _enclosing.Count > 0
+                && !row.Type.IsValueType)
+            {
+                return OneRowRebuilt(call, reassembly, rebuild, element);
+            }
+
             if (!RowCounting.Contains(name))
             {
                 return null;
@@ -622,6 +638,52 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         return Expression.Call(
             WithoutPredicate(declaring, name).MakeGenericMethod(element),
             Rebuilt(reassembly, filtered, element));
+    }
+
+    /// <summary>
+    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a projection on the server's
+    ///     tuple, and rebuilds the one row it returns on the client, or <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b>
+    ///         <c>b.Posts.Select(p =&gt; new { p.Heading }).FirstOrDefault()</c> inside a projection
+    ///         kept the operator above the rebuild, on the client, so the whole collection travelled
+    ///         in a slot of the outer tuple and this client kept its first element. EF's own client
+    ///         writes a <c>ROW_NUMBER()</c> window and reads one row per owner:
+    ///         <c>Lift_projection_mapping_when_pushing_down_subquery</c> read 134 rows where plain
+    ///         EF reads 24.
+    ///     </para>
+    ///     <para>
+    ///         <b>The tuple is the reference-typed family</b>, chosen for this projection before it
+    ///         was rewritten (<see cref="SingleResultSourceFinder" />), because a value tuple has no
+    ///         value that says "no row". The operator runs on the server's tuple, the slot holds the
+    ///         row or <see langword="null" />, and the client rebuilds the row only when there is
+    ///         one. The rebuild goes into the outer body as an invocation over the one value, so the
+    ///         outer rewrite lifts that value into a slot of its own, whole, and never evaluates it
+    ///         twice.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only inside a lambda.</b> At the root of the query the operator already bounds the
+    ///         rows the server sends (<c>QuerySplitter.WithRowLimitForTerminalOperator</c>).
+    ///     </para>
+    /// </remarks>
+    private InvocationExpression OneRowRebuilt(
+        MethodCallExpression call, MethodCallExpression reassembly, LambdaExpression rebuild, Type element)
+    {
+        ParameterExpression row = rebuild.Parameters[0];
+        Forget(reassembly);
+
+        MethodCallExpression single = Expression.Call(
+            call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), reassembly.Arguments[0]);
+        // `Expression.Default` is safe here, unlike in `Guarded`: this conditional stays on the
+        // client and is never serialized.
+        Expression body = Expression.Condition(
+            Expression.Equal(row, Expression.Constant(null, row.Type)),
+            Expression.Default(element),
+            rebuild.Body.Type == element ? rebuild.Body : Expression.Convert(rebuild.Body, element));
+
+        return Expression.Invoke(Expression.Lambda(body, row), single);
     }
 
     /// <summary>
@@ -725,6 +787,51 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         return analyzer.Analyze(fused).FactsFor(fused.Body).ServerOk && !SequenceSlotFinder.Reads(body, row)
             ? fused
             : null;
+    }
+
+    /// <summary>
+    ///     Finds the projections inside a lambda that a <c>FirstOrDefault</c> or
+    ///     <c>SingleOrDefault</c> without a predicate reads one row of. See
+    ///     <see cref="OneRowRebuilt" />.
+    /// </summary>
+    private sealed class SingleResultSourceFinder : ExpressionVisitor
+    {
+        private readonly HashSet<Expression> _found = new(ReferenceEqualityComparer.Instance);
+        private int _depth;
+
+        public static IReadOnlySet<Expression> Find(Expression query)
+        {
+            var finder = new SingleResultSourceFinder();
+            finder.Visit(query);
+            return finder._found;
+        }
+
+        protected override Expression VisitLambda<T>(Expression<T> node)
+        {
+            _depth++;
+            try
+            {
+                return base.VisitLambda(node);
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (_depth > 0
+                && node.Method.Name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
+                && (node.Method.DeclaringType == typeof(Queryable) || node.Method.DeclaringType == typeof(Enumerable))
+                && node.Arguments is [MethodCallExpression source]
+                && IsPlainSelect(source))
+            {
+                _found.Add(source);
+            }
+
+            return base.VisitMethodCall(node);
+        }
     }
 
     /// <summary>Finds a read of a tuple slot that holds a sequence. See <see cref="Fuse" />.</summary>

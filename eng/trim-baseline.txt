@@ -274,5 +274,21 @@
 #
 # `total` rises with ours, 1145 -> 1148: EFCore is unchanged at 864.
 
-ours=103
-total=1148
+# 2026-09-26, 103 -> 104 (#167 step H7: a `FirstOrDefault` inside a projection runs on the server's
+# tuple, one diagnostic).
+#
+# `b.Posts.Select(p => new { p.Heading }).FirstOrDefault()` inside a projection kept the operator on
+# the client, so every child row travelled and this client kept one: EF's
+# `Lift_projection_mapping_when_pushing_down_subquery` read 134 rows where plain EF reads 24.
+# `ProjectionRewriter.OneRowRebuilt` now runs the operator on the server's tuple and rebuilds the
+# one row on the client.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: the operator is instantiated for the
+# tuple, whose type the caller's projection decides. The premise again. Its `Activator.CreateInstance`
+# for the empty case would have cost an IL2072 as well; the conditional never crosses the wire, so
+# `Expression.Default` serves and costs nothing.
+#
+# `total` rises with ours, 1148 -> 1149: EFCore is unchanged at 864.
+
+ours=104
+total=1149

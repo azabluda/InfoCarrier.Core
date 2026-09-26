@@ -558,6 +558,63 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A <c>FirstOrDefault</c> inside a projection, over a projection into a client type, reads
+    ///     one row per owner at the store, as it does in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The inner projection became a server-side tuple and a client-side rebuild, and the
+    ///         <c>FirstOrDefault</c> above the rebuild stayed with it on the client. So the whole
+    ///         collection travelled in a slot of the outer tuple, every post of every blog, and this
+    ///         client kept the first. EF's own client writes a <c>ROW_NUMBER()</c> window and reads
+    ///         one post per blog.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Lift_projection_mapping_when_pushing_down_subquery</c>,
+    ///         <c>Select_subquery_single_nested_subquery</c> and its <c>2</c>, four classes each, and
+    ///         <c>Select_collection_FirstOrDefault_project_anonymous_type_client_eval</c>. The first
+    ///         two were parked on 2026-09-26 for the slow run to show them.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_nested_FirstOrDefault_over_a_client_type_reads_one_row_per_owner()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Take(25)
+                .Select(b => new
+                {
+                    b.Id,
+                    First = b.Posts.Select(p => new { p.Heading }).FirstOrDefault(),
+                    All = b.Posts.Select(p => new { p.Heading }),
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>FirstOrDefault</c> inside a projection, over a construction that reads nothing from
+    ///     the row, reads one row per owner at the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own
+    ///     <c>Select_subquery_projecting_single_constant_of_non_mapped_type</c> and its <c>null</c>
+    ///     variant, in the TPC and TPT Gears of War classes.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_nested_FirstOrDefault_reading_no_column_reads_one_row_per_owner()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Title, Card = b.Posts.Where(p => p.Id > 0).Select(p => new BlogCard()).FirstOrDefault() })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

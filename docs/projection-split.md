@@ -246,6 +246,11 @@ of a cross join where EF reads two. `ProjectionRewriter.TryMoveBelowReassembly` 
   server can run. EF's `ReplacingExpressionVisitor` does the fusion and folds
   `new Dto { Id = row.Item1 }.Id` to `row.Item1`, through a cast to an interface too.
 - A predicate given to a terminal operator is a `Where` under the operator, as EF normalizes it.
+- `FirstOrDefault` and `SingleOrDefault` without a predicate, inside a projection, run on the
+  server's tuple (`OneRowRebuilt`, the same day, H7). Their projection is carried in the
+  reference-typed `Tuple` family, so that "no row" reads as `null`, and the client rebuilds the one
+  row it gets. Before, the whole collection travelled in a slot and the client kept its first
+  element: `Lift_projection_mapping_when_pushing_down_subquery` read 134 rows where EF reads 24.
 
 **What stays on the client** is an operator whose lambda still needs the rebuild or client code,
 and one whose fused lambda reads a slot that holds a sequence. The second is §6a's lesson: a slot

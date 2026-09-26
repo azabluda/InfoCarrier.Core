@@ -7227,6 +7227,31 @@ claims a runtime difference. The amendment proposed:
       `trim-ratchet.sh` OK at 103 <= 103, a deliberate rise of three recorded in
       `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total:
       28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H7. A `FirstOrDefault` inside a projection runs on the server's tuple.** On the branch
+      `live-comparison-nested-single`, on top of H6. It is the first of the two gaps parked on
+      2026-09-26 for the slow run to show: `b.Posts.Select(p => new { p.Heading }).FirstOrDefault()`
+      inside a projection kept the operator above the rebuild, on the client, so every child row
+      travelled in a slot and this client kept one. `Lift_projection_mapping_when_pushing_down_subquery`
+      read 134 rows where plain EF reads 24 with a `ROW_NUMBER()` window.
+
+      1. **Two promises in `ServerParameterizationTest`, seen red first**: the `Lift_projection`
+         shape, whose anonymous type appears both under the operator and as a collection, and a
+         construction that reads no column. A single anonymous type under the operator already
+         reached the store through the carrier rewrite, which is why the first promise carries both.
+      2. **The fix**: `ProjectionRewriter.SingleResultSourceFinder` marks each projection inside a
+         lambda that a `FirstOrDefault` or `SingleOrDefault` reads one row of, and its tuple is the
+         reference-typed family, so that "no row" is `null`. `OneRowRebuilt` runs the operator on
+         that tuple and rebuilds the row on the client through an invocation, which the outer rewrite
+         lifts whole into a slot of its own.
+      3. **The next slow run**: `Passed: 19291, Failed: 169, Skipped: 155, Total: 19615`, against
+         `Failed: 209`. **20 methods left the red list and none joined it**, and none of the 88 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh nested-single rebuild-operators2`: **FAILING 0, TOTAL 29922**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104, a deliberate
+      rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
