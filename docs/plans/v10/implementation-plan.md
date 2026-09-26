@@ -7006,8 +7006,9 @@ chosen; it does not mean this comes before Y.
 
 ## Phase H — each test compared with plain EF Core, live (#167)
 
-**PROPOSED 2026-09-26, and no step starts before the owner's yes** (`CLAUDE.md`, guardrail 4: this
-plan adds a concept to every normal run). ADR-014 is the decision; this is its order of work. The
+**Approved by the owner on 2026-09-26**, after it was proposed with its whole footprint (`CLAUDE.md`,
+guardrail 4: this plan adds a concept to every normal run). The approval covers the amendment to
+ADR-014 below. ADR-014 is the decision; this is its order of work. The
 superseded spec and the first Phase H stay on the branch `sql-capture` (PR #170, a draft), under a
 dated note.
 
@@ -7140,3 +7141,8 @@ claims a runtime difference. The amendment proposed:
 **Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
 only. The two parked SQL gaps and the parameter-numbering family wait for the triage, and each then
 gets a red promise, a fix and a pull request of its own.
+
+**No code of this phase lands on `main` until the owner has seen the mechanism in real action**
+(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). H0/H1 is
+PR #171 and stays open. H3 is built on a branch on top of it, and the stack goes to `main` only when
+the owner accepts it. H2 is on `main` because it is a decision and not code.
