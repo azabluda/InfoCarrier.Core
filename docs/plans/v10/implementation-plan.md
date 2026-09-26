@@ -7351,6 +7351,30 @@ claims a runtime difference. The amendment proposed:
       29930**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H12. A `GroupBy` on an empty key aggregates at the store.** On the branch
+      `live-comparison-empty-group-key`, on top of H11. `GroupBy(o => new { })` keys every row on
+      one empty anonymous object. The carrier rewrite gives a key of the caller's anonymous type a
+      tuple, and skipped a key with no member, because a tuple needs a slot. The grouping stayed on
+      the client and the server sent the whole table for one aggregate:
+      `GroupBy_empty_key_Aggregate` read 831 orders where plain EF reads one row, and the two
+      `Group_by_multiple_aggregate_joining_different_tables` methods read every parent with both
+      joins.
+
+      1. **Two promises in `ServerParameterizationTest`, seen red first**: an aggregate over an empty
+         key, and the same with `g.Key` projected.
+      2. **The fix**: `TransparentIdentifierRewriter` re-carries an empty anonymous type as a tuple
+         of one constant slot, which EF groups by as it groups by the empty key. A member of that
+         type takes no slot in a tuple that holds it, because plain EF projects no column for such
+         a `g.Key`; the client builds the empty object from nothing.
+      3. **The next slow run**: `Passed: 19368, Failed: 102, Skipped: 155, Total: 19625`, against
+         `Failed: 110`. **4 methods left the red list and none joined it**, and none of the 54 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18746, Failed: 0, Skipped: 46, Total:
+      18792**. Normal run, `eng/measure.sh empty-group-key member-folding`: **FAILING 0, TOTAL
+      29932**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

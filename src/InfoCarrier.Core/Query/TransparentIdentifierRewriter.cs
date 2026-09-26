@@ -89,6 +89,15 @@ internal static class TransparentIdentifierRewriter
     private static bool IsSequence(Type type)
         => type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
 
+    /// <summary>
+    ///     Whether the type is one the compiler generated for <c>new { }</c>, an anonymous type with
+    ///     no member, which is not generic as every other anonymous type is.
+    /// </summary>
+    private static bool IsEmptyAnonymous(Type type)
+        => !type.IsGenericType
+            && type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), inherit: false)
+            && type.Name.Contains("AnonymousType", StringComparison.Ordinal);
+
     private static Type MemberType(MemberInfo member)
         => member switch
         {
@@ -599,6 +608,26 @@ internal static class TransparentIdentifierRewriter
                 return;
             }
 
+            // AN EMPTY ANONYMOUS TYPE IS A CARRIER TOO, since 2026-09-26 (#167's slow run).
+            // `GroupBy(o => new { })` keys every row on one empty object, and the check below
+            // skipped a construction with no member, because a tuple needs one slot. The grouping
+            // then stayed on the client and the server sent the whole table for one aggregate:
+            // `GroupBy_empty_key_Aggregate` read 831 orders where EF reads one row. It gets one
+            // constant slot, which EF groups by as it groups by the empty key, and the client
+            // rebuilds the empty object from nothing.
+            if (node is NewExpression { Arguments.Count: 0 } empty
+                && IsEmptyAnonymous(empty.Type)
+                && !allowlist.IsAllowed(empty.Type))
+            {
+                _candidates[empty.Type] = [];
+                if (parent is not null)
+                {
+                    _nestedIn[empty.Type] = parent;
+                }
+
+                return;
+            }
+
             if (node is not NewExpression { Members: { } members } construction
                 || members.Count == 0
                 || allowlist.IsAllowed(construction.Type))
@@ -661,8 +690,10 @@ internal static class TransparentIdentifierRewriter
                 // A carrier compared to null -- or handed to a `where TEntity : class` method --
                 // has to stay a reference type, or the thing it is used for stops being
                 // expressible at all.
+                MemberInfo[] slotted = [.. members.Where(m => !IsEmptyCarrier(MemberType(m)))];
                 return TupleCarrier.MakeType(
-                    [.. members.Select(m => Map(MemberType(m)))], referenceTyped.Contains(type));
+                    slotted.Length == 0 ? [typeof(int)] : [.. slotted.Select(m => Map(MemberType(m)))],
+                    referenceTyped.Contains(type));
             }
 
             if (type.IsGenericType)
@@ -707,10 +738,18 @@ internal static class TransparentIdentifierRewriter
             MemberInfo[] members = carriers[carrier];
 
             var arguments = new Expression[members.Length];
+            int next = 0;
             for (int i = 0; i < members.Length; i++)
             {
-                Expression slot = TupleCarrier.Read(tuple, i);
                 Type memberType = MemberType(members[i]);
+                if (IsEmptyCarrier(memberType))
+                {
+                    // It took no slot, and there is nothing to read to build it.
+                    arguments[i] = Construct(memberType, [], []);
+                    continue;
+                }
+
+                Expression slot = TupleCarrier.Read(tuple, next++);
                 arguments[i] = carriers.ContainsKey(memberType) ? Rebuild(slot, memberType) : slot;
             }
 
@@ -741,10 +780,32 @@ internal static class TransparentIdentifierRewriter
                 : Expression.New(carrier.GetConstructors()[0], arguments, members);
 
         protected override Expression VisitNew(NewExpression node)
-            => carriers.ContainsKey(node.Type)
-                ? TupleCarrier.New(
-                    [.. node.Arguments.Select(a => Visit(a))], referenceTyped.Contains(node.Type))
-                : base.VisitNew(node);
+        {
+            if (!carriers.TryGetValue(node.Type, out MemberInfo[]? members))
+            {
+                return base.VisitNew(node);
+            }
+
+            Expression[] values =
+                [.. node.Arguments.Where((_, i) => !IsEmptyCarrier(MemberType(members[i]))).Select(a => Visit(a))];
+
+            return TupleCarrier.New(values.Length == 0 ? [EmptySlot] : values, referenceTyped.Contains(node.Type));
+        }
+
+        /// <summary>
+        ///     The one slot of a tuple that has nothing else to hold, an empty anonymous type's: a
+        ///     constant, the same in every row, which nothing reads.
+        /// </summary>
+        private static readonly Expression EmptySlot = Expression.Constant(1);
+
+        /// <summary>
+        ///     Whether <paramref name="type" /> is an empty anonymous type re-carried here. A member of
+        ///     that type takes no slot in the tuple holding it, because there is nothing in it to
+        ///     carry: plain EF projects no column for <c>g.Key</c> of <c>GroupBy(o =&gt; new { })</c>,
+        ///     and the client builds it from nothing.
+        /// </summary>
+        private bool IsEmptyCarrier(Type type)
+            => carriers.TryGetValue(type, out MemberInfo[]? members) && members.Length == 0;
 
         protected override Expression VisitMemberInit(MemberInitExpression node)
         {
@@ -760,18 +821,23 @@ internal static class TransparentIdentifierRewriter
                 .Cast<MemberAssignment>()
                 .ToDictionary(b => b.Member.Name, b => b.Expression);
 
-            var arguments = new Expression[members.Length];
+            var arguments = new List<Expression>(members.Length);
             for (int i = 0; i < members.Length; i++)
             {
-                arguments[i] = bound.TryGetValue(members[i].Name, out Expression? value)
-                    ? Visit(value)
+                Expression value = bound.TryGetValue(members[i].Name, out Expression? assigned)
+                    ? assigned
                     // Caught by `Rewrite`, which keeps the original tree. A carrier initialized
                     // with a different member set at two sites is not one this pass can retype.
                     : throw new InvalidOperationException(
                         $"'{node.Type}' is initialized without '{members[i].Name}' here.");
+
+                if (!IsEmptyCarrier(MemberType(members[i])))
+                {
+                    arguments.Add(Visit(value));
+                }
             }
 
-            return TupleCarrier.New(arguments, referenceTyped.Contains(node.Type));
+            return TupleCarrier.New(arguments.Count == 0 ? [EmptySlot] : arguments, referenceTyped.Contains(node.Type));
         }
 
         protected override Expression VisitConstant(ConstantExpression node)
@@ -806,8 +872,17 @@ internal static class TransparentIdentifierRewriter
         {
             if (node.Expression is { } inner
                 && carriers.TryGetValue(inner.Type, out MemberInfo[]? members)
-                && Array.FindIndex(members, m => m.Name == node.Member.Name) is >= 0 and int slot)
+                && Array.FindIndex(members, m => m.Name == node.Member.Name) is >= 0 and int index)
             {
+                // A member of an empty anonymous type took no slot; its value is the empty object,
+                // re-carried as the one-constant tuple every other occurrence of the type is.
+                Type memberType = MemberType(members[index]);
+                if (IsEmptyCarrier(memberType))
+                {
+                    return TupleCarrier.New([EmptySlot], referenceTyped.Contains(memberType));
+                }
+
+                int slot = members.Take(index).Count(m => !IsEmptyCarrier(MemberType(m)));
                 return TupleCarrier.Read(Visit(inner), slot);
             }
 

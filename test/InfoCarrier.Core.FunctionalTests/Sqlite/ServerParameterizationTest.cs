@@ -812,6 +812,50 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A <c>GroupBy</c> on an empty key aggregates at the store, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GroupBy(o =&gt; new { })</c> keys every row on one empty anonymous object. The
+    ///         carrier rewrite gives a key of the caller's anonymous type a tuple, and skipped a key
+    ///         with no member, because a tuple needs at least one slot. So the grouping stayed on
+    ///         the client, and the server sent the whole table for one aggregate:
+    ///         <c>GroupBy_empty_key_Aggregate</c> read 831 orders where EF reads one row.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as that test, its <c>_Key</c> variant and the two
+    ///         <c>Group_by_multiple_aggregate_joining_different_tables</c> methods.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_group_by_an_empty_key_aggregates_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { })
+                .Select(g => g.Sum(b => b.Id))
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> on an empty key whose key is projected aggregates at the store too.
+    /// </summary>
+    /// <inheritdoc cref="A_group_by_an_empty_key_aggregates_at_the_store" />
+    [ConditionalFact]
+    public async Task A_group_by_an_empty_key_projecting_the_key_aggregates_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { })
+                .Select(g => new { g.Key, Sum = g.Sum(b => b.Id) })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>
