@@ -7353,7 +7353,7 @@ change what H1 builds on.
             `eng/measure.sh h1c h1b`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29687,
             Passed: 29449, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
             Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
-      - [ ] **H1d. The capture and the assertion.**
+      - [x] **H1d. The capture and the assertion.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCapture.cs` and its
             `SqlCaptureAttribute : BeforeAfterTestAttribute`. Create
             `test/InfoCarrier.Core.FunctionalTests/SqlCaptureAssemblyInfo.cs`:
@@ -7389,6 +7389,25 @@ change what H1 builds on.
             - `Compare` gives null for equal text with different counts, and a message naming the
               command for a changed statement, an extra one, a missing one, and a missing entry;
             - two rows of one class that print alike get ordinals 1 and 2 (review focus 1).
+
+            **Result, 2026-09-26.** Thirteen pins in `SqlCaptureAssertionTest`, among them the
+            direct side's name, `ParseMode`, and a changed failure mark. Mutation runs show each
+            fails when its rule is broken. **The folder check holds in every mode**: all 176
+            classes of Tiers B and C sit in the folder their namespace names, and three are nested,
+            in `ProxyGraphUpdatesInfoCarrierTest`, which gives `Outer.Inner.wire.sql`. An unknown
+            value of the variable fails each captured test, and only those. **End to end, by hand
+            and not committed**: a `wire` capture of `Sqlite.SqlCaptureTest` wrote its file, with the
+            failed insert marked and the two tests that ran nothing sharing one entry; a normal run
+            passed against it; one edited statement failed with both texts, the file and the capture
+            command; and a capture filtered to one test rewrote that entry and left an edited entry
+            of another test byte for byte (review focus 3). The file was then deleted. Beside the
+            plan: `CurrentTest.Ordinal`, a public `CapturedCommand` constructor for a test that
+            builds one, `SqlCapture.CaseOf` and `ParseMode`, and `OverrideAudit.FindRepositoryDirectory`.
+            Gates: the Release build, 5 warnings and 0 errors, with the three test projects rebuilt.
+            `eng/measure.sh h1d h1c`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29700,
+            Passed: 29462, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
+            Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The spec project's run took
+            7 min 5 s against H1c's 6 min 44 s.
       - [ ] **H1e. `DeviationKind.SqlDiffers` and the two compliance tests.**
             **Files.** Modify `OverrideReasonAttributes.cs`: `SqlDiffers = 1 << 8`, with spec §9's
             meaning. Modify `OverrideAudit.cs`: `SqlDiffers` is legal only on an InfoCarrier

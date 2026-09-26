@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -34,6 +35,7 @@ public sealed class CurrentTest
         TestClass = (test.TestCase.TestMethod.TestClass.Class as IReflectionTypeInfo)?.Type
             ?? throw new InvalidOperationException($"'{test.DisplayName}' has no runtime test class.");
         MethodName = test.TestCase.TestMethod.Method.Name;
+        Ordinal = SqlCapture.NextOrdinal(TestClass, DisplayName);
     }
 
     /// <summary>The test running in this async flow, or null outside one.</summary>
@@ -50,6 +52,12 @@ public sealed class CurrentTest
 
     /// <summary>The test method's name, without the class and the arguments.</summary>
     public string MethodName { get; }
+
+    /// <summary>
+    ///     1, unless an earlier test of the same class had the same <see cref="DisplayName" />: then
+    ///     2, 3, … in the order they ran, which xUnit keeps fixed within a class.
+    /// </summary>
+    public int Ordinal { get; }
 
     /// <summary>
     ///     The commands the server ran for this test until <see cref="Close" />, in the order it ran
@@ -82,7 +90,7 @@ public sealed class CurrentTest
         }
     }
 
-    internal static void Start(ITest test)
+    internal static CurrentTest Start(ITest test)
         => Current.Value = new CurrentTest(test);
 
     internal void Add(CapturedCommand command)
@@ -138,6 +146,12 @@ public enum CapturedCommandKind
 /// </remarks>
 public sealed class CapturedCommand
 {
+    /// <summary>A command as the interceptor saw it, for a test that builds one by hand.</summary>
+    public CapturedCommand(string text, CapturedCommandKind kind, int? count, bool failed)
+        : this(Guid.Empty, text, kind, count, failed)
+    {
+    }
+
     internal CapturedCommand(Guid commandId, string text, CapturedCommandKind kind, int? count, bool failed)
     {
         CommandId = commandId;
@@ -191,6 +205,11 @@ public sealed class CapturedCommand
 ///         <see cref="ITest" /> with its own display name, so each row is named here as well.
 ///     </para>
 ///     <para>
+///         <b>The bus also tells <see cref="SqlCapture" /> how each test ended</b>, and the executor
+///         counts each class's test cases so that the wrapper of the last one can say the class has
+///         ended. A capture run writes a class's file then (#167).
+///     </para>
+///     <para>
 ///         <b>When EF's specification packages move to xUnit v3, <c>TestContext.Current.Test</c>
 ///         replaces this class.</b> <c>Microsoft.EntityFrameworkCore.Specification.Tests</c> 10.0.1
 ///         depends on <c>xunit.core</c> 2.9.3, which is what keeps this suite on v2.
@@ -212,16 +231,31 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
             IEnumerable<IXunitTestCase> testCases,
             IMessageSink executionMessageSink,
             ITestFrameworkExecutionOptions executionOptions)
-            => base.RunTestCases(
-                [.. testCases.Select(testCase => (IXunitTestCase)new TestCase(testCase))],
+        {
+            IXunitTestCase[] cases = [.. testCases];
+            Dictionary<Type, StrongBox<int>> remaining = cases
+                .Select(ClassOf)
+                .OfType<Type>()
+                .GroupBy(type => type)
+                .ToDictionary(group => group.Key, group => new StrongBox<int>(group.Count()));
+
+            base.RunTestCases(
+                [.. cases.Select(testCase => (IXunitTestCase)new TestCase(
+                    testCase,
+                    ClassOf(testCase) is { } type ? (type, remaining[type]) : null))],
                 executionMessageSink,
                 executionOptions);
+        }
+
+        private static Type? ClassOf(IXunitTestCase testCase)
+            => (testCase.TestMethod.TestClass.Class as IReflectionTypeInfo)?.Type;
     }
 
     /// <summary>
-    ///     The test case it wraps, in every member but one: the bus it runs on.
+    ///     The test case it wraps, in every member but one: the bus it runs on. It also counts down
+    ///     its class's test cases, and the last one to return says that the class has ended.
     /// </summary>
-    private sealed class TestCase(IXunitTestCase inner) : IXunitTestCase
+    private sealed class TestCase(IXunitTestCase inner, (Type Class, StrongBox<int> Remaining)? testClass) : IXunitTestCase
     {
         public string DisplayName => inner.DisplayName;
 
@@ -253,30 +287,69 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
         public void Serialize(IXunitSerializationInfo info)
             => inner.Serialize(info);
 
-        public Task<RunSummary> RunAsync(
+        public async Task<RunSummary> RunAsync(
             IMessageSink diagnosticMessageSink,
             IMessageBus messageBus,
             object[] constructorArguments,
             ExceptionAggregator aggregator,
             CancellationTokenSource cancellationTokenSource)
-            => inner.RunAsync(
+        {
+            RunSummary summary = await inner.RunAsync(
                 diagnosticMessageSink,
                 new MessageBus(messageBus),
                 constructorArguments,
                 aggregator,
                 cancellationTokenSource);
+
+            if (testClass is var (type, remaining) && Interlocked.Decrement(ref remaining.Value) == 0)
+            {
+                SqlCapture.ClassFinished(type);
+            }
+
+            return summary;
+        }
     }
 
     /// <summary>
-    ///     The bus it wraps, which sets <see cref="CurrentTest" /> as each test starts.
+    ///     The bus it wraps, which sets <see cref="CurrentTest" /> as each test starts, and tells
+    ///     <see cref="SqlCapture" /> how each test that ran ended.
     /// </summary>
+    /// <remarks>
+    ///     One bus serves one test case, whose tests run one after another, so one test at a time is
+    ///     tracked here. A skipped test runs no statement and gets no entry.
+    /// </remarks>
     private sealed class MessageBus(IMessageBus inner) : IMessageBus
     {
+        private CurrentTest? _test;
+        private bool _failed;
+        private bool _skipped;
+
         public bool QueueMessage(IMessageSinkMessage message)
         {
-            if (message is ITestStarting starting)
+            switch (message)
             {
-                CurrentTest.Start(starting.Test);
+                case ITestStarting starting:
+                    _test = CurrentTest.Start(starting.Test);
+                    _failed = false;
+                    _skipped = false;
+                    break;
+
+                case ITestFailed:
+                    _failed = true;
+                    break;
+
+                case ITestSkipped:
+                    _skipped = true;
+                    break;
+
+                case ITestFinished when _test is not null:
+                    if (!_skipped)
+                    {
+                        SqlCapture.TestFinished(_test, _failed);
+                    }
+
+                    _test = null;
+                    break;
             }
 
             return inner.QueueMessage(message);

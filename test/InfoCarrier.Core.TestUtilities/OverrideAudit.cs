@@ -164,6 +164,14 @@ public static class OverrideAudit
         => FindRepositoryPath(relativePath, File.Exists)
             ?? throw new FileNotFoundException($"'{relativePath}' is not above '{AppContext.BaseDirectory}'.");
 
+    /// <summary>
+    ///     Walks up from the test binaries to the folder at <paramref name="relativePath" /> in the
+    ///     repository.
+    /// </summary>
+    public static string FindRepositoryDirectory(string relativePath)
+        => FindRepositoryPath(relativePath, Directory.Exists)
+            ?? throw new DirectoryNotFoundException($"'{relativePath}' is not above '{AppContext.BaseDirectory}'.");
+
     private static string? FindRepositoryPath(string relativePath, Func<string, bool> exists)
     {
         for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
