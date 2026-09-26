@@ -7006,6 +7006,10 @@ chosen; it does not mean this comes before Y.
 
 ## Phase H — every test's server SQL, beside plain EF Core's (#167)
 
+> **SUPERSEDED on 2026-09-26 by ADR-014**, with the spec it implements. H0, H1a and H1b go forward
+> under the same names; H1c to H1e and H2 to H5 do not. The replacement is Phase H in `main`'s copy
+> of this file, whose steps from H2 on are new. The text below is kept as it was written.
+
 **Not a milestone.** The spec is [`docs/sql-capture.md`](../../sql-capture.md), agreed with the owner on
 2026-09-26. This phase implements it in the spec's order of work (§13). Read the spec first: this
 plan argues from it and does not repeat its reasons.

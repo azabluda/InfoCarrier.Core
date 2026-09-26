@@ -1,5 +1,14 @@
 # SQL capture: every test's statements, against plain EF Core (#167)
 
+> **SUPERSEDED on 2026-09-26 by ADR-014**, which is in `main`'s `docs/decisions.md` and not on this
+> branch. The owner withdrew the committed files: a slow run's output is never committed and never
+> asserted, and #167 compares each test with plain EF Core live, in one process. What goes forward from this
+> spec is `CurrentTest` and its test framework (H0), the command capture (H1a), `SqlNormalizer`
+> (H1b), `SqlCapture.Compare` and `SameStatements`, and `DeviationKind.SqlDiffers`. The files, their
+> assertion, the folder check and the compliance tests on files do not. The spike that proved the
+> live form is on `experiment/live-comparison`; the plan that replaces §13 is Phase H in `main`'s
+> `docs/plans/v10/implementation-plan.md`. The text below is kept as it was agreed.
+
 **Status: design, agreed with the owner on 2026-09-26. Not implemented.** This document is the spec
 for #167. Its decisions were taken one question at a time in a brainstorming session; each is
 recorded in §2 with the alternative it beat, so that a later reader can tell a decision from a
