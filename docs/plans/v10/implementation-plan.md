@@ -7399,6 +7399,21 @@ claims a runtime difference. The amendment proposed:
       rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
       28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+- [x] **H14. `EnsureCreated` runs no statement on this client: a reason, not a fix.** On the branch
+      `live-comparison-ensure-created`, on top of H13. `Throws_on_concurrent_query_list` and
+      `_first` pass, and the store sees one statement fewer for each: the base calls
+      `EnsureCreatedResilientlyAsync()`, EF's SQLite creator answers it with
+      `SELECT COUNT(*) FROM "sqlite_master" …`, and `InfoCarrierDatabaseCreator` reports success and
+      runs nothing, because schema operations are the server's. The fix would be a remote schema
+      operation, which this provider does not offer, so this is the fallback the owner's rule allows:
+      two overrides with EF's body and an `[InfoCarrierDesign]` reason flagged `SqlDiffers`, naming
+      `docs/architecture.md` D7. Test only.
+
+      Slow run of Tier B: **`Passed: 19375, Failed: 96, Skipped: 155, Total: 19626`**, against
+      `Failed: 100`. **2 methods left the red list and none joined it**, and none of the 51 that
+      stayed red changed its verdict or its read counts. The class with `OverrideAuditTest`: **Passed:
+      936, Failed: 0, Skipped: 1, Total: 937**. Normal run, `eng/measure.sh ensure-created last-row`:
+      **FAILING 0, TOTAL 29933**, FIXED none, BROKEN none, REASONS unchanged.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

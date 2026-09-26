@@ -40,6 +40,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         other 27 pass — an override is written where a test fails, not where the reference
 ///         provider has one.
 ///     </para>
+///     <para>
+///         <b>Two more carry a reason and EF's own body, since 2026-09-26.</b>
+///         <c>Throws_on_concurrent_query_list</c> and <c>_first</c> pass, and #167's slow run found
+///         that the store sees one statement fewer for each, because this client's
+///         <c>EnsureCreated</c> runs nothing. The reason says so, flagged <c>SqlDiffers</c>.
+///     </para>
 /// </remarks>
 public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
     : NorthwindMiscellaneousQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
@@ -219,6 +225,43 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
         Justification = Upstream.GaveNoReason)]
     public override Task Where_nanosecond_and_microsecond_component(bool async)
         => AssertTranslationFailed(() => base.Where_nanosecond_and_microsecond_component(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <para>
+    ///         <b>The body is EF's; the statements the store sees are one fewer.</b> The base calls
+    ///         <c>Database.EnsureCreatedResilientlyAsync()</c> before it starts the two queries, and
+    ///         EF's SQLite creator answers it with <c>SELECT COUNT(*) FROM "sqlite_master" …</c>. This
+    ///         client has no database: its <c>InfoCarrierDatabaseCreator</c> reports success and runs
+    ///         nothing, because schema operations are the server's, past the capture point, and a
+    ///         client that could create or delete the server's database is not something this
+    ///         provider offers. The queries the test is about run the same statement both ways.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, 2026-09-26. A reason and not a fix, because the fix would be
+    ///         a remote schema operation.
+    ///     </para>
+    /// </remarks>
+    [InfoCarrierDesign(
+        Decisions.Architecture,
+        Decisions.ClientServices,
+        Justification = EnsureCreatedIsTheServers,
+        Deviation = DeviationKind.SqlDiffers)]
+    public override Task Throws_on_concurrent_query_list(bool async)
+        => base.Throws_on_concurrent_query_list(async);
+
+    /// <inheritdoc cref="Throws_on_concurrent_query_list" />
+    [InfoCarrierDesign(
+        Decisions.Architecture,
+        Decisions.ClientServices,
+        Justification = EnsureCreatedIsTheServers,
+        Deviation = DeviationKind.SqlDiffers)]
+    public override Task Throws_on_concurrent_query_first(bool async)
+        => base.Throws_on_concurrent_query_first(async);
+
+    private const string EnsureCreatedIsTheServers =
+        "The client has no database, so EnsureCreated runs no statement here; the server's store checks for its "
+        + "tables where plain EF Core's client does.";
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(
