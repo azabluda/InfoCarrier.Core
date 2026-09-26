@@ -7309,7 +7309,7 @@ change what H1 builds on.
             rebuilt. `eng/measure.sh h1b h1a`: `InfoCarrier.Core.FunctionalTests` `Total tests:
             29678, Passed: 29440, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests:
             234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
-      - [ ] **H1c. The file: one reader and one writer.**
+      - [x] **H1c. The file: one reader and one writer.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCaptureFile.cs`. Test in
             `test/InfoCarrier.Core.FunctionalTests/SqlCaptureFileTest.cs`.
             **Produces.**
@@ -7342,6 +7342,17 @@ change what H1 builds on.
             - a case with no commands is written as headers alone, which differs from a missing
               case;
             - a name with `\n` and `--` stays one header line and reads back (review focus 5).
+
+            **Result, 2026-09-26.** Nine pins in `SqlCaptureFileTest`, four of them beyond the list:
+            a missing file reads as empty, a `TagWith` line that reads like a header stays in its
+            command, and **text the reader would split differently is refused by `Write`**, an
+            empty line or a line starting `-- #n+1 `, rather than written and misread. One run with
+            grouping, header escaping, the refusal and the command boundary each broken fails four.
+            The file ends with one LF, and entries are separated by one empty line. Gates: the
+            Release build, 5 warnings and 0 errors, with the three test projects rebuilt.
+            `eng/measure.sh h1c h1b`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29687,
+            Passed: 29449, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
+            Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
       - [ ] **H1d. The capture and the assertion.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCapture.cs` and its
             `SqlCaptureAttribute : BeforeAfterTestAttribute`. Create
