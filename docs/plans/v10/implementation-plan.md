@@ -7252,6 +7252,31 @@ claims a runtime difference. The amendment proposed:
       rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
       28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+- [x] **H8. A subquery that reads nothing of the row runs in the projection's statement.** On the
+      branch `live-comparison-closed-subquery`, on top of H7. The second gap parked on 2026-09-26:
+      `Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy` ran two statements where plain
+      EF runs one with a scalar subquery, and the second statement had `OFFSET @p` where EF writes
+      `OFFSET 1`. The subquery is closed, so `ProjectionRewriter.CollectFragments` left it in the
+      client-side rebuild like a constant, and the client ran it on its own.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_subquery_reading_nothing_of_the_row_runs_in_the_same_statement`.
+      2. **The fix**: `ReadsTheStore` makes a closed subtree that contains a query root a fragment,
+         the exception `CallsMappedFunction` already makes for a store function.
+      3. **The next slow run**: `Passed: 19296, Failed: 165, Skipped: 155, Total: 19616`, against
+         `Failed: 169`. 163 of the 165 are comparison reds in 85 methods: **3 methods left the red
+         list and none joined it**, and none of those that stayed red changed its verdict or its
+         read counts. The other 2 are `NorthwindGroupBy.Complex_query_with_groupBy_in_subquery3`,
+         one of the 22 methods plain EF on SQLite refuses: its subquery now reaches the store in
+         the projection's statement, and SQLite refuses it with EF's own `ApplyNotSupported`. EF's
+         `NorthwindGroupByQuerySqliteTest` overrides it with exactly that assertion, so the override
+         is adopted, as the rule for a newly red SQLite test says, and 21 of the 22 remain.
+
+      Normal run, `eng/measure.sh closed-subquery nested-single`: **FAILING 2, TOTAL 29923**, and the
+      2 are those two tests, BROKEN with `ApplyNotSupported`; the class with EF's override adopted
+      then ran green on its own (below). `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

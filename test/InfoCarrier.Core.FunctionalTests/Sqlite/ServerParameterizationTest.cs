@@ -615,6 +615,40 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A subquery in a projection that reads nothing of the row runs in the same statement, as it
+    ///     does in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The projection into a client type is rewritten into a server-side tuple of the values
+    ///         that read the row. A value that reads nothing of it stayed in the client-side rebuild,
+    ///         which is right for a constant, and the client then ran this subquery as a statement
+    ///         of its own. EF's own client writes it as a scalar subquery in the one statement, with
+    ///         its <c>OFFSET 1</c> a literal; the second statement had <c>OFFSET @p</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy</c>, in two classes. It
+    ///         was parked on 2026-09-26 for the slow run to show it.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_subquery_reading_nothing_of_the_row_runs_in_the_same_statement()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => b.Id < 3)
+                .Select(b => new
+                {
+                    b.Id,
+                    Second = context.Set<Blog>().OrderBy(o => o.Id).Skip(1).FirstOrDefault()!.Title,
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

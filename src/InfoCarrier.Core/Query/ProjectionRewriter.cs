@@ -1516,6 +1516,27 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         mapped call, which has always worked.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     Whether a subtree queries the store: it contains a query root.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> A subquery that reads nothing of
+    ///         the row is closed, so <see cref="CollectFragments" /> left it in the client-side
+    ///         rebuild like a constant, and the client ran it as a statement of its own:
+    ///         <c>Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy</c> ran two statements
+    ///         where EF's own client writes one, with a scalar subquery in it.
+    ///     </para>
+    ///     <para>
+    ///         It is the same exception to "a closed subtree is the client's" that
+    ///         <see cref="CallsMappedFunction" /> makes, for a related reason: a query is the
+    ///         store's work, and EF puts it in the statement of the projection that holds it.
+    ///     </para>
+    /// </remarks>
+    private static bool ReadsTheStore(Expression node)
+        => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
+            || ChildrenOf(node).Any(ReadsTheStore);
+
     private bool CallsMappedFunction(Expression node)
     {
         if (_model is null)
@@ -1539,8 +1560,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     <para>
     ///         A fragment must read the row: a body constant needs no round trip and stays on the
     ///         client, where it costs nothing. <b>Unless the client cannot compute it</b>, which
-    ///         is a mapped store function and nothing else. See
-    ///         <see cref="CallsMappedFunction" />.
+    ///         is a mapped store function (<see cref="CallsMappedFunction" />), <b>or it queries the
+    ///         store</b> (<see cref="ReadsTheStore" />). Until 2026-09-26 this read "which is a mapped
+    ///         store function and nothing else", and a closed subquery then ran as a statement of its
+    ///         own.
     ///     </para>
     ///     <para>
     ///         A fragment taken from the branch of a conditional carries that conditional's test in
@@ -1562,7 +1585,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // cheaper there — unless it calls a function only the store has. See above.
         if (facts.ServerOk
             && facts.Free.All(rowParameters.Contains)
-            && (facts.Free.Count > 0 || CallsMappedFunction(node)))
+            && (facts.Free.Count > 0 || CallsMappedFunction(node) || ReadsTheStore(node)))
         {
             fragments.Add(node);
             if (guard is not null)
