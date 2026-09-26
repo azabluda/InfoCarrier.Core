@@ -434,6 +434,39 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A captured variable the query reads twice is ONE parameter over the wire, as it is in plain
+    ///     EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's funcletizer gives both reads of <c>title</c> one parameter on the client. The
+    ///         client then replaced each read with a <see cref="ParameterBox{T}" /> of its own, and
+    ///         the server's funcletizer, which keeps one parameter only for values that compare
+    ///         equal, saw two: <c>@p0 ... @p1</c> where plain EF sends <c>@p0 ... @p0</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Using_same_parameter_twice_in_query_generates_one_sql_parameter</c> and about 54
+    ///         methods more of the same shape, among them the bulk deletes with
+    ///         <c>Skip(n).Take(n)</c>. Compared positionally with <see cref="SqlNormalizer" />,
+    ///         because this class's own normalization renames every parameter to <c>@p</c>, which is
+    ///         why none of its promises saw it.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_captured_variable_read_twice_is_one_parameter()
+    {
+        string title = "beta";
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => b.Title == title || b.Title + b.Title == title)
+                .Select(b => b.Id)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     A collection the box cannot hand back, category 3 of issue #62.
     /// </summary>
     /// <remarks>
@@ -1587,6 +1620,57 @@ public partial class ServerParameterizationTest
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> against the client context and again against the server
+    ///     context, and returns the one statement the store saw for each, with its parameters, table
+    ///     aliases and column aliases made positional by <see cref="SqlNormalizer" />.
+    /// </summary>
+    /// <remarks>
+    ///     Positional, not renamed: two uses of one parameter stay <c>@p0 ... @p0</c> and two
+    ///     parameters stay <c>@p0 ... @p1</c>, which <see cref="Normalize" /> makes the same.
+    /// </remarks>
+    private async Task<(string OverTheWire, string Directly)> PositionalStatementBothWays(Func<DbContext, Task> run)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            await run(client);
+        }
+
+        string overTheWire = PositionalStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            await run(server);
+        }
+
+        return (overTheWire, PositionalStatement(Drain()));
+    }
+
+    /// <summary>The one statement in <paramref name="logged" />, made positional by <see cref="SqlNormalizer" />.</summary>
+    private static string PositionalStatement(string[] logged)
+    {
+        string entry = Assert.Single(logged);
+        string[] lines = entry.Split('\n');
+        int start = Array.FindIndex(lines, l => l.TrimStart().StartsWith("SELECT", StringComparison.Ordinal));
+        Assert.True(start >= 0, "no SELECT found in: " + entry);
+        return SqlNormalizer.Normalize(string.Join('\n', lines[start..].Select(l => l.Trim())));
     }
 
     /// <summary>

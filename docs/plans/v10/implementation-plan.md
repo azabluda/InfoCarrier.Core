@@ -7158,6 +7158,35 @@ claims a runtime difference. The amendment proposed:
       - `DeviationKind.SqlDiffers`, `SqlCapture.Compare` and `SameStatements` from `sql-capture`.
 
       Done when a slow run of Tier B is red only for differences, and a normal run is unchanged.
+- [x] **H5. The loop, shown on one finding: a captured variable read twice is one parameter.**
+      The owner asked to see the mechanism in real action before any of it reaches `main`, and
+      that "the best way to deal with a slow red is to fix the bug in prod" (2026-09-26). So one
+      family went through the whole loop, on the branch `live-comparison-one-parameter`, on top of
+      H3:
+
+      1. **The slow run showed it red**: 187 red methods after H3, EF's own
+         `Using_same_parameter_twice_in_query_generates_one_sql_parameter` among them, plain EF
+         sending `@p0 ... @p0` where InfoCarrier sent `@p0 ... @p1`.
+      2. **A promise went red in a normal run**:
+         `ServerParameterizationTest.A_captured_variable_read_twice_is_one_parameter`, compared
+         positionally with `SqlNormalizer`, because the class's own normalization renames every
+         parameter to `@p` and none of its promises could see it. Seen red with only the test
+         committed.
+      3. **The fix**: `SubstituteParametersExpressionVisitor` gives every read of one query
+         parameter the same `ParameterBox<T>`, where it made a box per read. The mapper sends a
+         back-reference for an object it has already mapped in the same message, so the server
+         rebuilds one box, and EF's funcletizer, which keeps one parameter for values its
+         `ExpressionEqualityComparer` finds equal, gives the two reads one parameter. No public
+         type and no wire format changed.
+      4. **The next slow run**: `Passed: 19204, Failed: 249, Skipped: 155, Total: 19608`, against
+         `Failed: 367` before. **59 methods left the red list and none joined it**, and no test
+         that stayed red changed its verdict; the family also held the four bulk updates with
+         `Skip(n).Take(n)` and 20 Gears of War methods.
+
+      Normal run, `eng/measure.sh one-parameter h3`: **FAILING 0, TOTAL 29915**, FIXED none, BROKEN
+      none, REASONS unchanged. `trim-ratchet.sh` OK at 100 <= 100. `InfoCarrier.Core.TransportTests`
+      **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5
+      warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
