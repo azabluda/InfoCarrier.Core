@@ -128,8 +128,17 @@ it, so the file format has one reader and one writer.
 - **Parameter names** become `@p0`, `@p1`, … in order of first appearance. The owner's rule:
   a name does not matter, and a parameter reaches the server inside a `ParameterBox<T>`, so EF names
   it `@Value` where the caller wrote `city`.
-- **Table aliases and column aliases** get positional names the same way, so that the tuple's
-  `Item1` against the anonymous type's `Title` does not differ.
+- **Table aliases** become `"t0"`, `"t1"`, … the same way, as alias and as qualifier.
+- **Column aliases go**, and a column read through a derived table (a subquery, or a function such
+  as `json_each`) becomes `"c0"`, `"c1"`, … within its table alias, in order of first appearance. A
+  base table's columns keep their names. **Amended 2026-09-26 by step H1b.** This said that column
+  aliases get positional names, so that the tuple's `Item1` against the anonymous type's `Title`
+  does not differ. **EF writes no `AS` when an alias equals the column's own name**, so
+  InfoCarrier's `"c"."Id" AS "Item1"` is plain EF's `"c"."Id"`, and a positional name cannot pair an
+  alias with no alias. Over the 97,685 statements step 0 recorded, the normalizer is idempotent and
+  leaves no alias or parameter name behind.
+- **Lines**: a line break stays, trailing whitespace goes, CRLF becomes LF, and an empty line goes,
+  because the file format ends an entry with one (§5).
 - **Literals and structure stay.** A literal where EF has a parameter, or the reverse, is a defect
   (`docs/test-policy.md`, the owner's rule of 2026-09-15), and a structural change that can change
   the plan is what the comparison is for.

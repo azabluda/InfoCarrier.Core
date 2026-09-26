@@ -7257,7 +7257,7 @@ change what H1 builds on.
             Passed: 29424, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
             Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The six new tests are the five
             pins and H0's eighth pin, which came after `h0`.
-      - [ ] **H1b. The normalizer.**
+      - [x] **H1b. The normalizer.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlNormalizer.cs`. Test in
             `test/InfoCarrier.Core.FunctionalTests/SqlNormalizerTest.cs`, which runs no store.
             **Produces.** `public static string SqlNormalizer.Normalize(string commandText)`.
@@ -7296,6 +7296,19 @@ change what H1 builds on.
             - `UPDATE "Customers" AS "c" SET …` and `LEFT JOIN LATERAL (…) AS "s" ON TRUE`
               rename their aliases;
             - a batch `INSERT …; SELECT …` numbers its parameters across the whole command.
+
+            **Result, 2026-09-26.** Sixteen pins in `SqlNormalizerTest`. Two mutation runs show each
+            can fail: 13 fail when the normalizer numbers and removes nothing, and 12 when it treats
+            every table as derived, a literal as a parameter and `CAST`'s `AS` as an alias. A
+            temporary probe ran it over the 97,685 statements of H0's serial run: 10,324 distinct
+            texts became 10,154, with no exception, none that a second pass changes, and no alias or
+            parameter name left. **Rule 6 applies to a literal too**: a line inside a multi-line
+            literal loses its trailing whitespace, and an empty line inside one goes, on both sides
+            alike, because the file ends an entry at an empty line. Spec §4.3 carries rules 4, 5
+            and 6. Gates: the Release build, 5 warnings and 0 errors, with the three test projects
+            rebuilt. `eng/measure.sh h1b h1a`: `InfoCarrier.Core.FunctionalTests` `Total tests:
+            29678, Passed: 29440, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests:
+            234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
       - [ ] **H1c. The file: one reader and one writer.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlCaptureFile.cs`. Test in
             `test/InfoCarrier.Core.FunctionalTests/SqlCaptureFileTest.cs`.
