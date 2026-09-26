@@ -885,6 +885,42 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A filter inside a <c>SelectMany</c> over a navigation, whose elements are built into a
+    ///     client type, runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The inner projection became a server-side tuple and a client-side rebuild, inside the
+    ///         <c>SelectMany</c>'s collection selector. So the <c>SelectMany</c> read the rebuild and
+    ///         could not ship, and the outer projection shipped each blog's posts with every tag of
+    ///         every post. This client then filtered the tags and built the cards; plain EF filters
+    ///         at the store.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>SelectMany_with_client_eval_with_constructor</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_filter_inside_a_nested_SelectMany_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => new
+                {
+                    b.Id,
+                    Cards = b.Posts
+                        .SelectMany(p => p.Tags
+                            .Where(t => t.Id < 10)
+                            .Select(t => new BlogCard { Id = t.Id, Title = t.Label }))
+                        .ToArray(),
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

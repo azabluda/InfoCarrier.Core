@@ -7414,6 +7414,29 @@ claims a runtime difference. The amendment proposed:
       stayed red changed its verdict or its read counts. The class with `OverrideAuditTest`: **Passed:
       936, Failed: 0, Skipped: 1, Total: 937**. Normal run, `eng/measure.sh ensure-created last-row`:
       **FAILING 0, TOTAL 29933**, FIXED none, BROKEN none, REASONS unchanged.
+- [x] **H15. A `SelectMany` over a rebuilt inner projection flattens the server's tuples.** On the
+      branch `live-comparison-selectmany-rebuild`, on top of H14. Inside a projection,
+      `c.Orders.SelectMany(o => o.OrderDetails.Where(…).Select(od => new Dto(…)))` kept the inner
+      rebuild inside the collection selector, so the `SelectMany` read client code and could not
+      ship. The outer projection then carried every order with every detail, and this client ran the
+      filter: `SelectMany_with_client_eval_with_constructor` read 70 rows where plain EF reads 66.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_filter_inside_a_nested_SelectMany_over_a_client_type_runs_at_the_store`, over blogs,
+         posts and tags.
+      2. **The fix**: `ProjectionRewriter.TryMoveBelowReassembly` moves the rebuild above a
+         `SelectMany` whose collection selector returns a reassembly that does not read the
+         selector's row. `TryHoistCollectionProjection` already did this for a `Queryable`
+         `SelectMany` before it is visited; this covers the `Enumerable` one inside a projection.
+      3. **The next slow run**: `Passed: 19378, Failed: 94, Skipped: 155, Total: 19627`, against
+         `Failed: 96`. **1 method left the red list and none joined it**, and none of the 50 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh selectmany-rebuild ensure-created`: **FAILING 0, TOTAL 29934**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 105 <= 105: the move is
+      in a member that already carried its diagnostic. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

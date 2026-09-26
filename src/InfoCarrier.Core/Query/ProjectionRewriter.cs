@@ -602,6 +602,20 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///             A predicate given to a terminal operator is a <c>Where</c> under the operator
     ///             without one, which is how EF normalizes it before translating.
     ///         </item>
+    ///         <item>
+    ///             A <c>SelectMany</c> whose collection selector returns a reassembly flattens the
+    ///             tuples, and the rebuild goes above it: <c>SelectMany(s, o =&gt; Select(server,
+    ///             rebuild))</c> is <c>Select(SelectMany(s, o =&gt; server), rebuild)</c> when the
+    ///             rebuild does not read <c>o</c>. Since 2026-09-27: inside a projection,
+    ///             <c>c.Orders.SelectMany(o =&gt; o.OrderDetails.Where(…).Select(od =&gt; new
+    ///             Dto(…)))</c> kept the rebuild inside the selector, so the <c>SelectMany</c> read
+    ///             client code, the outer projection carried every order with every detail, and this
+    ///             client filtered them (<c>SelectMany_with_client_eval_with_constructor</c>, 70 rows
+    ///             where plain EF reads 66). <see cref="TryHoistCollectionProjection" /> does the same
+    ///             for a <see cref="Queryable" /> <c>SelectMany</c> before it is visited; this one
+    ///             runs after the selector was rewritten in place, whose rebuild reads only the tuple
+    ///             when every value of an enclosing row went into it (<see cref="_enclosing" />).
+    ///         </item>
     ///     </list>
     /// </remarks>
     private Expression? TryMoveBelowReassembly(MethodCallExpression call)
@@ -609,8 +623,35 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         if (call.Method.DeclaringType is not { } declaring
             || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
             || !call.Method.IsGenericMethod
-            || call.Arguments.Count is 0 or > 2
-            || call.Arguments[0] is not MethodCallExpression reassembly
+            || call.Arguments.Count is 0 or > 2)
+        {
+            return null;
+        }
+
+        if (call.Method.Name == nameof(Queryable.SelectMany))
+        {
+            if (StripQuotes(call.Arguments[^1]) is not LambdaExpression { Parameters: [var outer], Body: MethodCallExpression inner }
+                || inner.Method.DeclaringType != declaring
+                || !_reassemblies.Contains(inner)
+                || StripQuotes(inner.Arguments[1]) is not LambdaExpression { Parameters: [var tuple] } innerRebuild
+                || ReferencesParameter(innerRebuild.Body, outer))
+            {
+                return null;
+            }
+
+            // Typed as the operator declares it, IEnumerable<T>, which a queryable server half is too.
+            LambdaExpression collector = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(outer.Type, typeof(IEnumerable<>).MakeGenericType(tuple.Type)),
+                inner.Arguments[0],
+                outer);
+            MethodCallExpression flattened = Expression.Call(
+                call.Method.GetGenericMethodDefinition().MakeGenericMethod(outer.Type, tuple.Type),
+                call.Arguments[0],
+                call.Arguments[^1] is UnaryExpression { NodeType: ExpressionType.Quote } ? Expression.Quote(collector) : collector);
+            return Rebuilt(inner, flattened, call.Method.GetGenericArguments()[^1]);
+        }
+
+        if (call.Arguments[0] is not MethodCallExpression reassembly
             || !_reassemblies.Contains(reassembly)
             || StripQuotes(reassembly.Arguments[1]) is not LambdaExpression { Parameters: [var row] } rebuild)
         {
