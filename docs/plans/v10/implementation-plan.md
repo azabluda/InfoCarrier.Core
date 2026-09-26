@@ -7043,12 +7043,32 @@ run is not a gate (decision 5), so a red there blocks nothing.
 | `SqlNormalizer` | Makes parameter names, table aliases and derived-table columns positional | Only its own tests | H1b |
 | The ADR-014 amendment | Decision 3 narrowed and the scope stated, below | No | H2 |
 | The plain-EF client | `DirectClient`, a per-flow side that a store reads once, when it is created; a `.direct` store of its own | No, except `UseTestTransaction` at 28 call sites, which is `UseInfoCarrierTransaction` on the wire side | H3 |
-| The slow mode | `INFOCARRIER_LIVE_COMPARE=<folder>` runs each test twice and turns a difference red | No: off unless the variable is set | H3 |
+| The slow mode | `INFOCARRIER_LIVE_COMPARE=1` runs each test twice and turns a difference red. It writes no file | No: off unless the variable is `1` | H3 |
 | `DeviationKind.SqlDiffers` | The flag a reason carries when it states an SQL difference | No | H3 |
 | Deletions | `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`, `ServerSqlLog`, `ServerSqlLogInterceptor`, `ServerSqlLogTest` and the log's markers | Removes an opt-in | H4 |
 
-**Nothing is committed from a slow run**, so there is no file for a red to be about. **What a red
-means** (guardrail 2): a person reads the two sides in the failure message and then either fixes the
+**A slow run writes no file (owner, 2026-09-26: "file output adds no value")**, so nothing of it can
+be committed and there is no file for a red to be about. Everything a red test has to say is in its
+failure message, in a format a person reads in the console and a script parses out of the console or
+the TRX's `<Message>` element:
+
+```text
+[live-compare] <label> <verdict> <display name>
+<one sentence>
+--- plain EF Core: <outcome>, <n> statement(s)
+  | <the plain-EF failure's text, up to six lines, when it failed>
+-- #1 reads 3
+<statement, normalized>
+--- InfoCarrier: <outcome>, <n> statement(s)
+-- #1 ...
+[/live-compare]
+```
+
+The label is `difference-without-reason`, `reason-without-difference` or `no-direct-run`; the verdict
+is `reads`, `writes`, `order`, `failmark`, `counts` and `outcome` joined by `+`, or `same`. No line
+of the message is blank, because a normalized statement never has one, so a count of the reds by
+kind is one `grep` and `uniq -c`; the spike measured it (`514a691`). **What a red means**
+(guardrail 2): a person reads the two sides in the failure message and then either fixes the
 provider, with a promise in `Sqlite/ServerSqlTest.cs` or `ServerParameterizationTest` that runs in
 every normal run (decision 4), or adds an InfoCarrier reason flagged `SqlDiffers`. Never "run a tool
 and commit its output". CI and a normal run's results do not change (decision 5).
@@ -7104,8 +7124,7 @@ claims a runtime difference. The amendment proposed:
         The H1a review chose `ReadCount` so that no provider meets a reader it did not create. That
         risk stays, and it is confined to the slow run, where it would show on both sides at once;
       - the judgement at the test's result message, where the outcome is known: a pass that the
-        comparison rejects is reported as a failure, and a red message shows the plain-EF failure's
-        text as well as its type;
+        comparison rejects is reported as a failure, in the message format above;
       - the reverse half of decision 3 at a method's last row, found by a countdown per method and by
         the plain-EF run's row count inside the last test case;
       - `DeviationKind.SqlDiffers`, `SqlCapture.Compare` and `SameStatements` from `sql-capture`.
