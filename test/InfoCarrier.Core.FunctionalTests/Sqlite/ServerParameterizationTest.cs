@@ -856,6 +856,35 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     <c>Last</c> above a projection into a client type reverses the ordering at the store and
+    ///     reads one row, as plain EF Core does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>First</c> and <c>Single</c> above a client-side rebuild send their row limit to
+    ///         the server, and <c>Last</c> did not, because it needs the ordering reversed: the
+    ///         server sent every row and this client kept the last. EF writes
+    ///         <c>ORDER BY ... DESC LIMIT 1</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Return_type_of_singular_operator_is_preserved</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_Last_over_a_client_type_reads_one_row_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Title)
+                .ThenByDescending(b => b.Id)
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .LastOrDefaultAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

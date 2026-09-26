@@ -290,5 +290,20 @@
 #
 # `total` rises with ours, 1148 -> 1149: EFCore is unchanged at 864.
 
-ours=104
-total=1149
+# 2026-09-26, 104 -> 105 (#167 step H13: `Last` above a client-side rebuild reverses the ordering
+# at the server, one diagnostic).
+#
+# `First` and `Single` above a projection this client rebuilds sent their row limit to the server,
+# and `Last` did not, because it needs the ordering reversed: the server sent every row and this
+# client kept the last (`Return_type_of_singular_operator_is_preserved`). EF writes
+# `ORDER BY ... DESC LIMIT 1`, and `QuerySplitter.WithOrderingReversed` now turns the shipped
+# query's ordering chain round for it.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: each reversed operator is instantiated
+# for the element and key types the caller's query decides. The four `MethodInfo`s it needs come
+# from delegates, R149's lesson, so the lookups cost nothing.
+#
+# `total` rises with ours, 1149 -> 1150: EFCore is unchanged at 864.
+
+ours=105
+total=1150

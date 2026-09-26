@@ -7375,6 +7375,30 @@ claims a runtime difference. The amendment proposed:
       29932**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H13. `Last` above a client-side rebuild reverses the ordering at the store.** On the
+      branch `live-comparison-last-row`, on top of H12. `First` and `Single` above a projection
+      this client rebuilds sent their row limit to the server, and `Last` did not, because it needs
+      the ordering reversed: the server sent every row and this client kept the last
+      (`Return_type_of_singular_operator_is_preserved`). EF writes `ORDER BY ... DESC LIMIT 1`.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_Last_over_a_client_type_reads_one_row_at_the_store`, over an `OrderBy` and a
+         `ThenByDescending`.
+      2. **The fix**: `QuerySplitter.WithRowLimitForTerminalOperator` handles `Last` and
+         `LastOrDefault`: `WithOrderingReversed` turns the shipped query's ordering chain round,
+         through the projections above it, and a limit of one follows. Paging under `Last`, and a
+         query with no ordering, stay as they were. The remark on `RowsForTerminalOperator` that
+         called `Last` absent is corrected, quoting it.
+      3. **The next slow run**: `Passed: 19371, Failed: 100, Skipped: 155, Total: 19626`, against
+         `Failed: 102`. **1 method left the red list and none joined it**, and none of the 53 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18747, Failed: 0, Skipped: 46, Total:
+      18793**. Normal run, `eng/measure.sh last-row empty-group-key`: **FAILING 0, TOTAL 29933**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 105 <= 105, a deliberate
+      rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
