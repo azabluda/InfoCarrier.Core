@@ -7212,7 +7212,7 @@ change what H1 builds on.
       `Total tests: 234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The pin class
       after the eighth pin: `Total tests: 8, Passed: 8`.
 
-- [ ] **H1. Capture: the tagged recorder, the normalizer, the file, the assertion hook, and the
+- [x] **H1. Capture: the tagged recorder, the normalizer, the file, the assertion hook, and the
       compliance tests.** No class is adopted, so a normal run asserts nothing new.
 
       - [x] **H1a. Each statement is filed under its test, with its outcome.**
@@ -7408,7 +7408,7 @@ change what H1 builds on.
             Passed: 29462, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
             Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The spec project's run took
             7 min 5 s against H1c's 6 min 44 s.
-      - [ ] **H1e. `DeviationKind.SqlDiffers` and the two compliance tests.**
+      - [x] **H1e. `DeviationKind.SqlDiffers` and the two compliance tests.**
             **Files.** Modify `OverrideReasonAttributes.cs`: `SqlDiffers = 1 << 8`, with spec §9's
             meaning. Modify `OverrideAudit.cs`: `SqlDiffers` is legal only on an InfoCarrier
             reason, as `AnswerNotRefusal` is. Create
@@ -7422,6 +7422,23 @@ change what H1 builds on.
             **Tests.** Each check on a temporary folder: a file naming `NoSuchMethod` gives one
             violation; a `SqlDiffers` reason on a class with no file gives one; a reason whose
             case is the same on both sides gives one. Over the real repository, both give none.
+
+            **Result, 2026-09-26.** Nine tests in `SqlCaptureComplianceTest`: the two checks over
+            the real repository, and seven pins on a temporary folder against two abstract classes
+            in `Sqlite/SqlCaptureComplianceFixtures.cs`, abstract so that xUnit runs none of them
+            and the real checks, which read the classes xUnit runs, skip them. Beyond the list: a
+            file that belongs to no class is a violation, a differing case clears a reason, **a
+            count alone is no difference**, and a reason covers only the cases its `Case` names.
+            **Each check takes the classes and a project folder** rather than the assembly, so that
+            a pin can hand it a fixture. `SqlCapture.SameStatements` is the one definition of a
+            difference, text and failure mark, which the assertion of H1d now uses as well. A case
+            that the `.direct.sql` file lacks shows no difference. One mutation run fails the four
+            targeted pins, and a store reason given `SqlDiffers` by hand fails `OverrideAuditTest`
+            with "SqlDiffers is this provider's behaviour, not the store's". `CLAUDE.md` and
+            `docs/test-policy.md` name `SqlDiffers` beside `AnswerNotRefusal` and `RefusedEarlier`.
+            Gates: the Release build, 5 warnings and 0 errors, with the three test projects rebuilt.
+            `eng/measure.sh h1e h1d`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29709, Passed: 29471, Skipped: 238`;
+            `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
 
 - [ ] **H2. The plain-EF client on `main`, for Tiers B and C** (spec §10).
       **Files**, from the satellite commits `10b4873` and `d6c2ffa`: `DirectClient.cs`, whose

@@ -167,7 +167,7 @@ public static class SqlCapture
         {
             string? what = i >= ran.Length ? "is missing"
                 : i >= expected.Count ? "is extra"
-                : ran[i].Text != expected[i].Text || IsFailed(ran[i]) != IsFailed(expected[i]) ? "differs"
+                : !Same(ran[i], expected[i]) ? "differs"
                 : null;
             if (what is not null)
             {
@@ -177,6 +177,22 @@ public static class SqlCapture
         }
 
         return null;
+    }
+
+    /// <summary>
+    ///     Whether two entries run the same statements: the same text and the same failure marks, in
+    ///     the same order. Counts are not compared (decision 8).
+    /// </summary>
+    /// <remarks>
+    ///     The one definition of a difference, for the assertion of a normal run and for the labels'
+    ///     compliance test alike.
+    /// </remarks>
+    public static bool SameStatements(IReadOnlyList<SqlCaptureCommand> x, IReadOnlyList<SqlCaptureCommand> y)
+    {
+        ArgumentNullException.ThrowIfNull(x);
+        ArgumentNullException.ThrowIfNull(y);
+
+        return x.Count == y.Count && x.Zip(y).All(pair => Same(pair.First, pair.Second));
     }
 
     /// <summary>The test's case in a capture file: its display name without <c>Ns.Class.</c>, and its ordinal.</summary>
@@ -284,6 +300,9 @@ public static class SqlCapture
                 CapturedCommandKind.NonQuery => $"rows {command.Count}",
                 _ => "scalar",
             });
+
+    private static bool Same(SqlCaptureCommand x, SqlCaptureCommand y)
+        => x.Text == y.Text && IsFailed(x) == IsFailed(y);
 
     private static bool IsFailed(SqlCaptureCommand command)
         => command.Outcome == "failed";

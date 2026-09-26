@@ -161,9 +161,9 @@ reference, all typed:
   **only the owner files its issue.**
 
 **A test can carry a store reason and InfoCarrier reasons together**: the store one says what EF's
-own provider test does, the InfoCarrier ones why this test differs from it. `AnswerNotRefusal` and
-`RefusedEarlier` are legal only on an InfoCarrier reason, and `StoreExceptionAsData` is mechanical,
-because one decision covers every server error.
+own provider test does, the InfoCarrier ones why this test differs from it. `AnswerNotRefusal`,
+`RefusedEarlier` and `SqlDiffers` are legal only on an InfoCarrier reason, and `StoreExceptionAsData`
+is mechanical, because one decision covers every server error.
 
 **A skip is permitted only with an upstream reference**, because only upstream's own choice
 justifies asserting nothing, and it copies upstream's justification text. **A crash or a wrong

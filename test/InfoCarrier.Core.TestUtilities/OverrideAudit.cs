@@ -44,9 +44,10 @@ public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, strin
 ///         says what EF's own provider test does and links it; an InfoCarrier reason says why this
 ///         test differs from that one. At most one store reason covers a case, and any number of
 ///         InfoCarrier reasons can, each naming a different decision or issue. A deviation that is
-///         this provider's behaviour, <see cref="DeviationKind.AnswerNotRefusal" /> or
-///         <see cref="DeviationKind.RefusedEarlier" />, is legal only on an InfoCarrier reason, so
-///         that such a difference is never counted as the store's.
+///         this provider's behaviour, <see cref="DeviationKind.AnswerNotRefusal" />,
+///         <see cref="DeviationKind.RefusedEarlier" /> or <see cref="DeviationKind.SqlDiffers" />, is
+///         legal only on an InfoCarrier reason, so that such a difference is never counted as the
+///         store's.
 ///     </para>
 /// </remarks>
 public static class OverrideAudit
@@ -64,7 +65,8 @@ public static class OverrideAudit
     public const string ReasonsDirectoryVariable = "INFOCARRIER_OVERRIDE_REASONS";
 
     /// <summary>The deviations that are this provider's behaviour, legal only on an InfoCarrier reason.</summary>
-    private const DeviationKind InfoCarrierBehaviour = DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier;
+    private const DeviationKind InfoCarrierBehaviour =
+        DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier | DeviationKind.SqlDiffers;
 
     private static readonly Regex MarkdownHeading = new(@"^#{1,6}\s+(.*?)\s*$", RegexOptions.Compiled | RegexOptions.Multiline);
 

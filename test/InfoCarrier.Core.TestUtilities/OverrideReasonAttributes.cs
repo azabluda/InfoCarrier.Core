@@ -136,6 +136,18 @@ public enum DeviationKind
     /// <summary>The base's assertion cannot state the behaviour, so the override writes the base's query out.</summary>
     QueryWrittenOut = 1 << 7,
 
+    /// <summary>
+    ///     The answer is upstream's, and the server's SQL differs from what plain EF Core runs for the
+    ///     same test: the case's entries in its class's <c>.wire.sql</c> and <c>.direct.sql</c> differ
+    ///     (#167, <c>docs/sql-capture.md</c> §9). This provider's behaviour, so legal only on an
+    ///     InfoCarrier reason.
+    /// </summary>
+    /// <remarks>
+    ///     <c>SqlCaptureComplianceTest</c> fails when no case the reason covers differs, so a fix that
+    ///     removes the difference removes the reason too, and a pass-through override with it.
+    /// </remarks>
+    SqlDiffers = 1 << 8,
+
     /// <summary>Anything else, described in <see cref="OverrideReasonAttribute.DeviationNote" />.</summary>
     Other = 1 << 30,
 }
