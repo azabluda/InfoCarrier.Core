@@ -24,6 +24,10 @@ public sealed class CurrentTest
 {
     private static readonly AsyncLocal<CurrentTest?> Current = new();
 
+    private readonly object _gate = new();
+    private readonly List<CapturedCommand> _commands = [];
+    private bool _closed;
+
     private CurrentTest(ITest test)
     {
         DisplayName = test.DisplayName;
@@ -47,8 +51,121 @@ public sealed class CurrentTest
     /// <summary>The test method's name, without the class and the arguments.</summary>
     public string MethodName { get; }
 
+    /// <summary>
+    ///     The commands the server ran for this test until <see cref="Close" />, in the order it ran
+    ///     them. <c>ServerSqlRecordingInterceptor</c> files them.
+    /// </summary>
+    public IReadOnlyList<CapturedCommand> Commands
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _commands];
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Ends the test's statements: a command the server runs later is not recorded, and a
+    ///     reader disposed later leaves its count as it was.
+    /// </summary>
+    /// <remarks>
+    ///     <c>After</c> calls it, because a test class's <c>Dispose</c> runs after <c>After</c>, and
+    ///     a statement there would belong to no entry of a capture.
+    /// </remarks>
+    public void Close()
+    {
+        lock (_gate)
+        {
+            _closed = true;
+        }
+    }
+
     internal static void Start(ITest test)
         => Current.Value = new CurrentTest(test);
+
+    internal void Add(CapturedCommand command)
+    {
+        lock (_gate)
+        {
+            if (!_closed)
+            {
+                _commands.Add(command);
+            }
+        }
+    }
+
+    internal void SetReadCount(Guid commandId, int readCount)
+    {
+        lock (_gate)
+        {
+            if (_closed)
+            {
+                return;
+            }
+
+            for (int i = _commands.Count - 1; i >= 0; i--)
+            {
+                if (_commands[i].CommandId == commandId)
+                {
+                    _commands[i].Count = readCount;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// <summary>Which of <c>DbCommand</c>'s three execute methods the server called.</summary>
+public enum CapturedCommandKind
+{
+    /// <summary><c>ExecuteReader</c>: a query, and a write that reads back what the store generated.</summary>
+    Reader,
+
+    /// <summary><c>ExecuteNonQuery</c>.</summary>
+    NonQuery,
+
+    /// <summary><c>ExecuteScalar</c>.</summary>
+    Scalar,
+}
+
+/// <summary>One command the server ran for the current test, and how it ended.</summary>
+/// <remarks>
+///     <b>Never the parameter values or the rows</b>: they vary from run to run and say nothing
+///     about the statement's shape, and the test asserts the rows already (<c>docs/sql-capture.md</c>
+///     §4.2).
+/// </remarks>
+public sealed class CapturedCommand
+{
+    internal CapturedCommand(Guid commandId, string text, CapturedCommandKind kind, int? count, bool failed)
+    {
+        CommandId = commandId;
+        Text = text;
+        Kind = kind;
+        Count = count;
+        Failed = failed;
+    }
+
+    /// <summary>The command text as the server ran it. A capture normalizes it when it writes or compares.</summary>
+    public string Text { get; }
+
+    /// <summary>Which execute method ran it.</summary>
+    public CapturedCommandKind Kind { get; }
+
+    /// <summary>
+    ///     For a reader, EF's own <c>ReadCount</c>, which counts every <c>Read()</c>, the last one
+    ///     that returns false included, so three rows read to the end are four reads. For a
+    ///     non-query, the rows it affected. Null for a scalar, a failed command, and a reader not
+    ///     yet disposed.
+    /// </summary>
+    public int? Count { get; internal set; }
+
+    /// <summary>The command threw.</summary>
+    public bool Failed { get; }
+
+    /// <summary>EF's correlation ID, which matches a reader's disposal to the command that opened it.</summary>
+    internal Guid CommandId { get; }
 }
 
 /// <summary>

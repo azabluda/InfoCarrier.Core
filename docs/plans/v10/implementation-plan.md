@@ -7215,7 +7215,7 @@ change what H1 builds on.
 - [ ] **H1. Capture: the tagged recorder, the normalizer, the file, the assertion hook, and the
       compliance tests.** No class is adopted, so a normal run asserts nothing new.
 
-      - [ ] **H1a. Each statement is filed under its test, with its outcome.**
+      - [x] **H1a. Each statement is filed under its test, with its outcome.**
             **Files.** Modify `CurrentTest.cs` and `ServerSqlRecorder.cs`. Test in
             `test/InfoCarrier.Core.FunctionalTests/Sqlite/SqlCaptureTest.cs`.
             **Produces.**
@@ -7245,6 +7245,18 @@ change what H1 builds on.
             - a `SaveChanges` that violates a unique index gives a failed command;
             - after `CurrentTest.Value!.Close()`, a query adds no command (review focus 2);
             - no command is recorded while the class fixture seeds.
+
+            **Result, 2026-09-26.** Five pins in `SqlCaptureTest`, and four of them fail with the
+            close gate, the read count and the failure filing each removed. **`First()` reads twice,
+            not once**, on both sides: EF runs it as `LIMIT 1` with single cardinality, which reads
+            once more to see the end. The pin runs it through the wire and on the server's own
+            context, and asserts two reads for each. The failed `SaveChanges` violates the primary
+            key, since the model has no other unique index. Spec §4.2, §5, §8 and §13 say `reads`.
+            Gates: the Release build, 5 warnings and 0 errors, with the three test projects rebuilt.
+            `eng/measure.sh h1a h0`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29662,
+            Passed: 29424, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234,
+            Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The six new tests are the five
+            pins and H0's eighth pin, which came after `h0`.
       - [ ] **H1b. The normalizer.**
             **Files.** Create `test/InfoCarrier.Core.TestUtilities/SqlNormalizer.cs`. Test in
             `test/InfoCarrier.Core.FunctionalTests/SqlNormalizerTest.cs`, which runs no store.

@@ -82,12 +82,17 @@ public sealed class ServerSqlRecorder
 ///         round: a fixture's own <c>LogTo</c> displaced the log. The log is an interceptor too
 ///         now, <see cref="ServerSqlLogInterceptor" />, and writes the same text.
 ///     </para>
+///     <para>
+///         <b>It also files each command under <see cref="CurrentTest" /></b>, with its outcome, for
+///         the capture of #167: a failed command as well, and a reader's count as EF disposes it.
+///         The recorder beside it keeps what it always held, for <c>ServerSqlTest</c>.
+///     </para>
 /// </remarks>
 public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : DbCommandInterceptor
 {
     /// <inheritdoc />
     public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
-        => Record(command, base.ReaderExecuted(command, eventData, result));
+        => Record(command, eventData, count: null, base.ReaderExecuted(command, eventData, result));
 
     /// <inheritdoc />
     public override ValueTask<DbDataReader> ReaderExecutedAsync(
@@ -95,11 +100,11 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
         CommandExecutedEventData eventData,
         DbDataReader result,
         CancellationToken cancellationToken = default)
-        => Record(command, base.ReaderExecutedAsync(command, eventData, result, cancellationToken));
+        => Record(command, eventData, count: null, base.ReaderExecutedAsync(command, eventData, result, cancellationToken));
 
     /// <inheritdoc />
     public override int NonQueryExecuted(DbCommand command, CommandExecutedEventData eventData, int result)
-        => Record(command, base.NonQueryExecuted(command, eventData, result));
+        => Record(command, eventData, result, base.NonQueryExecuted(command, eventData, result));
 
     /// <inheritdoc />
     public override ValueTask<int> NonQueryExecutedAsync(
@@ -107,11 +112,11 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
         CommandExecutedEventData eventData,
         int result,
         CancellationToken cancellationToken = default)
-        => Record(command, base.NonQueryExecutedAsync(command, eventData, result, cancellationToken));
+        => Record(command, eventData, result, base.NonQueryExecutedAsync(command, eventData, result, cancellationToken));
 
     /// <inheritdoc />
     public override object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
-        => Record(command, base.ScalarExecuted(command, eventData, result));
+        => Record(command, eventData, count: null, base.ScalarExecuted(command, eventData, result));
 
     /// <inheritdoc />
     public override ValueTask<object?> ScalarExecutedAsync(
@@ -119,14 +124,76 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
         CommandExecutedEventData eventData,
         object? result,
         CancellationToken cancellationToken = default)
-        => Record(command, base.ScalarExecutedAsync(command, eventData, result, cancellationToken));
+        => Record(command, eventData, count: null, base.ScalarExecutedAsync(command, eventData, result, cancellationToken));
 
-    private T Record<T>(DbCommand command, T result)
+    /// <summary>
+    ///     Files a command that threw under the current test, marked failed. The recorder never
+    ///     held one, and still does not.
+    /// </summary>
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
+    {
+        FileUnderCurrentTest(command, eventData, count: null, failed: true);
+        base.CommandFailed(command, eventData);
+    }
+
+    /// <inheritdoc cref="CommandFailed" />
+    public override Task CommandFailedAsync(
+        DbCommand command,
+        CommandErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        FileUnderCurrentTest(command, eventData, count: null, failed: true);
+        return base.CommandFailedAsync(command, eventData, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Gives a reader its count as EF disposes it: EF's own <c>ReadCount</c>, matched to the
+    ///     command by its correlation ID.
+    /// </summary>
+    /// <remarks>
+    ///     EF's count and not a wrapping <c>DbDataReader</c>, which the spec first planned: no
+    ///     provider then meets a reader of a type it did not create. EF counts every <c>Read()</c>,
+    ///     the last one that returns false included, which is why a capture calls it reads and not
+    ///     rows.
+    /// </remarks>
+    public override InterceptionResult DataReaderDisposing(
+        DbCommand command,
+        DataReaderDisposingEventData eventData,
+        InterceptionResult result)
+    {
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        CurrentTest.Value?.SetReadCount(eventData.CommandId, eventData.ReadCount);
+        return base.DataReaderDisposing(command, eventData, result);
+    }
+
+    private T Record<T>(DbCommand command, CommandEventData eventData, int? count, T result)
     {
         ArgumentNullException.ThrowIfNull(command);
 
         recorder.Add(command.CommandText);
+        FileUnderCurrentTest(command, eventData, count, failed: false);
         return result;
+    }
+
+    // Filed under the test running in this async flow (#167), and nowhere when none is: a class
+    // fixture's seeding belongs to no test.
+    private static void FileUnderCurrentTest(DbCommand command, CommandEventData eventData, int? count, bool failed)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        CurrentTest.Value?.Add(new CapturedCommand(
+            eventData.CommandId,
+            command.CommandText,
+            eventData.ExecuteMethod switch
+            {
+                DbCommandMethod.ExecuteNonQuery => CapturedCommandKind.NonQuery,
+                DbCommandMethod.ExecuteScalar => CapturedCommandKind.Scalar,
+                _ => CapturedCommandKind.Reader,
+            },
+            count,
+            failed));
     }
 }
 

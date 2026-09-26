@@ -103,10 +103,15 @@ For each test case, every command the server runs while it is the current test, 
   several SQL statements in one command. `SaveChanges`, split queries and `ExecuteUpdate` all give
   commands of their own.
 - **A failure mark**, for a command that threw.
-- **The number of rows**: the rows the server's EF read from a reader, counted by a wrapping
-  `DbDataReader`, or the rows a non-query affected. Recorded in the file and **never asserted**
-  (decision 8). A test that writes on a shared store could move a count, and a flaky assertion is
-  worse than none. If a capture shows noise in them, they go.
+- **A count**: for a reader, the reads EF made, and for a non-query, the rows it affected. Recorded
+  in the file and **never asserted** (decision 8). A test that writes on a shared store could move a
+  count, and a flaky assertion is worse than none. If a capture shows noise in them, they go.
+  **Amended 2026-09-26 by step H1a.** This said "the number of rows", counted for a reader by a
+  wrapping `DbDataReader`. EF counts already: `DataReaderDisposingEventData.ReadCount`, matched to
+  the command by `CommandId`, counts every `Read()` call, the last one that returns false included.
+  Three rows read to the end are four reads, so the file says `reads` and not `rows`, and no
+  provider meets a reader of a type it did not create. `First` reads twice on both sides, because EF
+  reads a `LIMIT 1` with single cardinality.
 
 **Not recorded:** parameter values, which vary from run to run and say nothing about the shape; the
 rows themselves, which the test already asserts; and any command with no current test, such as a
@@ -139,13 +144,13 @@ One file per test class and per side, `<Class>.wire.sql` and `<Class>.direct.sql
 ```sql
 -- Where_simple_closure(async: False)
 -- Where_simple_closure(async: True)
--- #1 rows 6
+-- #1 reads 7
 SELECT "t0"."CustomerID", "t0"."Address", "t0"."City", …
 FROM "Customers" AS "t0"
 WHERE "t0"."City" = @p0
 
 -- A_compiled_query_indexing_a_list_matches_the_direct_query(mode: Parameter, list: True)
--- #1 rows 1
+-- #1 reads 2
 …
 ```
 
@@ -156,7 +161,9 @@ WHERE "t0"."City" = @p0
   differ, the entry splits, and the diff shows it.
 - **Two different cases that xUnit prints the same** (a string cut after 50 characters, two objects
   with one `ToString()`) get `#2`, `#3` in execution order, which xUnit keeps fixed within a class.
-- **`-- #n rows k`** starts each command, and `-- #n failed` marks one that threw.
+- **`-- #n reads k`** starts a reader's command, `-- #n rows k` a non-query's and `-- #n scalar` a
+  scalar's, and `-- #n failed` marks one that threw. **Amended 2026-09-26 by step H1a**, which found
+  that a reader's count is EF's reads rather than rows (§4.2). This said `-- #n rows k` for each.
 - **`-- direct run failed`** marks an entry in a `.direct.sql` file whose test failed in the plain-EF
   run: a test that asserts InfoCarrier's own behaviour (87 of them in the prototype). Its statements
   up to the failure are still written, and nobody takes them for a full reference.
@@ -225,7 +232,7 @@ the other, over Tiers B and C. They do not depend on each other, and either can 
   An entry whose test no longer exists is caught by the compliance test (§9).
 - **The report is the diff.** `git diff` shows every entry that changed, appeared or went away.
   `git diff --no-index` between a class's two files shows every difference from plain EF, with both
-  sides' row counts.
+  sides' counts.
 
 ## 9. Labels, and the compliance tests
 
@@ -358,7 +365,7 @@ The figure is the mean, rounded down as today.
 0. **Spike.** Prove that the current test reaches `ServerSqlRecordingInterceptor` in a parallel run,
    through the test-framework wrapper. Count the theories of Tiers B and C whose data xUnit cannot
    serialize. Nothing builds on §4.1 before this step says it holds.
-1. **Capture.** The tagged recorder with row counts, the normalizer and its tests, the file reader
+1. **Capture.** The tagged recorder with counts, the normalizer and its tests, the file reader
    and writer, the assertion in `After`, and both compliance tests. The wrapper landed with step 0,
    and there is no row counter (§4.1, amended 2026-09-26).
    No class is adopted yet, so a normal run asserts nothing new.
