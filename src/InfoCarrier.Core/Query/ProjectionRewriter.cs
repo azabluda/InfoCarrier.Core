@@ -816,8 +816,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private LambdaExpression? Fuse(LambdaExpression lambda, LambdaExpression rebuild)
     {
         ParameterExpression row = rebuild.Parameters[0];
-        Expression body = Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
-            lambda.Parameters[0], rebuild.Body, lambda.Body);
+        Expression body = MemberReadFolder.Fold(Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+            lambda.Parameters[0], rebuild.Body, lambda.Body));
         LambdaExpression fused = Expression.Lambda(
             typeof(Func<,>).MakeGenericType(row.Type, lambda.ReturnType), body, row);
 

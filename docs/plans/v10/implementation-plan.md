@@ -7326,6 +7326,31 @@ claims a runtime difference. The amendment proposed:
       29928**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H11. A member read through a construction is the value it was built from.** On the
+      branch `live-comparison-member-folding`, on top of H10. `where new { Name =
+      g.LeaderNickname, Squad = g.LeaderSquadId }.Name == "Marcus"` names a type only this client
+      has, so the filter ran on the client over every row, where EF reads `.Name` through the
+      construction and writes the filter: `Where_member_access_on_anonymous_type`. The same read
+      through `(test ? new Dto { … } : null).Member`, with the DTO's members typed as interfaces so
+      the carrier rewrite cannot retype them, kept the filter of
+      `Filter_on_nested_DTO_with_interface_gets_simplified_correctly` on the client.
+
+      1. **Two promises in `ServerParameterizationTest`, both seen red with the fix stashed**: a
+         member of a construction in a filter, and a member through a null-checked construction
+         held through an interface.
+      2. **The fix**: `MemberReadFolder`, EF's own `ReplacingExpressionVisitor` used with nothing to
+         replace, whose member visit folds a read through a construction, plus the conditional
+         shape with a `null` branch whose member type can hold a `null`. It runs over the whole
+         query before the split, and inside `ProjectionRewriter.Fuse`.
+      3. **The next slow run**: `Passed: 19358, Failed: 110, Skipped: 155, Total: 19623`, against
+         `Failed: 116`. **3 methods left the red list and none joined it**, and none of the 58 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18744, Failed: 0, Skipped: 46, Total:
+      18790**. Normal run, `eng/measure.sh member-folding projected-constants`: **FAILING 0, TOTAL
+      29930**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

@@ -230,6 +230,11 @@ public sealed class QuerySplitter
 
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
+        // `new { Name = x }.Name` is `x`, as EF reads it before translating, and a construction
+        // of a client type that nothing else reads no longer keeps the operator holding it on the
+        // client. See `MemberReadFolder` (#167's slow run, 2026-09-26).
+        query = MemberReadFolder.Fold(query);
+
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
         // identifier between them holds the *grouping*, which the carrier re-carry below must
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …

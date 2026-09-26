@@ -759,6 +759,59 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A member read out of a construction in a filter is the value it was built from, and the
+    ///     filter runs at the store, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>where new { Name = g.LeaderNickname }.Name == "Marcus"</c> names a type only this
+    ///         client has, so the filter could not ship and ran on the client over every row. EF
+    ///         reads <c>.Name</c> through the construction to <c>g.LeaderNickname</c> and writes the
+    ///         filter.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Where_member_access_on_anonymous_type</c>
+    ///         in the TPC and TPT Gears of War classes.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_member_of_a_construction_in_a_filter_is_read_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => new { Name = b.Title, b.Id }.Name == "beta")
+                .Select(b => b.Id)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A member read through a construction under a null check, in a filter above a projection
+    ///     into a client type, runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     EF reads <c>(test ? new Dto { … } : null).Member</c> as <c>test ? value : null</c>. Found by
+    ///     #167's slow run, as EF's own
+    ///     <c>Filter_on_nested_DTO_with_interface_gets_simplified_correctly</c>.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_member_through_a_null_checked_construction_in_a_filter_is_read_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCardHolder
+                {
+                    Id = b.Id,
+                    Card = b.Title != null ? new BlogCard { Id = b.Id, Title = b.Title } : null,
+                })
+                .Where(h => h.Card!.Title == "beta")
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>
@@ -1999,6 +2052,17 @@ public partial class ServerParameterizationTest
     private interface IHasTitle
     {
         string? Title { get; }
+    }
+
+    /// <summary>
+    ///     A client type holding another through an interface, so a filter reads through a cast the
+    ///     carrier rewrite cannot retype, as in EF's own <c>Context31961</c>.
+    /// </summary>
+    private sealed class BlogCardHolder
+    {
+        public int Id { get; init; }
+
+        public IHasTitle? Card { get; init; }
     }
 
     /// <summary>A type only this client has, so a projection into it is rebuilt on the client.</summary>
