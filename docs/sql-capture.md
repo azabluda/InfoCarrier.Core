@@ -235,10 +235,21 @@ One variable, `INFOCARRIER_SQL_CAPTURE`, with two values:
 The assertion of §7 is off in both. **`eng/sql-capture.sh [--filter X]`** runs the two, one after
 the other, over Tiers B and C. They do not depend on each other, and either can run alone.
 
-- **A test writes only its own entry**, in `After`. Only the tests of one class write that class's
-  file, and xUnit runs them one after another, so no lock is needed.
+- **A test prepares only its own entry**, in `After`: the class's first test reads the class's
+  file, and each test checks that its entry can be written so that it reads back the same. The end of
+  a test marks a failed direct run, and the class's end writes the file. **Amended 2026-09-26 by the
+  review of step H1.** This said that a test writes its entry in `After` and that no lock is needed.
+  What can fail runs in `After`, because xUnit makes an exception there the test's failure. The end
+  of a test and of a class run outside every runner's error handling, where an exception aborts the
+  whole run and loses every class not yet written, so nothing there throws: a write that fails is
+  reported on the standard error, and the run exits with 1.
 - **Entries of tests that did not run stay**, so a capture with `--filter` rewrites only what it ran.
-  An entry whose test no longer exists is caught by the compliance test (§9).
+- **An unfiltered capture starts from empty files.** `eng/sql-capture.sh` without `--filter` deletes
+  the side's files in Tiers B and C before that side's run, so an entry whose test, or whose theory
+  row, no longer exists goes with the next full capture. The compliance test (§9) catches an entry
+  whose test method no longer exists between two captures; it cannot see a row that no longer
+  exists. **Added 2026-09-26 by the review of step H1**, which found that §8 promised more than §9
+  checks: this said that "an entry whose test no longer exists is caught by the compliance test".
 - **The report is the diff.** `git diff` shows every entry that changed, appeared or went away.
   `git diff --no-index` between a class's two files shows every difference from plain EF, with both
   sides' counts.
@@ -285,7 +296,8 @@ Two compliance tests run in every normal run:
 - **Every reason with `SqlDiffers` covers a real difference.** When a fix removes a difference, the
   test fails until the reason, and with it a pass-through override, is deleted.
 - **Every entry names a method that exists on its class.** An entry left behind by a test that EF
-  renamed or deleted fails it. It works like `InfoCarrierComplianceTest`.
+  renamed or deleted fails it. It works like `InfoCarrierComplianceTest`. A theory row that no longer
+  exists names a method that does, so it passes here and goes with the next unfiltered capture (§8).
 
 With `INFOCARRIER_OVERRIDE_REASONS` set, the first of them also writes every test case whose two
 entries differ, with its reason or none, to `<assembly>.sql-differences.tsv` beside
@@ -352,8 +364,16 @@ The badge keeps one figure, and it now counts statements as well as answers (dec
 `eng/spec-parity.py` scores each test case that ran through InfoCarrier:
 
 - **1** when no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason covers it **and**, in Tiers B
-  and C, its `.wire.sql` entry is exactly its `.direct.sql` entry;
-- **0** otherwise.
+  and C, its `.wire.sql` entry runs the same statements as its `.direct.sql` entry: the same text and
+  the same failure marks in the same order, the counts aside;
+- **0** otherwise, **and 0 for a case with no `.direct.sql` entry**, which has no reference. The list
+  names such a case apart from the differences.
+
+**Amended 2026-09-26 by the review of step H1.** This said "its `.wire.sql` entry is exactly its
+`.direct.sql` entry". A count is recorded and never asserted (decision 8), so it is no difference
+either: `SqlCapture.SameStatements` is the one definition, for the assertion of §7, the compliance
+test of §9 and this figure. A case with no reference used to fall between the rules; scoring it 1
+would read better than the truth, which is what this section guards against.
 
 The figure is the mean, rounded down as today.
 
@@ -404,3 +424,6 @@ The figure is the mean, rounded down as today.
   asserted twice. Harmless, and it can be excluded later if it is only noise.
 - **File size.** Most classes will be the same on both sides, and git stores an identical file once.
   The rest is a few MB of text, which compresses well.
+- **What `-- direct run failed` means for the badge. Open, for the owner (2026-09-26).** The
+  statements of a failed direct run stop where the test failed. Compared as they stand, such a case
+  scores 1 only if the failure came after the last statement.

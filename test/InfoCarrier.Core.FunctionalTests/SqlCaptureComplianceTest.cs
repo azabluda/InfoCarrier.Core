@@ -104,6 +104,22 @@ public sealed class SqlCaptureComplianceTest : IDisposable
         Assert.Empty(LabelViolations([typeof(SqlCaptureComplianceFixture)], _folder));
     }
 
+    /// <summary>
+    ///     A case the <c>.direct.sql</c> file lacks has no reference, which is a finding of its own and
+    ///     never a reason to delete the label (review, 2026-09-26).
+    /// </summary>
+    [ConditionalFact]
+    public void A_SqlDiffers_reason_whose_case_has_no_reference_says_so()
+    {
+        Write(typeof(SqlCaptureComplianceFixture), SqlCaptureMode.Wire, "-- Differs\n-- #1 reads 2\nSELECT 1\n");
+        Write(typeof(SqlCaptureComplianceFixture), SqlCaptureMode.Direct, "-- Plain\n-- #1 reads 2\nSELECT 1\n");
+
+        string violation = Assert.Single(LabelViolations([typeof(SqlCaptureComplianceFixture)], _folder));
+
+        Assert.Contains("no entry in SqlCaptureComplianceFixture.direct.sql", violation, StringComparison.Ordinal);
+        Assert.DoesNotContain("Delete the reason", violation, StringComparison.Ordinal);
+    }
+
     /// <summary>A count is recorded and never compared (decision 8), so a count alone is no difference.</summary>
     [ConditionalFact]
     public void A_count_alone_is_no_difference()
@@ -171,10 +187,18 @@ public sealed class SqlCaptureComplianceTest : IDisposable
 
                     SqlCaptureFile wire = SqlCaptureFile.Read(wirePath);
                     SqlCaptureFile direct = SqlCaptureFile.Read(directPath);
-                    bool differs = wire.Cases
-                        .Where(c => MethodOf(c) == method.Name && Covers(reason.Case, c.Name))
+                    SqlCaptureCase[] covered = [.. wire.Cases.Where(c => MethodOf(c) == method.Name && Covers(reason.Case, c.Name))];
+                    int unreferenced = covered.Count(c => direct.Find(c) is null);
+                    bool differs = covered
                         .Any(c => direct.Find(c) is { } reference && !SqlCapture.SameStatements(wire.Find(c)!, reference));
-                    if (!differs)
+                    if (!differs && unreferenced > 0)
+                    {
+                        violations.Add(
+                            $"{at}: carries SqlDiffers, and {unreferenced} case(s) it covers have no entry in "
+                            + $"{Path.GetFileName(directPath)}, so no difference can be shown. Capture the direct side: "
+                            + $"eng/sql-capture.sh --filter {type.Name}.");
+                    }
+                    else if (!differs)
                     {
                         violations.Add(
                             $"{at}: carries SqlDiffers, and no case it covers differs between {Path.GetFileName(wirePath)} "

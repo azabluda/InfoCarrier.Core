@@ -5,6 +5,7 @@ using InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 using InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Xunit;
+using Xunit.Sdk;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -120,8 +121,100 @@ public class SqlCaptureAssertionTest
     public static IEnumerable<object[]> Alike
         => [[new Same(1)], [new Same(2)]];
 
+    /// <summary>
+    ///     A capture reads its file in <c>After</c>, where xUnit turns an exception into the test's
+    ///     failure. Anywhere later it would escape every runner and abort the run (review, 2026-09-26).
+    /// </summary>
+    [ConditionalFact]
+    public void A_capture_that_cannot_read_its_file_fails_the_test_and_not_the_run()
+    {
+        using var folder = new ScratchFolder();
+        string path = folder.PathOf("Some.wire.sql");
+        File.WriteAllText(path, "not a capture\n");
+
+        XunitException failure = Assert.Throws<XunitException>(
+            () => new SqlCaptureRun(SqlCaptureMode.Wire).Prepare(typeof(SqlCaptureAssertionTest), Case, [], path));
+
+        Assert.Contains(path, failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>A command the file cannot hold fails its test in <c>After</c>, before anything is written.</summary>
+    [ConditionalFact]
+    public void A_command_the_file_cannot_hold_fails_the_test_and_not_the_run()
+    {
+        using var folder = new ScratchFolder();
+
+        XunitException failure = Assert.Throws<XunitException>(
+            () => new SqlCaptureRun(SqlCaptureMode.Wire).Prepare(
+                typeof(SqlCaptureAssertionTest),
+                Case,
+                [Ran("-- #2 reads 9\nSELECT 1")],
+                folder.PathOf("Some.wire.sql")));
+
+        Assert.Contains("'-- #2 '", failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The whole flow of a capture: the entry is prepared in <c>After</c>, a failed test marks a
+    ///     direct run, and the class's end writes the file.
+    /// </summary>
+    [ConditionalFact]
+    public void A_direct_capture_writes_the_class_when_it_ends_and_marks_a_failed_run()
+    {
+        using var folder = new ScratchFolder();
+        string path = folder.PathOf("Some.direct.sql");
+        var run = new SqlCaptureRun(SqlCaptureMode.Direct);
+
+        run.Prepare(typeof(SqlCaptureAssertionTest), Case, [Ran("SELECT \"t\".\"Id\"\r\nFROM \"T\" AS \"t\"", count: 4)], path);
+        run.TestFinished(typeof(SqlCaptureAssertionTest), Case, failed: true);
+
+        Assert.Null(run.ClassFinished(typeof(SqlCaptureAssertionTest)));
+        Assert.Equal("-- Some(async: True)\n-- direct run failed\n-- #1 reads 4\nSELECT \"t0\".\"Id\"\nFROM \"T\" AS \"t0\"\n", File.ReadAllText(path));
+    }
+
+    /// <summary>A write that fails is reported to the caller, which then goes on to the next class.</summary>
+    [ConditionalFact]
+    public void A_write_that_fails_is_reported_and_does_not_throw()
+    {
+        using var folder = new ScratchFolder();
+        string path = folder.PathOf("Some.wire.sql");
+        Directory.CreateDirectory(path);
+        var run = new SqlCaptureRun(SqlCaptureMode.Wire);
+        run.Prepare(typeof(SqlCaptureAssertionTest), Case, [], path);
+
+        Assert.Contains(path, run.ClassFinished(typeof(SqlCaptureAssertionTest)), StringComparison.Ordinal);
+    }
+
+    /// <summary>A test whose <c>After</c> never ran has no entry to mark, and its end writes nothing.</summary>
+    [ConditionalFact]
+    public void A_test_that_ends_without_After_leaves_nothing_to_write()
+    {
+        var run = new SqlCaptureRun(SqlCaptureMode.Direct);
+
+        run.TestFinished(typeof(SqlCaptureAssertionTest), Case, failed: true);
+
+        Assert.Null(run.ClassFinished(typeof(SqlCaptureAssertionTest)));
+    }
+
+    private static SqlCaptureCase Case { get; } = new("Some(async: True)", 1);
+
     private static CapturedCommand Ran(string text, int? count = 2, bool failed = false)
         => new(text, CapturedCommandKind.Reader, count, failed);
+
+    /// <summary>A folder of this test's own, deleted when the test ends.</summary>
+    private sealed class ScratchFolder : IDisposable
+    {
+        private readonly string _path = Path.Combine(Path.GetTempPath(), nameof(SqlCaptureAssertionTest), Guid.NewGuid().ToString("N"));
+
+        public ScratchFolder()
+            => Directory.CreateDirectory(_path);
+
+        public string PathOf(string name)
+            => Path.Combine(_path, name);
+
+        public void Dispose()
+            => Directory.Delete(_path, recursive: true);
+    }
 
     /// <summary>A theory argument that xUnit cannot serialize, and whose rows print alike.</summary>
     public sealed class Same(int number)

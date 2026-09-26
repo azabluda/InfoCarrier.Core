@@ -165,6 +165,11 @@ public sealed partial class SqlCaptureFile
         File.WriteAllText(path, text.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    /// <summary>Checks that the case's commands can be written so that they read back the same.</summary>
+    /// <exception cref="InvalidOperationException">A command's text holds an empty line, a CR, or a line that starts the next command.</exception>
+    public static void EnsureWritable(SqlCaptureCase testCase, IReadOnlyList<SqlCaptureCommand> commands)
+        => _ = Body(testCase, commands, directRunFailed: false);
+
     private static string Body(SqlCaptureCase testCase, IReadOnlyList<SqlCaptureCommand> commands, bool directRunFailed)
     {
         var body = new StringBuilder();

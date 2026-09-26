@@ -7392,8 +7392,8 @@ change what H1 builds on.
 
             **Result, 2026-09-26.** Thirteen pins in `SqlCaptureAssertionTest`, among them the
             direct side's name, `ParseMode`, and a changed failure mark. Mutation runs show each
-            fails when its rule is broken. **The folder check holds in every mode**: all 176
-            classes of Tiers B and C sit in the folder their namespace names, and three are nested,
+            fails when its rule is broken. **The folder check holds in every mode**: for all 176
+            classes of Tiers B and C, the folder their namespace names exists, and three are nested,
             in `ProxyGraphUpdatesInfoCarrierTest`, which gives `Outer.Inner.wire.sql`. An unknown
             value of the variable fails each captured test, and only those. **End to end, by hand
             and not committed**: a `wire` capture of `Sqlite.SqlCaptureTest` wrote its file, with the
@@ -7440,6 +7440,39 @@ change what H1 builds on.
             `eng/measure.sh h1e h1d`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29709, Passed: 29471, Skipped: 238`;
             `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged.
 
+      **Review, 2026-09-26.** One reviewer read the whole branch, as the owner chose, and found
+      three Important issues and eight Minor ones. The three are fixed:
+
+      - **A capture could abort the whole run.** It read the class's file at a test's end and
+        wrote it at the class's end, outside every runner's error handling, so a corrupt file or a
+        failed write escaped to xUnit's `async void` executor. `SqlCaptureRun` now does what can
+        fail in `After`, where the exception fails the one test: it reads the file on the class's
+        first test and checks each entry with `SqlCaptureFile.EnsureWritable`. The end of a test
+        only marks a failed direct run, and the end of a class reports a failed write on the
+        standard error and exits with 1. Five pins in `SqlCaptureAssertionTest`, three of which
+        fail under mutation; by hand, a corrupt file failed its class's five tests, the run
+        completed, and the other class's file was written.
+      - **A theory row that no longer exists was never pruned.** Spec §8 promised more than §9
+        checks. An unfiltered `eng/sql-capture.sh` now deletes the side's files first (spec §8,
+        H3).
+      - **A difference had three readings.** Spec §12 said "exactly", and a case with no direct
+        entry fell between the rules. §12 now uses `SqlCapture.SameStatements`, counts aside,
+        and a case with no reference scores 0 (H6). The label check says "no entry in
+        X.direct.sql" for it instead of "delete the reason", pinned by
+        `A_SqlDiffers_reason_whose_case_has_no_reference_says_so`. What `-- direct run failed`
+        means for the badge is open for the owner (spec §14).
+
+      **Minor, deferred to the step that meets them:** ordinals never reset in a host that runs
+      the assembly twice; no pin fails if `After` stops closing the test; `Read` lets the last
+      entry win for a case in two entries; a name ending ` #<digits>` reads back as an ordinal;
+      derived-table columns numbered by first reference can hide a compensating swap (§4.3 asks
+      for it); the folder check proves the folder exists and not that the `.cs` file is there,
+      which H1d's result said more strongly until this review; spec §5 does not list `reads ?`.
+      Gates: the Release build, 5 warnings and 0 errors, with the three test projects rebuilt.
+      `eng/measure.sh h1r h1e`: `InfoCarrier.Core.FunctionalTests` `Total tests: 29715, Passed:
+      29477, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests` `Total tests: 234, Passed: 234`;
+      FIXED none, BROKEN none, REASONS unchanged.
+
 - [ ] **H2. The plain-EF client on `main`, for Tiers B and C** (spec §10).
       **Files**, from the satellite commits `10b4873` and `d6c2ffa`: `DirectClient.cs`, whose
       `IsEnabled` becomes `SqlCapture.Mode == SqlCaptureMode.Direct`;
@@ -7458,7 +7491,9 @@ change what H1 builds on.
 - [ ] **H3. `eng/sql-capture.sh`, and `NorthwindWhereQuerySqliteInfoCarrierTest` from end to end.**
       **Files.** Create `eng/sql-capture.sh [--filter X]`: a `direct` run, then a `wire` run, over
       Tiers B and C, with TRX and console output in `artifacts/sql-capture/`. Failures of the
-      `direct` run are data; failures of the `wire` run fail the script. Modify
+      `direct` run are data; failures of the `wire` run fail the script. **Without `--filter`, it
+      deletes the side's files in Tiers B and C before that side's run** (spec §8, amended by the
+      review of H1), so an entry of a test or a theory row that no longer exists goes. Modify
       `InfoCarrier.Core.FunctionalTests.csproj`: a `DependentUpon` rule that nests `X.wire.sql` and
       `X.direct.sql` under `X.cs`. Commit the class's two files. Remove `SqlNotAsserted` from that
       class's overrides. Add the script's row to the `eng/` table in `CLAUDE.md`.
@@ -7487,7 +7522,9 @@ change what H1 builds on.
 - [ ] **H6. The badge** (spec §12).
       **Files.** `SqlCaptureComplianceTest` writes `<assembly>.sql-differences.tsv` beside
       `override-reasons.tsv` when `INFOCARRIER_OVERRIDE_REASONS` names a directory: class, case,
-      and the reason labels or none. `eng/spec-parity.py` joins it: a case scores 1 only when no
+      and the reason labels or none, or "no reference" for a case the `.direct.sql` file lacks.
+      A difference is `SqlCapture.SameStatements`'s, counts aside (spec §12, amended by the review
+      of H1). `eng/spec-parity.py` joins it: a case scores 1 only when no
       InfoCarrier reason covers it and it is not in the list. Yellow while an `[InfoCarrierDefect]`
       exists or a difference has no reason. `eng/suite-summary.sh` passes the new file.
       **Tests.** A three-case fixture of TRX and TSV files scores 1, 0 and 0: equal, differing with

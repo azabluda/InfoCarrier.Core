@@ -62,6 +62,13 @@ public sealed class SqlCaptureAttribute(params string[] namespaces) : BeforeAfte
 ///         process exit whatever is left. It reads the file first, so an entry of a test that did not
 ///         run stays as it was, and a capture with <c>--filter</c> rewrites only what it ran.
 ///     </para>
+///     <para>
+///         <b>Everything that can fail runs in <c>After</c></b>, where xUnit makes an exception the
+///         test's failure: reading the file, and checking that the entry can be written. The end of a
+///         test and the end of a class run outside every runner's error handling, where an exception
+///         would abort the whole run and lose every other class's file, so nothing there throws
+///         (review, 2026-09-26). <see cref="SqlCaptureRun" /> holds a capture's files.
+///     </para>
 /// </remarks>
 public static class SqlCapture
 {
@@ -70,9 +77,8 @@ public static class SqlCapture
 
     private static readonly ConcurrentDictionary<Type, string?> Paths = new();
     private static readonly ConcurrentDictionary<string, SqlCaptureFile?> Expected = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<Type, (string Path, SqlCaptureFile File)> Captured = new();
     private static readonly ConcurrentDictionary<(Type, string), int> Ordinals = new();
-    private static int _exitHooked;
+    private static SqlCaptureRun? _run;
 
     /// <summary>What this run does with the statements, from <see cref="ModeVariable" />.</summary>
     /// <exception cref="InvalidOperationException">The variable holds a value other than <c>wire</c> or <c>direct</c>.</exception>
@@ -231,66 +237,42 @@ public static class SqlCapture
                 + $"'{Path.GetDirectoryName(path)}', does not exist. Move the class, or its namespace, so that the two agree.");
         }
 
-        if (mode == SqlCaptureMode.Assert
-            && Expected.GetOrAdd(path, p => File.Exists(p) ? SqlCaptureFile.Read(p) : null) is { } file
-            && Compare(file.Find(CaseOf(test)), test.Commands, ClassName(test.TestClass)) is { } difference)
+        if (mode == SqlCaptureMode.Assert)
         {
-            throw new XunitException($"{difference}\nFile: {path}");
-        }
-    }
-
-    /// <summary>In a capture, files the test's entry in its class's file, which is written when the class ends.</summary>
-    internal static void TestFinished(CurrentTest test, bool failed)
-    {
-        // An unknown value has already failed the test in After, which is where it can be reported.
-        SqlCaptureMode mode;
-        try
-        {
-            mode = Mode;
-        }
-        catch (InvalidOperationException)
-        {
-            return;
-        }
-
-        if (mode == SqlCaptureMode.Assert
-            || FileFor(test.TestClass, mode) is not { } path
-            || !Directory.Exists(Path.GetDirectoryName(path)))
-        {
-            return;
-        }
-
-        if (Interlocked.Exchange(ref _exitHooked, 1) == 0)
-        {
-            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            if (Expected.GetOrAdd(path, p => File.Exists(p) ? SqlCaptureFile.Read(p) : null) is { } file
+                && Compare(file.Find(CaseOf(test)), test.Commands, ClassName(test.TestClass)) is { } difference)
             {
-                foreach (Type left in Captured.Keys)
-                {
-                    ClassFinished(left);
-                }
-            };
+                throw new XunitException($"{difference}\nFile: {path}");
+            }
+
+            return;
         }
 
-        (string _, SqlCaptureFile file) = Captured.GetOrAdd(test.TestClass, _ => (path, SqlCaptureFile.Read(path)));
-        lock (file)
+        if (_run is null && Interlocked.CompareExchange(ref _run, new SqlCaptureRun(mode), null) is null)
         {
-            file.Set(CaseOf(test), [.. test.Commands.Select(ToFileCommand)], directRunFailed: mode == SqlCaptureMode.Direct && failed);
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => Report(_run!.Finish());
         }
+
+        _run!.Prepare(test, FileFor(test.TestClass, mode)!);
     }
 
-    /// <summary>Writes the class's file, when its last test case has returned.</summary>
+    /// <summary>In a capture, marks a failed direct run on the entry <c>After</c> prepared. Never throws.</summary>
+    internal static void TestFinished(CurrentTest test, bool failed)
+        => _run?.TestFinished(test, failed);
+
+    /// <summary>
+    ///     In a capture, writes the class's file when its last test case has returned. Never throws: a
+    ///     write that fails is reported on the standard error, and the process exits with 1.
+    /// </summary>
     internal static void ClassFinished(Type testClass)
     {
-        if (Captured.TryRemove(testClass, out (string Path, SqlCaptureFile File) captured))
+        if (_run?.ClassFinished(testClass) is { } error)
         {
-            lock (captured.File)
-            {
-                captured.File.Write(captured.Path);
-            }
+            Report([error]);
         }
     }
 
-    private static SqlCaptureCommand ToFileCommand(CapturedCommand command)
+    internal static SqlCaptureCommand ToFileCommand(CapturedCommand command)
         => new(
             SqlNormalizer.Normalize(command.Text),
             command.Failed ? "failed"
@@ -318,10 +300,147 @@ public static class SqlCapture
         return text.ToString();
     }
 
+    private static void Report(IReadOnlyList<string> errors)
+    {
+        foreach (string error in errors)
+        {
+            Console.Error.WriteLine(error);
+            Environment.ExitCode = 1;
+        }
+    }
+
     // The name xUnit, the TRX and a --filter use: Outer+Inner for a nested class.
     private static string ClassName(Type testClass)
         => testClass.FullName![(testClass.Namespace!.Length + 1)..];
 
     private static string FileName(Type testClass)
         => testClass.DeclaringType is { } outer ? $"{FileName(outer)}.{testClass.Name}" : testClass.Name;
+}
+
+/// <summary>
+///     One capture's files, <c>wire</c> or <c>direct</c>: each test's entry is prepared in
+///     <c>After</c>, a failed direct run is marked at the test's end, and a class's file is written
+///     at the class's end (#167).
+/// </summary>
+/// <remarks>
+///     <b>Only <see cref="Prepare(CurrentTest, string)" /> throws</b>, and it runs in <c>After</c>,
+///     where the exception fails the one test. <see cref="TestFinished(CurrentTest, bool)" /> and
+///     <see cref="ClassFinished" /> run outside xUnit's error handling, so they never throw: an
+///     exception there would abort the run and lose every class not yet written.
+/// </remarks>
+public sealed class SqlCaptureRun(SqlCaptureMode side)
+{
+    private readonly ConcurrentDictionary<Type, Pending> _files = new();
+
+    /// <summary>
+    ///     Reads the class's file on its first test, and sets the test's entry from the commands it
+    ///     ran, normalized. Called from <c>After</c>, once the test's commands are closed.
+    /// </summary>
+    /// <exception cref="XunitException">The file cannot be read, or the entry could not be written so that it reads back the same.</exception>
+    public void Prepare(CurrentTest test, string path)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+
+        Prepare(test.TestClass, SqlCapture.CaseOf(test), test.Commands, path);
+    }
+
+    /// <summary>The same, for a case and commands a test builds by hand.</summary>
+    /// <inheritdoc cref="Prepare(CurrentTest, string)" path="/exception" />
+    public void Prepare(Type testClass, SqlCaptureCase testCase, IReadOnlyList<CapturedCommand> ran, string path)
+    {
+        ArgumentNullException.ThrowIfNull(testClass);
+        ArgumentNullException.ThrowIfNull(ran);
+
+        Pending pending;
+        try
+        {
+            pending = _files.GetOrAdd(testClass, _ => new Pending(path, SqlCaptureFile.Read(path)));
+        }
+        catch (Exception e) when (e is FormatException or IOException or UnauthorizedAccessException)
+        {
+            throw new XunitException($"The capture cannot read {path}: {e.Message}");
+        }
+
+        SqlCaptureCommand[] commands = [.. ran.Select(SqlCapture.ToFileCommand)];
+        try
+        {
+            SqlCaptureFile.EnsureWritable(testCase, commands);
+        }
+        catch (InvalidOperationException e)
+        {
+            throw new XunitException($"{e.Message} File: {path}");
+        }
+
+        lock (pending)
+        {
+            pending.File.Set(testCase, commands, directRunFailed: false);
+            pending.Prepared.Add(testCase);
+        }
+    }
+
+    /// <summary>
+    ///     Marks the test's entry <c>direct run failed</c> when the test failed in a direct capture.
+    ///     A test whose <c>After</c> never ran has no entry, and is left alone.
+    /// </summary>
+    public void TestFinished(CurrentTest test, bool failed)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+
+        TestFinished(test.TestClass, SqlCapture.CaseOf(test), failed);
+    }
+
+    /// <summary>The same, for a case a test names by hand.</summary>
+    public void TestFinished(Type testClass, SqlCaptureCase testCase, bool failed)
+    {
+        ArgumentNullException.ThrowIfNull(testClass);
+
+        if (side != SqlCaptureMode.Direct || !failed || !_files.TryGetValue(testClass, out Pending? pending))
+        {
+            return;
+        }
+
+        lock (pending)
+        {
+            if (pending.Prepared.Contains(testCase) && pending.File.Find(testCase) is { } commands)
+            {
+                pending.File.Set(testCase, commands, directRunFailed: true);
+            }
+        }
+    }
+
+    /// <summary>Writes the class's file, if a test of it was prepared.</summary>
+    /// <returns>Null, or what went wrong, for the caller to report.</returns>
+    public string? ClassFinished(Type testClass)
+    {
+        ArgumentNullException.ThrowIfNull(testClass);
+
+        if (!_files.TryRemove(testClass, out Pending? pending))
+        {
+            return null;
+        }
+
+        try
+        {
+            lock (pending)
+            {
+                pending.File.Write(pending.Path);
+            }
+
+            return null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return $"The capture could not write {pending.Path}: {e.Message}";
+        }
+    }
+
+    /// <summary>Writes every file still held, at process exit.</summary>
+    /// <returns>What went wrong, one line per file.</returns>
+    public IReadOnlyList<string> Finish()
+        => [.. _files.Keys.Select(ClassFinished).OfType<string>()];
+
+    private sealed record Pending(string Path, SqlCaptureFile File)
+    {
+        public HashSet<SqlCaptureCase> Prepared { get; } = [];
+    }
 }
