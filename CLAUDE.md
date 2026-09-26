@@ -196,7 +196,10 @@ investigation that finds new promises, and it is a report, never a gate. **A slo
 never committed and never asserted, and that includes text we captured ourselves** (ADR-014):
 committing each test's statements beside its class was built, reviewed and withdrawn on 2026-09-26.
 #167 replaces this script with a slow mode that runs each test with plain EF and through InfoCarrier
-and compares the two in memory, and every InfoCarrier reason must then agree with that comparison.
+and compares the two in memory, and every InfoCarrier reason that claims a runtime difference
+(`SqlDiffers`, `AnswerNotRefusal` or `RefusedEarlier`) must then agree with that comparison. This
+said "every InfoCarrier reason" until ADR-014's amendment of 2026-09-26: the spike's six reasons with
+no difference were skips, rewritten test bodies and a compliance test, and none claimed one.
 
 ### Running and reporting
 

@@ -7105,7 +7105,10 @@ claims a runtime difference. The amendment proposed:
       which proves that `After` closes it; and `SqlNormalizerTest` pins the known limit that two
       derived-table columns swapped in two places normalize equal, because columns are numbered in
       the order they are first read. Measure a normal run before and after.
-- [ ] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
+- [x] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
+      [Amendment 2026-09-26](../../decisions.md#amendment-2026-09-26-the-spike-ran-and-decision-3-reads-only-the-reasons-that-claim-a-difference).
+      It records two corrections the spike measured as well: the comparison runs when the result
+      arrives, because `After` cannot know the outcome, and a slow run writes no file.
 - [ ] **H3. The plain-EF client and the slow mode.** From the spike, with what the whole-tier run
       found:
       - the plain-EF client copies EF's own `SqliteTestStore`: one connection per store, opened when
