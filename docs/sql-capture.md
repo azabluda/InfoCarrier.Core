@@ -70,7 +70,9 @@ the test is carried there by an **async-local "current test"**. The in-process h
 carries a value this way: the client side sets `InfoCarrierBackendTestStore.CurrentClientContext`
 and the server side reads it when it creates its context (`InfoCarrierBackendTestStore.cs`, the
 server context's creation). Step 0 proves that the new value reaches the recording interceptor in a
-parallel run before anything builds on it.
+parallel run before anything builds on it. **It did, on 2026-09-26**: in a serial and a parallel run
+of Tiers B and C, every one of 97,685 statements carried the name of the test that ran it.
+[`implementation-plan.md`](plans/v10/implementation-plan.md), Phase H, step H0, has the figures.
 
 **The value is the test case's display name**, the name the test explorer and the TRX show, for
 example `A_compiled_query_indexing_a_list_matches_the_direct_query(mode: Parameter, list: True)`.
@@ -83,13 +85,15 @@ name comes from xUnit v2's supported extension point, `[assembly: TestFramework(
 async-local and delegates every member, so discovery, EF's `ConditionalFact` and `ConditionalTheory`,
 and the test explorer are unaffected.
 
-**A theory whose data xUnit cannot serialize** is one test case whose rows run inside it, so the
-wrapper sees only the method. For those, a `BeforeAfterTestAttribute` counts the rows, and the name
-is `Method [row 3]`. Step 0 measures how many such theories Tiers B and C have.
+**A theory whose data xUnit cannot serialize** is one test case whose rows run inside it. **Amended
+2026-09-26 by step 0.** This said that the wrapper sees only the method there, so a
+`BeforeAfterTestAttribute` would count the rows and name each `Method [row 3]`. The wrapper wraps the
+test case's message bus as well, and sets the value when xUnit queues `ITestStarting`. Each row is
+its own `ITest` with its own display name, so each row gets its readable name, and there is no row
+counter. Step 0 found no such theory in Tiers B and C besides its own pin.
 
-**When EF's specification packages move to xUnit v3, `TestContext.Current.Test` replaces both the
-wrapper and the row counter.** The doc comment of the wrapper says so, so that the cleanup is not
-forgotten.
+**When EF's specification packages move to xUnit v3, `TestContext.Current.Test` replaces the
+wrapper.** The doc comment of the wrapper says so, so that the cleanup is not forgotten.
 
 ### 4.2 What is recorded
 
@@ -354,8 +358,9 @@ The figure is the mean, rounded down as today.
 0. **Spike.** Prove that the current test reaches `ServerSqlRecordingInterceptor` in a parallel run,
    through the test-framework wrapper. Count the theories of Tiers B and C whose data xUnit cannot
    serialize. Nothing builds on §4.1 before this step says it holds.
-1. **Capture.** The wrapper and the row counter, the tagged recorder with row counts, the normalizer
-   and its tests, the file reader and writer, the assertion in `After`, and both compliance tests.
+1. **Capture.** The tagged recorder with row counts, the normalizer and its tests, the file reader
+   and writer, the assertion in `After`, and both compliance tests. The wrapper landed with step 0,
+   and there is no row counter (§4.1, amended 2026-09-26).
    No class is adopted yet, so a normal run asserts nothing new.
 2. **The plain-EF client on `main`**, for Tiers B and C (§10).
 3. **`eng/sql-capture.sh`, and one class adopted from end to end**: `NorthwindWhereQuerySqliteInfoCarrierTest`.
@@ -370,12 +375,15 @@ The figure is the mean, rounded down as today.
 
 - **The async-local may not reach the interceptor** on some path, for example a transport that queues
   work on a thread of its own. Step 0 exists for this. The fallback is the prototype's serial run
-  with a marker per test, which is known to work.
+  with a marker per test, which is known to work. **Closed by step 0, 2026-09-26**: no statement of
+  Tiers B and C reached the interceptor with a wrong name or with none.
 - **Theories with data xUnit cannot serialize** get `[row n]` names, which are stable but not
-  readable. If step 0 finds many, a custom theory discoverer could split them.
-- **Statements issued by a test class's constructor** run before the wrapper's value is set and are
-  not recorded. EF's test classes seldom query there. If one does, the statement is missing from
-  both sides alike.
+  readable. If step 0 finds many, a custom theory discoverer could split them. **Closed by step 0,
+  2026-09-26**: each row gets its own display name (§4.1), and Tiers B and C have no such theory.
+- **Statements issued by a test class's constructor.** **Corrected by step 0, 2026-09-26.** This
+  said that they run before the wrapper's value is set and are not recorded. xUnit queues
+  `ITestStarting` before it builds the test class, so they are the test's, and a pin shows it. Only
+  a class fixture's constructor runs outside every test, and that is where a shared store seeds.
 - **`ServerSqlTest` and `ServerParameterizationTest` would be captured too**, and their SQL then
   asserted twice. Harmless, and it can be excluded later if it is only noise.
 - **File size.** Most classes will be the same on both sides, and git stores an identical file once.

@@ -7083,7 +7083,7 @@ change what H1 builds on.
 
 ---
 
-- [ ] **H0. Spike: the running test reaches the server's interceptor in a parallel run.** Nothing
+- [x] **H0. Spike: the running test reaches the server's interceptor in a parallel run.** Nothing
       of H1 starts before this passes (spec §4.1, §14).
 
       **Files.** Create `test/InfoCarrier.Core.TestUtilities/CurrentTest.cs` (the async-local and
@@ -7135,7 +7135,7 @@ change what H1 builds on.
       its own `ITest` with its own display name**, so the spec's `[row n]` counter may be
       unnecessary. This step measures that.
 
-      - [ ] **H0.1 Write the pins, and see them fail to compile.** `CurrentTestTest`, in the
+      - [x] **H0.1 Write the pins, and see them fail to compile.** `CurrentTestTest`, in the
             Sqlite namespace because one pin needs a server:
             - `A_fact_sees_its_own_display_name`: `CurrentTest.Value?.DisplayName` equals
               `$"{typeof(CurrentTestTest).FullName}.{nameof(A_fact_sees_its_own_display_name)}"`.
@@ -7149,34 +7149,68 @@ change what H1 builds on.
             - `A_statement_the_server_runs_carries_the_display_name`: a query over the wire runs
               one statement, and an interceptor that the fixture's `OnAddOptions` adds to the server
               recorded `CurrentTest.Value?.DisplayName` for it, equal to the test's own.
-      - [ ] **H0.2 Implement.** `CurrentTest.cs` and the assembly attribute. Run
+      - [x] **H0.2 Implement.** `CurrentTest.cs` and the assembly attribute. Run
             `dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~CurrentTestTest"`.
             Expected: every pin passes.
-      - [ ] **H0.3 The baseline for the test explorer.** Before the probe, with the assembly
-            attribute commented out, run Tiers B and C in parallel with `--logger trx` into
-            `artifacts/sql-capture/h0-baseline/`. The filter is
+      - [x] **H0.3 The baseline for the test explorer.** Planned as a run with the assembly
+            attribute commented out. **Not made**: the console log of `to-query-string`, the last
+            full measurement, already lists every test name and outcome without the framework. The
+            filter for Tiers B and C is
             `FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite|FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird`.
-      - [ ] **H0.4 The probe (temporary).** With `INFOCARRIER_CURRENT_TEST_PROBE` naming a
+      - [x] **H0.4 The probe (temporary).** With `INFOCARRIER_CURRENT_TEST_PROBE` naming a
             directory, the bus wrapper writes a line for each `ITestStarting` and `ITestFinished`:
             the class, the test's display name, the test case's display name, and the test case's
             type. `ServerSqlRecordingInterceptor` writes a line for each statement: the async-local
             display name, the display name of the test that a process-wide marker says is running
             (set at start, cleared at finish), a number for the store, and the command text.
-      - [ ] **H0.5 The serial run.** Tiers B and C, with the probe, and
+      - [x] **H0.5 The serial run.** Tiers B and C, with the probe, and
             `-- xUnit.ParallelizeTestCollections=false`. **Check: for every statement, the
             async-local name equals the marker's name**, both empty between a finish and the next
             start. Expected: no statement where they differ.
-      - [ ] **H0.6 The parallel run.** Tiers B and C, with the probe, default settings, and
+      - [x] **H0.6 The parallel run.** Tiers B and C, with the probe, default settings, and
             `--logger trx` into `artifacts/sql-capture/h0-parallel/`. **Check: for each display
             name, the sequence of statements equals the serial run's.** Check also that the TRX
             holds the same test names with the same outcomes as the H0.3 baseline. Expected: no
             difference.
-      - [ ] **H0.7 Count the theories whose rows run inside one test case**, from the probe's
+      - [x] **H0.7 Count the theories whose rows run inside one test case**, from the probe's
             start lines: test cases with more than one `ITest`, and how many of their rows share a
             display name within their class.
-      - [ ] **H0.8 Record and commit.** Remove the probe. Write the figures under this step, and
+      - [x] **H0.8 Record and commit.** Remove the probe. Write the figures under this step, and
             amend spec §4.1 and §14 with the finding, dated. Gates: the Release build, then
             `eng/measure.sh h0 to-query-string`. Commit `Step H0: …`.
+
+      **Result, 2026-09-26: the value reaches the interceptor, and each row has its own name.**
+      Tiers B and C ran twice with the probe. The parallel run took 394 s and the serial run 898 s,
+      and each reported `Total tests: 19710, Passed: 19554, Skipped: 156`, with no failure.
+
+      - **The serial run:** 97,685 statements. For each one, the async-local name equals the name
+        of the test that the process-wide marker says is running. 17,035 statements ran between
+        tests and have neither. No statement differs.
+      - **The parallel run against the serial run:** 17,371 tests ran statements, and each test's
+        statements are the same sequence in both runs. The 17,035 statements outside any test are
+        the same in both. So the value flows per test under parallel collections, and each test's
+        statements come in a fixed order, which the in-order assertion of spec §7 needs.
+      - **The test explorer:** against the console log of `to-query-string`, no test name is
+        missing and no outcome changed. 19 names are new: the 7 pins of H0.1, and 12 tests that
+        #165, #166 and #168 added after that measurement.
+      - **Theories that xUnit cannot serialize:** none in Tiers B and C besides the pin. 19,709 test
+        cases held 19,710 tests, and no display name occurs twice within one class. **So there is no
+        row counter**: the message bus names each row, and the spec's `[row n]` names never occur.
+      - **The pins fail without the framework:** with the assembly attribute commented out, 6 of the
+        7 failed. The class fixture's pin passes either way, because it checks that nothing is set.
+
+      **An eighth pin corrects the spec.** Spec §14 said that a test class's constructor runs
+      before the value is set. xUnit queues `ITestStarting` before it builds the test class, so the
+      constructor's statements are the test's, and `A_test_class_is_built_inside_its_test` pins it.
+      Only a class fixture's constructor runs outside every test. Spec §4.1, §13 and §14 are
+      amended with this date.
+
+      **Gates.** `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`: 5 warnings,
+      0 errors, both test projects rebuilt, and the same for the spec project after the eighth pin.
+      `eng/measure.sh h0 to-query-string`, run before the eighth pin: `InfoCarrier.Core.FunctionalTests`
+      `Total tests: 29656, Passed: 29418, Skipped: 238`; `InfoCarrier.Core.DocumentStoreTests`
+      `Total tests: 234, Passed: 234`; FIXED none, BROKEN none, REASONS unchanged. The pin class
+      after the eighth pin: `Total tests: 8, Passed: 8`.
 
 - [ ] **H1. Capture: the tagged recorder, the normalizer, the file, the assertion hook, and the
       compliance tests.** No class is adopted, so a normal run asserts nothing new.
