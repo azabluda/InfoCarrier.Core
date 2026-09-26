@@ -7277,6 +7277,30 @@ claims a runtime difference. The amendment proposed:
       then ran green on its own (below). `trim-ratchet.sh` OK at 104 <= 104.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H9. A scalar under a null check travels as the column, with no `CASE`.** On the branch
+      `live-comparison-unguarded-slots`, on top of H8. A value lifted out of a branch of
+      `x.Nav != null ? new { … } : null` travelled as `CASE WHEN test THEN value ELSE default END`,
+      so that a non-nullable slot never received a `NULL` from an outer join. Plain EF projects the
+      column as it stands and reads it as nullable: about fifteen methods, the eight
+      `Null_check_in_*_projection_should_not_be_removed` among them.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_value_under_a_null_check_is_read_as_the_column`.
+      2. **The fix**: `ProjectionRewriter.Guarded` sends a string or a nullable scalar as it is, and a
+         non-nullable scalar converted to its nullable type, which EF translates to the bare column;
+         `ReadBack` converts the slot back on the client, down the branch that reads it. An entity,
+         a collection, an enum and any type not in `NullableScalars` keep the guard. The table is
+         spelt out rather than built with `MakeGenericType`, so the trim count does not move.
+      3. **The next slow run**: `Passed: 19328, Failed: 134, Skipped: 155, Total: 19617`, against
+         `Failed: 165`. **15 methods left the red list and none joined it**, and none of the 70 that
+         stayed red changed its verdict or its read counts. All 134 are comparison reds.
+
+      The Gears of War, complex-navigation, owned and ad-hoc classes on all three tiers first,
+      because the guard was added for 26 Gears of War failures: **Passed: 8251, Failed: 0,
+      Skipped: 21, Total: 8272**. Normal run, `eng/measure.sh unguarded-slots closed-subquery`:
+      **FAILING 0, TOTAL 29924**, FIXED the two tests H8 converged, BROKEN none. `trim-ratchet.sh`
+      OK at 104 <= 104. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**.
+      `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

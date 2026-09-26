@@ -74,6 +74,38 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             && second.GetGenericArguments().Length == 2);
 
     /// <summary>
+    ///     The scalar types a guarded slot can travel as the nullable type of, each with that type.
+    ///     See <see cref="Guarded" />.
+    /// </summary>
+    /// <remarks>
+    ///     Spelt out rather than built with <c>typeof(Nullable&lt;&gt;).MakeGenericType</c>, which
+    ///     the trimmer cannot follow (<c>eng/trim-baseline.txt</c>). An enum is absent for the same
+    ///     reason, and keeps its guard.
+    /// </remarks>
+    private static readonly Dictionary<Type, Type> NullableScalars = new()
+    {
+        [typeof(bool)] = typeof(bool?),
+        [typeof(byte)] = typeof(byte?),
+        [typeof(sbyte)] = typeof(sbyte?),
+        [typeof(short)] = typeof(short?),
+        [typeof(ushort)] = typeof(ushort?),
+        [typeof(int)] = typeof(int?),
+        [typeof(uint)] = typeof(uint?),
+        [typeof(long)] = typeof(long?),
+        [typeof(ulong)] = typeof(ulong?),
+        [typeof(char)] = typeof(char?),
+        [typeof(float)] = typeof(float?),
+        [typeof(double)] = typeof(double?),
+        [typeof(decimal)] = typeof(decimal?),
+        [typeof(DateTime)] = typeof(DateTime?),
+        [typeof(DateTimeOffset)] = typeof(DateTimeOffset?),
+        [typeof(DateOnly)] = typeof(DateOnly?),
+        [typeof(TimeOnly)] = typeof(TimeOnly?),
+        [typeof(TimeSpan)] = typeof(TimeSpan?),
+        [typeof(Guid)] = typeof(Guid?),
+    };
+
+    /// <summary>
     ///     The operators that count the rows below them and read nothing a projection computes, when
     ///     they are given no predicate. See <see cref="TryMoveBelowReassembly" />.
     /// </summary>
@@ -355,7 +387,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
+            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
         }
 
         Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(selector.Body)!;
@@ -1185,7 +1217,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
+            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
         }
 
         Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(innerSelector.Body)!;
@@ -1651,16 +1683,52 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         rewritten call unshippable — six tests fell back to the residual, where the
     ///         navigation they read had no query to carry it.
     ///     </para>
+    ///     <para>
+    ///         <b>A scalar travels unguarded since 2026-09-26, found by #167's slow run.</b> The
+    ///         guard put <c>CASE WHEN test THEN value ELSE default END</c> into the statement, where
+    ///         plain EF Core projects the column as it stands and reads it as nullable: about fifteen
+    ///         methods, the <c>Null_check_in_*_projection_should_not_be_removed</c> family among
+    ///         them. What the guard protected against is a <c>NULL</c> reaching a non-nullable slot,
+    ///         and a slot that is nullable cannot fail that way. So a string or a nullable scalar
+    ///         travels as it is, a non-nullable scalar travels converted to its nullable type, which
+    ///         EF translates to the bare column, and <see cref="ReadBack" /> converts it back on the
+    ///         client, down the branch that reads it. Anything else, an entity, a collection or a
+    ///         type this rewrite does not know as a scalar, keeps the guard.
+    ///     </para>
     /// </remarks>
     private static Expression Guarded(
         Expression shipped, Expression fragment, IReadOnlyDictionary<Expression, Expression> guards)
-        => guards.TryGetValue(fragment, out Expression? guard)
-            ? Expression.Condition(
-                guard,
-                shipped,
-                Expression.Constant(
-                    shipped.Type.IsValueType ? Activator.CreateInstance(shipped.Type) : null, shipped.Type))
-            : shipped;
+    {
+        if (!guards.TryGetValue(fragment, out Expression? guard))
+        {
+            return shipped;
+        }
+
+        if (NullableScalars.TryGetValue(shipped.Type, out Type? nullable))
+        {
+            return Expression.Convert(shipped, nullable);
+        }
+
+        if (shipped.Type == typeof(string) || NullableScalars.ContainsValue(shipped.Type))
+        {
+            return shipped;
+        }
+
+        return Expression.Condition(
+            guard,
+            shipped,
+            Expression.Constant(
+                shipped.Type.IsValueType ? Activator.CreateInstance(shipped.Type) : null, shipped.Type));
+    }
+
+    /// <summary>
+    ///     A slot read back as the type of the fragment it carries, where <see cref="Guarded" />
+    ///     sent a non-nullable scalar as its nullable type.
+    /// </summary>
+    private static Expression ReadBack(Expression slot, Expression fragment)
+        => slot.Type != fragment.Type && Nullable.GetUnderlyingType(slot.Type) == fragment.Type
+            ? Expression.Convert(slot, fragment.Type)
+            : slot;
 
     private static IEnumerable<Expression> ChildrenOf(Expression node)
     {

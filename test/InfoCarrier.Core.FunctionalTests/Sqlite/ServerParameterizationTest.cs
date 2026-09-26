@@ -649,6 +649,40 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A value read inside a conditional of a client-typed projection is read as the column,
+    ///     as plain EF Core reads it, with no <c>CASE</c> around it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each value from a branch of <c>p.Blog != null ? new { … } : null</c> travelled as
+    ///         <c>CASE WHEN test THEN value ELSE default END</c>, so that a non-nullable slot never
+    ///         received a <c>NULL</c> from an outer join. EF projects the column as it stands and
+    ///         reads it as nullable; the conditional runs on the client either way.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, in about fifteen methods: the eight
+    ///         <c>Null_check_in_*_projection_should_not_be_removed</c>,
+    ///         <c>Select_conditional_with_anonymous_type*</c>, <c>Projecting_nullable_struct</c>,
+    ///         <c>Owned_entity_with_all_null_properties_in_compared_to_null_in_conditional_projection</c>
+    ///         and <c>Correlated_subquery_with_owned_navigation_being_compared_to_null_works</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_value_under_a_null_check_is_read_as_the_column()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new
+                {
+                    b.Id,
+                    Newest = b.Title != null ? new { b.Id, b.Title } : null,
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>
