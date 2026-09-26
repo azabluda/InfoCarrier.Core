@@ -395,6 +395,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         DbContext clientContext,
         CancellationToken cancellationToken = default)
     {
+        NoteWireInDirectRun();
         using var _ = WithClientContext(clientContext);
         return await _client.QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
@@ -405,6 +406,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         DbContext clientContext,
         CancellationToken cancellationToken = default)
     {
+        NoteWireInDirectRun();
         using var _ = WithClientContext(clientContext);
         return await _client.SaveChangesAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
@@ -440,7 +442,20 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
     /// <inheritdoc />
     public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => _client.BeginTransactionAsync(cancellationToken);
+    {
+        NoteWireInDirectRun();
+        return _client.BeginTransactionAsync(cancellationToken);
+    }
+
+    // SPIKE (#167): a request that crosses the wire while the direct side is set means the test
+    // built an InfoCarrier client by hand, so its "plain EF" run was not plain EF.
+    private static void NoteWireInDirectRun()
+    {
+        if (DirectClient.IsEnabled)
+        {
+            CurrentTest.Value?.NoteWire();
+        }
+    }
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)

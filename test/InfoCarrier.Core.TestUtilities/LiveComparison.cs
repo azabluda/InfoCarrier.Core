@@ -124,6 +124,7 @@ public static class LiveComparison
 
             string verdict = direct.FixtureFailure is not null || other is null ? "no-direct"
                 : other.DisplayName != test.DisplayName ? "unmatched"
+                : other.UsedWire ? "direct-used-infocarrier"
                 : Verdict(plain, wire, directOutcome, wireOutcome);
 
             (Type, string) method = (test.TestClass, test.MethodName);
@@ -145,7 +146,7 @@ public static class LiveComparison
             string sides = $"\n\nPlain EF Core ({directOutcome}):\n{Show(plain)}\nInfoCarrier ({wireOutcome}):\n{Show(wire)}";
             (string? label, string? red) = verdict switch
             {
-                "no-direct" or "unmatched" => ("no-direct-run", $"The slow run has no plain-EF run to compare this test with ({verdict}: {directOutcome})."),
+                "no-direct" or "unmatched" or "direct-used-infocarrier" => ("no-direct-run", $"The slow run has no plain-EF run to compare this test with ({verdict}: {directOutcome})."),
                 "same" when lastRowOfMethod && reason && !anyRowDiffers => (
                     "reason-without-difference",
                     $"{name} carries an [InfoCarrierDesign] or [InfoCarrierDefect] reason, and no row of it differs from plain EF Core: the reason suppresses nothing, so it goes.{sides}"),
@@ -310,7 +311,7 @@ public static class LiveComparison
     internal sealed record DirectRun(IReadOnlyList<DirectResult> Results, Exception? FixtureFailure);
 
     /// <summary>One test of a direct run: its name, its statements, and how it ended.</summary>
-    internal sealed record DirectResult(string DisplayName, IReadOnlyList<CapturedCommand> Commands, string Outcome);
+    internal sealed record DirectResult(string DisplayName, IReadOnlyList<CapturedCommand> Commands, string Outcome, bool UsedWire);
 
     /// <summary>
     ///     A class's second set of class fixtures, for the direct run: created and initialized on the
@@ -395,7 +396,7 @@ public static class LiveComparison
 
                 case ITestFinished when _test is not null:
                     _test.Close();
-                    results.Add(new DirectResult(_test.DisplayName, _test.Commands, _outcome));
+                    results.Add(new DirectResult(_test.DisplayName, _test.Commands, _outcome, _test.UsedWire));
                     _test = null;
                     break;
             }

@@ -90,6 +90,13 @@ public sealed class CurrentTest
         }
     }
 
+    /// <summary>SPIKE (#167): a request crossed the wire while the direct side was set.</summary>
+    internal bool UsedWire { get; private set; }
+
+    /// <summary>SPIKE (#167): records that a request crossed the wire during a direct run.</summary>
+    public void NoteWire()
+        => UsedWire = true;
+
     internal static CurrentTest Start(ITest test)
         => Current.Value = new CurrentTest(test);
 
