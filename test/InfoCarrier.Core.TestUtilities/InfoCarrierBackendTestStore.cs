@@ -37,6 +37,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         : base(name, shared)
     {
         _testStoreProperties = testStoreProperties;
+        IsDirect = DirectClient.IsEnabled;
 
         IServiceCollection services = AddServices(new ServiceCollection().AddLogging());
         if (testStoreProperties.OnAddServices is { } onAddServices)
@@ -213,6 +214,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => handler(request, cancellationToken);
     }
+
+    /// <summary>
+    ///     SPIKE (#167): whether this store was created for the direct side, where the client is
+    ///     plain EF Core on it. Read once, from <see cref="DirectClient.IsEnabled" />, when the store
+    ///     is created.
+    /// </summary>
+    public bool IsDirect { get; }
 
     /// <summary>
     ///     The server URL/name this store stands in for.

@@ -64,7 +64,7 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     ///     independently.
     /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => DirectClient.IsEnabled
+        => _backend.IsDirect
             ? _backend.AddDirectClientOptions(builder)
             : builder.UseInfoCarrier(_backend, ClientOptions(_backend));
 

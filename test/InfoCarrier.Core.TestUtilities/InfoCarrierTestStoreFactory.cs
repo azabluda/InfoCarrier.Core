@@ -91,11 +91,16 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
 
     /// <inheritdoc />
     public virtual TestStore Create(string storeName)
-        => CreateClientStore(_tier.CreateBackend(storeName, shared: false, _props()));
+        => CreateClientStore(_tier.CreateBackend(SideName(storeName), shared: false, _props()));
 
     /// <inheritdoc />
     public virtual TestStore GetOrCreate(string storeName)
-        => CreateClientStore(_tier.CreateBackend(storeName, shared: true, _props()));
+        => CreateClientStore(_tier.CreateBackend(SideName(storeName), shared: true, _props()));
+
+    // SPIKE (#167): the direct side gets a store of its own, so neither side sees what the other
+    // wrote.
+    private static string SideName(string storeName)
+        => DirectClient.IsEnabled ? storeName + DirectClient.StoreSuffix : storeName;
 
     /// <inheritdoc />
     /// <remarks>

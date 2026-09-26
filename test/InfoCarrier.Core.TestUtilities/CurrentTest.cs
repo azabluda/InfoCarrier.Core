@@ -294,9 +294,18 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
             ExceptionAggregator aggregator,
             CancellationTokenSource cancellationTokenSource)
         {
+            // SPIKE (#167, ADR-014): in a slow run the test case runs first with plain EF, on a
+            // second set of class fixtures, and its wire run then compares with that.
+            LiveComparison.DirectRun? direct = null;
+            if (LiveComparison.IsEnabled && testClass is { } covered && LiveComparison.Covers(covered.Class))
+            {
+                direct = await LiveComparison.RunDirectAsync(
+                    inner, covered.Class, diagnosticMessageSink, constructorArguments);
+            }
+
             RunSummary summary = await inner.RunAsync(
                 diagnosticMessageSink,
-                new MessageBus(messageBus),
+                new MessageBus(messageBus, direct),
                 constructorArguments,
                 aggregator,
                 cancellationTokenSource);
@@ -304,6 +313,7 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
             if (testClass is var (type, remaining) && Interlocked.Decrement(ref remaining.Value) == 0)
             {
                 SqlCapture.ClassFinished(type);
+                await LiveComparison.ClassFinishedAsync(type);
             }
 
             return summary;
@@ -318,11 +328,13 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
     ///     One bus serves one test case, whose tests run one after another, so one test at a time is
     ///     tracked here. A skipped test runs no statement and gets no entry.
     /// </remarks>
-    private sealed class MessageBus(IMessageBus inner) : IMessageBus
+    private sealed class MessageBus(IMessageBus inner, LiveComparison.DirectRun? direct = null) : IMessageBus
     {
         private CurrentTest? _test;
         private bool _failed;
         private bool _skipped;
+        private string _outcome = "unknown";
+        private int _index;
 
         public bool QueueMessage(IMessageSinkMessage message)
         {
@@ -332,14 +344,21 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                     _test = CurrentTest.Start(starting.Test);
                     _failed = false;
                     _skipped = false;
+                    _outcome = "unknown";
                     break;
 
-                case ITestFailed:
+                case ITestPassed:
+                    _outcome = "passed";
+                    break;
+
+                case ITestFailed failed:
                     _failed = true;
+                    _outcome = $"failed: {failed.ExceptionTypes.FirstOrDefault()}";
                     break;
 
                 case ITestSkipped:
                     _skipped = true;
+                    _outcome = "skipped";
                     break;
 
                 case ITestFinished when _test is not null:
@@ -348,6 +367,13 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                         SqlCapture.TestFinished(_test, _failed);
                     }
 
+                    if (direct is not null)
+                    {
+                        _test.Close();
+                        LiveComparison.Report(_test, direct, _index, _outcome);
+                    }
+
+                    _index++;
                     _test = null;
                     break;
             }

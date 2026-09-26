@@ -65,7 +65,7 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     ///     is the whole guard. See the class remarks.
     /// </remarks>
     protected override DbConnection Connection
-        => DirectClient.IsEnabled
+        => _backend.IsDirect
             ? _backend.DirectClientConnection
             : throw new InvalidOperationException(
             "The InfoCarrier client has no database of its own, so this test store exposes no "
@@ -90,7 +90,7 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => DirectClient.IsEnabled
+        => _backend.IsDirect
             ? _backend.AddDirectClientOptions(builder)
             : builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
 

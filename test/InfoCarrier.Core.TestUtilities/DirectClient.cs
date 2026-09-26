@@ -7,35 +7,38 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
 /// <summary>
-///     An opt-in run of a tier with InfoCarrier REMOVED: the client context is a plain EF Core
-///     context on the server's own store, with the server's options.
+///     A run with InfoCarrier REMOVED: the client context is a plain EF Core context on a store of
+///     its own, with the server's options (#167, ADR-014).
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Off unless <c>INFOCARRIER_DIRECT_CLIENT</c> is set, and a run with it on asserts
-///         nothing about this provider.</b> Its whole product is the server SQL log
-///         (<see cref="ServerSqlLog" />): the statements plain EF runs for each test method, to set
-///         beside the statements the server runs for the same method when InfoCarrier is in
-///         between. That is a plain-EF baseline for every test method, not only for the ones EF's
-///         own <c>AssertSql</c> covers.
-///     </para>
-///     <para>
-///         Tests that assert something specific to InfoCarrier fail in such a run, and that is
-///         expected: only the log is wanted.
+///         <b>SPIKE. Per async flow, not per process.</b> The satellite read a process-wide
+///         environment variable; the live comparison runs both sides in one process, so the side
+///         is an async-local that <c>CurrentTestFramework</c> sets around the direct run, and a
+///         store reads it once, when it is created (<see cref="InfoCarrierBackendTestStore.IsDirect" />).
 ///     </para>
 /// </remarks>
 public static class DirectClient
 {
+    private static readonly AsyncLocal<bool> Current = new();
+
     /// <summary>
-    ///     Whether the client is plain EF Core on the server's store rather than InfoCarrier.
+    ///     Whether the client being built in this async flow is plain EF Core rather than
+    ///     InfoCarrier.
     /// </summary>
-    public static bool IsEnabled { get; }
-        = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOCARRIER_DIRECT_CLIENT"));
+    public static bool IsEnabled => Current.Value;
+
+    /// <summary>The suffix a direct store adds to its name, so the two sides never share a file.</summary>
+    public const string StoreSuffix = ".direct";
+
+    /// <summary>Sets the side for this async flow and the flows it starts.</summary>
+    public static void Set(bool direct)
+        => Current.Value = direct;
 
     /// <summary>
     ///     Enlists <paramref name="facade" /> in a transaction another context of the same test
     ///     began: over the wire through the server's token, or directly through the shared
-    ///     connection when <see cref="IsEnabled" />.
+    ///     connection on the direct side.
     /// </summary>
     public static IDbContextTransaction? UseTestTransaction(this DatabaseFacade facade, IDbContextTransaction transaction)
         => IsEnabled
