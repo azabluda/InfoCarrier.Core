@@ -230,7 +230,29 @@ running Tier B a second time with InfoCarrier removed and comparing each test me
 `Multi_level_includes_are_applied_with_skip` had read every order of every customer whose key
 starts with "A".
 
-The general case stays deferred, and §7 still holds it.
+**Amendment 2026-09-26 — the operators written above a rebuild move below it.** Until this date
+the line after this paragraph read "The general case stays deferred, and §7 still holds it." #167's
+slow run, which runs each Tier B test with plain EF Core and through this provider and compares the
+two, showed what that cost: `Select(x => new Dto { Id = x.OrderID }).Where(d => ((IHaveId)d).Id ==
+10252)` read all 831 orders where EF reads one, `Select(o => new { Id = CodeFormat(o.OrderID)
+}).Count()` read every order to count them, and EF's `Take_with_single_select_many` read 75531 rows
+of a cross join where EF reads two. `ProjectionRewriter.TryMoveBelowReassembly` and
+`VisitOrderingChain` now move these onto the server's tuple:
+
+- `Count`, `LongCount` and `Any` without a predicate drop the rebuild, because they read no value
+  of it. EF drops the projection under them too, so client code in it is never called.
+- `Skip` and `Take` move below, for the reason paging under a terminal operator does.
+- `Where` and an ordering chain move below when their lambda, fused with the rebuild, is one the
+  server can run. EF's `ReplacingExpressionVisitor` does the fusion and folds
+  `new Dto { Id = row.Item1 }.Id` to `row.Item1`, through a cast to an interface too.
+- A predicate given to a terminal operator is a `Where` under the operator, as EF normalizes it.
+
+**What stays on the client** is an operator whose lambda still needs the rebuild or client code,
+and one whose fused lambda reads a slot that holds a sequence. The second is §6a's lesson: a slot
+can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
+provider translates. `QuerySplitter` judges what stays exactly as before.
+
+The general case of §7, an arbitrary operator over any client-typed element, is still deferred.
 
 ### 3.5 Frontier and fallback
 
@@ -349,7 +371,7 @@ of EF's transparent-identifier handling to hand the server a tree its own normal
 
 | Item | Why deferred | Where |
 |---|---|---|
-| Operator pushdown past the boundary (`Take`/`OrderBy` on tuples) | Correctness first; needs the residual→tuple slot map to be invertible | performance backlog |
+| Operator pushdown past the boundary for any operator over any client-typed element (`Where`, orderings, paging, counting, `Distinct` and `Select` over a rebuild are done, §3.4) | Correctness first; needs the residual→tuple slot map to be invertible | performance backlog |
 | Streaming the residual | Residual evaluation buffers; `IAsyncEnumerable` results are M8/W4 | M8 |
 | Compiled split cache | Depends on ADR-008 constraint 6 canonical form | M8 |
 | `EF.Property` in a residual | Requires shipping shadow state per row | M6 |

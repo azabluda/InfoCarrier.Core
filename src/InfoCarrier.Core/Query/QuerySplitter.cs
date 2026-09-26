@@ -468,9 +468,22 @@ public sealed class QuerySplitter
         var paging = new List<MethodCallExpression>();
         Expression source = terminal.Arguments[0];
         while (source is MethodCallExpression { Method.DeclaringType: var operatorDeclaring } call
-               && operatorDeclaring == typeof(Queryable)
-               && call.Arguments.Count == 2)
+               && operatorDeclaring == typeof(Queryable))
         {
+            // `Cast` is row for row too, and `Take(1).Cast<object>().Single()` is how EF's own
+            // `Take_with_single_select_many` is written. The client runs it, and the rows it casts
+            // are the ones the limit bounds (#167's slow run, 2026-09-26).
+            if (call.Method.Name == nameof(Queryable.Cast) && call.Arguments.Count == 1)
+            {
+                source = call.Arguments[0];
+                continue;
+            }
+
+            if (call.Arguments.Count != 2)
+            {
+                break;
+            }
+
             if (call.Method.Name == nameof(Queryable.Select))
             {
                 source = call.Arguments[0];

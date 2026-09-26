@@ -467,6 +467,123 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A filter written above a projection into a client type runs at the store, as it does in
+    ///     plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A filter that reads <see cref="BlogCard" /> directly already reached the store, because
+    ///         the carrier rewrite replaces the type with a tuple all the way up to the result. One
+    ///         that reads it through an interface did not: the interface cannot be retyped, so the
+    ///         projection became a server-side tuple and a client-side rebuild, and the <c>Where</c>
+    ///         above the rebuild ran on the client over every row the server sent. The server read
+    ///         the whole table where EF's own client writes <c>WHERE "b"."Title" = 'beta'</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Interface_casting_though_generic_method</c>
+    ///         (831 rows read where plain EF reads one).
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_filter_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .Where(c => ((IHasTitle)c).Title == "beta")
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A predicate given to a terminal operator above a projection into a client type runs at
+    ///     the store, with the terminal operator's row limit.
+    /// </summary>
+    /// <inheritdoc cref="A_filter_over_a_client_type_runs_at_the_store" />
+    [ConditionalFact]
+    public async Task A_terminal_predicate_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .FirstOrDefaultAsync(c => c.Title == "beta"));
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A count above a projection that calls client code counts at the store, and the client
+    ///     code is never called, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     The count does not depend on what the projection computes, and EF drops the projection
+    ///     under it. This client kept it: the server sent the column the client method reads, for
+    ///     every row, and the client counted them. Found by #167's slow run, as EF's own
+    ///     <c>Count_on_projection_with_client_eval</c>, <c>GroupBy_nominal_type_count</c> and the
+    ///     six <c>GroupJoin_in_subquery_with_client_projection</c> methods, the last of which read
+    ///     every row of two tables for a count compared in a filter.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_count_over_a_client_computed_projection_counts_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { Loud = Shout(b.Title) })
+                .CountAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     Paging above a projection that calls client code runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     The client projection is row for row, so the offset and the limit select the same rows
+    ///     below it as above it, and EF applies them in SQL. Found by #167's slow run, as EF's own
+    ///     six <c>Client_method_*_loads_owned_navigations</c> methods.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task Paging_over_a_client_computed_projection_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => Shout(b.Title))
+                .Skip(1)
+                .Take(1)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     An ordering above a projection into a client type runs at the store, and so does the
+    ///     limit above it.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own <c>Take_with_single_select_many</c>: a
+    ///     <c>SelectMany</c> ordered by the members of the anonymous type it builds, then
+    ///     <c>Take(1)</c>, <c>Cast&lt;object&gt;()</c> and <c>Single()</c>. Plain EF read two rows of
+    ///     the cross join; this client read all 75531 and ordered, paged and checked them on the
+    ///     client.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_ordering_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => (from b in context.Set<Blog>()
+                        from o in context.Set<Blog>()
+                        orderby b.Id, o.Id
+                        select new { b, o })
+                .Take(1)
+                .Cast<object>()
+                .SingleOrDefaultAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     A collection the box cannot hand back, category 3 of issue #62.
     /// </summary>
     /// <remarks>
@@ -1671,6 +1788,24 @@ public partial class ServerParameterizationTest
         int start = Array.FindIndex(lines, l => l.TrimStart().StartsWith("SELECT", StringComparison.Ordinal));
         Assert.True(start >= 0, "no SELECT found in: " + entry);
         return SqlNormalizer.Normalize(string.Join('\n', lines[start..].Select(l => l.Trim())));
+    }
+
+    /// <summary>Client code: a method the server has no way to run, because no model maps it.</summary>
+    private static string? Shout(string? title)
+        => title?.ToUpperInvariant();
+
+    /// <summary>An interface only this client has, which a filter can read a rebuilt row through.</summary>
+    private interface IHasTitle
+    {
+        string? Title { get; }
+    }
+
+    /// <summary>A type only this client has, so a projection into it is rebuilt on the client.</summary>
+    private sealed class BlogCard : IHasTitle
+    {
+        public int Id { get; init; }
+
+        public string? Title { get; init; }
     }
 
     /// <summary>

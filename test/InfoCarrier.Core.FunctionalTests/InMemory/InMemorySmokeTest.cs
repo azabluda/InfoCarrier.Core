@@ -193,12 +193,17 @@ public class InMemorySmokeTest
     }
 
     [ConditionalFact]
-    public async Task A_split_that_pages_on_the_client_names_what_stayed_behind()
+    public async Task A_split_that_removes_rows_on_the_client_names_what_stayed_behind()
     {
         // THE SPLIT EVENT SAYS WHETHER THE SPLIT COST ANYTHING, not only that one happened.
-        // `Take` above a projection the server cannot run is rebuilt with the projection, so the
-        // server sends every matching row and this client keeps one page. The answer is right and
+        // `ElementAt` above a projection the server cannot run stays with the projection, so the
+        // server sends every matching row and this client keeps one. The answer is right and
         // nothing else reports the cost, which is what the sentence is for.
+        //
+        // Until 2026-09-26 this was `A_split_that_pages_on_the_client_names_what_stayed_behind`, and
+        // its query was `Take(2)` above the same projection. #167's slow run moved paging below a
+        // client-side rebuild onto the server (`ProjectionRewriter.TryMoveBelowReassembly`), so
+        // `Take` no longer stays behind and the example had to be an operator that still does.
         //
         // The test above already covers the other half of the same event: a residual that only
         // reshapes rows says so instead, and a query the server runs whole says nothing at all.
@@ -221,15 +226,15 @@ public class InMemorySmokeTest
                 .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
                 .Options))
         {
-            var page = await context.Blogs
+            var second = await context.Blogs
                 .Select(b => new { b.Id, Label = ClientOnly.Describe(b.Title) })
-                .Take(2)
-                .ToListAsync();
+                .OrderBy(x => x.Id)
+                .ElementAtAsync(1);
 
-            Assert.Equal(2, page.Count);
+            Assert.Equal(2, second.Id);
         }
 
-        Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("Take"));
+        Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("ElementAt"));
     }
 
     [ConditionalFact]

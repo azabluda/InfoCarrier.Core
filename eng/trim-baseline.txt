@@ -254,5 +254,25 @@
 #
 # `total` rises with ours, 1144 -> 1145: EFCore is unchanged at 864.
 
-ours=100
-total=1145
+# 2026-09-26, 100 -> 103 (#167 step H6: operators above a client-side rebuild move below it, three
+# diagnostics).
+#
+# #167's slow run compares each Tier B test with plain EF Core. It found operators written above a
+# projection this client rebuilds staying on the client: `Select(x => new Dto { ... }).Where(d =>
+# ((IHaveId)d).Id == 10252)` read all 831 orders where EF reads one, a `Count()` above a projection
+# calling client code read every row to count it, and EF's `Take_with_single_select_many` read 75531
+# rows of a cross join where EF reads two. `ProjectionRewriter` now moves a `Where`, an ordering
+# chain, `Skip`, `Take`, a terminal operator's predicate and a count below the rebuild, onto the
+# tuple the server computes.
+#
+# The three are IL2060 on `MakeGenericMethod` in `TryMoveBelowReassembly`, `VisitOrderingChain` and
+# `Rebuilt`: each operator is instantiated for the tuple, whose type the caller's projection decides.
+# The premise again, as for `Distinct` and the fused `Select` above.
+#
+# IT COST FOUR AND COSTS THREE. The fourth was an IL2070 for reading `GetMethods()` through a `Type`
+# parameter; reading it off `typeof(Queryable)` and `typeof(Enumerable)` directly costs nothing.
+#
+# `total` rises with ours, 1145 -> 1148: EFCore is unchanged at 864.
+
+ours=103
+total=1148

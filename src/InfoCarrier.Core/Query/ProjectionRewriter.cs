@@ -61,6 +61,54 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         .GetMethods(BindingFlags.Public | BindingFlags.Static)
         .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
 
+    private static readonly MethodInfo QueryableWhere = typeof(Queryable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Queryable.Where)
+            && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
+            && second.GetGenericArguments()[0].GetGenericArguments().Length == 2);
+
+    private static readonly MethodInfo EnumerableWhere = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Enumerable.Where)
+            && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
+            && second.GetGenericArguments().Length == 2);
+
+    /// <summary>
+    ///     The operators that count the rows below them and read nothing a projection computes, when
+    ///     they are given no predicate. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private static readonly HashSet<string> RowCounting =
+        [nameof(Queryable.Count), nameof(Queryable.LongCount), nameof(Queryable.Any)];
+
+    /// <summary>
+    ///     The terminal operators whose predicate overload is a <c>Where</c> under the overload that
+    ///     takes the source alone. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private static readonly HashSet<string> PredicateTerminals =
+    [
+        nameof(Queryable.Count),
+        nameof(Queryable.LongCount),
+        nameof(Queryable.Any),
+        nameof(Queryable.First),
+        nameof(Queryable.FirstOrDefault),
+        nameof(Queryable.Single),
+        nameof(Queryable.SingleOrDefault),
+        nameof(Queryable.Last),
+        nameof(Queryable.LastOrDefault),
+    ];
+
+    // Read off `typeof(...)` directly, never through a `Type` parameter: the trimmer sees these, and
+    // reflection over a parameter costs an IL2070 of its own (eng/trim-baseline.txt, 2026-09-26).
+    private static readonly Dictionary<string, MethodInfo> QueryableWithoutPredicate = typeof(Queryable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Where(m => IsSourceOnlyTerminal(m, typeof(IQueryable<>)))
+        .ToDictionary(m => m.Name);
+
+    private static readonly Dictionary<string, MethodInfo> EnumerableWithoutPredicate = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Where(m => IsSourceOnlyTerminal(m, typeof(IEnumerable<>)))
+        .ToDictionary(m => m.Name);
+
     /// <summary>
     ///     The single slot a projection gets when its body reads nothing from the row: the server
     ///     is being asked which rows exist, and for no column of them.
@@ -219,6 +267,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             call = TryFuseSelectWithReassembly(node, source)
                 ?? node.Update(node.Object, [source, Visit(node.Arguments[1])]);
         }
+        else if (!ReferenceEquals(node, _preserved) && OrderingChain(node) is { } chain)
+        {
+            // The whole chain at once, from its top: a ThenBy needs an ordered source, and an
+            // ordering moved below a reassembly comes back as the reassembly, which is not ordered.
+            return VisitOrderingChain(chain);
+        }
         else if (base.VisitMethodCall(node) is MethodCallExpression visited)
         {
             call = visited;
@@ -237,6 +291,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         if (TryMoveDistinctBelowReassembly(call) is { } moved)
         {
             return moved;
+        }
+
+        if (TryMoveBelowReassembly(call) is { } below)
+        {
+            return below;
         }
 
         if (!IsResultSelectorOperator(call, out LambdaExpression? selector))
@@ -456,6 +515,315 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             reassembly.Arguments[0],
             Visit(node.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote } ? Expression.Quote(fused) : fused));
     }
+
+    /// <summary>
+    ///     Moves an operator written above a reassembly below it, onto the tuple the server
+    ///     computes, where it reads nothing the rebuild alone has.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> An operator above a reassembly
+    ///         stayed on the client, so the server sent every row the operator was about to drop or
+    ///         count. <c>Select(x =&gt; new Dto { Id = x.OrderID }).Where(d =&gt; ((IHaveId)d).Id ==
+    ///         10252)</c> read all 831 orders where plain EF Core reads one, and
+    ///         <c>Select(o =&gt; new { Id = CodeFormat(o.OrderID) }).Count()</c> read every order to
+    ///         count them. The carrier rewrite covers a filter or an ordering that reads the client
+    ///         type directly; this covers the rest.
+    ///     </para>
+    ///     <para>
+    ///         <b>Every reassembly is <c>Select(server, rebuild)</c>, which is row for row and keeps
+    ///         the order</b>, and each move below follows from that:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <c>Count</c>, <c>LongCount</c> and <c>Any</c> without a predicate count the rows
+    ///             and read none, so the rebuild is dropped. EF drops the projection under them too,
+    ///             so client code in it is never called, here or there.
+    ///         </item>
+    ///         <item>
+    ///             <c>Skip</c> and <c>Take</c> select the same rows below the rebuild as above it.
+    ///         </item>
+    ///         <item>
+    ///             <c>Where</c> and an ordering read the rebuilt element through their lambda, which
+    ///             is fused with the rebuild, as <see cref="TryFuseSelectWithReassembly" /> fuses a
+    ///             projection. EF's <see cref="Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor" />
+    ///             folds <c>new Dto { Id = row.Item1 }.Id</c>, through a cast to an interface too, to
+    ///             <c>row.Item1</c>. The move happens only when the fused lambda is one the server can
+    ///             run; a lambda that still needs the rebuild, or client code, stays where it was,
+    ///             and <c>QuerySplitter</c> judges it there as before.
+    ///         </item>
+    ///         <item>
+    ///             A predicate given to a terminal operator is a <c>Where</c> under the operator
+    ///             without one, which is how EF normalizes it before translating.
+    ///         </item>
+    ///     </list>
+    /// </remarks>
+    private Expression? TryMoveBelowReassembly(MethodCallExpression call)
+    {
+        if (call.Method.DeclaringType is not { } declaring
+            || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
+            || !call.Method.IsGenericMethod
+            || call.Arguments.Count is 0 or > 2
+            || call.Arguments[0] is not MethodCallExpression reassembly
+            || !_reassemblies.Contains(reassembly)
+            || StripQuotes(reassembly.Arguments[1]) is not LambdaExpression { Parameters: [var row] } rebuild)
+        {
+            return null;
+        }
+
+        string name = call.Method.Name;
+        Expression server = reassembly.Arguments[0];
+        Type element = call.Method.GetGenericArguments()[0];
+
+        if (call.Arguments.Count == 1)
+        {
+            if (!RowCounting.Contains(name))
+            {
+                return null;
+            }
+
+            Forget(reassembly);
+            return Expression.Call(call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), server);
+        }
+
+        Expression argument = call.Arguments[1];
+        if (name is nameof(Queryable.Skip) or nameof(Queryable.Take) && argument.Type == typeof(int))
+        {
+            return Rebuilt(
+                reassembly,
+                Expression.Call(call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), server, argument),
+                element);
+        }
+
+        if (StripQuotes(argument) is not LambdaExpression { Parameters: [_], ReturnType: var returned } lambda
+            || !(returned == typeof(bool) && (name == nameof(Queryable.Where) || PredicateTerminals.Contains(name)))
+            || Fuse(lambda, rebuild) is not { } fused)
+        {
+            return null;
+        }
+
+        bool quoted = argument is UnaryExpression { NodeType: ExpressionType.Quote };
+        MethodCallExpression filtered = Expression.Call(
+            (declaring == typeof(Queryable) ? QueryableWhere : EnumerableWhere).MakeGenericMethod(row.Type),
+            server,
+            quoted ? Expression.Quote(fused) : fused);
+
+        if (name == nameof(Queryable.Where))
+        {
+            return Rebuilt(reassembly, filtered, element);
+        }
+
+        if (RowCounting.Contains(name))
+        {
+            Forget(reassembly);
+            return Expression.Call(WithoutPredicate(declaring, name).MakeGenericMethod(row.Type), filtered);
+        }
+
+        return Expression.Call(
+            WithoutPredicate(declaring, name).MakeGenericMethod(element),
+            Rebuilt(reassembly, filtered, element));
+    }
+
+    /// <summary>
+    ///     The ordering operators from <paramref name="node" /> down to the <c>OrderBy</c> that
+    ///     starts them, topmost first, or <see langword="null" /> when <paramref name="node" /> is not
+    ///     such a chain of <see cref="Queryable" /> or <see cref="Enumerable" /> operators.
+    /// </summary>
+    private static List<MethodCallExpression>? OrderingChain(MethodCallExpression node)
+    {
+        var chain = new List<MethodCallExpression>();
+        for (Expression current = node; ;)
+        {
+            if (current is not MethodCallExpression { Arguments.Count: 2 } call
+                || (call.Method.DeclaringType != typeof(Queryable) && call.Method.DeclaringType != typeof(Enumerable))
+                || StripQuotes(call.Arguments[1]) is not LambdaExpression { Parameters.Count: 1 })
+            {
+                return null;
+            }
+
+            chain.Add(call);
+            switch (call.Method.Name)
+            {
+                case nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending):
+                    return chain;
+
+                case nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending):
+                    current = call.Arguments[0];
+                    break;
+
+                default:
+                    return null;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Visits an ordering chain, and moves it below the reassembly it orders when every key
+    ///     reads nothing the rebuild alone has. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    /// <param name="chain">The chain, topmost first, as <see cref="OrderingChain" /> returns it.</param>
+    private Expression VisitOrderingChain(List<MethodCallExpression> chain)
+    {
+        Expression source = Visit(chain[^1].Arguments[0]);
+
+        if (source is MethodCallExpression reassembly
+            && _reassemblies.Contains(reassembly)
+            && StripQuotes(reassembly.Arguments[1]) is LambdaExpression { Parameters: [var row] } rebuild)
+        {
+            Expression? ordered = reassembly.Arguments[0];
+            for (int i = chain.Count - 1; i >= 0 && ordered is not null; i--)
+            {
+                MethodCallExpression call = chain[i];
+                if (Fuse((LambdaExpression)StripQuotes(call.Arguments[1]), rebuild) is { } fused)
+                {
+                    bool quoted = call.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote };
+                    ordered = Expression.Call(
+                        call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type, fused.ReturnType),
+                        ordered,
+                        quoted ? Expression.Quote(fused) : fused);
+                }
+                else
+                {
+                    ordered = null;
+                }
+            }
+
+            if (ordered is not null)
+            {
+                return Rebuilt(reassembly, ordered, chain[0].Method.GetGenericArguments()[0]);
+            }
+        }
+
+        Expression result = source;
+        for (int i = chain.Count - 1; i >= 0; i--)
+        {
+            result = chain[i].Update(chain[i].Object, [result, Visit(chain[i].Arguments[1])]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     <paramref name="lambda" /> over the tuple rather than over the rebuilt element, or
+    ///     <see langword="null" /> when the server could not run it.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Not when it reads a slot that holds a sequence.</b> A slot can hold the grouping of a
+    ///     <c>GroupJoin</c>, and a lambda that navigates out of a projected tuple back into such a
+    ///     collection is what no provider translates: moving operators below a rebuild was measured
+    ///     at 91 to 383 failures for that reason in 2026-08 (<c>docs/projection-split.md</c> §6a).
+    ///     Such an operator stays on the client, where it answered before.
+    /// </remarks>
+    private LambdaExpression? Fuse(LambdaExpression lambda, LambdaExpression rebuild)
+    {
+        ParameterExpression row = rebuild.Parameters[0];
+        Expression body = Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+            lambda.Parameters[0], rebuild.Body, lambda.Body);
+        LambdaExpression fused = Expression.Lambda(
+            typeof(Func<,>).MakeGenericType(row.Type, lambda.ReturnType), body, row);
+
+        return analyzer.Analyze(fused).FactsFor(fused.Body).ServerOk && !SequenceSlotFinder.Reads(body, row)
+            ? fused
+            : null;
+    }
+
+    /// <summary>Finds a read of a tuple slot that holds a sequence. See <see cref="Fuse" />.</summary>
+    private sealed class SequenceSlotFinder(ParameterExpression row) : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Reads(Expression body, ParameterExpression row)
+        {
+            var finder = new SequenceSlotFinder(row);
+            finder.Visit(body);
+            return finder._found;
+        }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            // A slot itself, not a navigation out of an entity a slot holds, which EF follows.
+            if (node.Type != typeof(string)
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type)
+                && node.Expression is { } holder
+                && TupleCarrier.IsCarrier(holder.Type)
+                && RootOf(node) == row)
+            {
+                _found = true;
+            }
+
+            return base.VisitMember(node);
+        }
+
+        private static Expression? RootOf(MemberExpression node)
+        {
+            Expression? current = node;
+            while (current is MemberExpression member)
+            {
+                current = member.Expression;
+            }
+
+            return current;
+        }
+    }
+
+    /// <summary>
+    ///     The reassembly again, over <paramref name="server" /> instead of its own source, and
+    ///     recorded in its place.
+    /// </summary>
+    /// <param name="reassembly">The reassembly the operator was above.</param>
+    /// <param name="server">Its source with the operator applied.</param>
+    /// <param name="element">
+    ///     The element type the operator had, which is the rebuild's type or one it implements,
+    ///     as a <c>Where&lt;IHaveId&gt;</c> over a DTO has. The rebuild converts to it, so every
+    ///     operator above sees the type it was written against.
+    /// </param>
+    private MethodCallExpression Rebuilt(MethodCallExpression reassembly, Expression server, Type element)
+    {
+        var rebuild = (LambdaExpression)StripQuotes(reassembly.Arguments[1]);
+        if (rebuild.ReturnType != element)
+        {
+            rebuild = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(rebuild.Parameters[0].Type, element),
+                Expression.Convert(rebuild.Body, element),
+                rebuild.Parameters);
+        }
+
+        bool quoted = reassembly.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote };
+        MethodCallExpression moved = Expression.Call(
+            reassembly.Method.GetGenericMethodDefinition().MakeGenericMethod(rebuild.Parameters[0].Type, element),
+            server,
+            quoted ? Expression.Quote(rebuild) : rebuild);
+
+        _reassemblies.Remove(reassembly);
+        _reassemblies.Add(moved);
+        if (_collectionReassemblies.Remove(reassembly))
+        {
+            _collectionReassemblies.Add(moved);
+        }
+
+        return moved;
+    }
+
+    /// <summary>Removes a reassembly an operator has dropped.</summary>
+    private void Forget(MethodCallExpression reassembly)
+    {
+        _reassemblies.Remove(reassembly);
+        _collectionReassemblies.Remove(reassembly);
+    }
+
+    /// <summary>
+    ///     The overload of the terminal operator <paramref name="name" /> of
+    ///     <paramref name="declaring" /> that takes the source alone.
+    /// </summary>
+    private static MethodInfo WithoutPredicate(Type declaring, string name)
+        => (declaring == typeof(Queryable) ? QueryableWithoutPredicate : EnumerableWithoutPredicate)[name];
+
+    private static bool IsSourceOnlyTerminal(MethodInfo method, Type sequence)
+        => PredicateTerminals.Contains(method.Name)
+            && method.IsGenericMethodDefinition
+            && method.GetGenericArguments().Length == 1
+            && method.GetParameters() is [{ ParameterType: { IsGenericType: true } source }]
+            && source.GetGenericTypeDefinition() == sequence;
 
     /// <summary>
     ///     Whether <paramref name="node" /> is <c>Select(source, x =&gt; …)</c> of

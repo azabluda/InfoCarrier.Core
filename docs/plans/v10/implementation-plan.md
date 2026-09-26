@@ -7031,9 +7031,18 @@ plain-EF run:
   misses rows, 118 methods of this repository's own classes, 13 of the harness, 6 false alarms of
   decision 3's reverse half; and 22 methods that plain EF on SQLite refuses and InfoCarrier answers.
 
-**Triage is deferred (owner, 2026-09-26), and the slow run stays red until it happens.** No
-InfoCarrier reason is added in this phase, the 22 "InfoCarrier answers" methods included. The slow
-run is not a gate (decision 5), so a red there blocks nothing.
+**Every red family goes through the loop, and a fix in the product comes before a reason (owner,
+2026-09-26).** Until H6 this paragraph read: "Triage is deferred (owner, 2026-09-26), and the slow
+run stays red until it happens. No InfoCarrier reason is added in this phase, the 22 "InfoCarrier
+answers" methods included." The owner reversed it the same day, after H5 showed the loop working:
+convert all remaining families, not only the largest, and "slow reds don't necessarily need to be
+attributed; the best way to deal with them is to fix the bug in prod". So a red is a defect report
+first. An `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason flagged `SqlDiffers`,
+`AnswerNotRefusal` or `RefusedEarlier` is the fallback where no fix is possible, never a way to turn
+the slow run green in bulk. The 22 methods plain EF on SQLite refuses and this provider answers are
+the exception to "fix first": aligning them changes what a user gets today, and
+`website/docs/limitations.md` says this provider answers such queries, so their cost goes to the
+owner before any code. The slow run is not a gate (decision 5), so a red there blocks nothing.
 
 ### The whole permanent footprint
 
@@ -7187,10 +7196,43 @@ claims a runtime difference. The amendment proposed:
       none, REASONS unchanged. `trim-ratchet.sh` OK at 100 <= 100. `InfoCarrier.Core.TransportTests`
       **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5
       warnings, 0 errors.
+- [x] **H6. Operators above a client-side rebuild move below it.** The first family after the
+      owner's "convert all of them", on the branch `live-comparison-rebuild-operators`, on top of H5.
+      The slow run after H5 grouped its 249 red tests into 128 methods, and the family that read the
+      most rows was one gap: an operator written above a projection this client rebuilds stayed on
+      the client. `Interface_casting_though_generic_method` read 831 orders where plain EF reads
+      one, `Count_on_projection_with_client_eval` read every order to count them, and
+      `Take_with_single_select_many` read 75531 rows of a cross join where plain EF reads two.
+
+      1. **Five promises in `ServerParameterizationTest`, seen red first**: a filter through an
+         interface, a terminal operator's predicate, a count above client code, paging above client
+         code, and an ordered `SelectMany` with `Take(1).Cast<object>().SingleOrDefault()`. A plain
+         filter and a plain ordering over a client type already reached the store through the
+         carrier rewrite, which is why the first two read through an interface and a terminal.
+      2. **The fix**: `ProjectionRewriter.TryMoveBelowReassembly` and `VisitOrderingChain` move a
+         `Where`, an ordering chain, `Skip`, `Take`, a terminal operator's predicate and a
+         `Count`/`LongCount`/`Any` below the rebuild, when the lambda fused with the rebuild is one
+         the server can run and reads no slot that holds a sequence (§6a of
+         `docs/projection-split.md`, whose §3.4 has the amendment). `WithRowLimitForTerminalOperator`
+         looks through `Cast`.
+      3. **The next slow run**: `Passed: 19249, Failed: 209, Skipped: 155, Total: 19613`, against
+         `Failed: 249`. **20 methods left the red list and none joined it**, and none of the 108 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh rebuild-operators2 one-parameter`: **FAILING 0, TOTAL 29920**,
+      FIXED none, BROKEN none, REASONS unchanged. The first measurement broke one test,
+      `InMemorySmokeTest.A_split_that_pages_on_the_client_names_what_stayed_behind`, whose example
+      of a split that removes rows on the client was a `Take` that no longer stays there; it is
+      `A_split_that_removes_rows_on_the_client_names_what_stayed_behind` now, over `ElementAt`.
+      `trim-ratchet.sh` OK at 103 <= 103, a deliberate rise of three recorded in
+      `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total:
+      28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
 
 **Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
-only. The two parked SQL gaps and the parameter-numbering family wait for the triage, and each then
-gets a red promise, a fix and a pull request of its own.
+only. Until H6 this went on: "The two parked SQL gaps and the parameter-numbering family wait for the
+triage, and each then gets a red promise, a fix and a pull request of its own." The triage is under
+way: each family is a step from H5 on, with its red promise, its fix and one commit, on a branch
+stacked on the step before, and no pull request is opened for any of them until the owner says so.
