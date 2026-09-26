@@ -533,12 +533,13 @@ are 0, and both tests must stay green.** Those tests, not a list in this file, a
 "which bases are in".
 
 **Every milestone is closed, so `docs/plans/v10/implementation-plan.md` is ISSUE-DRIVEN**: it holds
-Phases Q, R, S, T, U, V, Y and Z, each naming the GitHub issue it serves, and which release a phase
-lands in is decided on the issue rather than in the plan. **Phase Y is the 10.1 release
+Phases Q, R, S, T, U, V, X, Y, Z and H, each naming the GitHub issue it serves, and which release a
+phase lands in is decided on the issue rather than in the plan. **Phase Y is the 10.1 release
 preparation** — the letter is Y and not W because W1 to W6 are M5's requirement labels, used
 throughout `roadmap.md`. **Phase Z is #54's idle timeout for a server-held transaction**, the first
-of that issue's three separable properties. Query, projection split, `SaveChanges` and lazy loading
-all work end-to-end.
+of that issue's three separable properties. **Phase H is #167's live comparison with plain EF
+(ADR-014), PROPOSED on 2026-09-26: no step of it starts before the owner's yes.** Query, projection
+split, `SaveChanges` and lazy loading all work end-to-end.
 
 ### What may and may not be claimed
 

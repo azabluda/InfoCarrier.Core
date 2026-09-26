@@ -7003,3 +7003,118 @@ chosen; it does not mean this comes before Y.
       moment to sweep the prose that argued for it: the disposal premise above, and "the cost is
       bounded by CONCURRENCY rather than by tier size", which serializing the starts ended. Growth
       now costs about 600 ms per class in wall clock; memory is still bounded by concurrency.
+
+## Phase H — each test compared with plain EF Core, live (#167)
+
+**PROPOSED 2026-09-26, and no step starts before the owner's yes** (`CLAUDE.md`, guardrail 4: this
+plan adds a concept to every normal run). ADR-014 is the decision; this is its order of work. The
+superseded spec and the first Phase H stay on the branch `sql-capture` (PR #170, a draft), under a
+dated note.
+
+The letter stays H because ADR-014 names the parts that go forward H0, H1a and H1b. The steps from
+H2 on are new and do not match the superseded plan.
+
+**What the spike measured**, on `experiment/live-comparison` (not for merge; its commit messages
+hold the detail). A slow run of the whole of Tier B, each test first with plain EF Core on a store
+of its own and then through InfoCarrier, in one process, with a second set of class fixtures for the
+plain-EF run:
+
+- report only: `Passed: 19451, Failed: 0, Skipped: 155, Total: 19606`, 11 m 43 s;
+- with ADR-014's red: `Passed: 18907, Failed: 544, Skipped: 155, Total: 19606`, 12 m 12 s;
+- every wire test found its plain-EF run, and all 35 suspects of the satellite
+  `experiment/direct-baseline` are among the differences;
+- 157 methods differ in their statements with no InfoCarrier reason: about 54 only in parameter
+  numbering, where plain EF sends one value used twice as one parameter and InfoCarrier as two;
+  43 run a different number of statements;
+- the rest of the 544 are artifacts the steps below remove: 35 methods where EF's own `ReadCount`
+  misses rows, 118 methods of this repository's own classes, 13 of the harness, 6 false alarms of
+  decision 3's reverse half; and 22 methods that plain EF on SQLite refuses and InfoCarrier answers.
+
+**Triage is deferred (owner, 2026-09-26), and the slow run stays red until it happens.** No
+InfoCarrier reason is added in this phase, the 22 "InfoCarrier answers" methods included. The slow
+run is not a gate (decision 5), so a red there blocks nothing.
+
+### The whole permanent footprint
+
+| Part | What it is | In every normal run? | Step |
+|---|---|---|---|
+| `CurrentTest`, `CurrentTestFramework` | The running test in an async-local, set by an xUnit v2 test-framework wrapper | Yes: every test case runs through the wrapper | H0 |
+| Command capture | `ServerSqlRecordingInterceptor` files each server command under `CurrentTest`: text, kind, count, failure | Yes: one list per test | H1a |
+| `SqlNormalizer` | Makes parameter names, table aliases and derived-table columns positional | Only its own tests | H1b |
+| The ADR-014 amendment | Decision 3 narrowed and the scope stated, below | No | H2 |
+| The plain-EF client | `DirectClient`, a per-flow side that a store reads once, when it is created; a `.direct` store of its own | No, except `UseTestTransaction` at 28 call sites, which is `UseInfoCarrierTransaction` on the wire side | H3 |
+| The slow mode | `INFOCARRIER_LIVE_COMPARE=<folder>` runs each test twice and turns a difference red | No: off unless the variable is set | H3 |
+| `DeviationKind.SqlDiffers` | The flag a reason carries when it states an SQL difference | No | H3 |
+| Deletions | `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`, `ServerSqlLog`, `ServerSqlLogInterceptor`, `ServerSqlLogTest` and the log's markers | Removes an opt-in | H4 |
+
+**Nothing is committed from a slow run**, so there is no file for a red to be about. **What a red
+means** (guardrail 2): a person reads the two sides in the failure message and then either fixes the
+provider, with a promise in `Sqlite/ServerSqlTest.cs` or `ServerParameterizationTest` that runs in
+every normal run (decision 4), or adds an InfoCarrier reason flagged `SqlDiffers`. Never "run a tool
+and commit its output". CI and a normal run's results do not change (decision 5).
+
+### The amendment to ADR-014, and guardrail 1
+
+Decision 3 says a difference needs an `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason, and
+"if no row differs, such a reason is red too". Its rationale is that the reasons become "an exact,
+checked statement of where this provider differs from plain EF". **That reason still holds, and for
+a reason that claims a difference the comparison can see, it holds unchanged.** It does not reach
+the others: the spike's 6 "reasons without a difference" were two skips, two `QueryWrittenOut`
+bodies rewritten for the transaction helper, and a compliance test that runs no SQL. None of them
+claims a runtime difference. The amendment proposed:
+
+1. **Both halves read only an InfoCarrier reason whose `Deviation` carries `SqlDiffers`,
+   `AnswerNotRefusal` or `RefusedEarlier`**, the three that `OverrideAudit` already calls this
+   provider's behaviour, and never a skip. A statement difference needs `SqlDiffers`; an outcome
+   difference needs one of the other two. The forward half is unmeasured under this rule: the 13
+   methods the spike found green, each with a reason and a difference, are checked in H3.
+2. **The comparison covers the classes that run an EF specification base.** This repository's own
+   classes (`ServerSqlTest`, `SqliteSmokeTest`, `ServerParameterizationTest` and the others) assert
+   this provider directly and have no plain-EF counterpart. A plain-EF run that still crosses the
+   wire is red, which is how the spike found them.
+3. **Tier B only.** Tier C would need a Firebird plain-EF client, and Tier D has its own `Direct*`
+   controls. Either is a later option, as a nightly slow run in CI is.
+
+### Steps
+
+- [ ] **H0/H1. The test identity and the command capture.** H0, H1a and H1b from `sql-capture`,
+      without the files: no `SqlCaptureFile`, no folder check, no `SqlCaptureAttribute` assertion.
+      `Ordinal` and `SqlCapture.NextOrdinal` go, because the slow run matches a wire test with its
+      plain-EF run by position inside the test case, which ends the review's "ordinals are never
+      reset" minor. New pins: a statement in a test class's `DisposeAsync` is filed under no test,
+      which proves that `After` closes it; and `SqlNormalizerTest` pins the known limit that two
+      derived-table columns swapped in two places normalize equal, because columns are numbered in
+      the order they are first read. Measure a normal run before and after.
+- [ ] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
+- [ ] **H3. The plain-EF client and the slow mode.** From the spike, with what the whole-tier run
+      found:
+      - the plain-EF client copies EF's own `SqliteTestStore`: one connection per store, opened when
+        the store starts, EF's SQLite warning settings and `SingleQuery`. The spike kept the
+        connection closed, so `ToListAsync_with_canceled_token` got a `TaskCanceledException` where
+        EF gets `OperationCanceledException`;
+      - the harness's store-error helpers (`AssertStoreRefuses`,
+        `GearsOfWarSqliteAssertions.StoreRefuses`, the keyless assertion) accept the raw store
+        exception on the plain-EF side, which removes 10 of the 13 harness reds. The other 3 are
+        the cancelled token above and `RelationalClientTierPinTest`, one of this repository's own
+        classes;
+      - **a reader that counts every `Read`**, returned by the interceptor in the slow mode only.
+        EF's `ReadCount` is counted in `RelationalDataReader.Read`, and
+        `GroupBySingleQueryingEnumerable` reads all but a group's first row from the raw
+        `DbDataReader`, so plain EF reported 2 reads for a final `GroupBy` of 92 rows (35 methods).
+        The H1a review chose `ReadCount` so that no provider meets a reader it did not create. That
+        risk stays, and it is confined to the slow run, where it would show on both sides at once;
+      - the judgement at the test's result message, where the outcome is known: a pass that the
+        comparison rejects is reported as a failure, and a red message shows the plain-EF failure's
+        text as well as its type;
+      - the reverse half of decision 3 at a method's last row, found by a countdown per method and by
+        the plain-EF run's row count inside the last test case;
+      - `DeviationKind.SqlDiffers`, `SqlCapture.Compare` and `SameStatements` from `sql-capture`.
+
+      Done when a slow run of Tier B is red only for differences, and a normal run is unchanged.
+- [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
+      their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
+      describe them. The slow run is the investigation they served.
+
+**Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
+only. The two parked SQL gaps and the parameter-numbering family wait for the triage, and each then
+gets a red promise, a fix and a pull request of its own.
