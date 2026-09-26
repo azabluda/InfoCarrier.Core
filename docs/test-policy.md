@@ -343,8 +343,9 @@ correct while client and server share one model.
 - **An override can carry a reason from each side.** A store reason says what EF's own provider
   test does and links it; an InfoCarrier reason says why this test differs from that one. At most
   one store reason covers a case, and InfoCarrier reasons can be several, each naming a different
-  decision or issue. `AnswerNotRefusal` and `RefusedEarlier` are legal only on an InfoCarrier
-  reason, so that a difference of this provider's is never counted as the store's. Three overrides
+  decision or issue. `AnswerNotRefusal`, `RefusedEarlier` and, since 2026-09-26, `SqlDiffers`
+  (#167) are legal only on an InfoCarrier reason, so that a difference of this provider's is never
+  counted as the store's. Three overrides
   carry both: the two `Join_with_result_selector_returning_queryable_throws_validation_error`, whose
   one `DESIGN` reason had lost the link to EF's `ApplyNotSupported` override, and the
   primitive-collection compiled query below. Each of the three new rules was shown to fail on a
