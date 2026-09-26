@@ -45,4 +45,9 @@ public sealed class FirebirdInfoCarrierTier : InfoCarrierTier
     /// <inheritdoc />
     public override ListLoggerFactory CreateListLoggerFactory(Func<string, bool> shouldLogCategory)
         => new TestSqlLoggerFactory(shouldLogCategory);
+
+    /// <inheritdoc />
+    public override Microsoft.Extensions.DependencyInjection.IServiceCollection AddDirectClientServices(
+        Microsoft.Extensions.DependencyInjection.IServiceCollection serviceCollection)
+        => FirebirdInfoCarrierBackendTestStore.AddFirebirdServices(serviceCollection);
 }

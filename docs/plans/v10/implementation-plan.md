@@ -7102,8 +7102,14 @@ claims a runtime difference. The amendment proposed:
    classes (`ServerSqlTest`, `SqliteSmokeTest`, `ServerParameterizationTest` and the others) assert
    this provider directly and have no plain-EF counterpart. A plain-EF run that still crosses the
    wire is red, which is how the spike found them.
-3. **Tier B only.** Tier C would need a Firebird plain-EF client, and Tier D has its own `Direct*`
-   controls. Either is a later option, as a nightly slow run in CI is.
+3. **Tiers B and C.** Tier D has its own `Direct*` controls, and is a later option, as a nightly slow
+   run in CI is. Until 2026-09-27 this point read "**Tier B only.** Tier C would need a Firebird
+   plain-EF client, and Tier D has its own `Direct*` controls. Either is a later option". The owner
+   took up Tier C that day (H17), and the Firebird plain-EF client is the provider with the
+   server's own correction to its SQL generator. Tier A is not covered either, and this point has
+   never said why. What bounds its value is a fact rather than a decision: its store is EF's
+   InMemory provider, which runs no statement, so a comparison there could see only an outcome
+   that differs.
 
 ### Steps
 
@@ -7469,6 +7475,23 @@ claims a runtime difference. The amendment proposed:
       a deliberate rise of one recorded in `eng/trim-baseline.txt`.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H17. The slow mode covers Tier C.** On the branch `live-comparison-tier-c`, on top of H16,
+      at the owner's request of 2026-09-27. `LiveComparison.Covers` takes Tier C's namespace beside
+      Tier B's. The Firebird store gets a plain-EF client: one shared connection opened once the
+      store is initialized, and the settings of the Firebird provider's own `FbTestStore`. Its
+      provider services carry the server's `FirebirdLateralQuerySqlGenerator` correction too,
+      through one `AddFirebirdServices` for both, because without it plain EF fails every correlated
+      table-valued function on the store defect the correction exists for. Point 3 of the amendment
+      above says so, quoting what it said before. Test only.
+
+      Slow run of Tier C: **`Passed: 108, Failed: 1, Skipped: 1, Total: 110`**. Every test of
+      `UdfDbFunctionInfoCarrierTest` found its plain-EF run. The one red,
+      `Scalar_Function_ClientEval_Method_As_Translateable_Method_Parameter_Instance`, runs the same
+      statement and counts one more `Read()`: plain EF stops reading when the client method in the
+      projection throws, and this provider's server reads to the end first. It stays red for the
+      owner's triage. Normal run, `eng/measure.sh tier-c final-groupby`: **FAILING 0, TOTAL 29937**,
+      FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5
+      warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

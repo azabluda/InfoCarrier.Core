@@ -78,6 +78,8 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
     private readonly string _path;
     private readonly string _connectionString;
+    private FbConnection? _directClientConnection;
+    private bool _initialized;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="FirebirdInfoCarrierBackendTestStore" />
@@ -224,14 +226,59 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     {
         ArgumentNullException.ThrowIfNull(serviceCollection);
 
-        serviceCollection
-            .AddEntityFrameworkFirebird()
-            .AddSingleton<TestStoreIndex>();
+        return AddFirebirdServices(serviceCollection).AddSingleton<TestStoreIndex>();
+    }
+
+    /// <summary>
+    ///     The Firebird provider with this repository's correction to its SQL generator, for the
+    ///     server context and for the plain-EF client of a slow run alike.
+    /// </summary>
+    /// <remarks>
+    ///     The plain-EF client of a slow run gets the correction too (#167, 2026-09-27), because it
+    ///     stands for an application on the server's configuration. Without it, plain EF fails every
+    ///     correlated table-valued function on the defect the correction exists for, and the slow
+    ///     run compares a store bug with this provider.
+    /// </remarks>
+    internal static IServiceCollection AddFirebirdServices(IServiceCollection serviceCollection)
+    {
+        serviceCollection.AddEntityFrameworkFirebird();
 
         serviceCollection.RemoveAll<IQuerySqlGeneratorFactory>();
         serviceCollection.AddSingleton<IQuerySqlGeneratorFactory, FirebirdLateralQuerySqlGeneratorFactory>();
 
         return serviceCollection;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The settings of the Firebird provider's own <c>FbTestStore</c>: one connection, and
+    ///     <see cref="QuerySplittingBehavior.SingleQuery" />, which also silences the
+    ///     <c>MultipleCollectionIncludeWarning</c> that the fixture's <c>AddOptions</c> turns into an
+    ///     error on this client.
+    /// </remarks>
+    public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => AddServerContextOptions(builder)
+            .UseFirebird(DirectClientConnection, b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Created closed and opened once the store is initialized, for the reasons
+    ///     <see cref="SqliteInfoCarrierBackendTestStore" /> gives: an open connection would keep
+    ///     <c>EnsureDeleted</c> from dropping the database, and a context EF opens itself answers a
+    ///     cancelled token differently from EF's own test store, which keeps its connection open.
+    /// </remarks>
+    public override System.Data.Common.DbConnection DirectClientConnection
+    {
+        get
+        {
+            _directClientConnection ??= new FbConnection(_connectionString);
+            if (_initialized && _directClientConnection.State != System.Data.ConnectionState.Open)
+            {
+                _directClientConnection.Open();
+            }
+
+            return _directClientConnection;
+        }
     }
 
     /// <inheritdoc />
@@ -308,6 +355,28 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         finally
         {
             gate.Release();
+            _initialized = true;
         }
+
+        // The plain-EF half of a slow run, once the database is there to stay: see DirectClientConnection.
+        if (_directClientConnection is { State: not System.Data.ConnectionState.Open } connection)
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Releases the plain-EF half's connection and nothing else, for the reasons
+    ///     <see cref="SqliteInfoCarrierBackendTestStore" /> gives for keeping its file.
+    /// </remarks>
+    public override async ValueTask DisposeAsync()
+    {
+        if (_directClientConnection is not null)
+        {
+            await _directClientConnection.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await base.DisposeAsync().ConfigureAwait(false);
     }
 }

@@ -27,9 +27,12 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         is matched with it by position inside the test case.
 ///     </para>
 ///     <para>
-///         <b>Which tests</b> (ADR-014, amendment 2026-09-26): Tier B's classes that run an EF
-///         specification base. This repository's own classes assert the provider directly and have
-///         no plain-EF counterpart, and they run once.
+///         <b>Which tests</b> (ADR-014, amendment 2026-09-26): the classes of Tiers B and C that run
+///         an EF specification base. This repository's own classes assert the provider directly and
+///         have no plain-EF counterpart, and they run once. Until 2026-09-27 this read "Tier B's
+///         classes that run an EF specification base"; the owner extended it to Tier C that day, whose
+///         plain-EF client is the Firebird provider with the server's own correction to its SQL
+///         generator.
 ///     </para>
 ///     <para>
 ///         <b>When a test is red</b>, by the same amendment. A row whose statements differ needs a
@@ -53,7 +56,11 @@ public static class LiveComparison
     /// <summary>The last line of every red message.</summary>
     public const string Footer = "[/live-compare]";
 
-    private const string TierBNamespace = "InfoCarrier.Core.FunctionalTests.Sqlite";
+    private static readonly string[] ComparedNamespaces =
+    [
+        "InfoCarrier.Core.FunctionalTests.Sqlite",
+        "InfoCarrier.Core.FunctionalTests.Firebird",
+    ];
 
     private const DeviationKind OutcomeReasons = DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier;
 
@@ -65,7 +72,7 @@ public static class LiveComparison
     /// <summary>Whether this run is a slow one.</summary>
     public static bool IsEnabled { get; } = Environment.GetEnvironmentVariable(Variable) == "1";
 
-    /// <summary>Whether the class runs twice in a slow run: a Tier B class that runs an EF specification base.</summary>
+    /// <summary>Whether the class runs twice in a slow run: a Tier B or Tier C class that runs an EF specification base.</summary>
     public static bool Covers(Type testClass)
     {
         ArgumentNullException.ThrowIfNull(testClass);
@@ -73,7 +80,7 @@ public static class LiveComparison
         return Covered.GetOrAdd(
             testClass,
             type => type.Namespace is { } space
-                && (space == TierBNamespace || space.StartsWith(TierBNamespace + ".", StringComparison.Ordinal))
+                && ComparedNamespaces.Any(tier => space == tier || space.StartsWith(tier + ".", StringComparison.Ordinal))
                 && RunsSpecificationBase(type));
     }
 
