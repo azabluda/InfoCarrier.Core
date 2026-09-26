@@ -365,6 +365,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         CollectFragments(selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], fragments, guards);
 
+        if (TranslatableLeaves(selector.Body, fragments, bodyAnalysis) is { } leaves)
+        {
+            fragments = leaves;
+        }
+
         IReadOnlySet<Expression> consumed = Consumed(selector.Body);
 
         // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
@@ -1548,6 +1553,83 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         mapped call, which has always worked.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     The values of a projection EF would translate whole, in order, constants and captured
+    ///     values included; or <see langword="null" /> when EF would not, or when the fragments are
+    ///     already all of them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> EF binds a projection made of
+    ///         constructions whose every value translates in one mode and puts each value in the
+    ///         statement: <c>Select(c =&gt; new { c.CustomerID, ConstantTrue = true })</c> is
+    ///         <c>SELECT "c"."CustomerID", 1</c>, and a captured value is a parameter there. A
+    ///         projection with anything else in it, client code or a conditional, is bound in the
+    ///         other mode, which keeps constants on the client. This client kept them on the client
+    ///         always, because <see cref="CollectFragments" /> lifts only what reads the row, and a
+    ///         projection of a constant alone asked the store for <c>1</c> instead of the constant.
+    ///     </para>
+    ///     <para>
+    ///         <b>A closed construction that holds a captured value is not decomposed</b>, because
+    ///         EF's funcletizer lifts it whole into one parameter of the anonymous type, which no
+    ///         statement can project: <c>Select(b =&gt; new { F = flag })</c> is <c>SELECT 1</c>
+    ///         there. Parameter substitution opens that parameter back into its construction here,
+    ///         so a closed construction of constants and one of captured values look alike until
+    ///         their values are read (<c>A_projection_reading_no_column_matches_the_direct_query</c>).
+    ///     </para>
+    /// </remarks>
+    private static List<Expression>? TranslatableLeaves(
+        Expression body, List<Expression> fragments, BoundaryAnalysis analysis)
+    {
+        var lifted = new HashSet<Expression>(fragments, ReferenceEqualityComparer.Instance);
+        var leaves = new List<Expression>();
+
+        return Collect(body) && leaves.Count > fragments.Count ? leaves : null;
+
+        bool Collect(Expression node)
+        {
+            IEnumerable<Expression>? parts = node switch
+            {
+                NewExpression construction => construction.Arguments,
+                MemberInitExpression initialization
+                    when initialization.Bindings.All(b => b.BindingType == MemberBindingType.Assignment)
+                    => [
+                        .. initialization.NewExpression.Arguments,
+                        .. initialization.Bindings.Cast<MemberAssignment>().Select(a => a.Expression),
+                    ],
+                _ => null,
+            };
+
+            if (parts is not null)
+            {
+                return (analysis.FactsFor(node).Free.Count > 0 || parts.All(p => p is ConstantExpression or NewExpression or MemberInitExpression))
+                    && parts.All(Collect);
+            }
+
+            if (lifted.Contains(node))
+            {
+                leaves.Add(node);
+                return true;
+            }
+
+            NodeFacts facts = analysis.FactsFor(node);
+            if (facts.ServerOk && facts.Free.Count == 0 && IsScalar(node.Type))
+            {
+                leaves.Add(node);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private static bool IsScalar(Type type)
+        => type == typeof(string)
+            || NullableScalars.ContainsKey(type)
+            || NullableScalars.ContainsValue(type)
+            || type.IsEnum
+            || Nullable.GetUnderlyingType(type) is { IsEnum: true };
+
     /// <summary>
     ///     Whether a subtree queries the store: it contains a query root.
     /// </summary>

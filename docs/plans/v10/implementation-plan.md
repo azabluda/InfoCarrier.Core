@@ -7301,6 +7301,31 @@ claims a runtime difference. The amendment proposed:
       **FAILING 0, TOTAL 29924**, FIXED the two tests H8 converged, BROKEN none. `trim-ratchet.sh`
       OK at 104 <= 104. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**.
       `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H10. A constant in a projection EF translates whole is projected by the store.** On the
+      branch `live-comparison-projected-constants`, on top of H9. EF binds a projection made only
+      of constructions whose every value translates in one mode and puts each value in the
+      statement, a constant or a captured value included; a projection with client code or a
+      conditional keeps its constants on the client. This client kept them on the client always:
+      `Select_anonymous_literal` asked the store for `1` where EF asks for `10`, and
+      `Select_null_parameter` for no column where EF projects `@p0`.
+
+      1. **Four promises in `ServerParameterizationTest`**, three seen red first: constants beside a
+         column, a constant alone, a captured value; and a control, a constant beside client code,
+         green before and after, because EF keeps that one on the client too.
+      2. **The fix**: `ProjectionRewriter.TranslatableLeaves` lifts every closed scalar of a
+         projection made only of constructions into the tuple, in order, when EF would translate the
+         projection whole. A closed construction holding a captured value is not decomposed, because
+         EF's funcletizer lifts it whole into one parameter no statement can project, and
+         `A_projection_reading_no_column_matches_the_direct_query` pins that it stays `SELECT 1`.
+      3. **The next slow run**: `Passed: 19350, Failed: 116, Skipped: 155, Total: 19621`, against
+         `Failed: 134`. **9 methods left the red list and none joined it**, and none of the 61 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 11823, Failed: 0, Skipped: 34, Total:
+      11857**. Normal run, `eng/measure.sh projected-constants unguarded-slots`: **FAILING 0, TOTAL
+      29928**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

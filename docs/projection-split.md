@@ -134,6 +134,16 @@ single constant in that case and the reassembly reads none of it, so the sentenc
 a projection that needs no value too. Both answers were always right, which is why the suite could
 not see it and only a comparison with EF's statement did.
 
+**Amendment 2026-09-26 — a constant is a value too, when EF would translate the projection
+whole.** EF binds a projection made only of constructions whose every value translates in one mode,
+and puts each value in the statement, a constant or a captured value included:
+`Select(c => new { c.CustomerID, ConstantTrue = true })` is `SELECT "c"."CustomerID", 1`, and
+`Select(c => new { Ten = 10 })` is `SELECT 10`, not the stand-in `1`. A projection with client code
+or a conditional in it is bound in EF's other mode, which keeps constants on the client, and so does
+this rewrite. `ProjectionRewriter.TranslatableLeaves` makes the difference; #167's slow run found
+it in nine methods. The stand-in `1` remains for a body with no value at all, `new OrderDto()`,
+where EF projects nothing and a tuple has to hold something.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:

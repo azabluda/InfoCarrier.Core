@@ -683,6 +683,82 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A constant in a projection that translates whole is projected by the store, as plain EF
+    ///     Core projects it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF binds a projection of constructions whose every value translates in one mode, and
+    ///         puts each value in the statement, a constant included: <c>SELECT "b"."Id", 1, 'x', 42</c>.
+    ///         Only a projection with client code in it keeps its constants on the client. This
+    ///         client kept them there always, because a value that reads nothing of the row was not
+    ///         a fragment.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Select_anonymous_literal</c>,
+    ///         <c>Select_anonymous_bool_constant_true</c>, <c>Projection_when_arithmetic_expressions</c>,
+    ///         <c>Ternary_should_not_evaluate_both_sides</c>, <c>Null_Coalesce_Short_Circuit</c> and
+    ///         <c>Select_null_parameter</c> among others.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_constant_in_a_translatable_projection_is_projected_by_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Flag = true, Label = "x", Answer = 42 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A projection of a constant alone projects the constant, not a stand-in.
+    /// </summary>
+    /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
+    [ConditionalFact]
+    public async Task A_projection_of_a_constant_alone_projects_the_constant()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { Ten = 10 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A captured value in a projection that translates whole is a parameter of the statement.
+    /// </summary>
+    /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
+    [ConditionalFact]
+    public async Task A_captured_value_in_a_translatable_projection_is_projected_by_the_store()
+    {
+        int? answer = 42;
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Answer = answer })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     The control: a projection with client code in it keeps its constants on the client, as
+    ///     plain EF Core keeps them.
+    /// </summary>
+    [ConditionalFact]
+    public async Task A_constant_beside_client_code_stays_on_the_client()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Loud = Shout(b.Title), Answer = 42 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>
