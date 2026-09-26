@@ -192,7 +192,11 @@ was trusted**, by reverting the fix it is about. **Copying EF's `AssertSql` text
 overrides was tried and dropped the same day**, with 580 generated and green: the set could not be
 complete, the scenario belongs to upstream, and golden text argues for conformance where the
 owner's rule allows a deviation that runs no dangerous SQL. `eng/ef-sql-compare.sh` is the
-investigation that finds new promises, and it is a report, never a gate.
+investigation that finds new promises, and it is a report, never a gate. **A slow run's output is
+never committed and never asserted, and that includes text we captured ourselves** (ADR-014):
+committing each test's statements beside its class was built, reviewed and withdrawn on 2026-09-26.
+#167 replaces this script with a slow mode that runs each test with plain EF and through InfoCarrier
+and compares the two in memory, and every InfoCarrier reason must then agree with that comparison.
 
 ### Running and reporting
 
@@ -328,6 +332,7 @@ Each is cheap to avoid, and the account of what it cost is in
 | `docs/plans/v10/implementation-plan.md` | **Rolling** checkbox detail for the *current* milestone only |
 | `docs/architecture.md` | Components, test strategy, open questions |
 | `docs/research-findings.md` | EF Core 10 pipeline findings backing the ADRs |
+| `docs/decisions.md` **ADR-014** | **A slow run's output is never committed, and #167 compares with plain EF live.** The committed form of a finding is our own minimal repro, seen red and made green. Read it before designing anything that generates text. |
 | `docs/decisions.md` **ADR-013** | The test project may reference `EFCore.Relational.Specification.Tests`. **Before adopting a relational spec base, check whether it assumes the *client* is relational** — a non-virtual `UseTransaction` calling `GetDbTransaction()` blocks a base only when every route runs through it (cost 142 tests to discover); a `protected virtual` caller above it, or only some tests routing through it, still adopts. See the ADR's 2026-08-30 amendment. |
 | `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
 | `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why. Read before adding any `NoWarn`.** **Green is not zero here**: the gate build reports `5 Warning(s), 0 Error(s)`, the five being `IL2110`/`IL2111` from the framework's own Razor output in `samples/Northwind.Client`, downgraded from error on purpose so the trim ratchet can still count them. Debug reports `0 Warning(s)`, which is why "the build is clean" stood uncorrected for five milestones. |
@@ -364,6 +369,23 @@ date**, because the next reader needs to know the reasoning changed rather than 
 this.
 
 ## Guardrails
+
+**A new permanent mechanism is argued against before it is built.** #167's committed SQL captures
+were specified, planned, built and reviewed before anyone tested them against the reasons the
+owner had given, ten days earlier, for rejecting the same idea (ADR-014). Four rules:
+
+1. **Before a design amends a recorded decision** (an ADR, `docs/test-policy.md`, a rule in this
+   file), list each reason of that decision and say whether it still holds. If one holds, stop and
+   ask the owner. Writing "that rejection stands" is not the check.
+2. **Name what a red means for every artifact that is committed**: what does a person do when it
+   goes red? If the answer is "run a tool and commit its output", it is golden text, and the answer
+   is no.
+3. **Prove on a satellite branch first**, and move to `main` only the smallest part that the next
+   finding needs.
+4. **A plan of more than three pull requests, or one that adds a concept to every normal run, shows
+   its whole permanent footprint and gets the owner's yes before its first step.** Before agreeing
+   to such a mechanism, state the strongest case against it, citing the recorded decisions it
+   touches.
 
 **Never edit anything under `subrepos/`.** Those are git-ignored reference clones of `efcore`,
 `rlinq`, `aqua`, `infocarrier-v1`, and `firebird` (`FirebirdSQL/NETProvider` at `EFCore-13.0.0.0`,

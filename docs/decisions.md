@@ -1061,3 +1061,58 @@ core bases. Tier A's list of ignored bases names the **108 core bases adopted on
 from the test's own output rather than written by hand, and an entry there is a claim that a
 subclass exists in the sibling assembly. Missing: **0 on Tier A, 1 on Tier B** (`SqlQueryTestBase`),
 which is the same 1 the single test reported before the split.
+
+---
+
+## ADR-014 — The comparison with plain EF runs live, and a slow run's output is never committed — LOCKED (2026-09-26)
+
+**Context.** #167 compares the SQL this provider's server runs with what plain EF Core runs for the
+same test. Its first design, `docs/sql-capture.md` on the branch `sql-capture` (PR #170), wrote each
+test's statements into `<Class>.wire.sql` and `<Class>.direct.sql` beside the test class, committed
+them, and asserted them in every normal run. Step H1 was built and reviewed before the owner stopped
+it. A capture with `--filter` cannot update such files surgically, and the rules for merging and
+pruning them kept growing. It was also the golden text that `docs/test-policy.md` rejected on
+2026-09-16, when 580 copied `AssertSql` overrides were dropped, and two of that decision's three
+reasons still held for text we captured ourselves: we would own the string and not the query, and a
+wall of text argues for conformance every time it goes red. The spec said that rejection "stands"
+without testing each reason against the new design.
+
+**Decision.**
+
+1. **The output of a slow run is never committed and never asserted by a normal run.** A slow run
+   is an investigation. What is committed is our own minimal repro, a promise in
+   `Sqlite/ServerSqlTest.cs` or a differential test in `ServerParameterizationTest`, seen red and
+   then made green by the fix.
+2. **#167 compares live, in one process.** A slow mode, switched on by an environment variable,
+   runs each test twice: with plain EF, then through InfoCarrier, each side on a store of its own.
+   `After` compares the two captures in memory: the normalized statements, their failure marks,
+   their counts (a reader's reads, a non-query's rows), and the test's outcome.
+3. **The InfoCarrier reasons of a test method agree with the comparison, both ways, per method.**
+   If any row of the method differs, the method needs an `[InfoCarrierDesign]` or
+   `[InfoCarrierDefect]` reason, and the slow run is red until it has one. If no row differs, such
+   a reason is red too, as a suppression nobody needs. A store reason is not checked, because both
+   sides use the same store.
+4. **A defect that the slow run finds and a fix closes also gets a promise** that runs in every
+   normal run, because the slow run protects only when somebody runs it.
+5. **A normal run and CI do not change.** A nightly slow run in CI is a later option.
+
+**Rationale.** Nothing is kept in sync, because the reference is computed in the same run, and so
+`--filter` needs no rule at all. The reasons become an exact, checked statement of where this
+provider differs from plain EF: a difference with no reason is red, and a reason with no difference
+is red. A count is compared because each side has its own store, so it is stable, and because it is
+the one signal of a read that plain EF never makes when the statement text is the same: the
+prototype on `experiment/direct-baseline` found 54 such methods.
+
+**Consequences.**
+
+- `docs/sql-capture.md` and Phase H exist only on the branch `sql-capture`, and are superseded
+  there. PR #170 is a draft. What goes forward from it: `CurrentTest` and its test framework (H0),
+  the command capture (H1a), `SqlNormalizer` (H1b), `SqlCapture.Compare` and `SameStatements`, and
+  `DeviationKind.SqlDiffers`. What does not: the files, the assertion against them, the folder
+  check, and the compliance tests on files.
+- **Running a test twice with a second set of class fixtures is not proven.** A spike on three
+  classes decides whether this is built: a shared store (`NorthwindWhereQuerySqliteInfoCarrierTest`),
+  a `NonSharedModelTestBase` class, and a class with transactions. If it fails, the satellite branch
+  stays the investigation.
+- `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`, `ServerSqlLog` and its markers stay until the slow
+  mode replaces them, and go in the same series that lands it.

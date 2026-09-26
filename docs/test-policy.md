@@ -819,7 +819,11 @@ dropped on 2026-09-16, with 580 of them generated and green. Three reasons: the 
 complete (580 of 798, and the 218 left out were precisely the tests where our SQL differs, which is
 where the questions are), the scenario belongs to upstream so we would own the string and not the
 query, and a wall of golden text argues quietly for conformance every time it goes red. The
-`[UpstreamOverride]` label that supported it is deleted.
+`[UpstreamOverride]` label that supported it is deleted. **Text we captured ourselves is no different, and that
+was learned the same way on 2026-09-26** (ADR-014): each test's statements, committed beside its
+class and asserted in every run, were built and withdrawn, because the same two reasons held and a
+capture with `--filter` could not update the files surgically. #167 compares with plain EF live, in
+memory, in a slow mode.
 
 ## Extending to the other tiers
 
