@@ -360,7 +360,6 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
         private bool _failed;
         private bool _skipped;
         private int _index;
-        private LiveComparison.Judgement? _judgement;
 
         /// <summary>SPIKE (#167): how many passes the comparison turned into failures.</summary>
         public int TurnedRed { get; private set; }
@@ -373,7 +372,6 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                     _test = CurrentTest.Start(starting.Test);
                     _failed = false;
                     _skipped = false;
-                    _judgement = null;
                     break;
 
                 case ITestPassed passed:
@@ -404,11 +402,6 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                         SqlCapture.TestFinished(_test, _failed);
                     }
 
-                    if (_judgement is not null)
-                    {
-                        LiveComparison.Report(_test, _judgement);
-                    }
-
                     _index++;
                     _test = null;
                     break;
@@ -420,7 +413,7 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
         private LiveComparison.Judgement? Judge(string outcome)
             => direct is null || _test is null
                 ? null
-                : _judgement = LiveComparison.Judge(
+                : LiveComparison.Judge(
                     _test,
                     direct,
                     _index,

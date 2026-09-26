@@ -15,33 +15,32 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Switched on by <see cref="Variable" />, which names a folder</b> for the report. Unset,
-///         nothing here runs and a test runs once.
+///         <b>Switched on by <see cref="Variable" /> set to <c>1</c>.</b> Otherwise nothing here
+///         runs and a test runs once. <b>It writes no file</b> (owner, 2026-09-26): everything a
+///         red test has to say is in its failure message, in the format <see cref="Message" />
+///         documents.
 ///     </para>
 ///     <para>
 ///         <b>The direct run gets a second set of class fixtures</b>, created and initialized with
 ///         <see cref="DirectClient" /> set, and disposed when the class's last test case returns. Its
 ///         messages are swallowed; its statements and its outcome are kept for the wire run.
 ///     </para>
-///     <para>
-///         <b>The spike reports and never fails a test.</b> Failing one from <c>After</c> is what H1d
-///         proved on <c>sql-capture</c>; what the spike has to show is that the two runs can be made
-///         and matched.
-///     </para>
 /// </remarks>
 public static class LiveComparison
 {
-    /// <summary>The environment variable that switches the slow mode on, naming the report's folder.</summary>
+    /// <summary>The environment variable that switches the slow mode on, when it is <c>1</c>.</summary>
     public const string Variable = "INFOCARRIER_LIVE_COMPARE";
 
-    private static readonly string? Folder
-        = Environment.GetEnvironmentVariable(Variable) is { Length: > 0 } folder ? folder : null;
+    /// <summary>The first word of every red message, for a script to find it by.</summary>
+    public const string Header = "[live-compare]";
+
+    /// <summary>The last line of every red message.</summary>
+    public const string Footer = "[/live-compare]";
 
     private static readonly ConcurrentDictionary<Type, DirectFixtures> Fixtures = new();
-    private static readonly object ReportGate = new();
 
     /// <summary>Whether this run is a slow one.</summary>
-    public static bool IsEnabled => Folder is not null;
+    public static bool IsEnabled { get; } = Environment.GetEnvironmentVariable(Variable) == "1";
 
     /// <summary>
     ///     Whether the class runs twice: Tier B only, because only SQLite has a direct client.
@@ -143,63 +142,104 @@ public static class LiveComparison
 
             bool reason = HasInfoCarrierReason(test.TestClass, test.MethodName);
             string name = $"{test.TestClass.Name}.{test.MethodName}";
-            string sides = $"\n\nPlain EF Core ({directOutcome}):\n{Show(plain)}\nInfoCarrier ({wireOutcome}):\n{Show(wire)}";
-            (string? label, string? red) = verdict switch
+            (string? label, string? why) = verdict switch
             {
-                "no-direct" or "unmatched" or "direct-used-infocarrier" => ("no-direct-run", $"The slow run has no plain-EF run to compare this test with ({verdict}: {directOutcome})."),
+                "no-direct" or "unmatched" or "direct-used-infocarrier" => (
+                    "no-direct-run",
+                    $"The slow run has no plain-EF run of this test to compare with ({verdict})."),
                 "same" when lastRowOfMethod && reason && !anyRowDiffers => (
                     "reason-without-difference",
-                    $"{name} carries an [InfoCarrierDesign] or [InfoCarrierDefect] reason, and no row of it differs from plain EF Core: the reason suppresses nothing, so it goes.{sides}"),
+                    $"{name} carries an InfoCarrier reason, and no row of it differs from plain EF Core, so the reason suppresses nothing."),
                 "same" => (null, null),
                 _ when !reason => (
                     "difference-without-reason",
-                    $"This test runs differently through InfoCarrier than with plain EF Core ({verdict}), and {name} carries no [InfoCarrierDesign] or [InfoCarrierDefect] reason.{sides}"),
+                    $"This test runs differently through InfoCarrier than with plain EF Core, and {name} carries no InfoCarrier reason."),
                 _ => (null, null),
             };
 
-            return new Judgement(verdict, directOutcome, wireOutcome, plain, wire, label, red);
+            string? red = label is null
+                ? null
+                : Message(
+                    label,
+                    verdict,
+                    test.DisplayName,
+                    why!,
+                    directOutcome,
+                    other?.FailureText ?? direct.FixtureFailure?.Message,
+                    plain,
+                    wireOutcome,
+                    wire);
+            return new Judgement(verdict, label, red);
         }
         catch (Exception e)
         {
-            return new Judgement("error", "?", wireOutcome, [], [], "comparison-error", $"The live comparison failed: {e}");
+            return new Judgement(
+                "error",
+                "comparison-error",
+                $"{Header} comparison-error error {test.DisplayName}\nThe live comparison failed: {e}\n{Footer}");
         }
     }
 
-    /// <summary>Appends a judged test to the report. Never throws.</summary>
-    internal static void Report(CurrentTest test, Judgement judgement)
+    /// <summary>
+    ///     The failure message of a red test: for a person to read in the console, and for a script
+    ///     to parse out of the console or the TRX.
+    /// </summary>
+    /// <remarks>
+    ///     <code>
+    ///     [live-compare] &lt;label&gt; &lt;verdict&gt; &lt;display name&gt;
+    ///     &lt;one sentence&gt;
+    ///     --- plain EF Core: &lt;outcome&gt;, &lt;n&gt; statement(s)
+    ///       | &lt;the plain-EF failure's text, up to six lines, when it failed&gt;
+    ///     -- #1 reads 3
+    ///     &lt;statement, normalized&gt;
+    ///     --- InfoCarrier: &lt;outcome&gt;, &lt;n&gt; statement(s)
+    ///     -- #1 ...
+    ///     [/live-compare]
+    ///     </code>
+    ///     <para>
+    ///         The label, the verdict and the display name are the rest of the first line in that
+    ///         order, separated by one space; only the display name can contain spaces. <b>No line of
+    ///         the message is blank</b>, because a normalized statement never has one, so the console's
+    ///         blank line after a failure is where the message ends; the footer says so as well.
+    ///     </para>
+    /// </remarks>
+    private static string Message(
+        string label,
+        string verdict,
+        string displayName,
+        string why,
+        string directOutcome,
+        string? directFailureText,
+        IReadOnlyList<SqlCaptureCommand> plain,
+        string wireOutcome,
+        IReadOnlyList<SqlCaptureCommand> wire)
     {
-        try
-        {
-            string line = string.Join(
-                '\t',
-                test.TestClass.FullName,
-                test.MethodName,
-                test.DisplayName,
-                judgement.Verdict,
-                judgement.DirectOutcome,
-                judgement.WireOutcome,
-                judgement.Plain.Count,
-                judgement.Wire.Count,
-                judgement.RedLabel ?? string.Empty);
+        var text = new StringBuilder()
+            .Append($"{Header} {label} {verdict} {displayName}\n")
+            .Append(why).Append('\n')
+            .Append($"--- plain EF Core: {directOutcome}, {Statements(plain.Count)}\n");
 
-            lock (ReportGate)
+        if (directOutcome != "passed" && directFailureText is not null)
+        {
+            foreach (string line in directFailureText.Split('\n')
+                .Select(l => l.TrimEnd('\r'))
+                .Where(l => l.Trim().Length > 0)
+                .Take(6))
             {
-                Directory.CreateDirectory(Folder!);
-                File.AppendAllText(Path.Combine(Folder!, "live-compare.tsv"), line + "\n");
-                if (judgement.Verdict != "same" || judgement.RedLabel is not null)
-                {
-                    File.AppendAllText(
-                        Path.Combine(Folder!, "live-compare-details.txt"),
-                        $"===== {test.DisplayName}\n{judgement.Verdict} {judgement.RedLabel}\n--- direct ({judgement.DirectOutcome})\n{Show(judgement.Plain)}--- wire ({judgement.WireOutcome})\n{Show(judgement.Wire)}\n");
-                }
+                text.Append("  | ").Append(line.Length > 300 ? line[..300] + " ..." : line).Append('\n');
             }
         }
-        catch (Exception e)
-        {
-            Console.Error.WriteLine($"LiveComparison could not report {test.DisplayName}: {e}");
-            Environment.ExitCode = 1;
-        }
+
+        return text
+            .Append(Show(plain))
+            .Append($"--- InfoCarrier: {wireOutcome}, {Statements(wire.Count)}\n")
+            .Append(Show(wire))
+            .Append(Footer)
+            .ToString();
     }
+
+    private static string Statements(int count)
+        => count == 1 ? "1 statement" : $"{count} statements";
 
     private static readonly ConcurrentDictionary<(Type, string), MethodState> MethodStates = new();
     private static readonly ConcurrentDictionary<(Type, string), bool> Reasons = new();
@@ -218,14 +258,7 @@ public static class LiveComparison
     }
 
     /// <summary>What the comparison found for one wire test, and why it is red, if it is.</summary>
-    internal sealed record Judgement(
-        string Verdict,
-        string DirectOutcome,
-        string WireOutcome,
-        IReadOnlyList<SqlCaptureCommand> Plain,
-        IReadOnlyList<SqlCaptureCommand> Wire,
-        string? RedLabel,
-        string? Red);
+    internal sealed record Judgement(string Verdict, string? RedLabel, string? Red);
 
     /// <summary>
     ///     "same", or each way the two runs differ: <c>reads</c> and <c>writes</c> when the
@@ -311,7 +344,8 @@ public static class LiveComparison
     internal sealed record DirectRun(IReadOnlyList<DirectResult> Results, Exception? FixtureFailure);
 
     /// <summary>One test of a direct run: its name, its statements, and how it ended.</summary>
-    internal sealed record DirectResult(string DisplayName, IReadOnlyList<CapturedCommand> Commands, string Outcome, bool UsedWire);
+    internal sealed record DirectResult(
+        string DisplayName, IReadOnlyList<CapturedCommand> Commands, string Outcome, string? FailureText, bool UsedWire);
 
     /// <summary>
     ///     A class's second set of class fixtures, for the direct run: created and initialized on the
@@ -372,6 +406,7 @@ public static class LiveComparison
     {
         private CurrentTest? _test;
         private string _outcome = "unknown";
+        private string? _failureText;
 
         public bool QueueMessage(IMessageSinkMessage message)
         {
@@ -380,6 +415,7 @@ public static class LiveComparison
                 case ITestStarting starting:
                     _test = CurrentTest.Start(starting.Test);
                     _outcome = "unknown";
+                    _failureText = null;
                     break;
 
                 case ITestPassed:
@@ -388,6 +424,7 @@ public static class LiveComparison
 
                 case ITestFailed failed:
                     _outcome = $"failed: {failed.ExceptionTypes.FirstOrDefault()}";
+                    _failureText = failed.Messages.FirstOrDefault();
                     break;
 
                 case ITestSkipped:
@@ -396,7 +433,7 @@ public static class LiveComparison
 
                 case ITestFinished when _test is not null:
                     _test.Close();
-                    results.Add(new DirectResult(_test.DisplayName, _test.Commands, _outcome, _test.UsedWire));
+                    results.Add(new DirectResult(_test.DisplayName, _test.Commands, _outcome, _failureText, _test.UsedWire));
                     _test = null;
                     break;
             }
