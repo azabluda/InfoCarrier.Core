@@ -239,10 +239,18 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                 .GroupBy(type => type)
                 .ToDictionary(group => group.Key, group => new StrongBox<int>(group.Count()));
 
+            // SPIKE (#167): the test cases of one method run one after another, so a countdown per
+            // method tells the last one that the method's rows end with it.
+            Dictionary<(Type, string), StrongBox<int>> remainingInMethod = cases
+                .Where(testCase => ClassOf(testCase) is not null)
+                .GroupBy(testCase => (ClassOf(testCase)!, testCase.TestMethod.Method.Name))
+                .ToDictionary(group => group.Key, group => new StrongBox<int>(group.Count()));
+
             base.RunTestCases(
                 [.. cases.Select(testCase => (IXunitTestCase)new TestCase(
                     testCase,
-                    ClassOf(testCase) is { } type ? (type, remaining[type]) : null))],
+                    ClassOf(testCase) is { } type ? (type, remaining[type]) : null,
+                    ClassOf(testCase) is { } owner ? remainingInMethod[(owner, testCase.TestMethod.Method.Name)] : null))],
                 executionMessageSink,
                 executionOptions);
         }
@@ -255,7 +263,10 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
     ///     The test case it wraps, in every member but one: the bus it runs on. It also counts down
     ///     its class's test cases, and the last one to return says that the class has ended.
     /// </summary>
-    private sealed class TestCase(IXunitTestCase inner, (Type Class, StrongBox<int> Remaining)? testClass) : IXunitTestCase
+    private sealed class TestCase(
+        IXunitTestCase inner,
+        (Type Class, StrongBox<int> Remaining)? testClass,
+        StrongBox<int>? remainingInMethod) : IXunitTestCase
     {
         public string DisplayName => inner.DisplayName;
 
@@ -303,12 +314,17 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                     inner, covered.Class, diagnosticMessageSink, constructorArguments);
             }
 
+            bool lastCaseOfMethod = remainingInMethod is not null && Interlocked.Decrement(ref remainingInMethod.Value) == 0;
+            var bus = new MessageBus(messageBus, direct, lastCaseOfMethod);
             RunSummary summary = await inner.RunAsync(
                 diagnosticMessageSink,
-                new MessageBus(messageBus, direct),
+                bus,
                 constructorArguments,
                 aggregator,
                 cancellationTokenSource);
+
+            // A pass the comparison turned red is a failure in the summary as well.
+            summary.Failed += bus.TurnedRed;
 
             if (testClass is var (type, remaining) && Interlocked.Decrement(ref remaining.Value) == 0)
             {
@@ -328,13 +344,19 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
     ///     One bus serves one test case, whose tests run one after another, so one test at a time is
     ///     tracked here. A skipped test runs no statement and gets no entry.
     /// </remarks>
-    private sealed class MessageBus(IMessageBus inner, LiveComparison.DirectRun? direct = null) : IMessageBus
+    private sealed class MessageBus(
+        IMessageBus inner,
+        LiveComparison.DirectRun? direct = null,
+        bool lastCaseOfMethod = false) : IMessageBus
     {
         private CurrentTest? _test;
         private bool _failed;
         private bool _skipped;
-        private string _outcome = "unknown";
         private int _index;
+        private LiveComparison.Judgement? _judgement;
+
+        /// <summary>SPIKE (#167): how many passes the comparison turned into failures.</summary>
+        public int TurnedRed { get; private set; }
 
         public bool QueueMessage(IMessageSinkMessage message)
         {
@@ -344,21 +366,29 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                     _test = CurrentTest.Start(starting.Test);
                     _failed = false;
                     _skipped = false;
-                    _outcome = "unknown";
+                    _judgement = null;
                     break;
 
-                case ITestPassed:
-                    _outcome = "passed";
+                case ITestPassed passed:
+                    // SPIKE (#167, ADR-014 decision 3): the outcome is known here, and a pass can
+                    // still be reported as a failure.
+                    if (Judge("passed") is { Red: { } red })
+                    {
+                        TurnedRed++;
+                        _failed = true;
+                        message = new TestFailed(passed.Test, passed.ExecutionTime, passed.Output, new LiveComparisonException(red));
+                    }
+
                     break;
 
                 case ITestFailed failed:
                     _failed = true;
-                    _outcome = $"failed: {failed.ExceptionTypes.FirstOrDefault()}";
+                    Judge($"failed: {failed.ExceptionTypes.FirstOrDefault()}");
                     break;
 
                 case ITestSkipped:
                     _skipped = true;
-                    _outcome = "skipped";
+                    Judge("skipped");
                     break;
 
                 case ITestFinished when _test is not null:
@@ -367,10 +397,9 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
                         SqlCapture.TestFinished(_test, _failed);
                     }
 
-                    if (direct is not null)
+                    if (_judgement is not null)
                     {
-                        _test.Close();
-                        LiveComparison.Report(_test, direct, _index, _outcome);
+                        LiveComparison.Report(_test, _judgement);
                     }
 
                     _index++;
@@ -380,6 +409,16 @@ public sealed class CurrentTestFramework(IMessageSink messageSink) : XunitTestFr
 
             return inner.QueueMessage(message);
         }
+
+        private LiveComparison.Judgement? Judge(string outcome)
+            => direct is null || _test is null
+                ? null
+                : _judgement = LiveComparison.Judge(
+                    _test,
+                    direct,
+                    _index,
+                    outcome,
+                    lastRowOfMethod: lastCaseOfMethod && _index >= direct.Results.Count - 1);
 
         // The bus belongs to the runner that handed it over, and that runner disposes it.
         public void Dispose()

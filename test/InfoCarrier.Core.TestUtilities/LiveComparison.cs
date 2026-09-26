@@ -93,13 +93,28 @@ public static class LiveComparison
     }
 
     /// <summary>
-    ///     Compares one wire test with its direct run and appends the verdict to the report. Never
-    ///     throws.
+    ///     Compares one wire test with its direct run, once its outcome is known, and says whether
+    ///     it is red (ADR-014 decision 3). Never throws.
     /// </summary>
-    internal static void Report(CurrentTest test, DirectRun direct, int index, string wireOutcome)
+    /// <remarks>
+    ///     <para>
+    ///         <b>Red, per row:</b> the row differs from plain EF and its method carries no
+    ///         <see cref="InfoCarrierDesignAttribute" /> or <see cref="InfoCarrierDefectAttribute" />;
+    ///         or the row has no direct run to compare with.
+    ///     </para>
+    ///     <para>
+    ///         <b>Red, per method, at its last row:</b> the method carries such a reason and none of
+    ///         its rows differed, so the reason suppresses nothing.
+    ///     </para>
+    ///     <para>
+    ///         SPIKE: a reason's <c>Case</c> is not read, so a reason covers every row of its method.
+    ///     </para>
+    /// </remarks>
+    internal static Judgement Judge(CurrentTest test, DirectRun direct, int index, string wireOutcome, bool lastRowOfMethod)
     {
         try
         {
+            test.Close();
             DirectResult? other = index < direct.Results.Count ? direct.Results[index] : null;
             SqlCaptureCommand[] wire = [.. test.Commands.Select(SqlCapture.ToFileCommand)];
             SqlCaptureCommand[] plain = other is null ? [] : [.. other.Commands.Select(SqlCapture.ToFileCommand)];
@@ -111,26 +126,70 @@ public static class LiveComparison
                 : other.DisplayName != test.DisplayName ? "unmatched"
                 : Verdict(plain, wire, directOutcome, wireOutcome);
 
+            (Type, string) method = (test.TestClass, test.MethodName);
+            MethodState state = MethodStates.GetOrAdd(method, _ => new MethodState());
+            bool anyRowDiffers;
+            lock (state)
+            {
+                state.Differing += verdict == "same" ? 0 : 1;
+                anyRowDiffers = state.Differing > 0;
+            }
+
+            if (lastRowOfMethod)
+            {
+                MethodStates.TryRemove(method, out _);
+            }
+
+            bool reason = HasInfoCarrierReason(test.TestClass, test.MethodName);
+            string name = $"{test.TestClass.Name}.{test.MethodName}";
+            string sides = $"\n\nPlain EF Core ({directOutcome}):\n{Show(plain)}\nInfoCarrier ({wireOutcome}):\n{Show(wire)}";
+            (string? label, string? red) = verdict switch
+            {
+                "no-direct" or "unmatched" => ("no-direct-run", $"The slow run has no plain-EF run to compare this test with ({verdict}: {directOutcome})."),
+                "same" when lastRowOfMethod && reason && !anyRowDiffers => (
+                    "reason-without-difference",
+                    $"{name} carries an [InfoCarrierDesign] or [InfoCarrierDefect] reason, and no row of it differs from plain EF Core: the reason suppresses nothing, so it goes.{sides}"),
+                "same" => (null, null),
+                _ when !reason => (
+                    "difference-without-reason",
+                    $"This test runs differently through InfoCarrier than with plain EF Core ({verdict}), and {name} carries no [InfoCarrierDesign] or [InfoCarrierDefect] reason.{sides}"),
+                _ => (null, null),
+            };
+
+            return new Judgement(verdict, directOutcome, wireOutcome, plain, wire, label, red);
+        }
+        catch (Exception e)
+        {
+            return new Judgement("error", "?", wireOutcome, [], [], "comparison-error", $"The live comparison failed: {e}");
+        }
+    }
+
+    /// <summary>Appends a judged test to the report. Never throws.</summary>
+    internal static void Report(CurrentTest test, Judgement judgement)
+    {
+        try
+        {
             string line = string.Join(
                 '\t',
                 test.TestClass.FullName,
                 test.MethodName,
                 test.DisplayName,
-                verdict,
-                directOutcome,
-                wireOutcome,
-                plain.Length,
-                wire.Length);
+                judgement.Verdict,
+                judgement.DirectOutcome,
+                judgement.WireOutcome,
+                judgement.Plain.Count,
+                judgement.Wire.Count,
+                judgement.RedLabel ?? string.Empty);
 
             lock (ReportGate)
             {
                 Directory.CreateDirectory(Folder!);
                 File.AppendAllText(Path.Combine(Folder!, "live-compare.tsv"), line + "\n");
-                if (verdict != "same")
+                if (judgement.Verdict != "same" || judgement.RedLabel is not null)
                 {
                     File.AppendAllText(
                         Path.Combine(Folder!, "live-compare-details.txt"),
-                        $"===== {test.DisplayName}\n{verdict}\n--- direct ({directOutcome})\n{Show(plain)}--- wire ({wireOutcome})\n{Show(wire)}\n");
+                        $"===== {test.DisplayName}\n{judgement.Verdict} {judgement.RedLabel}\n--- direct ({judgement.DirectOutcome})\n{Show(judgement.Plain)}--- wire ({judgement.WireOutcome})\n{Show(judgement.Wire)}\n");
                 }
             }
         }
@@ -140,6 +199,32 @@ public static class LiveComparison
             Environment.ExitCode = 1;
         }
     }
+
+    private static readonly ConcurrentDictionary<(Type, string), MethodState> MethodStates = new();
+    private static readonly ConcurrentDictionary<(Type, string), bool> Reasons = new();
+
+    private static bool HasInfoCarrierReason(Type testClass, string methodName)
+        => Reasons.GetOrAdd(
+            (testClass, methodName),
+            key => key.Item1
+                .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Where(m => m.Name == key.Item2)
+                .Any(m => m.GetCustomAttributes(inherit: true).Any(a => a is InfoCarrierDesignAttribute or InfoCarrierDefectAttribute)));
+
+    private sealed class MethodState
+    {
+        public int Differing { get; set; }
+    }
+
+    /// <summary>What the comparison found for one wire test, and why it is red, if it is.</summary>
+    internal sealed record Judgement(
+        string Verdict,
+        string DirectOutcome,
+        string WireOutcome,
+        IReadOnlyList<SqlCaptureCommand> Plain,
+        IReadOnlyList<SqlCaptureCommand> Wire,
+        string? RedLabel,
+        string? Red);
 
     /// <summary>
     ///     "same", or each way the two runs differ: <c>reads</c> and <c>writes</c> when the
@@ -323,3 +408,6 @@ public static class LiveComparison
         }
     }
 }
+
+/// <summary>SPIKE (#167): the failure a slow run reports for a test the live comparison turned red.</summary>
+public sealed class LiveComparisonException(string message) : XunitException(message);
