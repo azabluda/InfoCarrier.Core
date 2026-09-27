@@ -7699,6 +7699,40 @@ claims a runtime difference. The amendment proposed:
       FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H29. A grouping projected as a collection of an anonymous type groups at the store.** On the
+      branch `live-comparison-each-carrier`, on top of H28. `TransparentIdentifierRewriter` re-carries
+      the anonymous grouping key and the result in tuples, and its rebuild of the result recursed
+      into a nested carrier held directly, never into a collection of one. For
+      `new { g.Key.Id, Values = g.Select(t => new { … }) }` it handed a sequence of tuples to a member
+      declared as a sequence of the anonymous type, the expression API refused it, and the pass fell
+      back to the query as written: the grouping and everything above it ran on the client over
+      every row of the join, `Ef6GroupBy.Whats_new_2021_sample_10`. Probed by variants: with a key of
+      the caller's own, or a collection of scalars, the same query was at the store already.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_grouping_projected_as_a_collection_of_a_client_type_groups_at_the_store`.
+      2. **The fix**: `RebuildEach` rebuilds such a member element by element, into a list, through
+         one helper method rather than `Select` and `ToList`. `RewriteVerifier` counts each
+         `Enumerable` operator left to the client as query work, and those two cancelled what the
+         rewrite moved: three operators on the client before, three after, and the rewrite was
+         discarded. A null collection stays null, which the first measure found in six tests of
+         `Accessing_property_of_optional_navigation_in_child_projection_works`.
+      3. **17 methods converge with EF's refusal**, and each takes EF's own SQLite override with its
+         line range: the four `Correlated_collection_with_groupby_*` in each Gears of War class,
+         `Complex_query_with_groupBy_in_subquery1`, `2` and `4`, and the two
+         `Correlated_collection_after_groupby_with_complex_projection_*`. This client answered them by
+         grouping on the client; now the server's EF translates them and SQLite refuses the `APPLY`
+         they need, as it does for plain EF Core. They were on the slow run's red list as an answer
+         where plain EF refuses, the family that waits for the owner; the owner's rule of 2026-09-17
+         and 2026-09-22 is to match EF.
+      4. **The next slow run**, Tiers B and C: **`Passed: 27124, Failed: 38, Skipped: 168, Total:
+         27330`**, 21 methods. **18 methods left the red list and none joined it**: `sample_10` and
+         the 17 above. None of the 21 that stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh each-carrier terminal-carrier`: **FAILING 0, TOTAL 29955**, FIXED
+      none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

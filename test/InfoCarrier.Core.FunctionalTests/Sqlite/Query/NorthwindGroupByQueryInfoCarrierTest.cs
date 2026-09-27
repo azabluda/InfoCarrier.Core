@@ -25,10 +25,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         over" once a relational backend landed. The relational base adds none of its own.
 ///     </para>
 ///     <para>
-///         The eight <c>ApplyNotSupported</c> overrides are EF Core's own — <c>APPLY</c> is not
+///         The eleven <c>ApplyNotSupported</c> overrides are EF Core's own — <c>APPLY</c> is not
 ///         SQLite syntax — adopted after measuring rather than copied in advance, and every one is
-///         convergence with <c>NorthwindGroupByQuerySqliteTest</c>. This said "seven" until
-///         2026-09-26, when <c>Complex_query_with_groupBy_in_subquery3</c> converged.
+///         convergence with <c>NorthwindGroupByQuerySqliteTest</c>. This said "eight" until
+///         2026-09-27, when <c>Complex_query_with_groupBy_in_subquery1</c>, <c>2</c> and <c>4</c>
+///         converged, and "seven" until 2026-09-26, when <c>Complex_query_with_groupBy_in_subquery3</c>
+///         converged.
 ///     </para>
 ///     <para>
 ///         <b><c>Final_GroupBy_nominal_type_entity</c> runs EF's own test since 2026-09-22.</b> Until
@@ -108,6 +110,39 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
     public override Task Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(bool async)
         => AssertApplyNotSupported(
             () => base.Select_correlated_collection_after_GroupBy_aggregate_when_identifier_changes_to_complex(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     It answered here until 2026-09-27, when the grouping on an anonymous key in its
+    ///     collection ran on the client; see <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 32, 33,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Complex_query_with_groupBy_in_subquery1(bool async)
+        => AssertApplyNotSupported(() => base.Complex_query_with_groupBy_in_subquery1(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     It answered here until 2026-09-27, when the grouping on an anonymous key in its
+    ///     collection ran on the client; see <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 35, 36,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Complex_query_with_groupBy_in_subquery2(bool async)
+        => AssertApplyNotSupported(() => base.Complex_query_with_groupBy_in_subquery2(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     It answered here until 2026-09-27, when the grouping on an anonymous key in its
+    ///     collection ran on the client; see <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 41, 42,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Complex_query_with_groupBy_in_subquery4(bool async)
+        => AssertApplyNotSupported(() => base.Complex_query_with_groupBy_in_subquery4(async));
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(

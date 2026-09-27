@@ -822,7 +822,7 @@ internal static class TransparentIdentifierRewriter
                 }
 
                 Expression slot = TupleCarrier.Read(tuple, next++);
-                arguments[i] = carriers.ContainsKey(memberType) ? Rebuild(slot, memberType) : slot;
+                arguments[i] = carriers.ContainsKey(memberType) ? Rebuild(slot, memberType) : RebuildEach(slot, memberType);
             }
 
             Expression rebuilt = Construct(carrier, members, arguments);
@@ -834,6 +834,59 @@ internal static class TransparentIdentifierRewriter
                     Expression.Constant(null, carrier),
                     rebuilt);
         }
+
+        /// <summary>
+        ///     A collection of a carrier rebuilt element by element into a list, or
+        ///     <paramref name="slot" /> itself when <paramref name="memberType" /> is no such
+        ///     collection or cannot hold a list.
+        /// </summary>
+        /// <remarks>
+        ///     <c>new { g.Key.Id, Values = g.Select(t =&gt; new { t.Id, t.Style }) }</c> holds its
+        ///     inner carrier through a sequence rather than directly, so its slot carries a sequence
+        ///     of tuples. Until 2026-09-27 that slot went into the member as it came, the expression
+        ///     API refused a sequence of tuples for a sequence of the anonymous type, and
+        ///     <see cref="Rewrite" /> fell back to the query as written: the grouping and every
+        ///     operator above it stayed on the client, over every row of the join below. Found by
+        ///     #167's slow run, as EF's <c>Ef6GroupBy.Whats_new_2021_sample_10</c>.
+        /// </remarks>
+        private Expression RebuildEach(Expression slot, Type memberType)
+        {
+            Type element = ServerBoundaryAnalyzer.SequenceElementType(memberType);
+            if (element == memberType || !carriers.ContainsKey(element))
+            {
+                return slot;
+            }
+
+            var item = Expression.Parameter(Map(element), "item");
+            Expression list = Expression.Call(
+                typeof(Rewriter),
+                nameof(RebuiltEach),
+                [item.Type, element],
+                slot,
+                Expression.Lambda(Rebuild(item, element), item));
+
+            return memberType.IsAssignableFrom(list.Type) ? list : slot;
+        }
+
+        /// <summary>
+        ///     The list <see cref="RebuildEach" /> builds, in one call rather than a <c>Select</c>
+        ///     and a <c>ToList</c>.
+        /// </summary>
+        /// <remarks>
+        ///     <see cref="RewriteVerifier" /> counts each <see cref="Enumerable" /> operator left to
+        ///     the client as query work, and those two would cancel what the rewrite moves to the
+        ///     server: <c>GroupBy(p =&gt; new { … }).Select(g =&gt; new { …, Values = g.Select(t =&gt;
+        ///     new { t.Id }) })</c> counted three operators on the client before the rewrite and
+        ///     three after it, and was discarded. Rebuilding a carrier is reassembly, as the root's
+        ///     own rebuild is.
+        ///     <para>
+        ///         No collection stays no collection: <c>t.Gear != null ? t.Gear.Weapons.Select(w
+        ///         =&gt; new { … }).ToList() : null</c> gives <see langword="null" /> for a tag with no
+        ///         gear.
+        ///     </para>
+        /// </remarks>
+        private static List<TElement>? RebuiltEach<TRow, TElement>(IEnumerable<TRow>? rows, Func<TRow, TElement> element)
+            => rows is null ? null : [.. rows.Select(element)];
 
         /// <summary>
         ///     Rebuilds a carrier from its slots, the way the query built it.

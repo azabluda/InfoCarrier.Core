@@ -42,6 +42,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         first <c>Distinct</c> on the client.
 ///     </para>
 ///     <para>
+///         <b>26 since 2026-09-27</b>, in each of the three classes: the four
+///         <c>Correlated_collection_with_groupby_*</c> tests came red with EF's own
+///         <c>ApplyNotSupported</c> once a grouping on an anonymous key, projected into a collection,
+///         stopped running on the client. Until then this provider answered them, and #167's slow
+///         run had them red for it.
+///     </para>
+///     <para>
 ///         <b>No override here is this provider's own since 2026-09-22.</b> Two per class used to
 ///         replace the relational base's refusal of a correlated collection after <c>Distinct</c>
 ///         with the core base's row-by-row answer, because the projection split reassembled that
@@ -277,6 +284,54 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_after_distinct_3_levels(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 126, 132,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 109, 115,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 117, 124,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 163, 170,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
 }
 
 /// <inheritdoc cref="TPTGearsOfWarQueryInfoCarrierTest" />
@@ -499,6 +554,54 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_after_distinct_3_levels(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 126, 132,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 109, 115,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 117, 124,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 163, 170,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
 }
 
 /// <summary>
@@ -709,6 +812,54 @@ public class GearsOfWarQueryInfoCarrierTest : GearsOfWarQueryRelationalTestBase<
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_after_distinct_3_levels(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 209, 219,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 184, 194,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 196, 207,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 8048, 8059,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
 }
 
 /// <summary>

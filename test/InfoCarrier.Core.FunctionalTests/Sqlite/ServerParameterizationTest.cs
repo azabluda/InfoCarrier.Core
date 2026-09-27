@@ -1050,6 +1050,35 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A grouping on an anonymous key, each group projected as a collection of an anonymous
+    ///     type, groups at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The key is re-carried in a tuple, and so is the result, whose rebuild then has to
+    ///         rebuild each element of the collection too. It did not: the pass that re-carries
+    ///         such types fell back to the query as written, and the client grouped every row. With
+    ///         a key of the caller's own, or a collection of scalars, the same query was at the
+    ///         store already.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run once <c>Ef6GroupByTestBase</c> moved to Tier B, as its
+    ///         <c>Whats_new_2021_sample_10</c>, which also joins and orders the groups.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_grouping_projected_as_a_collection_of_a_client_type_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Post>()
+                .GroupBy(p => new { p.BlogId, p.Heading })
+                .Select(g => new { g.Key.BlogId, Values = g.Select(t => new { t.Id }) })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>
