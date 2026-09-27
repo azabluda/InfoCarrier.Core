@@ -7782,6 +7782,62 @@ claims a runtime difference. The amendment proposed:
       Normal run, `eng/measure.sh move-app each-carrier`: **FAILING 0, TOTAL 29955**, FIXED none,
       BROKEN none, REASONS unchanged. `CI=true` Release build of the test project with
       `--no-incremental`: 0 warnings, 0 errors.
+- [x] **H31. A concurrency exception suppressed on the client is a documented limitation, and
+      `SaveChangesInterception` moves to Tier B.** On the branch
+      `live-comparison-concurrency-interception`, on top of H30. The owner, 2026-09-27: "document
+      this as a limitation".
+
+      **H30's first item above is wrong in its first claim, corrected here.** It says "A client's
+      interceptor never sees `ThrowingConcurrencyException`, which EF raises in the update pipeline,
+      here the server's, so it cannot suppress it." The client does raise that event, from
+      `InfoCarrierDatabase`, when the server replies with a `DbUpdateConcurrencyException`, and it
+      honours a suppression by returning 0. The 32 red tests had three causes:
+      1. **A synchronous save raised the asynchronous hook**, because `SaveChanges` waited for
+         `SaveChangesAsync`. Fixed: both call one method that knows which half it serves.
+      2. **The event carried the server's exception**, and the caller caught the client's re-raise,
+         where EF's event carries the exception the save throws. Fixed: the re-raise is built first
+         and handed to the event.
+      3. **The limitation.** The server's EF has thrown and rolled the save back before the
+         client's interceptor is asked. Measured on a stale update beside an insert: plain EF with a
+         suppressing interceptor returns 2 and writes the insert; the same interceptor on this
+         provider's server does the same; on the client, `SaveChanges` returns 0, writes nothing,
+         and EF accepts every change in the client's change tracker.
+
+      Documented in `website/docs/limitations.md`, with the server-side interceptor as the
+      workaround, and recorded as D9 in `docs/architecture.md` with the two alternatives not taken.
+      `SaveChangesInterceptionInfoCarrierTest` moves to Tier B, where
+      `Intercept_to_suppress_concurrency_exception` asserts 0 under an `[InfoCarrierDesign]` reason
+      naming the page's heading; `ConcurrencyTokenTest` pins the server-side workaround and the
+      client-side loss. The page's budget moves from 800 to 950 words. Slow run of the two classes:
+      **`Passed: 112, Failed: 0, Total: 112`**, no red.
+
+      Normal run, `eng/measure.sh concurrency-interception move-app`: **FAILING 0, TOTAL 29957**, the
+      two new tests, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors. `doc-words.py`: 0
+      over budget; `doc-links.py`: 0 broken; `mkdocs build --strict` clean.
+- [x] **H32. The spec test runs the configuration the limitations page recommends.** On the branch
+      `live-comparison-server-suppression`, on top of H31. The owner, 2026-09-27: "put the same
+      interceptor on the server is the correct and recommended approach. Can we test only if app is
+      configured correctly? Additionally we can have a pin test for misconfiguration, mainly for
+      documentation purpose."
+
+      `Intercept_to_suppress_concurrency_exception` on Tier B now registers the suppressing
+      interceptor on the server, through the fixture's server options, where it stays off until
+      this test turns it on, and a passive interceptor on the client. It asserts what the caller
+      sees, EF's answer: no exception, one entity saved, no failure event. EF's assertions on the
+      interceptor instance, its context and the entity by reference, describe one `DbContext`, and
+      the entity the server's interceptor saw is asserted by its key instead. The plain-EF half of
+      the slow run takes the server's options, so its one context has the interceptor too. Until
+      this step the override asserted the client-side row, 0 rather than 1.
+
+      The misconfiguration pin was already there, and both tests of H31 are renamed for what they
+      document: `A_suppression_configured_on_the_server_writes_the_rest_of_the_save` and
+      `A_suppression_misconfigured_on_the_client_writes_nothing`. D9 says the same.
+
+      Slow run of the two classes: **`Passed: 112, Failed: 0, Total: 112`**, no red. Normal run,
+      `eng/measure.sh server-suppression concurrency-interception`: **FAILING 0, TOTAL 29957**,
+      FIXED none, BROKEN none, REASONS unchanged.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

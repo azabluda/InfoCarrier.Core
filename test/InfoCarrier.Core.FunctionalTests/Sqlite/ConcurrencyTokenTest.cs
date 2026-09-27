@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -30,7 +31,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 /// </remarks>
 public class ConcurrencyTokenTest
 {
-    private static SqliteInfoCarrierBackendTestStore CreateStore()
+    private static SqliteInfoCarrierBackendTestStore CreateStore(Func<DbContextOptionsBuilder, DbContextOptionsBuilder>? onAddOptions = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -38,6 +39,7 @@ public class ConcurrencyTokenTest
             {
                 ContextType = typeof(ConcurrencyContext),
                 OnModelCreating = (_, _) => { },
+                OnAddOptions = onAddOptions,
             });
 
     private static ConcurrencyContext CreateClient(SqliteInfoCarrierBackendTestStore store)
@@ -170,5 +172,100 @@ public class ConcurrencyTokenTest
         parcel.Name = "mine";
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+    }
+
+    /// <summary>
+    ///     An application configured correctly, with the suppressing interceptor on the SERVER:
+    ///     the rest of the save is written, as plain EF Core writes it.
+    /// </summary>
+    /// <remarks>
+    ///     The configuration <c>website/docs/limitations.md</c> recommends, and the owner's
+    ///     (2026-09-27). Plain EF Core on the same store, measured on 2026-09-27: <c>SaveChanges</c>
+    ///     returns 2, the insert is written, and the stale update is not.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_suppression_configured_on_the_server_writes_the_rest_of_the_save()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(b => b.AddInterceptors(new ConflictSuppressor()));
+        await SeedAsync(store);
+
+        await using ConcurrencyContext client = CreateClient(store);
+        (int saved, string stored) = await SaveAStaleUpdateAndAnInsertAsync(store, client);
+
+        Assert.Equal(2, saved);
+        Assert.Equal("1:original:99, 2:new:1", stored);
+    }
+
+    /// <summary>
+    ///     An application MISCONFIGURED, with the suppressing interceptor on the client: nothing of
+    ///     the save is written, and the save reports no error.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         What <c>website/docs/limitations.md</c> tells a reader they would observe, pinned here
+    ///         for that page and so that the page changes when the behaviour does. The server's EF has
+    ///         thrown and rolled the save back by the time the client's interceptor is asked, so the
+    ///         insert beside the conflict is lost, and EF then accepts every change in the client's
+    ///         change tracker.
+    ///     </para>
+    ///     <para>
+    ///         The owner, 2026-09-27: documented as a limitation, with the interceptor on the server
+    ///         as the correct configuration. Resending the rest of the save, or refusing the
+    ///         suppression, would each change this test.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_suppression_misconfigured_on_the_client_writes_nothing()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await SeedAsync(store);
+
+        await using var client = new ConcurrencyContext(
+            new DbContextOptionsBuilder<ConcurrencyContext>().UseInfoCarrier(store).AddInterceptors(new ConflictSuppressor()).Options);
+        (int saved, string stored) = await SaveAStaleUpdateAndAnInsertAsync(store, client);
+
+        Assert.Equal(0, saved);
+        Assert.Equal("1:original:99", stored);
+        Assert.All(client.ChangeTracker.Entries(), e => Assert.Equal(EntityState.Unchanged, e.State));
+    }
+
+    /// <summary>
+    ///     Loads the seeded widget, lets another context change its token, then saves a change to it
+    ///     together with a new widget, and reads back what the store holds.
+    /// </summary>
+    private static async Task<(int Saved, string Stored)> SaveAStaleUpdateAndAnInsertAsync(
+        SqliteInfoCarrierBackendTestStore store, ConcurrencyContext client)
+    {
+        Widget widget = await client.Widgets.SingleAsync();
+
+        await using (DbContext other = store.CreateDbContext())
+        {
+            Widget theirs = await other.Set<Widget>().SingleAsync();
+            theirs.Version = 99;
+            await other.SaveChangesAsync();
+        }
+
+        widget.Name = "mine";
+        client.Add(new Widget { Id = 2, Name = "new", Version = 1 });
+
+        int saved = await client.SaveChangesAsync();
+
+        await using DbContext check = store.CreateDbContext();
+        List<Widget> rows = await check.Set<Widget>().OrderBy(w => w.Id).ToListAsync();
+        return (saved, string.Join(", ", rows.Select(w => $"{w.Id}:{w.Name}:{w.Version}")));
+    }
+
+    private sealed class ConflictSuppressor : SaveChangesInterceptor
+    {
+        public override InterceptionResult ThrowingConcurrencyException(
+            ConcurrencyExceptionEventData eventData,
+            InterceptionResult result)
+            => InterceptionResult.Suppress();
+
+        public override ValueTask<InterceptionResult> ThrowingConcurrencyExceptionAsync(
+            ConcurrencyExceptionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(InterceptionResult.Suppress());
     }
 }

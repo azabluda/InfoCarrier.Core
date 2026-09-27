@@ -1438,6 +1438,51 @@ one axis rather than four: `NorthwindSqlQueryTestBase`, `SqlQueryTestBase` and `
 are all item 2, and `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and
 for which EF ships no SQLite class.
 
+### D9 — a concurrency conflict is decided on the server, and a client-side suppression cannot complete the save (2026-09-27)
+
+**The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/limitations.md`,
+"Suppressing a concurrency exception in an interceptor on the client"), with an interceptor on the
+server as the workaround. It was found when `SaveChangesInterceptionTestBase` moved to Tier B for
+#167's slow run and ran the concurrency tests Tier A had never run.
+
+**What EF does.** A command that affects no row raises `ThrowingConcurrencyException` from the
+update pipeline. An interceptor that suppresses it makes EF treat that command as done: the rest of
+the save is written, the transaction commits, and `SaveChanges` returns the count.
+
+**What happens here.** The update pipeline is the server's. The server's EF raises the event to the
+server's interceptors, and one that suppresses behaves exactly as with plain EF. The client raises
+the same event to its own interceptors, from `InfoCarrierDatabase`, when the server's reply is a
+`DbUpdateConcurrencyException`, and by then the server's EF has thrown and rolled the save back. A
+client-side suppression therefore cannot complete anything. `SaveChanges` returns 0, EF accepts
+every change in the client's change tracker, and nothing of that save is in the store. Measured on
+one save of a stale update beside an insert:
+
+| The suppressing interceptor is on | `SaveChanges` returns | The insert is written | The client's entries |
+|---|---|---|---|
+| plain EF, no InfoCarrier | 2 | yes | `Unchanged` |
+| the server | 2 | yes | `Unchanged` |
+| the client | 0 | **no** | `Unchanged` |
+
+**The interceptor on the server is the correct configuration, not only a workaround** (the owner,
+the same day: "the correct and recommended approach"). So the spec test runs that configuration:
+`SaveChangesInterceptionInfoCarrierTest` overrides `Intercept_to_suppress_concurrency_exception` to
+register the suppressing interceptor on the server and a passive one on the client, and asserts what
+the caller sees, which is EF's. EF's assertions on the interceptor instance (`Assert.Same(context,
+interceptor.Context)`, the entity by reference) describe one `DbContext` and are replaced by the
+entity's key. `ConcurrencyTokenTest` pins both rows by name,
+`A_suppression_configured_on_the_server_writes_the_rest_of_the_save` and
+`A_suppression_misconfigured_on_the_client_writes_nothing`, the second for the page that describes
+it. Until the owner's second answer the override asserted the client-side row, 0 rather than 1.
+
+**Two alternatives were not taken.** Resending the rest of the save after a suppression would give
+EF's answer at the cost of a second round trip, one that can meet a conflict of its own. Refusing the
+suppression would keep the store and the change tracker in agreement and break EF's contract for the
+hook. Either one changes the page.
+
+**Two defects of this provider came out of the same run and are fixed**: a synchronous `SaveChanges`
+raised the interceptor's asynchronous hook, and the event carried the server's exception, where EF's
+carries the one the save then throws.
+
 ## 7. Out of scope (initial release) — requirements §6
 
 AuthN/authZ (protocol must not preclude); offline/disconnected caching; client-side query
