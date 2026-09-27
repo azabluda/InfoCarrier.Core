@@ -7808,6 +7808,28 @@ claims a runtime difference. The amendment proposed:
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors. `doc-words.py`: 0
       over budget; `doc-links.py`: 0 broken; `mkdocs build --strict` clean.
+- [x] **H32. The spec test runs the configuration the limitations page recommends.** On the branch
+      `live-comparison-server-suppression`, on top of H31. The owner, 2026-09-27: "put the same
+      interceptor on the server is the correct and recommended approach. Can we test only if app is
+      configured correctly? Additionally we can have a pin test for misconfiguration, mainly for
+      documentation purpose."
+
+      `Intercept_to_suppress_concurrency_exception` on Tier B now registers the suppressing
+      interceptor on the server, through the fixture's server options, where it stays off until
+      this test turns it on, and a passive interceptor on the client. It asserts what the caller
+      sees, EF's answer: no exception, one entity saved, no failure event. EF's assertions on the
+      interceptor instance, its context and the entity by reference, describe one `DbContext`, and
+      the entity the server's interceptor saw is asserted by its key instead. The plain-EF half of
+      the slow run takes the server's options, so its one context has the interceptor too. Until
+      this step the override asserted the client-side row, 0 rather than 1.
+
+      The misconfiguration pin was already there, and both tests of H31 are renamed for what they
+      document: `A_suppression_configured_on_the_server_writes_the_rest_of_the_save` and
+      `A_suppression_misconfigured_on_the_client_writes_nothing`. D9 says the same.
+
+      Slow run of the two classes: **`Passed: 112, Failed: 0, Total: 112`**, no red. Normal run,
+      `eng/measure.sh server-suppression concurrency-interception`: **FAILING 0, TOTAL 29957**,
+      FIXED none, BROKEN none, REASONS unchanged.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

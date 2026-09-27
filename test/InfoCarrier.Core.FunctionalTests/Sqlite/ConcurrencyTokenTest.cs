@@ -175,16 +175,16 @@ public class ConcurrencyTokenTest
     }
 
     /// <summary>
-    ///     A conflict an interceptor on the SERVER suppresses leaves the rest of the save to be
-    ///     written, as plain EF Core writes it.
+    ///     An application configured correctly, with the suppressing interceptor on the SERVER:
+    ///     the rest of the save is written, as plain EF Core writes it.
     /// </summary>
     /// <remarks>
-    ///     The workaround <c>website/docs/limitations.md</c> gives for the test below. Plain EF Core
-    ///     on the same store, measured on 2026-09-27: <c>SaveChanges</c> returns 2, the insert is
-    ///     written, and the stale update is not.
+    ///     The configuration <c>website/docs/limitations.md</c> recommends, and the owner's
+    ///     (2026-09-27). Plain EF Core on the same store, measured on 2026-09-27: <c>SaveChanges</c>
+    ///     returns 2, the insert is written, and the stale update is not.
     /// </remarks>
     [ConditionalFact]
-    public async Task A_conflict_suppressed_on_the_server_leaves_the_rest_of_the_save_written()
+    public async Task A_suppression_configured_on_the_server_writes_the_rest_of_the_save()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(b => b.AddInterceptors(new ConflictSuppressor()));
         await SeedAsync(store);
@@ -197,23 +197,25 @@ public class ConcurrencyTokenTest
     }
 
     /// <summary>
-    ///     A conflict an interceptor on the CLIENT suppresses leaves nothing written, and the save
-    ///     reports no error.
+    ///     An application MISCONFIGURED, with the suppressing interceptor on the client: nothing of
+    ///     the save is written, and the save reports no error.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The limitation <c>website/docs/limitations.md</c> names, pinned here so that the page
-    ///         changes when the behaviour does. The server's EF has thrown and rolled the save back by
-    ///         the time the client's interceptor is asked, so the insert beside the conflict is lost,
-    ///         and EF then accepts every change in the client's change tracker.
+    ///         What <c>website/docs/limitations.md</c> tells a reader they would observe, pinned here
+    ///         for that page and so that the page changes when the behaviour does. The server's EF has
+    ///         thrown and rolled the save back by the time the client's interceptor is asked, so the
+    ///         insert beside the conflict is lost, and EF then accepts every change in the client's
+    ///         change tracker.
     ///     </para>
     ///     <para>
-    ///         The owner, 2026-09-27: documented as a limitation. Resending the rest of the save, or
-    ///         refusing the suppression, would each change it.
+    ///         The owner, 2026-09-27: documented as a limitation, with the interceptor on the server
+    ///         as the correct configuration. Resending the rest of the save, or refusing the
+    ///         suppression, would each change this test.
     ///     </para>
     /// </remarks>
     [ConditionalFact]
-    public async Task A_conflict_suppressed_on_the_client_leaves_nothing_written()
+    public async Task A_suppression_misconfigured_on_the_client_writes_nothing()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await SeedAsync(store);

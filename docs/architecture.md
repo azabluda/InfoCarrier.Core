@@ -1463,8 +1463,16 @@ one save of a stale update beside an insert:
 | the server | 2 | yes | `Unchanged` |
 | the client | 0 | **no** | `Unchanged` |
 
-`ConcurrencyTokenTest` pins the last two rows, and `SaveChangesInterceptionInfoCarrierTest` overrides
-`Intercept_to_suppress_concurrency_exception` with a design reason naming the limitation.
+**The interceptor on the server is the correct configuration, not only a workaround** (the owner,
+the same day: "the correct and recommended approach"). So the spec test runs that configuration:
+`SaveChangesInterceptionInfoCarrierTest` overrides `Intercept_to_suppress_concurrency_exception` to
+register the suppressing interceptor on the server and a passive one on the client, and asserts what
+the caller sees, which is EF's. EF's assertions on the interceptor instance (`Assert.Same(context,
+interceptor.Context)`, the entity by reference) describe one `DbContext` and are replaced by the
+entity's key. `ConcurrencyTokenTest` pins both rows by name,
+`A_suppression_configured_on_the_server_writes_the_rest_of_the_save` and
+`A_suppression_misconfigured_on_the_client_writes_nothing`, the second for the page that describes
+it. Until the owner's second answer the override asserted the client-side row, 0 rather than 1.
 
 **Two alternatives were not taken.** Resending the rest of the save after a suppression would give
 EF's answer at the cost of a second round trip, one that can meet a conflict of its own. Refusing the
