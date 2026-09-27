@@ -23,12 +23,14 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         the store wiring is stated once and <c>EnableFilters</c> is the whole difference.
 ///     </para>
 ///     <para>
-///         <b>There is no TPH member here, and its absence is the rule rather than an omission.</b>
-///         EF's <c>TPHFiltersInheritanceQuerySqliteTest</c> derives from the <em>core</em>
-///         <c>FiltersInheritanceQueryTestBase</c>, which
-///         <c>InMemory.Query.FiltersInheritanceQueryInfoCarrierTest</c> already adopts on Tier A.
-///         ADR-009 gives a base exactly one tier, so a second class over the same base would be
-///         duplication and not coverage.
+///         <b>The TPH member is here since 2026-09-27</b>, when the owner moved the Tier A bases that
+///         make sense to Tier B, so that #167's slow run can compare them with plain EF. Like EF's
+///         own <c>TPHFiltersInheritanceQuerySqliteTest</c>, it runs the <em>core</em>
+///         <c>FiltersInheritanceQueryTestBase</c> over the TPH fixture. Until then this paragraph
+///         read: "There is no TPH member here, and its absence is the rule rather than an omission.
+///         [...] the core <c>FiltersInheritanceQueryTestBase</c>, which
+///         <c>InMemory.Query.FiltersInheritanceQueryInfoCarrierTest</c> already adopts on Tier A." The
+///         rule still holds: that Tier A class is gone.
 ///     </para>
 ///     <para>
 ///         <b>No <c>UseTransaction</c> override, and that is checked rather than assumed.</b> These
@@ -44,6 +46,20 @@ public class TPTFiltersInheritanceQueryInfoCarrierTest(TPTFiltersInheritanceQuer
 /// <inheritdoc cref="TPTFiltersInheritanceQueryInfoCarrierTest" />
 public class TPCFiltersInheritanceQueryInfoCarrierTest(TPCFiltersInheritanceQueryInfoCarrierFixture fixture)
     : TPCFiltersInheritanceQueryTestBase<TPCFiltersInheritanceQueryInfoCarrierFixture>(fixture);
+
+/// <inheritdoc cref="TPTFiltersInheritanceQueryInfoCarrierTest" />
+public class TPHFiltersInheritanceQueryInfoCarrierTest(TPHFiltersInheritanceQueryInfoCarrierFixture fixture)
+    : FiltersInheritanceQueryTestBase<TPHFiltersInheritanceQueryInfoCarrierFixture>(fixture);
+
+/// <summary>
+///     The TPH inheritance fixture with global query filters on.
+/// </summary>
+public class TPHFiltersInheritanceQueryInfoCarrierFixture : TPHInheritanceQueryInfoCarrierFixture
+{
+    /// <inheritdoc />
+    public override bool EnableFilters
+        => true;
+}
 
 /// <summary>
 ///     The TPT inheritance fixture with global query filters on.

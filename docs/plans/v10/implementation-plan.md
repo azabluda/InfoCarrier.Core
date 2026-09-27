@@ -7589,6 +7589,20 @@ claims a runtime difference. The amendment proposed:
       `eng/measure.sh move-northwind move-gearsofwar`: **FAILING 0, TOTAL 29930**, 10 fewer for the
       duplicate, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with
       `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H22. TPH `FiltersInheritance` moves to Tier B, and a Tier A copy of the core inheritance
+      base goes.** On the branch `live-comparison-move-inheritance`, on top of H21.
+      `TPHFiltersInheritanceQueryInfoCarrierTest` runs the core `FiltersInheritanceQueryTestBase` over
+      the TPH fixture, as EF's `TPHFiltersInheritanceQuerySqliteTest` does, beside its TPT and TPC
+      siblings. The Tier A `InheritanceQueryInfoCarrierTest` ran the core `InheritanceQueryTestBase`,
+      and Tier B's `TPHInheritanceQueryInfoCarrierTest` derives from that base, so its 97 tests ran
+      on both tiers. Two remarks had argued the opposite, "Two bases, one tier each" and "There is no
+      TPH member here, and its absence is the rule"; both are corrected, quoting what they said.
+
+      TPH filters: 22 tests, green, and no red in the slow run: **`Passed: 22, Failed: 0, Total:
+      22`**. With the TPH inheritance class, the audit and the compliance tests: **Passed: 122, Failed:
+      0, Skipped: 4, Total: 126**. Normal run, `eng/measure.sh move-inheritance move-northwind`:
+      **FAILING 0, TOTAL 29833**, 97 fewer for the duplicate, FIXED none, BROKEN none, REASONS
+      unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

@@ -16,11 +16,14 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Not a duplicate of the Tier A inheritance test, and the distinction is ADR-009's.</b>
-///         <c>InMemory.Query.InheritanceQueryInfoCarrierTest</c> adopts the <em>core</em>
-///         <c>InheritanceQueryTestBase</c>. This is a different base: it adds the tests that only
-///         make sense when a discriminator is really written to a store, and EF hosts it on SQLite
-///         itself, as <c>InheritanceQuerySqliteTest</c>. Two bases, one tier each.
+///         <b>The only class of the core <c>InheritanceQueryTestBase</c>, since 2026-09-27.</b> This
+///         base derives from it and adds the tests that only make sense when a discriminator is
+///         really written to a store; EF hosts it on SQLite as <c>InheritanceQuerySqliteTest</c>.
+///         Until that day this paragraph read "Not a duplicate of the Tier A inheritance test [...]
+///         Two bases, one tier each", beside <c>InMemory.Query.InheritanceQueryInfoCarrierTest</c>,
+///         which ran the core base on Tier A. It was a duplicate of every core test, because a
+///         class runs every test of the bases above it. When the owner moved the Tier A bases that
+///         make sense to Tier B, that class went and this one stayed.
 ///     </para>
 ///     <para>
 ///         <b>Why it earns its place next to the other two.</b> TPT and TPC are the mappings a
