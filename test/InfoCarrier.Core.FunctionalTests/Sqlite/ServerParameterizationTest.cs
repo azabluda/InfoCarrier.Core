@@ -993,6 +993,33 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A projected collection whose elements read nothing of their row projects no column for
+    ///     them, as plain EF Core projects none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>b.Posts.Select(p =&gt; new BlogCard())</c> has no value for the server to compute, so
+    ///         its tuple held the stand-in <c>1</c>, and the store projected that constant beside the
+    ///         key EF reads to form the collection. Plain EF projects the key alone.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>MemberInit_in_projection_without_arguments</c>
+    ///         and <c>OwnsMany_correlated_projection</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projected_collection_reading_no_column_projects_none_for_it()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Cards = b.Posts.Select(p => new BlogCard()).ToList() })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

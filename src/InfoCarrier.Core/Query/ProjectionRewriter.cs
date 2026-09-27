@@ -156,16 +156,28 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         .ToDictionary(m => m.Name);
 
     /// <summary>
-    ///     The single slot a projection gets when its body reads nothing from the row: the server
-    ///     is being asked which rows exist, and for no column of them.
+    ///     What a projection carries when its body reads nothing from the row: the server is being
+    ///     asked which rows exist, and for no column of them.
     /// </summary>
     /// <remarks>
-    ///     <c>1</c> rather than anything of the entity's, because EF's own client writes
-    ///     <c>SELECT 1</c> for the same projection, and this carrier is what the server's EF
-    ///     translates. Nothing reads the slot: the reassembly rebuilds a body that never mentioned
-    ///     the row.
+    ///     <para>
+    ///         A construction with no argument, which EF binds to no column at all, as it binds the
+    ///         caller's own <c>new OrderDto()</c>. At the root EF then writes <c>SELECT 1</c>, as its
+    ///         own client does for the same projection. Nothing reads the value: the reassembly
+    ///         rebuilds a body that never mentioned the row.
+    ///     </para>
+    ///     <para>
+    ///         <b>Since 2026-09-27, found by #167's slow run.</b> Until then this was a tuple holding
+    ///         the constant <c>1</c>, and read "<c>1</c> rather than anything of the entity's, because
+    ///         EF's own client writes <c>SELECT 1</c> for the same projection". True at the root. In a
+    ///         projected collection EF writes nothing for such an element, only the key it forms the
+    ///         collection by, and the <c>1</c> was a column plain EF does not project
+    ///         (<c>MemberInit_in_projection_without_arguments</c>, <c>OwnsMany_correlated_projection</c>).
+    ///         <see cref="object" /> is on the allowlist and constructs nothing else.
+    ///     </para>
     /// </remarks>
-    private static readonly Expression RowPresence = Expression.Constant(1);
+    private static NewExpression RowPresence()
+        => Expression.New(typeof(object));
 
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
@@ -467,11 +479,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // in the suite could see it and only a comparison with EF's statement did
         // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
         //
-        // So the carrier holds one constant instead, and the reassembly below reads none of it.
-        // What the server is asked for is the row count, which is what EF asks for.
+        // So the carrier holds nothing instead, and the reassembly below reads none of it. What the
+        // server is asked for is the row count, which is what EF asks for. Until 2026-09-27 this
+        // read "the carrier holds one constant instead", a tuple of `1`: see RowPresence.
         Expression tuple = fragments.Count > 0
             ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
-            : TupleCarrier.New([RowPresence], nullable);
+            : RowPresence();
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);

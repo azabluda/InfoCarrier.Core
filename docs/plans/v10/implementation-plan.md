@@ -7494,6 +7494,29 @@ claims a runtime difference. The amendment proposed:
       owner's triage. Normal run, `eng/measure.sh tier-c final-groupby`: **FAILING 0, TOTAL 29937**,
       FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5
       warnings, 0 errors.
+- [x] **H18. A projection that reads nothing carries no column.** On the branch
+      `live-comparison-no-column-row`, on top of H17, with the owner's yes of 2026-09-27. A
+      projected collection whose element reads nothing, `b.Posts.Select(p => new BlogCard())`, was
+      carried by a tuple of `1`, and the store projected that `1` beside the keys plain EF projects.
+      That was an accepted deviation: `ServerSqlTest` pinned it, because "the carrier has to hold
+      something" and a literal "reads no column and changes no plan". The first reason no longer
+      holds, and the owner chose EF's statement.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_projected_collection_reading_no_column_projects_none_for_it`.
+      2. **The fix**: `ProjectionRewriter.RowPresence` is an empty `new object()`, which EF binds to no
+         column. `object` is on the allowlist and constructs nothing else. At the root EF writes
+         `SELECT 1` either way. The pinned promise is now
+         `A_projected_collection_reading_no_column_projects_the_keys_alone`, and it and
+         `docs/projection-split.md` §3.2 quote what they said before.
+      3. **The next slow run**: `Passed: 19400, Failed: 76, Skipped: 155, Total: 19631`, against
+         `Failed: 80`. **2 methods left the red list and none joined it**, and none of the 41 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh no-column-row tier-c`: **FAILING 0, TOTAL 29938**, FIXED none,
+      BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build
+      with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

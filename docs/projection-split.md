@@ -129,10 +129,14 @@ minimal-column payload of requirements §3.3 is not a later optimization but the
 **One projection escaped that sentence until 2026-09-22**, and it is the one that needs no value at
 all. A body reading nothing from the row yields no fragment, so the rewrite gave up and the plain
 cut shipped the maximal `ServerOk` subtree, which is the query root: `Select(b => new { F = flag })`
-read every column the entity has, where EF's own client writes `SELECT 1`. The carrier now holds a
-single constant in that case and the reassembly reads none of it, so the sentence above is true of
-a projection that needs no value too. Both answers were always right, which is why the suite could
-not see it and only a comparison with EF's statement did.
+read every column the entity has, where EF's own client writes `SELECT 1`. The carrier now holds
+nothing in that case and the reassembly reads none of it, so the sentence above is true of a
+projection that needs no value too. Both answers were always right, which is why the suite could
+not see it and only a comparison with EF's statement did. **Since 2026-09-27 the carrier is an
+empty `new object()`**, which EF binds to no column at all; until then this read "The carrier now
+holds a single constant in that case", a tuple of `1`, which a projected collection put into the
+statement beside the keys EF projects (`MemberInit_in_projection_without_arguments`, found by
+#167's slow run). At the root EF writes `SELECT 1` either way.
 
 **Amendment 2026-09-26 — a constant is a value too, when EF would translate the projection
 whole.** EF binds a projection made only of constructions whose every value translates in one mode,
@@ -141,8 +145,11 @@ and puts each value in the statement, a constant or a captured value included:
 `Select(c => new { Ten = 10 })` is `SELECT 10`, not the stand-in `1`. A projection with client code
 or a conditional in it is bound in EF's other mode, which keeps constants on the client, and so does
 this rewrite. `ProjectionRewriter.TranslatableLeaves` makes the difference; #167's slow run found
-it in nine methods. The stand-in `1` remains for a body with no value at all, `new OrderDto()`,
-where EF projects nothing and a tuple has to hold something.
+it in nine methods. A body with no value at all, `new OrderDto()`, is carried by an empty
+`new object()` since 2026-09-27, and EF projects nothing for it, as it projects nothing for the
+caller's own construction. Until then this read "The stand-in `1` remains for a body with no value
+at all, `new OrderDto()`, where EF projects nothing and a tuple has to hold something"; a carrier
+that is not a tuple does not have to.
 
 ### 3.3 Which operators are rewritten
 
