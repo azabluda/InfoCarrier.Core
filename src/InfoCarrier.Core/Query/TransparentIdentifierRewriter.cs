@@ -70,9 +70,11 @@ internal static class TransparentIdentifierRewriter
             // Handed back so `ProjectionRewriter` leaves it alone. Both passes build the same
             // thing — a server-side tuple plus a client-side rebuild — and letting the second
             // one rewrite the first one's output ships a pointless tuple-to-tuple projection and
-            // buries the `GroupBy` an operator deeper than it belongs.
-            rootRebuild = rewriter.RebuildAtRoot(rewritten, elementCarrier);
-            return rootRebuild;
+            // buries the `GroupBy` an operator deeper than it belongs. Under a terminal operator
+            // the rebuild is the operator's source, not the root.
+            Expression rebuilt = rewriter.RebuildAtRoot(rewritten, elementCarrier, out Expression reassembly);
+            rootRebuild = reassembly;
+            return rebuilt;
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException)
         {
@@ -88,6 +90,22 @@ internal static class TransparentIdentifierRewriter
 
     private static bool IsSequence(Type type)
         => type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
+
+    /// <summary>
+    ///     The root call when the query ends in <c>First</c>, <c>Single</c>, <c>Last</c> or an
+    ///     <c>...OrDefault</c> sibling, with no argument or a predicate; otherwise
+    ///     <see langword="null" />.
+    /// </summary>
+    private static MethodCallExpression? TerminalCall(Expression query)
+        => query is MethodCallExpression { Method: { IsGenericMethod: true } method } call
+            && method.DeclaringType == typeof(Queryable)
+            && method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
+                or nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault)
+                or nameof(Queryable.Last) or nameof(Queryable.LastOrDefault)
+            && (call.Arguments.Count == 1
+                || (call.Arguments.Count == 2 && call.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote }))
+                ? call
+                : null;
 
     /// <summary>
     ///     Whether the type is one the compiler generated for <c>new { }</c>, an anonymous type with
@@ -215,6 +233,28 @@ internal static class TransparentIdentifierRewriter
                 && !finder._disqualified.Contains(element)
                     ? element
                     : null;
+
+            // A query ending in `First`, `Single` or `Last` returns its element itself, so the
+            // carrier is found under the operator, since 2026-09-27 (#167's slow run). Before, the
+            // root's type WAS the carrier, the carrier was struck out for being reachable from the
+            // result, and `Select(p => new { ... }).GroupBy(...).OrderBy(...).Select(g => g.First())
+            // .First()` kept every operator on the client over every row (EF's
+            // `Ef6GroupBy.Whats_new_2021_sample_2`, 26 reads where plain EF reads 4). An
+            // `...OrDefault` operator gets the reference-typed tuple, so that "no row" reads as
+            // `null` rather than as a default tuple rebuilt into an instance.
+            if (elementCarrier is null
+                && TerminalCall(query) is { } terminal
+                && ServerBoundaryAnalyzer.ElementTypeOf(terminal.Arguments[0].Type) is var terminalElement
+                && terminalElement == query.Type
+                && finder._candidates.ContainsKey(terminalElement)
+                && !finder._disqualified.Contains(terminalElement))
+            {
+                elementCarrier = terminalElement;
+                if (terminal.Method.Name.EndsWith("OrDefault", StringComparison.Ordinal))
+                {
+                    finder._referenceTyped.Add(terminalElement);
+                }
+            }
 
             var reachable = new HashSet<Type>();
             CollectTypes(query.Type, reachable);
@@ -709,13 +749,45 @@ internal static class TransparentIdentifierRewriter
             return type;
         }
 
-        public Expression RebuildAtRoot(Expression rewritten, Type elementCarrier)
-            => Expression.Call(
-                typeof(Queryable),
-                nameof(Queryable.Select),
-                [Map(elementCarrier), elementCarrier],
-                rewritten,
-                Rebuilder(elementCarrier));
+        /// <summary>
+        ///     The rewritten query with the carrier rebuilt from its tuple at the root, and the
+        ///     rebuild itself in <paramref name="reassembly" />.
+        /// </summary>
+        /// <remarks>
+        ///     Under a terminal operator the rebuild goes between the operator and its source, and a
+        ///     predicate the operator was given becomes a <c>Where</c> below the rebuild, over the
+        ///     tuple, as EF normalizes it before translating (2026-09-27).
+        /// </remarks>
+        public Expression RebuildAtRoot(Expression rewritten, Type elementCarrier, out Expression reassembly)
+        {
+            Type row = Map(elementCarrier);
+            if (TerminalCall(rewritten) is { } terminal)
+            {
+                Expression source = terminal.Arguments.Count == 2
+                    ? Expression.Call(typeof(Queryable), nameof(Queryable.Where), [row], terminal.Arguments[0], terminal.Arguments[1])
+                    : terminal.Arguments[0];
+                reassembly = Expression.Call(
+                    typeof(Queryable), nameof(Queryable.Select), [row, elementCarrier], source, Rebuilder(elementCarrier));
+
+                // A constant name in every arm, because the trimmer follows `Expression.Call` by
+                // name only when the name is a constant. `terminal.Method.Name` cost an IL2060 and
+                // two IL2026 (eng/trim-baseline.txt, 2026-09-27).
+                Type[] element = [elementCarrier];
+                return terminal.Method.Name switch
+                {
+                    nameof(Queryable.First) => Expression.Call(typeof(Queryable), nameof(Queryable.First), element, reassembly),
+                    nameof(Queryable.FirstOrDefault) => Expression.Call(typeof(Queryable), nameof(Queryable.FirstOrDefault), element, reassembly),
+                    nameof(Queryable.Single) => Expression.Call(typeof(Queryable), nameof(Queryable.Single), element, reassembly),
+                    nameof(Queryable.SingleOrDefault) => Expression.Call(typeof(Queryable), nameof(Queryable.SingleOrDefault), element, reassembly),
+                    nameof(Queryable.Last) => Expression.Call(typeof(Queryable), nameof(Queryable.Last), element, reassembly),
+                    _ => Expression.Call(typeof(Queryable), nameof(Queryable.LastOrDefault), element, reassembly),
+                };
+            }
+
+            reassembly = Expression.Call(
+                typeof(Queryable), nameof(Queryable.Select), [row, elementCarrier], rewritten, Rebuilder(elementCarrier));
+            return reassembly;
+        }
 
         private LambdaExpression Rebuilder(Type carrier)
         {

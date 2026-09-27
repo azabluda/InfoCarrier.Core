@@ -7665,6 +7665,40 @@ claims a runtime difference. The amendment proposed:
       Normal run, `eng/measure.sh move-endtoend move-load`: **FAILING 0, TOTAL 29953**, FIXED none,
       BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+
+      **The full slow run after the moves**, Tiers B and C at H27: **`Passed: 27084, Failed: 76,
+      Skipped: 168, Total: 27328`**, 40 methods: the 33 left after H19 and the 7 the moved bases
+      brought, 5 of them in known families and the two `Ef6GroupBy` ones. The Tier A bases that stay
+      need their SQLite counterparts built one by one, and are not moved yet: `Serialization` and
+      `DataBinding` build a server model over InMemory's conventions, `WithConstructors` produces
+      keyless rows with an InMemory defining query, `MaterializationInterception`, `Interception`,
+      `MusicStore`, `FieldMapping`, `Seeding`, `MonsterFixup` and `JsonTypes` each carry an
+      InMemory arrangement of their own. `Spatial` and `SpatialQuery` need SpatiaLite, and
+      `CompiledModel` runs no statement.
+- [x] **H28. A query ending in `First` over an anonymous type it groups runs at the store.** On the
+      branch `live-comparison-terminal-carrier`, on top of H27. `TransparentIdentifierRewriter` found
+      the carrier that reaches the result only when the root is a queryable. When the query ends in
+      `First`, `Single` or `Last`, the root's type is the carrier itself, so the carrier was struck
+      out for being reachable from the result, and every operator after the projection ran on the
+      client: `Ef6GroupBy.Whats_new_2021_sample_2` read 26 rows where plain EF reads 4.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_First_over_a_grouped_anonymous_type_runs_at_the_store`.
+      2. **The fix**: the carrier is also found under a root `First`, `Single` or `Last`, or an
+         `...OrDefault` sibling, which gets the reference-typed tuple so that "no row" stays
+         `null`. `RebuildAtRoot` puts the rebuild between the operator and its source, a predicate
+         becoming a `Where` below it, and hands the rebuild back separately so `ProjectionRewriter`
+         preserves it. Each operator is named by a constant, which keeps the trim count: the first
+         version passed the operator's name and cost three diagnostics.
+      3. **The next slow run**, Tiers B and C: **`Passed: 27087, Failed: 74, Skipped: 168, Total:
+         27329`**. **1 method left the red list and none joined it**, and none of the 39 that stayed
+         red changed its verdict or its read counts. After the trim correction, `Ef6GroupBy` again
+         in slow mode: only `Whats_new_2021_sample_10` red.
+
+      Normal run, `eng/measure.sh terminal-carrier move-endtoend`: **FAILING 0, TOTAL 29954**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
