@@ -172,15 +172,25 @@ internal static class PrimitiveCoercion
     ///     rule was written for, 30 times over <c>GearsOfWarQueryTestBase</c>.
     ///     <para>
     ///         The model already answers what to do with such a value: EF gives the property a
-    ///         <c>JsonValueReaderWriter</c> precisely because it knows how to write it. Using that
-    ///         is not a guess, and it is symmetric — the same reader rebuilds it on the far side.
+    ///         <c>JsonValueReaderWriter</c> precisely because it knows how to write it. Read off the
+    ///         <em>type mapping</em>, not off <c>IReadOnlyProperty.GetJsonValueReaderWriter()</c>:
+    ///         that one answers only what the model was explicitly annotated with, which is nothing
+    ///         in the ordinary case. Using it made this rule measure byte-identical — the code ran
+    ///         and the condition was simply never true.
     ///     </para>
     ///     <para>
-    ///         Read off the <em>type mapping</em>, not off
-    ///         <c>IReadOnlyProperty.GetJsonValueReaderWriter()</c>: that one answers only what the
-    ///         model was explicitly annotated with, which is nothing in the ordinary case. Using it
-    ///         made this rule measure byte-identical — the code ran and the condition was simply
-    ///         never true.
+    ///         <b>But only a reader EF Core itself declares, since 2026-09-27.</b> Until then this
+    ///         remark said that using the mapping's reader "is symmetric — the same reader rebuilds
+    ///         it on the far side". That holds only for a reader both halves derive the same way.
+    ///         The two halves' mappings come from two providers, and a provider may declare a reader
+    ///         of its own: SQLite's spatial mapping writes a geometry with its plugin's WKT reader,
+    ///         and this client's mapping has none. The server wrote a geometry from SpatiaLite as
+    ///         JSON the client could not read, and read a saved one as JSON the client never wrote
+    ///         (<c>SpatialiteServerTest</c>), and the store's form went ahead of the registered
+    ///         geometry mapper, which the value-mapper documentation promises never happens. A
+    ///         reader from EF Core's own assembly is what both halves compute for a type the store
+    ///         converts, as SQLite does <c>IPAddress</c> to a string; removing the type mapping's
+    ///         reader altogether broke 90 of <c>GearsOfWarQueryTestBase</c>'s on exactly that.
     ///     </para>
     /// </remarks>
     private static Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? JsonForm(
@@ -189,7 +199,17 @@ internal static class PrimitiveCoercion
             ? null
             : CollectionForm(property.ClrType)
                 ?? property.GetJsonValueReaderWriter()
-                ?? property.FindTypeMapping()?.JsonValueReaderWriter;
+                ?? CoreReader(property.FindTypeMapping()?.JsonValueReaderWriter);
+
+    /// <summary>
+    ///     <paramref name="reader" /> when EF Core's own assembly declares it, which both halves of
+    ///     the wire derive alike; <see langword="null" /> for a provider's own. See <see cref="JsonForm" />.
+    /// </summary>
+    private static Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? CoreReader(
+        Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? reader)
+        => reader?.GetType().Assembly == typeof(Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter).Assembly
+            ? reader
+            : null;
 
     /// <summary>
     ///     The <em>store-independent</em> JSON form of a collection of wire primitives, or

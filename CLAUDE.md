@@ -98,6 +98,13 @@ that *translates* is the one whose green means more.
 ADR-009 and its dated amendments carry the reasoning for all four, including why PostgreSQL was the
 better store for Tier C on the evidence and was still not chosen.
 
+**Spatial stays on Tier A, and its SQL is checked on Windows only** (the owner, 2026-09-27).
+`Sqlite/SpatialiteServerTest` runs against SQLite with SpatiaLite under `[SpatialiteRequired]`, met on
+Windows, where the `mod_spatialite` package brings the library, and never elsewhere: Ubuntu's
+`libsqlite3-mod-spatialite`, loaded into the SQLite EF's package bundles, crashed the test host (branch
+`ci-probe-spatialite`). **So CI skips those tests, and a change that touches spatial values or spatial
+queries is not verified until it has run on Windows.**
+
 **The tell that you are on the wrong tier: if adopting a base means writing a workaround for a
 store capability the base assumes, check the tier before writing the workaround.** A base adopted
 on the wrong tier produces failures that describe the *backing store* rather than this provider.
@@ -464,7 +471,10 @@ the backing store, so `FindTypeMapping()` is not one answer but two: a `DateTime
 by SQLite's JSON form (`2023-01-01 12:30:00`) and read by EF's core one (ISO-8601), 106 failures in
 both directions. Scalars are safe because `PrimitiveCoercion` short-circuits the wire primitives
 before any mapping is consulted; anything else must be derived from the **CLR type alone**, through a
-service no provider replaces.
+service no provider replaces. **`PrimitiveCoercion.JsonForm` was the next instance, found 2026-09-27**:
+it took a property's JSON reader from the type mapping, SQLite's spatial plugin declares one of its own
+and this client's mapping has none, so a geometry from SpatiaLite crossed in neither direction. It now
+takes only a reader EF Core's own assembly declares.
 
 **A fact two components read independently can disagree with itself, and the disagreement is silent
 when one component's answer only widens what the other is allowed to do.** The live instance: what
