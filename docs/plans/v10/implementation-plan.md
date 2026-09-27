@@ -7165,11 +7165,10 @@ claims a runtime difference. The amendment proposed:
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
 
-**Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
-only. The two parked SQL gaps and the parameter-numbering family wait for the triage, and each then
-gets a red promise, a fix and a pull request of its own.
-
-**No code of this phase lands on `main` until the owner has seen the mechanism in real action**
-(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). H0/H1 is
-PR #171 and stays open. H3 is built on a branch on top of it, and the stack goes to `main` only when
-the owner accepts it. H2 is on `main` because it is a decision and not code.
+**Five pull requests and one direct push**: H2 on `main`, because it is docs only; four for the
+stack, and one for H4. The owner saw the slow run work and chose the four on 2026-09-28: H0/H1 with
+H3 (#171), H5 to H19, H20 to H30, and H31 to H33a, each merged with `--no-ff` so that every step
+keeps its commit. Until then this read "Three pull requests and one direct push: H0/H1, H3 and H4",
+and "No code of this phase lands on `main` until the owner has seen the mechanism in real action"
+(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). The two
+parked SQL gaps and the parameter-numbering family wait for the triage, which starts at H5.
