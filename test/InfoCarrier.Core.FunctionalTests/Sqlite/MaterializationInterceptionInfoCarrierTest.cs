@@ -2,14 +2,19 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory;
+// Internal EF Core API usage. This provider is built on EF Core internals by design
+// (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
+#pragma warning disable EF1001
+
+namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     <c>MaterializationInterceptionTestBase</c> on ADR-009 Tier A.
+///     <c>MaterializationInterceptionTestBase</c> on ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
 ///     Adopted for its own sake rather than for the count. This provider does <em>not</em>
@@ -17,19 +22,35 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 ///     from the wire — so <c>IMaterializationInterceptor</c> never runs on the client, which is the
 ///     root of the `Nullable_client_side_concurrency_token_can_be_used` singleton the residual has
 ///     carried since A31. This base is where that shows up as a family rather than as one test.
+///     <para>
+///         <b>Moved from Tier A on 2026-09-27, at the owner's request</b>, so that #167's slow run
+///         can compare it with plain EF; Tier A's store runs no statement. The owned collection is
+///         mapped to JSON, as in EF's own <c>MaterializationInterceptionSqliteTest</c>, and the
+///         options no longer ignore InMemory's <c>TransactionIgnoredWarning</c>.
+///     </para>
 /// </remarks>
 public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture)
     : MaterializationInterceptionTestBase<MaterializationInterceptionInfoCarrierTest.InfoCarrierLibraryContext>(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(InMemoryInfoCarrierTier.Instance);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: projecting the owned collection needs <c>APPLY</c>, which SQLite does not have.
+    ///     It answered on Tier A, where InMemory runs the projection.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/MaterializationInterceptionSqliteTest.cs", 11, 16,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Intercept_query_materialization_with_owned_types_projecting_collection(bool async, bool usePooling)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Intercept_query_materialization_with_owned_types_projecting_collection(async, usePooling))).Message);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
         => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-        => base.AddOptions(builder).ConfigureWarnings(c => c.Ignore(InMemoryEventId.TransactionIgnoredWarning));
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(
@@ -66,8 +87,8 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
     }
 
     /// <summary>
-    ///     EF's own <c>InMemoryLibraryContext</c>: the backing store is InMemory, so the owned
-    ///     collection has to be mapped the way that provider maps one.
+    ///     EF's own <c>SqliteLibraryContext</c>: the backing store is SQLite, so the owned
+    ///     collection is mapped the way that provider's test maps one.
     /// </summary>
     public class InfoCarrierLibraryContext(DbContextOptions options) : LibraryContext(options)
     {
@@ -75,7 +96,7 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<TestEntity30244>().OwnsMany(e => e.Settings);
+            modelBuilder.Entity<TestEntity30244>().OwnsMany(e => e.Settings, b => b.ToJson());
         }
     }
 }

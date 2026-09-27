@@ -7733,6 +7733,47 @@ claims a runtime difference. The amendment proposed:
       none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
       build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors.
+- [x] **H30. Five more Tier A bases move to Tier B, and three stay, measured.** On the branch
+      `live-comparison-move-app`, on top of H29, at the owner's request of 2026-09-27 to move the
+      rest that make sense. `MusicStore`, `FieldMapping`, `WithConstructors`, `Serialization` with
+      `DataBinding`, and `QueryExpressionInterception` (two classes) with
+      `MaterializationInterception` kept their counts: 18, 167, 41, 6, 58, 8, 8 and 28. Each follows
+      EF's SQLite class. Their transactions are real now, and `FieldMapping` and `WithConstructors`
+      enlist the second context through the server's token. `WithConstructors` reads its keyless
+      rows through `ToSqlQuery`, and `MaterializationInterception` maps the owned collection to
+      JSON. The F1 fixture derives from `OptimisticConcurrencyInfoCarrierTest`'s with a store of its
+      own, because that one recreates its store before every test and the classes run in parallel.
+      First run: 44 red. The four of
+      `Intercept_query_materialization_with_owned_types_projecting_collection` take EF's own `APPLY`
+      override with its line range; the other 40 are the three bases below. Slow run of the moved
+      classes, first: 6 methods red, every one the plain-EF half failing with "No database provider
+      has been configured", because the interception fixture built the service provider for
+      injected interceptors with this provider's services by name. It now asks the store factory,
+      which gives the plain-EF half SQLite's. Then: **`Passed: 334, Failed: 0, Total: 334`**.
+
+      **Three bases stay on Tier A, each measured on Tier B first:**
+      1. `SaveChangesInterception`, two classes: 32 of 112 red, because SQLite checks concurrency
+         and InMemory does not. A client's interceptor never sees `ThrowingConcurrencyException`,
+         which EF raises in the update pipeline, here the server's, so it cannot suppress it. And
+         the caller catches an exception the client throws with the server's inside, while the
+         interceptor sees another. What the save protocol should carry is a question for the owner.
+      2. `MonsterFixup`: 6 of 12 red. The base chooses a query SQLite can translate by the client's
+         `Database.ProviderName` (EF's issue #16428), the client names this provider, and SQLite is
+         sent the one it cannot translate. An assumption about the topology in EF's test, with no
+         upstream test to reference for an override.
+      3. `Seeding`: 2 of 4 red, `no such table: Seed`. The base cleans the store and calls
+         `EnsureCreated` on the client, which creates nothing by design. InMemory's clean recreates
+         the store itself, and SQLite's drops its tables.
+
+      `JsonTypes`, `CompiledModel`, `Spatial` and `SpatialQuery` stay for the reasons recorded
+      before: the relational `JsonTypes` and `CompiledModel` bases were adopted and reverted on
+      Tier B (104 of 576 and 13 of 14 red), both wanting the backing provider's store types on the
+      client's model, and the spatial bases were measured worse on SQLite (C52). Each of the three
+      classes above now says on itself why it stays.
+
+      Normal run, `eng/measure.sh move-app each-carrier`: **FAILING 0, TOTAL 29955**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build of the test project with
+      `--no-incremental`: 0 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
