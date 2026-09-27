@@ -7626,6 +7626,25 @@ claims a runtime difference. The amendment proposed:
       run, `eng/measure.sh move-include move-manytomany`: **FAILING 0, TOTAL 29909**, FIXED none,
       BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+- [x] **H25. The last five Tier A query bases move to Tier B.** On the branch
+      `live-comparison-move-query-rest`, on top of H24. `Ef6GroupBy`, `IncludeOneToOne`,
+      `InheritanceRelationshipsQuery`, `NullKeys` and `QueryFilterFuncletization` had no override on
+      Tier A. Base and fixture follow EF's SQLite classes: `InheritanceRelationshipsQuery` runs the
+      relational base and gains its 44 tests (94 to 138), `QueryFilterFuncletization` takes the
+      relational fixture, and the query fixtures implement `ITestSqlLoggerFactory`, as the
+      relational compliance test requires on Tier B. The others kept their counts. EF's SQLite
+      overrides for these five only add `AssertSql`, and nothing was red. `SpatialQuery` stays on
+      Tier A: on SQLite it needs SpatiaLite, which this repository does not reference.
+
+      Slow run of the five: **`Passed: 289, Failed: 4, Total: 293`**, 2 methods, a family Tier A
+      could not show. `Ef6GroupBy.Whats_new_2021_sample_2` groups a projection into an anonymous
+      type, orders the groups and takes the first element of the first: this client runs all of it
+      on the client over every person, 26 reads where plain EF reads 4. `Whats_new_2021_sample_10`
+      groups a join by an anonymous key and projects each group as a collection; this client ships
+      the join and groups here, where plain EF writes the grouping. Both stay red for a fix. With the
+      audit and the compliance tests: **Passed: 297, Failed: 0, Total: 297**. Normal run,
+      `eng/measure.sh move-query-rest move-include`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
