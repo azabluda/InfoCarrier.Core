@@ -206,13 +206,23 @@ public class InfoCarrierDatabase(
         => throw new NotImplementedException("Precompiled queries are not supported by InfoCarrier.");
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     The same round trip as <see cref="SaveChangesAsync" />, waited for. Only the concurrency
+    ///     event is raised through its synchronous half, as EF raises it for a synchronous save.
+    ///     Until 2026-09-27 this called <see cref="SaveChangesAsync" />, and a synchronous save gave
+    ///     an interceptor <c>ThrowingConcurrencyExceptionAsync</c> (#167's slow run, once
+    ///     <c>SaveChangesInterceptionTestBase</c> reached a store that checks concurrency).
+    /// </remarks>
     public virtual int SaveChanges(IList<IUpdateEntry> entries)
-        => SaveChangesAsync(entries).GetAwaiter().GetResult();
+        => SaveAsync(entries, async: false, default).GetAwaiter().GetResult();
 
     /// <inheritdoc />
-    public virtual async Task<int> SaveChangesAsync(
+    public virtual Task<int> SaveChangesAsync(
         IList<IUpdateEntry> entries,
         CancellationToken cancellationToken = default)
+        => SaveAsync(entries, async: true, cancellationToken);
+
+    private async Task<int> SaveAsync(IList<IUpdateEntry> entries, bool async, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
@@ -251,9 +261,24 @@ public class InfoCarrierDatabase(
             IReadOnlyList<IUpdateEntry> conflicting =
                 FailedByOrdinal(exception, sent) ?? Translate(exception.Entries, sent);
 
-            if ((await _updateLogger.OptimisticConcurrencyExceptionAsync(
-                    _currentContext.Context, conflicting, exception, null, cancellationToken)
-                .ConfigureAwait(false)).IsSuppressed)
+            // Re-raised rather than rethrown, because `Entries` is the part callers use and the
+            // server's entries are useless here: they belong to the server's context, which is
+            // disposed with the request scope. Rethrowing gave "cannot access a disposed context
+            // instance" the moment `OptimisticConcurrencyTestBase`'s resolver touched
+            // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
+            //
+            // Built before the event and handed to it, because EF's event carries the exception
+            // the save then throws, and an interceptor may compare the two. Until 2026-09-27 the
+            // event carried the server's, the inner one here (#167's slow run).
+            var raised = new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
+
+            InterceptionResult logged = async
+                ? await _updateLogger.OptimisticConcurrencyExceptionAsync(
+                        _currentContext.Context, conflicting, raised, null, cancellationToken)
+                    .ConfigureAwait(false)
+                : _updateLogger.OptimisticConcurrencyException(_currentContext.Context, conflicting, raised, null);
+
+            if (logged.IsSuppressed)
             {
                 // An interceptor asked us not to throw. EF's own providers answer that by
                 // completing the write anyway; there is nothing to complete here, because the
@@ -261,12 +286,7 @@ public class InfoCarrierDatabase(
                 return 0;
             }
 
-            // Re-raised rather than rethrown, because `Entries` is the part callers use and the
-            // server's entries are useless here: they belong to the server's context, which is
-            // disposed with the request scope. Rethrowing gave "cannot access a disposed context
-            // instance" the moment `OptimisticConcurrencyTestBase`'s resolver touched
-            // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
-            throw new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
+            throw raised;
         }
         catch (DbUpdateException exception)
         {

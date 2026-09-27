@@ -424,6 +424,13 @@ public static class Decisions
 
     /// <summary>The one unsupported scenario, a property-bag complex collection holding a primitive collection.</summary>
     public const string NotSupported = "not-supported";
+
+    /// <summary>
+    ///     A concurrency exception suppressed by an interceptor on the client: the server has rolled
+    ///     the save back, so nothing is written and <c>SaveChanges</c> reports 0 (the owner,
+    ///     2026-09-27: documented as a limitation).
+    /// </summary>
+    public const string ClientSuppressedConcurrency = "suppressing-a-concurrency-exception-in-an-interceptor-on-the-client";
 }
 
 /// <summary>

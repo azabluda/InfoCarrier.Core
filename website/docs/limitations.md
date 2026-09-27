@@ -76,6 +76,30 @@ dictionary.
 The cause is a defect in EF Core's own materializer, reached because this provider rebuilds entities
 on the server from the values sent over the wire.
 
+### Suppressing a concurrency exception in an interceptor on the client
+
+Affects you if an `ISaveChangesInterceptor` registered on the client returns
+`InterceptionResult.Suppress()` from `ThrowingConcurrencyException` or
+`ThrowingConcurrencyExceptionAsync`.
+
+With EF Core, a suppression skips the conflicting row and the rest of the save goes ahead. Here the
+server finds the conflict and rolls the save back before the client's interceptor runs.
+`SaveChanges` returns 0 and does not throw. **Nothing in that save is written, and the change
+tracker marks every change in it as saved.**
+
+Register the interceptor on the server instead. The server runs EF Core's own save, so a
+suppression there behaves as it does with EF Core: the other changes are written, and the client's
+`SaveChanges` returns the count EF Core would.
+
+```csharp
+// On the server
+builder.Services.AddDbContext<ShopContext>(o => o
+    .UseSqlServer(connectionString)
+    .AddInterceptors(new IgnoreConcurrencyConflicts()));
+```
+
+An interceptor on the client still sees the exception, so it can log it and let it throw.
+
 ## Differences that are not limitations
 
 These behave correctly, and differ from another EF Core provider only in ways you would notice

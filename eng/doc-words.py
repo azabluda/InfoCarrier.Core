@@ -93,7 +93,10 @@ BUDGET = {
     # both halves. Deleting the first is what a shrinking page looks like; the second cannot just
     # be deleted, because it is still true unregistered, so the page has to say what makes the
     # difference. A budget yields to a missing fact, which is that one.
-    "website/docs/limitations.md": 800,
+    # RAISED TO 950 ON 2026-09-27 for a second unsupported scenario: suppressing a concurrency
+    # exception in an interceptor on the client writes nothing and reports the save as done. The
+    # page has to say where the interceptor goes instead, and that costs the example.
+    "website/docs/limitations.md": 950,
 
     # Added to the 700 tier 2026-08-24. Same tier rule as the four above: it covers a whole
     # subject rather than one task (reads, writes, resolving the tenant on the server, and what
