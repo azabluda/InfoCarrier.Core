@@ -7615,6 +7615,17 @@ claims a runtime difference. The amendment proposed:
       run, `eng/measure.sh move-manytomany move-inheritance`: **FAILING 0, TOTAL 29909**, FIXED none,
       BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
       errors.
+- [x] **H24. The three Northwind include variants move to Tier B.** On the branch
+      `live-comparison-move-include`, on top of H23. `EFPropertyInclude`, `IncludeNoTracking` and
+      `StringInclude` each carried one override on Tier A, EF's InMemory `RightJoin` refusal, whose
+      remark said it "must be deleted, not carried over" once the base reached a relational store.
+      It was. First run: 14 methods red, 5, 5 and 4, exactly the overrides EF's three SQLite classes
+      carry: `APPLY` and `LastUsedWithoutOrderBy`, adopted with their line ranges. The classes kept
+      their counts: 238, 236 and 238. Slow run of the three: **`Passed: 712, Failed: 0, Total:
+      712`**. With the audit and the compliance tests: **Passed: 716, Failed: 0, Total: 716**. Normal
+      run, `eng/measure.sh move-include move-manytomany`: **FAILING 0, TOTAL 29909**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
