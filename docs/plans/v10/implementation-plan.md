@@ -7547,6 +7547,11 @@ claims a runtime difference. The amendment proposed:
       Skipped: 1, Total: 110`**. `OverrideAuditTest` **Passed: 1, Failed: 0, Total: 1**. Normal run,
       `eng/measure.sh other-reason no-column-row`: **FAILING 0, TOTAL 29938**, FIXED none, BROKEN
       none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H19a. ADR-014 records what H6, H17 and H19 changed.** Merged with `main` for the pull
+      request of H5 to H19, the stack met H2's amendment for the first time, and three of its
+      sentences had been reversed on the branches with the owner's yes: triage deferred (H6), Tier B
+      only (H17), three flags only (H19). A dated amendment of 2026-09-28 records the three, and
+      `CLAUDE.md` names `Other` and drops "its triage is deferred". Docs only.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
