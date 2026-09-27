@@ -7567,6 +7567,28 @@ claims a runtime difference. The amendment proposed:
       refused by plain EF for `APPLY`). Normal run, `eng/measure.sh move-gearsofwar other-reason`:
       **FAILING 0, TOTAL 29940**, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release
       build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H21. Six Northwind query bases move to Tier B, and a seventh copy goes.** On the branch
+      `live-comparison-move-northwind`, on top of H20. `AsNoTracking`, `AsTracking`,
+      `ChangeTracking`, `CompiledQuery`, `QueryFilters` and `QueryTagging` had no override on Tier A,
+      and EF's SQLite classes have none that fails here either. The core `NorthwindDbFunctionsQuery`
+      class did not move: Tier B's relational class derives from the same base, so its 10 tests
+      already ran there and the Tier A class ran them a second time. The one harness change:
+      `NorthwindQueryInfoCarrierSqliteFixture` registers the two `NorthwindGroupByQueryTestBase` key
+      types only for the no-op customizer, because the base can be closed over no other and the
+      query-filters fixture failed every test building itself. The six classes kept their counts:
+      24, 6, 17, 32, 33 and 9.
+
+      Slow run of the six: 6 red methods, a family Tier A could never show. The five
+      `Query_with_*` tests of the compiled-query base and `QueryFilters.Compiled_query` take the
+      first row of a compiled query's `IEnumerable` with `First()`, which bounds nothing. Plain EF
+      streams and stops after one `Read()`; this client's server reads to the end. Same statement,
+      same row. Each gets an `[InfoCarrierDesign(10)]` reason flagged `SqlDiffers`: the client
+      evaluates what follows over rows the server has read to the end, and streaming is out of scope
+      for v10. After that: **`Passed: 121, Failed: 0, Total: 121`** in the slow run, and **Passed: 122,
+      Failed: 0, Total: 122** in the normal run with `OverrideAuditTest`. Normal run,
+      `eng/measure.sh move-northwind move-gearsofwar`: **FAILING 0, TOTAL 29930**, 10 fewer for the
+      duplicate, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with
+      `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

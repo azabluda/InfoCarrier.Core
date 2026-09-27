@@ -51,21 +51,37 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
             arbitrarySqlExecution: true,
-            allowedTypes:
+            allowedTypes: [.. AdHocProjectionTypes, .. GroupByKeyTypes]);
+
+    /// <summary>
+    ///     The two grouping keys <c>NorthwindGroupByQueryTestBase</c> declares, closed over this
+    ///     fixture, or none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A grouping key rather than a projection type, and the same argument: without
+    ///         <c>NoGroupByWrapper</c>, <c>Odata_groupby_empty_key</c> keeps its <c>GroupBy</c> on
+    ///         this client and the server sends every order, and without <c>RandomClass</c>,
+    ///         <c>Final_GroupBy_nominal_type_entity</c> keeps it here and is refused, where EF's own
+    ///         providers answer (2026-09-22). See <c>UpstreamKeyTypes</c>, which resolves them and
+    ///         fails loudly.
+    ///     </para>
+    ///     <para>
+    ///         <b>None for another customizer, since 2026-09-27.</b> The base constrains its fixture
+    ///         to the one with <see cref="NoopModelCustomizer" />, so the key types cannot even be
+    ///         closed over another, and a fixture with another customizer runs none of its tests.
+    ///         <c>NorthwindQueryFiltersCustomizer</c> reached Tier B that day, when its base moved
+    ///         from Tier A, and every one of its tests failed building the fixture.
+    ///     </para>
+    /// </remarks>
+    private static Type[] GroupByKeyTypes
+        => typeof(TModelCustomizer) == typeof(NoopModelCustomizer)
+            ?
             [
-                .. AdHocProjectionTypes,
-
-                // A grouping key rather than a projection type, and the same argument: without it
-                // `Odata_groupby_empty_key` keeps its `GroupBy` on this client and the server sends
-                // every order. See `UpstreamKeyTypes`, which resolves it and fails loudly.
-                UpstreamKeyTypes.NoGroupByWrapper(
-                    typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
-
-                // The same, for `Final_GroupBy_nominal_type_entity`: without it the `GroupBy` stays
-                // here and is refused, where EF's own providers answer (2026-09-22).
-                UpstreamKeyTypes.RandomClass(
-                    typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
-            ]);
+                UpstreamKeyTypes.NoGroupByWrapper(typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
+                UpstreamKeyTypes.RandomClass(typeof(NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>)),
+            ]
+            : [];
 
     /// <summary>
     ///     The projection types <c>SqlQueryTestBase</c> names, declared as an application must
