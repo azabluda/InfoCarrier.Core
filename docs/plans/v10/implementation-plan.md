@@ -7140,7 +7140,10 @@ claims a runtime difference. The amendment proposed:
       which proves that `After` closes it; and `SqlNormalizerTest` pins the known limit that two
       derived-table columns swapped in two places normalize equal, because columns are numbered in
       the order they are first read. Measure a normal run before and after.
-- [ ] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
+- [x] **H2. The ADR-014 amendment above**, as a dated edit in `docs/decisions.md`. Docs only.
+      [Amendment 2026-09-26](../../decisions.md#amendment-2026-09-26-the-spike-ran-and-decision-3-reads-only-the-reasons-that-claim-a-difference).
+      It records two corrections the spike measured as well: the comparison runs when the result
+      arrives, because `After` cannot know the outcome, and a slow run writes no file.
 - [x] **H3. The plain-EF client and the slow mode.**
       Slow run of Tier B (`INFOCARRIER_LIVE_COMPARE=1`): **Passed: 19085, Failed: 367, Skipped:
       155, Total: 19607** in 10 m 10 s, every failure a comparison red, in 187 methods: 157 whose
@@ -7544,6 +7547,11 @@ claims a runtime difference. The amendment proposed:
       Skipped: 1, Total: 110`**. `OverrideAuditTest` **Passed: 1, Failed: 0, Total: 1**. Normal run,
       `eng/measure.sh other-reason no-column-row`: **FAILING 0, TOTAL 29938**, FIXED none, BROKEN
       none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H19a. ADR-014 records what H6, H17 and H19 changed.** Merged with `main` for the pull
+      request of H5 to H19, the stack met H2's amendment for the first time, and three of its
+      sentences had been reversed on the branches with the owner's yes: triage deferred (H6), Tier B
+      only (H17), three flags only (H19). A dated amendment of 2026-09-28 records the three, and
+      `CLAUDE.md` names `Other` and drops "its triage is deferred". Docs only.
 - [x] **H20. `GearsOfWarQuery` (TPH) moves from Tier A to Tier B.** On the branch
       `live-comparison-move-gearsofwar`, on top of H19. **The owner's decision of 2026-09-27: move
       the Tier A bases that make sense to Tier B**, because the slow run cannot mine a store that runs
@@ -7778,8 +7786,14 @@ claims a runtime difference. The amendment proposed:
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
 
-**Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
-only. Until H6 this went on: "The two parked SQL gaps and the parameter-numbering family wait for the
-triage, and each then gets a red promise, a fix and a pull request of its own." The triage is under
-way: each family is a step from H5 on, with its red promise, its fix and one commit, on a branch
-stacked on the step before, and no pull request is opened for any of them until the owner says so.
+**Five pull requests and one direct push**: H2 on `main`, because it is docs only; four for the
+stack, and one for H4. The owner saw the slow run work and chose the four on 2026-09-28: H0/H1 with
+H3 (#171), H5 to H19, H20 to H30, and H31 to H33a, each merged with `--no-ff` so that every step
+keeps its commit. Until then this read "Three pull requests and one direct push: H0/H1, H3 and H4",
+and "No code of this phase lands on `main` until the owner has seen the mechanism in real action"
+(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area").
+
+The triage is a step per family from H5 on, with its red promise, its fix and one commit, on a
+branch stacked on the step before. Until H6 this read: "The two parked SQL gaps and the
+parameter-numbering family wait for the triage, and each then gets a red promise, a fix and a pull
+request of its own."
