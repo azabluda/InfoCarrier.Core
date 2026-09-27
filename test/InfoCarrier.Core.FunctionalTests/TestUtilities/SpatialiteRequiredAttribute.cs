@@ -15,8 +15,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         EF's own <c>SpatialiteRequiredAttribute</c>, with one more condition. EF's tries the
 ///         load anywhere and skips when it fails. On Linux that is not safe: the package has no
 ///         Linux library, and Ubuntu's <c>libsqlite3-mod-spatialite</c>, loaded into the SQLite
-///         EF's package bundles, crashed the test host outright on 2026-09-27 (branch
-///         <c>ci-probe-spatialite</c>, GitHub run 36348293565). So off Windows nothing is loaded.
+///         EF's package bundles, crashed the test host outright on 2026-09-27 (GitHub run
+///         36348293565). So off Windows nothing is loaded.
+///     </para>
+///     <para>
+///         The Windows check is for a machine that HAS that package. CI's runner has none, and
+///         without the check it skipped these tests cleanly too (run 36351274149, 2026-09-27): the
+///         load fails and <c>TryLoad</c> returns false. Such a skip is printed by xUnit and recorded
+///         in no TRX file, so CI's totals leave these tests out.
 ///     </para>
 ///     <para>
 ///         The owner, 2026-09-27: spatial stays on ADR-009 Tier A, and the spatial tests that need a

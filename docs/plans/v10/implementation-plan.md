@@ -7852,7 +7852,7 @@ claims a runtime difference. The amendment proposed:
          unregistered one is pinned. `website/docs/configuration/value-mappers.md` says so.
 
       **Spatial stays on Tier A** (the owner, 2026-09-27), because the trial on the branch
-      `ci-probe-spatialite` showed that Ubuntu's `libsqlite3-mod-spatialite` installs on
+      `ci-probe-spatialite` (deleted, H33a) showed that Ubuntu's `libsqlite3-mod-spatialite` installs on
       `ubuntu-latest` but crashes the test host when loaded into the SQLite EF's package bundles:
       GitHub runs 36347916260 and 36348293565, the second loading SpatiaLite and nothing else. The
       four tests are `Sqlite/SpatialiteServerTest`, under `[SpatialiteRequired]`, which is met on
@@ -7871,6 +7871,18 @@ claims a runtime difference. The amendment proposed:
       106 <= 106. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true`
       Release build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors. Docs: 0
       over budget, 0 broken links.
+- [x] **H33a. The SpatiaLite condition cites runs, and its Windows check is measured.** On the
+      branch `live-comparison-spatial`, on top of H33. The owner had the trial branches
+      `ci-probe-spatialite` and `ci-probe-spatial-skip` deleted on 2026-09-27, so CLAUDE.md and
+      `SpatialiteRequiredAttribute` cite run 36348293565 instead; GitHub keeps a deleted branch's
+      runs. The owner then asked for H33 to run on Ubuntu without the Windows check: run
+      36351274149 passed every job, with the spec project at **Passed: 29489, Failed: 0, Skipped:
+      234, Total: 29723**, the figures of the run with the check (36350307095). The runner has no
+      SpatiaLite, so the load fails and `SpatialiteLoader.TryLoad` returns false. **The check
+      therefore guards only a machine with Ubuntu's package installed**, where the load crashes the
+      host, and it stays until the owner says otherwise. Seen on the way: xUnit printed the four skips' reason, and the TRX
+      records none of the four, as passed or as skipped, in either run, which is why CI's total is
+      four below the Windows one. The attribute's remark says both. Comments only, so no run.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

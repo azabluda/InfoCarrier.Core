@@ -101,8 +101,8 @@ better store for Tier C on the evidence and was still not chosen.
 **Spatial stays on Tier A, and its SQL is checked on Windows only** (the owner, 2026-09-27).
 `Sqlite/SpatialiteServerTest` runs against SQLite with SpatiaLite under `[SpatialiteRequired]`, met on
 Windows, where the `mod_spatialite` package brings the library, and never elsewhere: Ubuntu's
-`libsqlite3-mod-spatialite`, loaded into the SQLite EF's package bundles, crashed the test host (branch
-`ci-probe-spatialite`). **So CI skips those tests, and a change that touches spatial values or spatial
+`libsqlite3-mod-spatialite`, loaded into the SQLite EF's package bundles, crashed the test host (GitHub
+run 36348293565). **So CI skips those tests, and a change that touches spatial values or spatial
 queries is not verified until it has run on Windows.**
 
 **The tell that you are on the wrong tier: if adopting a base means writing a workaround for a
