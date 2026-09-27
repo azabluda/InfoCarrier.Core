@@ -70,17 +70,15 @@ public sealed class ServerSqlRecorder
 ///     <para>
 ///         <b>An interceptor and not a second <c>LogTo</c>, and that cost a whole comparison run to
 ///         learn (2026-09-16).</b> <c>DbContextOptionsBuilder.LogTo</c> keeps ONE sink: calling it
-///         again REPLACES the first. The recorder was wired with one call and
-///         <see cref="ServerSqlLog" /> with another, so switching the log on emptied the recorder,
+///         again REPLACES the first. The recorder was wired with one call and the server SQL log
+///         with another, so switching the log on emptied the recorder,
 ///         and every test that asserts the server's SQL failed with "the server ran 0 statements"
 ///         while passing in an ordinary run.
 ///     </para>
 ///     <para>
-///         <c>AddInterceptors</c> appends, so this and the log coexist. This paragraph went on "and
-///         the log keeps the formatted text <c>eng/ef-sql-diff.py</c> reads" until 2026-09-24,
-///         because the log stayed on <c>LogTo</c> for that text. It was the same trap the other way
-///         round: a fixture's own <c>LogTo</c> displaced the log. The log is an interceptor too
-///         now, <see cref="ServerSqlLogInterceptor" />, and writes the same text.
+///         <c>AddInterceptors</c> appends, so no fixture's own <c>LogTo</c> displaces this. The
+///         log fell into the same trap the other way round until it became an interceptor too, on
+///         2026-09-24, and it was deleted on 2026-09-28 with the script that read it (#167, H4).
 ///     </para>
 ///     <para>
 ///         <b>It also files each command under <see cref="CurrentTest" /></b>, with its outcome, for
@@ -219,7 +217,7 @@ public sealed class ServerSqlRecordingInterceptor(ServerSqlRecorder recorder) : 
 ///         aliases. A parameter crosses inside <c>ParameterBox&lt;T&gt;</c>, so EF names it after the
 ///         box's property, and the projection split names a column <c>Item1</c> where the caller's
 ///         projection called it <c>Id</c>. Literals, structure and the order of the statements are
-///         compared. <c>eng/ef-sql-diff.py</c> reads EF's text the same way.
+///         compared.
 ///     </para>
 ///     <para>
 ///         <b>EF's parameter preamble is dropped from the expected text.</b> EF prints the parameter

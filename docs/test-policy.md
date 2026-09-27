@@ -411,11 +411,12 @@ the concrete class. One reason here is declared on a base — the `[StoreLimit]`
 `BeforeAfterTest` attribute writing each test's name into `server-sql.log`, and a deterministic
 script compared every test's statements with the `AssertSql` text of the same test in
 `EFCore.Sqlite.FunctionalTests` at `v10.0.1`: whitespace, parameter names, aliases and alias
-qualifiers ignored, literals and structure kept. **Both are committed since 2026-09-16** —
-`ServerSqlTestMarkerAttribute` beside `ServerSqlLog`, and `eng/ef-sql-diff.py` — because they found
-two lost updates in one run, and because #111's own progress is what they measure.
-`eng/ef-sql-compare.sh` runs the whole of it in one command since 2026-09-16, and the two lines this
-paragraph used to print by hand are inside it.
+qualifiers ignored, literals and structure kept. **Both were committed on 2026-09-16** —
+`ServerSqlTestMarkerAttribute` beside `ServerSqlLog`, and `eng/ef-sql-diff.py`, run by
+`eng/ef-sql-compare.sh` — because they found two lost updates in one run, and because #111's own
+progress was what they measured. **All of it was deleted on 2026-09-28** (#167, H4): the slow run
+compares every test with plain EF Core instead (ADR-014), and this section and the next are the
+dated record of what the text comparison found.
 
 791 tests were paired, and 758 produced EF's statements exactly. **No statement had a literal where
 EF has a parameter.** A first, shape-only pass over the
@@ -517,27 +518,33 @@ value and no JSON collection, which half the promises are about.
 which runs the same query over the wire and directly against the server and compares the two. That
 one needs no text at all and never churns.
 
-### The investigation is `eng/ef-sql-compare.sh`
+### The investigation was `eng/ef-sql-compare.sh`, and is now the slow run
 
 EF's specification suite is thousands of little users of this provider. They report a wrong answer
-loudly and say nothing about a full table crossing the wire. The comparison makes that silent half
-visible: one command, no checkout, nothing left behind. It reads the EF version from
-`Directory.Packages.props`, fetches that tag if `subrepos/efcore` is not already at it, runs Tier B
-serially with the server SQL log on, and prints the disagreements grouped by kind.
+loudly and say nothing about a full table crossing the wire. **Since 2026-09-28 the slow run makes
+that silent half visible** (ADR-014): `INFOCARRIER_LIVE_COMPARE=1` runs each test with plain EF
+Core and through InfoCarrier, and a test whose statements or outcome differ is red unless an
+InfoCarrier reason says so. Until then `eng/ef-sql-compare.sh` did it against EF's `AssertSql`
+text: it read the EF version from `Directory.Packages.props`, fetched that tag, ran Tier B serially
+with the server SQL log on, and printed the disagreements grouped by kind.
 
-**It is not a gate and not a quality claim.** Each difference it reports is read once and ends as:
+**It is not a gate and not a quality claim.** Each difference the script reported was read once
+and ended as:
 
 - **our defect** — fix it, and pin the promise in `ServerSqlTest`;
 - **a deviation we accept** — pin that in `ServerSqlTest` too, with the reason beside it, because a
   decision recorded in a test is checked on every run and a decision recorded in a file is not;
 - **an artifact of EF's own harness** — nothing to write.
 
+A slow-run red ends the same way, except that a deviation we accept is an `[InfoCarrierDesign]`
+reason flagged for the difference, which every slow run checks.
+
 **What the run of 2026-09-21 says**, on the whole tier: **791 tests paired, 790 identical, 1
 differing** (LITERAL 0, PARAMETER 0, VALUE 0, STRUCTURAL 1). It read 788 and 3 on 2026-09-20, 786
 and 5 on 2026-09-16, before the compiled-query fix below, and 784 and 7 before the join-key rewrite.
 The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skipped: 155, Total:
 19550`. What is left is one upstream accident, the last bullet. **These figures are a dated
-record and are not refreshed after a run**; `eng/ef-sql-compare.sh` prints the current ones.
+record**, and the script that printed them is deleted.
 
 - **One test read a whole table, and the class it stands for is decided.**
   `NorthwindGroupBy.Odata_groupby_empty_key` read every order and grouped here, because its group
@@ -609,10 +616,11 @@ covers the whole test. Matching EF's statements in order inside ours made the re
 (#119), and it left every unmatched statement of ours unreported and, after that rewrite, uncounted.
 The category was about 176 statements at the time and was classified by looking at a few.
 
-`eng/ef-sql-diff.py --extras` reads it. The statements are grouped by SQL **shape**, so one shape is
-read once however many tests run it, every extra belongs to a group, and the groups are ordered
-unbounded reads first, because a table crossing the wire is what this instrument exists to find.
-`--survey` is the same reading with nothing subtracted, for a tier upstream gives no baseline for.
+`eng/ef-sql-diff.py --extras` read it. The statements were grouped by SQL **shape**, so one shape
+was read once however many tests ran it, every extra belonged to a group, and the groups were
+ordered unbounded reads first, because a table crossing the wire is what this instrument existed to
+find. `--survey` was the same reading with nothing subtracted, for a tier upstream gives no
+baseline for.
 
 **The totals below are one run's, and the statement total is not comparable with another run's.
 Compare the `reads:` line**, which the report prints apart from the writes for exactly this reason.
@@ -690,8 +698,8 @@ that is not this report's question: the comparison against EF's own `AssertSql` 
 filter that went missing.
 
 **So the sampling verdict holds, and it is now a reading rather than a sample.** The remainder
-contains one thing of ours, and it was already on the list. Re-run it with
-`bash eng/ef-sql-compare.sh --keep` and then `--extras` on the log it names.
+contains one thing of ours, and it was already on the list. Since 2026-09-28 the slow run compares
+every statement a test runs, so the remainder needs no reading of its own.
 
 ### Tier C: what upstream gives us, and what the tier gives back (2026-09-20)
 
@@ -770,13 +778,10 @@ against ours for the same base, both runs serial (`parallel mode = none`, which 
 Tier D would answer the same question, and this answers it with no test code at all. Build one only
 if their suite stops being runnable.
 
-**The reading the tier gets instead of a comparison** is `eng/ef-sql-diff.py --survey`, which groups
-every statement in a log and needs no reference:
-
-```bash
-INFOCARRIER_SERVER_SQL=<file> dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj     --configuration Release --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"     -- xUnit.ParallelizeTestCollections=false
-python eng/ef-sql-diff.py <file> --survey --limit 100
-```
+**The reading the tier got instead of a comparison, until 2026-09-27**, was
+`eng/ef-sql-diff.py --survey`, which grouped every statement in a log and needed no reference. Since
+then the slow run compares Tier C with plain EF Core on the same embedded store (H17), and the
+survey's script was deleted on 2026-09-28.
 
 **The run of 2026-09-20: 109 passed, 1 skipped, six seconds, 106 statements in 57 shapes** — 10
 unbounded reads, 45 other reads, 2 writes. Read group by group:
@@ -798,7 +803,9 @@ unbounded reads, 45 other reads, 2 writes. Read group by group:
 **A survey is weaker evidence than a comparison and is not a substitute for one.** It says what the
 server ran, not what a second provider would have run for the same query, so it can show a whole
 table crossing the wire and cannot show a subtly worse plan. It is what this tier has on every run;
-the comparison above is what it has when somebody spends ten minutes on it.
+the comparison above is what it has when somebody spends ten minutes on it. This paragraph is
+the record of 2026-09-20: the survey was what the tier had on every run until the slow run gave it
+a comparison.
 
 **And the first reading of that run was mostly the instrument, which is the lesson worth keeping.**
 It reported 182 differing, and two defects of the tool accounted for 175 of them:
@@ -829,7 +836,8 @@ memory, in a slow mode.
 
 - **Read upstream first**: EF's InMemory and SQLite functional tests, and the Firebird provider's
   suite. Pin each link to the package version this repository runs. **The Firebird suite was read on
-  2026-09-20 and asserts no SQL at all**, so Tier C is surveyed rather than compared (above).
+  2026-09-20 and asserts no SQL at all**, so Tier C was surveyed rather than compared, until the slow
+  run compared it with plain EF Core (above).
 - **Build a control only where upstream has none.**
 - **Every existing override gets a label and a reference, or goes.** An existing
   `Task.CompletedTask` stays only if it copies an upstream skip, with the link and upstream's

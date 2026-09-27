@@ -7891,16 +7891,37 @@ claims a runtime difference. The amendment proposed:
       host, and it stays until the owner says otherwise. Seen on the way: xUnit printed the four skips' reason, and the TRX
       records none of the four, as passed or as skipped, in either run, which is why CI's total is
       four below the Windows one. The attribute's remark says both. Comments only, so no run.
-- [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
-      their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
-      describe them. The slow run is the investigation they served.
+- [x] **H4. Delete what reading EF's `AssertSql` needed.** On the branch
+      `live-comparison-delete-assertsql`, on `main` after the stack. The owner, 2026-09-28: "start
+      h4". Deleted: `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`, `ServerSqlLog` with
+      `ServerSqlLogInterceptor` and `ServerSqlTestMarkerAttribute`, the assembly attribute that
+      applied the marker, `ServerSqlLogTest`, and `INFOCARRIER_SERVER_SQL` with them. Their two
+      rows leave `CLAUDE.md`'s script table, and its paragraph names the slow run as the
+      investigation, quoting the date it replaced the script. `docs/test-policy.md` keeps what the
+      text comparison found as a dated record, in the past tense, and loses the commands that no
+      longer run. `docs/architecture.md` and the two EF 11 notes follow.
 
-**Five pull requests and one direct push**: H2 on `main`, because it is docs only; four for the
-stack, and one for H4. The owner saw the slow run work and chose the four on 2026-09-28: H0/H1 with
-H3 (#171), H5 to H19, H20 to H30, and H31 to H33a, each merged with `--no-ff` so that every step
-keeps its commit. Until then this read "Three pull requests and one direct push: H0/H1, H3 and H4",
-and "No code of this phase lands on `main` until the owner has seen the mechanism in real action"
-(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area").
+      **What changed in the scope since #167 was written.** `DirectClient.cs` stays: the issue listed
+      it with the prototype, and it is the slow mode's plain-EF half now. The rest of the prototype
+      never reached `main` and lives only on `experiment/direct-baseline`. And the sweep for
+      comments that argued for the log found nine files the issue did not name: the fixtures'
+      "`ServerSqlLog` is where the server's statements can actually be read", and the history in
+      `ServerSqlRecorder`, `ServerParameterizationTest`, `InfoCarrierBackendTestStore` and
+      `OverrideAudit`. `ServerSqlRecorder` and `ServerSqlTest` stay, as the issue says.
+
+      Normal run, `eng/measure.sh delete-assertsql spatial`: **FAILING 0, TOTAL 29957**, the four
+      tests of `ServerSqlLogTest` fewer, FIXED none, BROKEN none, REASONS unchanged. `CI=true`
+      Release build of the spec project: 0 warnings, 0 errors. `doc-links.py`: 0 broken. Test and
+      docs only.
+
+**Six pull requests and one direct push**: H2 on `main`, because it is docs only; five for the
+stack, and one for H4. The owner saw the slow run work and chose four on 2026-09-28: H0/H1 with H3
+(#171), H5 to H19 (#172), H20 to H30 (#173), and H31 to H33a, each merged with `--no-ff` so that
+every step keeps its commit. The same day the owner split the last one, because the concurrency
+limitation and the spatial fix are unrelated: H31 and H32 (#175), H33 and H33a (#176). Until then
+this read "Three pull requests and one direct push: H0/H1, H3 and H4", and "No code of this phase
+lands on `main` until the owner has seen the mechanism in real action" (owner, 2026-09-26: "I've
+seen twice my own ideas going to shelve/bin in this area").
 
 The triage is a step per family from H5 on, with its red promise, its fix and one commit, on a
 branch stacked on the step before. Until H6 this read: "The two parked SQL gaps and the

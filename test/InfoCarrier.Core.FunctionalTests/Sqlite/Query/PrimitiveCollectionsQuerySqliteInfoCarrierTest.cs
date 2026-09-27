@@ -273,8 +273,8 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
         ///     The compliance gate's second assertion (R54). The property is real —
         ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
         ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-        ///     this client has no database and emits no SQL. <c>ServerSqlLog</c> is where the
-        ///     server's statements can actually be read.
+        ///     this client has no database and emits no SQL. The server's statements are read
+        ///     by <c>ServerSqlRecorder</c>, and compared with plain EF's by the slow run of #167.
         /// </summary>
         public TestSqlLoggerFactory TestSqlLoggerFactory
             => (TestSqlLoggerFactory)ListLoggerFactory;

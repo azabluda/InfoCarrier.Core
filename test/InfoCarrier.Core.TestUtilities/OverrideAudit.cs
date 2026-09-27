@@ -58,9 +58,9 @@ public static class OverrideAudit
     /// </summary>
     /// <remarks>
     ///     CI sets it to the TRX directory, so that <c>eng/suite-summary.sh</c> can join every test
-    ///     result with its reasons for the README badge. A switch and a file, like
-    ///     <c>INFOCARRIER_SERVER_SQL</c>, because the test report is for people and the join needs
-    ///     the concrete class of every inherited override, which the report does not list.
+    ///     result with its reasons for the README badge. A switch and a file, because the test
+    ///     report is for people and the join needs the concrete class of every inherited override,
+    ///     which the report does not list.
     /// </remarks>
     public const string ReasonsDirectoryVariable = "INFOCARRIER_OVERRIDE_REASONS";
 

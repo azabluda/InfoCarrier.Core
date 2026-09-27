@@ -34,8 +34,8 @@ each line against the repository again when the work starts.
 - **The same holds for `UpstreamRepository.MongoEfCore`**, pinned at `v10.0.3`, when Tier D moves.
 - **The two enum members say their tags in their XML comments** (`OverrideReasonAttributes.cs`), and
   change with the pins.
-- **`eng/ef-sql-compare.sh` needs no edit.** It reads the EF version from `Directory.Packages.props`
-  and fetches that tag. The figures in `docs/test-policy.md` are dated records of EF 10 and stay as
-  they are; the first run on EF 11 is a new record, not a correction.
+- **The slow run has no tag to move.** It compares with plain EF Core at the version the suite
+  runs. `eng/ef-sql-compare.sh`, which fetched EF's tag to read its `AssertSql` text, was deleted on
+  2026-09-28. The figures in `docs/test-policy.md` are dated records of EF 10 and stay as they are.
 - **`subrepos/firebird` is at `EFCore-13.0.0.0`**, the tag of the package Tier C runs, and moves
   with whatever Tier C decides.

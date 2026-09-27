@@ -56,13 +56,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         assertions already say so.
 ///     </para>
 ///     <para>
-///         <b>That reading needed a fix first.</b> This class was invisible to
-///         <c>INFOCARRIER_SERVER_SQL</c>, so <c>eng/ef-sql-diff.py</c> could not see the one class
-///         whose whole subject is the statement: its <c>LogTo</c> in <c>CreateStore</c> replaced
-///         the store's. This paragraph said the fix was "the one in <c>CreateStore</c>" from
-///         2026-09-23, when <c>CreateStore</c> forwarded each line to the log itself. Since
-///         2026-09-24 the store writes the log through <see cref="ServerSqlLogInterceptor" />,
-///         which no fixture's <c>LogTo</c> can displace, and the forward is gone.
+///         <b>That reading needed a fix first.</b> This class was invisible to the server SQL
+///         log, so <c>eng/ef-sql-diff.py</c> could not see the one class whose whole subject is
+///         the statement: its <c>LogTo</c> in <c>CreateStore</c> replaced the store's. The log
+///         became an interceptor on 2026-09-24, which no fixture's <c>LogTo</c> can displace, and
+///         the log and the script were deleted on 2026-09-28 (#167, H4): the slow run compares
+///         every statement with plain EF's instead.
 ///     </para>
 /// </remarks>
 public partial class ServerParameterizationTest
@@ -2402,8 +2401,8 @@ public partial class ServerParameterizationTest
                         new SqliteDbContextOptionsBuilder(b).UseParameterizedCollectionMode(mode);
                     }
 
-                    // This class's own sink. It replaced the store's `ServerSqlLog` until
-                    // 2026-09-24, because `LogTo` keeps one sink; the log is an interceptor now.
+                    // This class's own sink. `LogTo` keeps one sink, and the store records its
+                    // statements through an interceptor, so this one displaces nothing.
                     return b.LogTo(
                         line => { lock (_sink) { _sink.Add(line); } },
                         [RelationalEventId.CommandExecuted]);
@@ -2444,8 +2443,8 @@ public partial class ServerParameterizationTest
 
         // A column alias is a name too, and the same argument applies: the projection split sends a
         // tuple, so EF names a column `Item1` where the caller's projection called it `Id`. The
-        // columns, their order and everything around them are what this compares, and
-        // `eng/ef-sql-diff.py` ignores an alias for the same reason.
+        // columns, their order and everything around them are what this compares, and the slow
+        // run's `SqlNormalizer` drops a column alias for the same reason.
         //
         // The same holds for the alias a column is READ through, which the line above leaves in
         // place. EF names a `VALUES` table after its parameter, so the caller's `ids` gives
