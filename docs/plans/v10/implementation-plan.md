@@ -7653,6 +7653,18 @@ claims a runtime difference. The amendment proposed:
       red. With the audit and the compliance tests: **Passed: 4, Failed: 0, Total: 4**. Normal run,
       `eng/measure.sh move-load move-query-rest`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
       none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H27. Five end-to-end bases move to Tier B.** On the branch `live-comparison-move-endtoend`,
+      on top of H26. `CompositeKeyEndToEnd`, `NotificationEntities`, `OverzealousInitialization`,
+      `ValueConvertersEndToEnd` and `Find` had no override on Tier A and kept their counts: 3, 2, 1,
+      27 and 411. What SQLite needed is what EF's own SQLite classes do: `Find`'s fixture takes
+      `FindSqliteFixture`'s owned-key configuration, without which the seed failed on `NOT NULL
+      constraint failed: IntKey_NestedOwnedCollection` (EF's issue #26708), and
+      `Can_use_generated_values_in_composite_key_end_to_end` takes EF's skip, "Not supported on
+      Sqlite", with its upstream reference. Slow run of the five: **`Passed: 444, Failed: 0, Total:
+      444`**, no red. With the audit and the compliance tests: **Passed: 448, Failed: 0, Total: 448**.
+      Normal run, `eng/measure.sh move-endtoend move-load`: **FAILING 0, TOTAL 29953**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
