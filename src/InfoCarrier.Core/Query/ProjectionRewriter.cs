@@ -3,6 +3,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using InfoCarrier.Core.Expressions;
 
 namespace InfoCarrier.Core.Query;
 
@@ -61,17 +62,122 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         .GetMethods(BindingFlags.Public | BindingFlags.Static)
         .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
 
+    private static readonly MethodInfo QueryableWhere = typeof(Queryable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Queryable.Where)
+            && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
+            && second.GetGenericArguments()[0].GetGenericArguments().Length == 2);
+
+    private static readonly MethodInfo EnumerableWhere = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Single(m => m.Name == nameof(Enumerable.Where)
+            && m.GetParameters() is [_, { ParameterType: { IsGenericType: true } second }]
+            && second.GetGenericArguments().Length == 2);
+
+    // From delegates, which the trimmer follows at no cost (R149). See TryGroupAtTheStore.
+    private static readonly MethodInfo QueryableGroupBy =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, IQueryable<IGrouping<object, object>>>)Queryable.GroupBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo QueryableGroupByElement =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, Expression<Func<object, object>>, IQueryable<IGrouping<object, object>>>)Queryable.GroupBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo RebuiltGroup =
+        ((Func<IGrouping<object, object>, Func<object, object>, Func<object, object>, IGrouping<object, object>>)WireGrouping.Rebuilt)
+            .Method.GetGenericMethodDefinition();
+
     /// <summary>
-    ///     The single slot a projection gets when its body reads nothing from the row: the server
-    ///     is being asked which rows exist, and for no column of them.
+    ///     The scalar types a guarded slot can travel as the nullable type of, each with that type.
+    ///     See <see cref="Guarded" />.
     /// </summary>
     /// <remarks>
-    ///     <c>1</c> rather than anything of the entity's, because EF's own client writes
-    ///     <c>SELECT 1</c> for the same projection, and this carrier is what the server's EF
-    ///     translates. Nothing reads the slot: the reassembly rebuilds a body that never mentioned
-    ///     the row.
+    ///     Spelt out rather than built with <c>typeof(Nullable&lt;&gt;).MakeGenericType</c>, which
+    ///     the trimmer cannot follow (<c>eng/trim-baseline.txt</c>). An enum is absent for the same
+    ///     reason, and keeps its guard.
     /// </remarks>
-    private static readonly Expression RowPresence = Expression.Constant(1);
+    private static readonly Dictionary<Type, Type> NullableScalars = new()
+    {
+        [typeof(bool)] = typeof(bool?),
+        [typeof(byte)] = typeof(byte?),
+        [typeof(sbyte)] = typeof(sbyte?),
+        [typeof(short)] = typeof(short?),
+        [typeof(ushort)] = typeof(ushort?),
+        [typeof(int)] = typeof(int?),
+        [typeof(uint)] = typeof(uint?),
+        [typeof(long)] = typeof(long?),
+        [typeof(ulong)] = typeof(ulong?),
+        [typeof(char)] = typeof(char?),
+        [typeof(float)] = typeof(float?),
+        [typeof(double)] = typeof(double?),
+        [typeof(decimal)] = typeof(decimal?),
+        [typeof(DateTime)] = typeof(DateTime?),
+        [typeof(DateTimeOffset)] = typeof(DateTimeOffset?),
+        [typeof(DateOnly)] = typeof(DateOnly?),
+        [typeof(TimeOnly)] = typeof(TimeOnly?),
+        [typeof(TimeSpan)] = typeof(TimeSpan?),
+        [typeof(Guid)] = typeof(Guid?),
+    };
+
+    /// <summary>
+    ///     The operators that count the rows below them and read nothing a projection computes, when
+    ///     they are given no predicate. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private static readonly HashSet<string> RowCounting =
+        [nameof(Queryable.Count), nameof(Queryable.LongCount), nameof(Queryable.Any)];
+
+    /// <summary>
+    ///     The terminal operators whose predicate overload is a <c>Where</c> under the overload that
+    ///     takes the source alone. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private static readonly HashSet<string> PredicateTerminals =
+    [
+        nameof(Queryable.Count),
+        nameof(Queryable.LongCount),
+        nameof(Queryable.Any),
+        nameof(Queryable.First),
+        nameof(Queryable.FirstOrDefault),
+        nameof(Queryable.Single),
+        nameof(Queryable.SingleOrDefault),
+        nameof(Queryable.Last),
+        nameof(Queryable.LastOrDefault),
+    ];
+
+    // Read off `typeof(...)` directly, never through a `Type` parameter: the trimmer sees these, and
+    // reflection over a parameter costs an IL2070 of its own (eng/trim-baseline.txt, 2026-09-26).
+    private static readonly Dictionary<string, MethodInfo> QueryableWithoutPredicate = typeof(Queryable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Where(m => IsSourceOnlyTerminal(m, typeof(IQueryable<>)))
+        .ToDictionary(m => m.Name);
+
+    private static readonly Dictionary<string, MethodInfo> EnumerableWithoutPredicate = typeof(Enumerable)
+        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+        .Where(m => IsSourceOnlyTerminal(m, typeof(IEnumerable<>)))
+        .ToDictionary(m => m.Name);
+
+    /// <summary>
+    ///     What a projection carries when its body reads nothing from the row: the server is being
+    ///     asked which rows exist, and for no column of them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A construction with no argument, which EF binds to no column at all, as it binds the
+    ///         caller's own <c>new OrderDto()</c>. At the root EF then writes <c>SELECT 1</c>, as its
+    ///         own client does for the same projection. Nothing reads the value: the reassembly
+    ///         rebuilds a body that never mentioned the row.
+    ///     </para>
+    ///     <para>
+    ///         <b>Since 2026-09-27, found by #167's slow run.</b> Until then this was a tuple holding
+    ///         the constant <c>1</c>, and read "<c>1</c> rather than anything of the entity's, because
+    ///         EF's own client writes <c>SELECT 1</c> for the same projection". True at the root. In a
+    ///         projected collection EF writes nothing for such an element, only the key it forms the
+    ///         collection by, and the <c>1</c> was a column plain EF does not project
+    ///         (<c>MemberInit_in_projection_without_arguments</c>, <c>OwnsMany_correlated_projection</c>).
+    ///         <see cref="object" /> is on the allowlist and constructs nothing else.
+    ///     </para>
+    /// </remarks>
+    private static NewExpression RowPresence()
+        => Expression.New(typeof(object));
 
     private readonly HashSet<Expression> _reassemblies = new(ReferenceEqualityComparer.Instance);
 
@@ -107,10 +213,20 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private IReadOnlySet<(Type, string)> _read = new HashSet<(Type, string)>();
 
     /// <summary>
+    ///     The projections inside a lambda that a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
+    ///     reads one row of. Their tuple is the reference-typed family, so that no row reads as
+    ///     <see langword="null" />. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    private IReadOnlySet<Expression> _singleResultSources = new HashSet<Expression>();
+
+    /// <summary>
     ///     A client-side rebuild another pass already produced. Rewriting it would only wrap one
     ///     carrier in another.
     /// </summary>
     private Expression? _preserved;
+
+    /// <summary>The query as it was handed in, whose result is what the caller receives.</summary>
+    private Expression? _root;
 
     /// <summary>
     ///     The parameters of every lambda that encloses the node being visited, outermost first.
@@ -174,7 +290,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var rewriter = new ProjectionRewriter(analyzer)
         {
             _preserved = alreadyReassembled,
+            _root = query,
             _read = MemberReadCollector.Find(query),
+            _singleResultSources = SingleResultSourceFinder.Find(query),
             _model = model,
         };
         Expression result = rewriter.Visit(query);
@@ -219,6 +337,12 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             call = TryFuseSelectWithReassembly(node, source)
                 ?? node.Update(node.Object, [source, Visit(node.Arguments[1])]);
         }
+        else if (!ReferenceEquals(node, _preserved) && OrderingChain(node) is { } chain)
+        {
+            // The whole chain at once, from its top: a ThenBy needs an ordered source, and an
+            // ordering moved below a reassembly comes back as the reassembly, which is not ordered.
+            return VisitOrderingChain(chain);
+        }
         else if (base.VisitMethodCall(node) is MethodCallExpression visited)
         {
             call = visited;
@@ -237,6 +361,16 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         if (TryMoveDistinctBelowReassembly(call) is { } moved)
         {
             return moved;
+        }
+
+        if (TryMoveBelowReassembly(call) is { } below)
+        {
+            return below;
+        }
+
+        if (ReferenceEquals(node, _root) && TryGroupAtTheStore(call) is { } grouped)
+        {
+            return grouped;
         }
 
         if (!IsResultSelectorOperator(call, out LambdaExpression? selector))
@@ -262,35 +396,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return call;
         }
 
-        List<Expression> fragments = [];
-        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        CollectFragments(selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], fragments, guards);
-
-        IReadOnlySet<Expression> consumed = Consumed(selector.Body);
-
-        // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
-        //
-        // This returned `call` until 2026-09-22, on the ground that there was nothing for the
-        // server to compute. True, and it left the plain cut to ship the maximal `ServerOk`
-        // subtree, which is the query root: `Select(b => new { F = flag })` read every column the
-        // entity has, where EF's own client writes `SELECT 1`. Both answers are right, so nothing
-        // in the suite could see it and only a comparison with EF's statement did
-        // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
-        //
-        // So the carrier holds one constant instead, and the reassembly below reads none of it.
-        // What the server is asked for is the row count, which is what EF asks for.
-        Expression tuple = fragments.Count > 0
-            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))])
-            : TupleCarrier.New([RowPresence]);
-        ParameterExpression row = Expression.Parameter(tuple.Type, "row");
-
-        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
-        for (int i = 0; i < fragments.Count; i++)
-        {
-            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
-        }
-
-        Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(selector.Body)!;
+        (Expression tuple, ParameterExpression row, Expression clientBody, bool carriesACollection) = Carry(
+            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node));
         if (selector.Parameters.Any(p => ReferencesParameter(clientBody, p)))
         {
             // A row value the server could not carry — a parameter of a type it does not know.
@@ -330,12 +437,212 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
                     typeof(Func<,>).MakeGenericType(row.Type, selector.ReturnType), clientBody, row)));
 
         _reassemblies.Add(reassembly);
-        if (fragments.Any(f => CarriesACollection(f, consumed)))
+        if (carriesACollection)
         {
             _collectionReassemblies.Add(reassembly);
         }
 
         return reassembly;
+    }
+
+    /// <summary>
+    ///     The tuple the server computes for <paramref name="body" />, the row parameter that reads
+    ///     it, and the body rebuilt from that row on the client.
+    /// </summary>
+    /// <param name="body">A body the server cannot run as written.</param>
+    /// <param name="analysis">The analysis of the lambda <paramref name="body" /> is from.</param>
+    /// <param name="rowParameters">The rows a value may read to be carried in the tuple.</param>
+    /// <param name="nullable">Whether the tuple is the reference-typed family.</param>
+    private (Expression Tuple, ParameterExpression Row, Expression ClientBody, bool CarriesACollection) Carry(
+        Expression body,
+        BoundaryAnalysis analysis,
+        IReadOnlyCollection<ParameterExpression> rowParameters,
+        bool nullable = false)
+    {
+        List<Expression> fragments = [];
+        var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        CollectFragments(body, analysis, rowParameters, fragments, guards);
+
+        if (TranslatableLeaves(body, fragments, analysis) is { } leaves)
+        {
+            fragments = leaves;
+        }
+
+        IReadOnlySet<Expression> consumed = Consumed(body);
+
+        // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
+        //
+        // This returned `call` until 2026-09-22, on the ground that there was nothing for the
+        // server to compute. True, and it left the plain cut to ship the maximal `ServerOk`
+        // subtree, which is the query root: `Select(b => new { F = flag })` read every column the
+        // entity has, where EF's own client writes `SELECT 1`. Both answers are right, so nothing
+        // in the suite could see it and only a comparison with EF's statement did
+        // (`ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query`).
+        //
+        // So the carrier holds nothing instead, and the reassembly below reads none of it. What the
+        // server is asked for is the row count, which is what EF asks for. Until 2026-09-27 this
+        // read "the carrier holds one constant instead", a tuple of `1`: see RowPresence.
+        Expression tuple = fragments.Count > 0
+            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
+            : RowPresence();
+        ParameterExpression row = Expression.Parameter(tuple.Type, "row");
+
+        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < fragments.Count; i++)
+        {
+            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
+        }
+
+        return (
+            tuple,
+            row,
+            new SlotSubstitutingVisitor(slots).Visit(body)!,
+            fragments.Any(f => CarriesACollection(f, consumed)));
+    }
+
+    /// <summary>
+    ///     Runs a <c>GroupBy</c> that ends the query at the store when its key or its element is a
+    ///     type the server does not have, over values it can carry, and rebuilds each group on the
+    ///     client.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-27, found by #167's slow run.</b> A <c>GroupBy</c> at the root returns
+    ///         its groups, so a key or an element of a client type, an anonymous one above all, made
+    ///         the result a type the server cannot send. The <c>GroupBy</c> stayed on the client, with
+    ///         everything it read: <c>GroupBy(c =&gt; c.City, c =&gt; new { c.ContactName,
+    ///         c.ContactTitle })</c> read every column of every customer, where EF reads three.
+    ///         EF runs a final <c>GroupBy</c> by ordering the rows by the key and reading the groups
+    ///         off the ordered rows, so the groups came back in a different order as well. Seven
+    ///         methods of <c>NorthwindGroupByQueryTestBase</c> showed it.
+    ///     </para>
+    ///     <para>
+    ///         The server now groups by a key it can carry, over elements it can carry. Each is the
+    ///         value itself when the server has its type, and otherwise the tuple of the values it is
+    ///         built from, as a projection is split (<see cref="Carry" />). Over a reassembly the key
+    ///         and the element read the rebuilt row, so they are fused with the rebuild first, as a
+    ///         filter is (<see cref="Fuse" />), and an element with no selector is the rebuild itself.
+    ///         The server's EF orders, groups and sends the groups as for any final <c>GroupBy</c>,
+    ///         and the client rebuilds the key and every element of each group
+    ///         (<see cref="WireGrouping.Rebuilt" />).
+    ///     </para>
+    ///     <para>
+    ///         <b>Only at the root</b>, where the groups are the result. A <c>GroupBy</c> an operator
+    ///         reads is an aggregate EF translates whole, and its key never crosses the wire.
+    ///     </para>
+    /// </remarks>
+    private MethodCallExpression? TryGroupAtTheStore(MethodCallExpression call)
+    {
+        if (call.Method.DeclaringType != typeof(Queryable)
+            || call.Method.Name != nameof(Queryable.GroupBy)
+            || call.Arguments.Count is not (2 or 3)
+            || StripQuotes(call.Arguments[1]) is not LambdaExpression { Parameters: [var keyed] } key
+            || (call.Arguments.Count == 3 && StripQuotes(call.Arguments[2]) is not LambdaExpression { Parameters: [_] }))
+        {
+            return null;
+        }
+
+        var elementSelector = call.Arguments.Count == 3 ? (LambdaExpression)StripQuotes(call.Arguments[2]) : null;
+        Type[] grouping = ServerBoundaryAnalyzer.SequenceElementType(call.Type)!.GetGenericArguments();
+
+        Expression source = call.Arguments[0];
+        ParameterExpression row = keyed;
+        MethodCallExpression? below = null;
+        LambdaExpression? rebuild = null;
+        if (source is MethodCallExpression reassembly
+            && _reassemblies.Contains(reassembly)
+            && StripQuotes(reassembly.Arguments[1]) is LambdaExpression { Parameters: [var tuple] } rebuilt)
+        {
+            below = reassembly;
+            rebuild = rebuilt;
+            source = reassembly.Arguments[0];
+            row = tuple;
+        }
+
+        Expression Read(LambdaExpression lambda)
+            => MemberReadFolder.Fold(Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+                lambda.Parameters[0], rebuild?.Body ?? row, lambda.Body));
+
+        if (!analyzer.Analyze(source).FactsFor(source).ServerOk)
+        {
+            return null;
+        }
+
+        (Expression Server, LambdaExpression? Client)? carriedElement = elementSelector is null && rebuild is not null
+            ? (row, rebuild)
+            : Carried(elementSelector is null ? row : Read(elementSelector), grouping[1]);
+        if (Carried(Read(key), grouping[0]) is not (var serverKey, var clientKey)
+            || carriedElement is not (var serverElement, var clientElement)
+            || (clientKey is null && clientElement is null))
+        {
+            return null;
+        }
+
+        MethodCallExpression grouped = ReferenceEquals(serverElement, row)
+            ? Expression.Call(
+                QueryableGroupBy.MakeGenericMethod(row.Type, serverKey.Type),
+                source,
+                Expression.Quote(Expression.Lambda(serverKey, row)))
+            : Expression.Call(
+                QueryableGroupByElement.MakeGenericMethod(row.Type, serverKey.Type, serverElement.Type),
+                source,
+                Expression.Quote(Expression.Lambda(serverKey, row)),
+                Expression.Quote(Expression.Lambda(serverElement, row)));
+
+        Type serverGroup = ServerBoundaryAnalyzer.SequenceElementType(grouped.Type)!;
+        Type clientGroup = ServerBoundaryAnalyzer.SequenceElementType(call.Type)!;
+        ParameterExpression group = Expression.Parameter(serverGroup, "group");
+        MethodCallExpression regrouped = Expression.Call(
+            QueryableSelect.MakeGenericMethod(serverGroup, clientGroup),
+            grouped,
+            Expression.Quote(
+                Expression.Lambda(
+                    typeof(Func<,>).MakeGenericType(serverGroup, clientGroup),
+                    Expression.Call(
+                        RebuiltGroup.MakeGenericMethod(serverKey.Type, serverElement.Type, grouping[0], grouping[1]),
+                        group,
+                        clientKey ?? Identity(serverKey.Type),
+                        clientElement ?? Identity(serverElement.Type)),
+                    group)));
+
+        if (below is not null)
+        {
+            Forget(below);
+        }
+
+        _reassemblies.Add(regrouped);
+        return regrouped;
+
+        // The value as it is when the server can run it, else the tuple of its values and its
+        // rebuild from that tuple; or nothing when some of it cannot travel at all.
+        (Expression Server, LambdaExpression? Client)? Carried(Expression body, Type type)
+        {
+            if (SequenceSlotFinder.Reads(body, row))
+            {
+                return null;
+            }
+
+            LambdaExpression lambda = Expression.Lambda(body, row);
+            BoundaryAnalysis analysis = analyzer.Analyze(lambda);
+            if (analysis.FactsFor(body).ServerOk)
+            {
+                return (body, null);
+            }
+
+            (Expression tuple, ParameterExpression slotted, Expression clientBody, _) = Carry(body, analysis, [row]);
+            return ReferencesParameter(clientBody, row)
+                ? null
+                : (tuple, Expression.Lambda(
+                    typeof(Func<,>).MakeGenericType(slotted.Type, type),
+                    clientBody.Type == type ? clientBody : Expression.Convert(clientBody, type),
+                    slotted));
+        }
+
+        static LambdaExpression Identity(Type type)
+        {
+            ParameterExpression value = Expression.Parameter(type, "value");
+            return Expression.Lambda(value, value);
+        }
     }
 
     /// <summary>
@@ -456,6 +763,454 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             reassembly.Arguments[0],
             Visit(node.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote } ? Expression.Quote(fused) : fused));
     }
+
+    /// <summary>
+    ///     Moves an operator written above a reassembly below it, onto the tuple the server
+    ///     computes, where it reads nothing the rebuild alone has.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> An operator above a reassembly
+    ///         stayed on the client, so the server sent every row the operator was about to drop or
+    ///         count. <c>Select(x =&gt; new Dto { Id = x.OrderID }).Where(d =&gt; ((IHaveId)d).Id ==
+    ///         10252)</c> read all 831 orders where plain EF Core reads one, and
+    ///         <c>Select(o =&gt; new { Id = CodeFormat(o.OrderID) }).Count()</c> read every order to
+    ///         count them. The carrier rewrite covers a filter or an ordering that reads the client
+    ///         type directly; this covers the rest.
+    ///     </para>
+    ///     <para>
+    ///         <b>Every reassembly is <c>Select(server, rebuild)</c>, which is row for row and keeps
+    ///         the order</b>, and each move below follows from that:
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <c>Count</c>, <c>LongCount</c> and <c>Any</c> without a predicate count the rows
+    ///             and read none, so the rebuild is dropped. EF drops the projection under them too,
+    ///             so client code in it is never called, here or there.
+    ///         </item>
+    ///         <item>
+    ///             <c>Skip</c> and <c>Take</c> select the same rows below the rebuild as above it.
+    ///         </item>
+    ///         <item>
+    ///             <c>Where</c> and an ordering read the rebuilt element through their lambda, which
+    ///             is fused with the rebuild, as <see cref="TryFuseSelectWithReassembly" /> fuses a
+    ///             projection. EF's <see cref="Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor" />
+    ///             folds <c>new Dto { Id = row.Item1 }.Id</c>, through a cast to an interface too, to
+    ///             <c>row.Item1</c>. The move happens only when the fused lambda is one the server can
+    ///             run; a lambda that still needs the rebuild, or client code, stays where it was,
+    ///             and <c>QuerySplitter</c> judges it there as before.
+    ///         </item>
+    ///         <item>
+    ///             A predicate given to a terminal operator is a <c>Where</c> under the operator
+    ///             without one, which is how EF normalizes it before translating.
+    ///         </item>
+    ///         <item>
+    ///             A <c>SelectMany</c> whose collection selector returns a reassembly flattens the
+    ///             tuples, and the rebuild goes above it: <c>SelectMany(s, o =&gt; Select(server,
+    ///             rebuild))</c> is <c>Select(SelectMany(s, o =&gt; server), rebuild)</c> when the
+    ///             rebuild does not read <c>o</c>. Since 2026-09-27: inside a projection,
+    ///             <c>c.Orders.SelectMany(o =&gt; o.OrderDetails.Where(…).Select(od =&gt; new
+    ///             Dto(…)))</c> kept the rebuild inside the selector, so the <c>SelectMany</c> read
+    ///             client code, the outer projection carried every order with every detail, and this
+    ///             client filtered them (<c>SelectMany_with_client_eval_with_constructor</c>, 70 rows
+    ///             where plain EF reads 66). <see cref="TryHoistCollectionProjection" /> does the same
+    ///             for a <see cref="Queryable" /> <c>SelectMany</c> before it is visited; this one
+    ///             runs after the selector was rewritten in place, whose rebuild reads only the tuple
+    ///             when every value of an enclosing row went into it (<see cref="_enclosing" />).
+    ///         </item>
+    ///     </list>
+    /// </remarks>
+    private Expression? TryMoveBelowReassembly(MethodCallExpression call)
+    {
+        if (call.Method.DeclaringType is not { } declaring
+            || (declaring != typeof(Queryable) && declaring != typeof(Enumerable))
+            || !call.Method.IsGenericMethod
+            || call.Arguments.Count is 0 or > 2)
+        {
+            return null;
+        }
+
+        if (call.Method.Name == nameof(Queryable.SelectMany))
+        {
+            if (StripQuotes(call.Arguments[^1]) is not LambdaExpression { Parameters: [var outer], Body: MethodCallExpression inner }
+                || inner.Method.DeclaringType != declaring
+                || !_reassemblies.Contains(inner)
+                || StripQuotes(inner.Arguments[1]) is not LambdaExpression { Parameters: [var tuple] } innerRebuild
+                || ReferencesParameter(innerRebuild.Body, outer))
+            {
+                return null;
+            }
+
+            // Typed as the operator declares it, IEnumerable<T>, which a queryable server half is too.
+            LambdaExpression collector = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(outer.Type, typeof(IEnumerable<>).MakeGenericType(tuple.Type)),
+                inner.Arguments[0],
+                outer);
+            MethodCallExpression flattened = Expression.Call(
+                call.Method.GetGenericMethodDefinition().MakeGenericMethod(outer.Type, tuple.Type),
+                call.Arguments[0],
+                call.Arguments[^1] is UnaryExpression { NodeType: ExpressionType.Quote } ? Expression.Quote(collector) : collector);
+            return Rebuilt(inner, flattened, call.Method.GetGenericArguments()[^1]);
+        }
+
+        if (call.Arguments[0] is not MethodCallExpression reassembly
+            || !_reassemblies.Contains(reassembly)
+            || StripQuotes(reassembly.Arguments[1]) is not LambdaExpression { Parameters: [var row] } rebuild)
+        {
+            return null;
+        }
+
+        string name = call.Method.Name;
+        Expression server = reassembly.Arguments[0];
+        Type element = call.Method.GetGenericArguments()[0];
+
+        if (call.Arguments.Count == 1)
+        {
+            if (name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
+                && _enclosing.Count > 0
+                && !row.Type.IsValueType)
+            {
+                return OneRowRebuilt(call, reassembly, rebuild, element);
+            }
+
+            if (!RowCounting.Contains(name))
+            {
+                return null;
+            }
+
+            Forget(reassembly);
+            return Expression.Call(call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), server);
+        }
+
+        Expression argument = call.Arguments[1];
+        if (name is nameof(Queryable.Skip) or nameof(Queryable.Take) && argument.Type == typeof(int))
+        {
+            return Rebuilt(
+                reassembly,
+                Expression.Call(call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), server, argument),
+                element);
+        }
+
+        if (StripQuotes(argument) is not LambdaExpression { Parameters: [_], ReturnType: var returned } lambda
+            || !(returned == typeof(bool) && (name == nameof(Queryable.Where) || PredicateTerminals.Contains(name)))
+            || Fuse(lambda, rebuild) is not { } fused)
+        {
+            return null;
+        }
+
+        bool quoted = argument is UnaryExpression { NodeType: ExpressionType.Quote };
+        MethodCallExpression filtered = Expression.Call(
+            (declaring == typeof(Queryable) ? QueryableWhere : EnumerableWhere).MakeGenericMethod(row.Type),
+            server,
+            quoted ? Expression.Quote(fused) : fused);
+
+        if (name == nameof(Queryable.Where))
+        {
+            return Rebuilt(reassembly, filtered, element);
+        }
+
+        if (RowCounting.Contains(name))
+        {
+            Forget(reassembly);
+            return Expression.Call(WithoutPredicate(declaring, name).MakeGenericMethod(row.Type), filtered);
+        }
+
+        return Expression.Call(
+            WithoutPredicate(declaring, name).MakeGenericMethod(element),
+            Rebuilt(reassembly, filtered, element));
+    }
+
+    /// <summary>
+    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a projection on the server's
+    ///     tuple, and rebuilds the one row it returns on the client, or <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b>
+    ///         <c>b.Posts.Select(p =&gt; new { p.Heading }).FirstOrDefault()</c> inside a projection
+    ///         kept the operator above the rebuild, on the client, so the whole collection travelled
+    ///         in a slot of the outer tuple and this client kept its first element. EF's own client
+    ///         writes a <c>ROW_NUMBER()</c> window and reads one row per owner:
+    ///         <c>Lift_projection_mapping_when_pushing_down_subquery</c> read 134 rows where plain
+    ///         EF reads 24.
+    ///     </para>
+    ///     <para>
+    ///         <b>The tuple is the reference-typed family</b>, chosen for this projection before it
+    ///         was rewritten (<see cref="SingleResultSourceFinder" />), because a value tuple has no
+    ///         value that says "no row". The operator runs on the server's tuple, the slot holds the
+    ///         row or <see langword="null" />, and the client rebuilds the row only when there is
+    ///         one. The rebuild goes into the outer body as an invocation over the one value, so the
+    ///         outer rewrite lifts that value into a slot of its own, whole, and never evaluates it
+    ///         twice.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only inside a lambda.</b> At the root of the query the operator already bounds the
+    ///         rows the server sends (<c>QuerySplitter.WithRowLimitForTerminalOperator</c>).
+    ///     </para>
+    /// </remarks>
+    private InvocationExpression OneRowRebuilt(
+        MethodCallExpression call, MethodCallExpression reassembly, LambdaExpression rebuild, Type element)
+    {
+        ParameterExpression row = rebuild.Parameters[0];
+        Forget(reassembly);
+
+        MethodCallExpression single = Expression.Call(
+            call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type), reassembly.Arguments[0]);
+        // `Expression.Default` is safe here, unlike in `Guarded`: this conditional stays on the
+        // client and is never serialized.
+        Expression body = Expression.Condition(
+            Expression.Equal(row, Expression.Constant(null, row.Type)),
+            Expression.Default(element),
+            rebuild.Body.Type == element ? rebuild.Body : Expression.Convert(rebuild.Body, element));
+
+        return Expression.Invoke(Expression.Lambda(body, row), single);
+    }
+
+    /// <summary>
+    ///     The ordering operators from <paramref name="node" /> down to the <c>OrderBy</c> that
+    ///     starts them, topmost first, or <see langword="null" /> when <paramref name="node" /> is not
+    ///     such a chain of <see cref="Queryable" /> or <see cref="Enumerable" /> operators.
+    /// </summary>
+    private static List<MethodCallExpression>? OrderingChain(MethodCallExpression node)
+    {
+        var chain = new List<MethodCallExpression>();
+        for (Expression current = node; ;)
+        {
+            if (current is not MethodCallExpression { Arguments.Count: 2 } call
+                || (call.Method.DeclaringType != typeof(Queryable) && call.Method.DeclaringType != typeof(Enumerable))
+                || StripQuotes(call.Arguments[1]) is not LambdaExpression { Parameters.Count: 1 })
+            {
+                return null;
+            }
+
+            chain.Add(call);
+            switch (call.Method.Name)
+            {
+                case nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending):
+                    return chain;
+
+                case nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending):
+                    current = call.Arguments[0];
+                    break;
+
+                default:
+                    return null;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Visits an ordering chain, and moves it below the reassembly it orders when every key
+    ///     reads nothing the rebuild alone has. See <see cref="TryMoveBelowReassembly" />.
+    /// </summary>
+    /// <param name="chain">The chain, topmost first, as <see cref="OrderingChain" /> returns it.</param>
+    private Expression VisitOrderingChain(List<MethodCallExpression> chain)
+    {
+        Expression source = Visit(chain[^1].Arguments[0]);
+
+        if (source is MethodCallExpression reassembly
+            && _reassemblies.Contains(reassembly)
+            && StripQuotes(reassembly.Arguments[1]) is LambdaExpression { Parameters: [var row] } rebuild)
+        {
+            Expression? ordered = reassembly.Arguments[0];
+            for (int i = chain.Count - 1; i >= 0 && ordered is not null; i--)
+            {
+                MethodCallExpression call = chain[i];
+                if (Fuse((LambdaExpression)StripQuotes(call.Arguments[1]), rebuild) is { } fused)
+                {
+                    bool quoted = call.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote };
+                    ordered = Expression.Call(
+                        call.Method.GetGenericMethodDefinition().MakeGenericMethod(row.Type, fused.ReturnType),
+                        ordered,
+                        quoted ? Expression.Quote(fused) : fused);
+                }
+                else
+                {
+                    ordered = null;
+                }
+            }
+
+            if (ordered is not null)
+            {
+                return Rebuilt(reassembly, ordered, chain[0].Method.GetGenericArguments()[0]);
+            }
+        }
+
+        Expression result = source;
+        for (int i = chain.Count - 1; i >= 0; i--)
+        {
+            result = chain[i].Update(chain[i].Object, [result, Visit(chain[i].Arguments[1])]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     <paramref name="lambda" /> over the tuple rather than over the rebuilt element, or
+    ///     <see langword="null" /> when the server could not run it.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Not when it reads a slot that holds a sequence.</b> A slot can hold the grouping of a
+    ///     <c>GroupJoin</c>, and a lambda that navigates out of a projected tuple back into such a
+    ///     collection is what no provider translates: moving operators below a rebuild was measured
+    ///     at 91 to 383 failures for that reason in 2026-08 (<c>docs/projection-split.md</c> §6a).
+    ///     Such an operator stays on the client, where it answered before.
+    /// </remarks>
+    private LambdaExpression? Fuse(LambdaExpression lambda, LambdaExpression rebuild)
+    {
+        ParameterExpression row = rebuild.Parameters[0];
+        Expression body = MemberReadFolder.Fold(Microsoft.EntityFrameworkCore.Query.ReplacingExpressionVisitor.Replace(
+            lambda.Parameters[0], rebuild.Body, lambda.Body));
+        LambdaExpression fused = Expression.Lambda(
+            typeof(Func<,>).MakeGenericType(row.Type, lambda.ReturnType), body, row);
+
+        return analyzer.Analyze(fused).FactsFor(fused.Body).ServerOk && !SequenceSlotFinder.Reads(body, row)
+            ? fused
+            : null;
+    }
+
+    /// <summary>
+    ///     Finds the projections inside a lambda that a <c>FirstOrDefault</c> or
+    ///     <c>SingleOrDefault</c> without a predicate reads one row of. See
+    ///     <see cref="OneRowRebuilt" />.
+    /// </summary>
+    private sealed class SingleResultSourceFinder : ExpressionVisitor
+    {
+        private readonly HashSet<Expression> _found = new(ReferenceEqualityComparer.Instance);
+        private int _depth;
+
+        public static IReadOnlySet<Expression> Find(Expression query)
+        {
+            var finder = new SingleResultSourceFinder();
+            finder.Visit(query);
+            return finder._found;
+        }
+
+        protected override Expression VisitLambda<T>(Expression<T> node)
+        {
+            _depth++;
+            try
+            {
+                return base.VisitLambda(node);
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (_depth > 0
+                && node.Method.Name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
+                && (node.Method.DeclaringType == typeof(Queryable) || node.Method.DeclaringType == typeof(Enumerable))
+                && node.Arguments is [MethodCallExpression source]
+                && IsPlainSelect(source))
+            {
+                _found.Add(source);
+            }
+
+            return base.VisitMethodCall(node);
+        }
+    }
+
+    /// <summary>Finds a read of a tuple slot that holds a sequence. See <see cref="Fuse" />.</summary>
+    private sealed class SequenceSlotFinder(ParameterExpression row) : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Reads(Expression body, ParameterExpression row)
+        {
+            var finder = new SequenceSlotFinder(row);
+            finder.Visit(body);
+            return finder._found;
+        }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            // A slot itself, not a navigation out of an entity a slot holds, which EF follows.
+            if (node.Type != typeof(string)
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type)
+                && node.Expression is { } holder
+                && TupleCarrier.IsCarrier(holder.Type)
+                && RootOf(node) == row)
+            {
+                _found = true;
+            }
+
+            return base.VisitMember(node);
+        }
+
+        private static Expression? RootOf(MemberExpression node)
+        {
+            Expression? current = node;
+            while (current is MemberExpression member)
+            {
+                current = member.Expression;
+            }
+
+            return current;
+        }
+    }
+
+    /// <summary>
+    ///     The reassembly again, over <paramref name="server" /> instead of its own source, and
+    ///     recorded in its place.
+    /// </summary>
+    /// <param name="reassembly">The reassembly the operator was above.</param>
+    /// <param name="server">Its source with the operator applied.</param>
+    /// <param name="element">
+    ///     The element type the operator had, which is the rebuild's type or one it implements,
+    ///     as a <c>Where&lt;IHaveId&gt;</c> over a DTO has. The rebuild converts to it, so every
+    ///     operator above sees the type it was written against.
+    /// </param>
+    private MethodCallExpression Rebuilt(MethodCallExpression reassembly, Expression server, Type element)
+    {
+        var rebuild = (LambdaExpression)StripQuotes(reassembly.Arguments[1]);
+        if (rebuild.ReturnType != element)
+        {
+            rebuild = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(rebuild.Parameters[0].Type, element),
+                Expression.Convert(rebuild.Body, element),
+                rebuild.Parameters);
+        }
+
+        bool quoted = reassembly.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote };
+        MethodCallExpression moved = Expression.Call(
+            reassembly.Method.GetGenericMethodDefinition().MakeGenericMethod(rebuild.Parameters[0].Type, element),
+            server,
+            quoted ? Expression.Quote(rebuild) : rebuild);
+
+        _reassemblies.Remove(reassembly);
+        _reassemblies.Add(moved);
+        if (_collectionReassemblies.Remove(reassembly))
+        {
+            _collectionReassemblies.Add(moved);
+        }
+
+        return moved;
+    }
+
+    /// <summary>Removes a reassembly an operator has dropped.</summary>
+    private void Forget(MethodCallExpression reassembly)
+    {
+        _reassemblies.Remove(reassembly);
+        _collectionReassemblies.Remove(reassembly);
+    }
+
+    /// <summary>
+    ///     The overload of the terminal operator <paramref name="name" /> of
+    ///     <paramref name="declaring" /> that takes the source alone.
+    /// </summary>
+    private static MethodInfo WithoutPredicate(Type declaring, string name)
+        => (declaring == typeof(Queryable) ? QueryableWithoutPredicate : EnumerableWithoutPredicate)[name];
+
+    private static bool IsSourceOnlyTerminal(MethodInfo method, Type sequence)
+        => PredicateTerminals.Contains(method.Name)
+            && method.IsGenericMethodDefinition
+            && method.GetGenericArguments().Length == 1
+            && method.GetParameters() is [{ ParameterType: { IsGenericType: true } source }]
+            && source.GetGenericTypeDefinition() == sequence;
 
     /// <summary>
     ///     Whether <paramref name="node" /> is <c>Select(source, x =&gt; …)</c> of
@@ -710,7 +1465,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(TupleCarrier.Read(row, i), fragments[i], consumed);
+            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
         }
 
         Expression clientBody = new SlotSubstitutingVisitor(slots).Visit(innerSelector.Body)!;
@@ -1041,6 +1796,104 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         mapped call, which has always worked.
     ///     </para>
     /// </remarks>
+    /// <summary>
+    ///     The values of a projection EF would translate whole, in order, constants and captured
+    ///     values included; or <see langword="null" /> when EF would not, or when the fragments are
+    ///     already all of them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> EF binds a projection made of
+    ///         constructions whose every value translates in one mode and puts each value in the
+    ///         statement: <c>Select(c =&gt; new { c.CustomerID, ConstantTrue = true })</c> is
+    ///         <c>SELECT "c"."CustomerID", 1</c>, and a captured value is a parameter there. A
+    ///         projection with anything else in it, client code or a conditional, is bound in the
+    ///         other mode, which keeps constants on the client. This client kept them on the client
+    ///         always, because <see cref="CollectFragments" /> lifts only what reads the row, and a
+    ///         projection of a constant alone asked the store for <c>1</c> instead of the constant.
+    ///     </para>
+    ///     <para>
+    ///         <b>A closed construction that holds a captured value is not decomposed</b>, because
+    ///         EF's funcletizer lifts it whole into one parameter of the anonymous type, which no
+    ///         statement can project: <c>Select(b =&gt; new { F = flag })</c> is <c>SELECT 1</c>
+    ///         there. Parameter substitution opens that parameter back into its construction here,
+    ///         so a closed construction of constants and one of captured values look alike until
+    ///         their values are read (<c>A_projection_reading_no_column_matches_the_direct_query</c>).
+    ///     </para>
+    /// </remarks>
+    private static List<Expression>? TranslatableLeaves(
+        Expression body, List<Expression> fragments, BoundaryAnalysis analysis)
+    {
+        var lifted = new HashSet<Expression>(fragments, ReferenceEqualityComparer.Instance);
+        var leaves = new List<Expression>();
+
+        return Collect(body) && leaves.Count > fragments.Count ? leaves : null;
+
+        bool Collect(Expression node)
+        {
+            IEnumerable<Expression>? parts = node switch
+            {
+                NewExpression construction => construction.Arguments,
+                MemberInitExpression initialization
+                    when initialization.Bindings.All(b => b.BindingType == MemberBindingType.Assignment)
+                    => [
+                        .. initialization.NewExpression.Arguments,
+                        .. initialization.Bindings.Cast<MemberAssignment>().Select(a => a.Expression),
+                    ],
+                _ => null,
+            };
+
+            if (parts is not null)
+            {
+                return (analysis.FactsFor(node).Free.Count > 0 || parts.All(p => p is ConstantExpression or NewExpression or MemberInitExpression))
+                    && parts.All(Collect);
+            }
+
+            if (lifted.Contains(node))
+            {
+                leaves.Add(node);
+                return true;
+            }
+
+            NodeFacts facts = analysis.FactsFor(node);
+            if (facts.ServerOk && facts.Free.Count == 0 && IsScalar(node.Type))
+            {
+                leaves.Add(node);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private static bool IsScalar(Type type)
+        => type == typeof(string)
+            || NullableScalars.ContainsKey(type)
+            || NullableScalars.ContainsValue(type)
+            || type.IsEnum
+            || Nullable.GetUnderlyingType(type) is { IsEnum: true };
+
+    /// <summary>
+    ///     Whether a subtree queries the store: it contains a query root.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Since 2026-09-26, found by #167's slow run.</b> A subquery that reads nothing of
+    ///         the row is closed, so <see cref="CollectFragments" /> left it in the client-side
+    ///         rebuild like a constant, and the client ran it as a statement of its own:
+    ///         <c>Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy</c> ran two statements
+    ///         where EF's own client writes one, with a scalar subquery in it.
+    ///     </para>
+    ///     <para>
+    ///         It is the same exception to "a closed subtree is the client's" that
+    ///         <see cref="CallsMappedFunction" /> makes, for a related reason: a query is the
+    ///         store's work, and EF puts it in the statement of the projection that holds it.
+    ///     </para>
+    /// </remarks>
+    private static bool ReadsTheStore(Expression node)
+        => node is Microsoft.EntityFrameworkCore.Query.QueryRootExpression
+            || ChildrenOf(node).Any(ReadsTheStore);
+
     private bool CallsMappedFunction(Expression node)
     {
         if (_model is null)
@@ -1064,8 +1917,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///     <para>
     ///         A fragment must read the row: a body constant needs no round trip and stays on the
     ///         client, where it costs nothing. <b>Unless the client cannot compute it</b>, which
-    ///         is a mapped store function and nothing else. See
-    ///         <see cref="CallsMappedFunction" />.
+    ///         is a mapped store function (<see cref="CallsMappedFunction" />), <b>or it queries the
+    ///         store</b> (<see cref="ReadsTheStore" />). Until 2026-09-26 this read "which is a mapped
+    ///         store function and nothing else", and a closed subquery then ran as a statement of its
+    ///         own.
     ///     </para>
     ///     <para>
     ///         A fragment taken from the branch of a conditional carries that conditional's test in
@@ -1087,7 +1942,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // cheaper there — unless it calls a function only the store has. See above.
         if (facts.ServerOk
             && facts.Free.All(rowParameters.Contains)
-            && (facts.Free.Count > 0 || CallsMappedFunction(node)))
+            && (facts.Free.Count > 0 || CallsMappedFunction(node) || ReadsTheStore(node)))
         {
             fragments.Add(node);
             if (guard is not null)
@@ -1153,16 +2008,52 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         rewritten call unshippable — six tests fell back to the residual, where the
     ///         navigation they read had no query to carry it.
     ///     </para>
+    ///     <para>
+    ///         <b>A scalar travels unguarded since 2026-09-26, found by #167's slow run.</b> The
+    ///         guard put <c>CASE WHEN test THEN value ELSE default END</c> into the statement, where
+    ///         plain EF Core projects the column as it stands and reads it as nullable: about fifteen
+    ///         methods, the <c>Null_check_in_*_projection_should_not_be_removed</c> family among
+    ///         them. What the guard protected against is a <c>NULL</c> reaching a non-nullable slot,
+    ///         and a slot that is nullable cannot fail that way. So a string or a nullable scalar
+    ///         travels as it is, a non-nullable scalar travels converted to its nullable type, which
+    ///         EF translates to the bare column, and <see cref="ReadBack" /> converts it back on the
+    ///         client, down the branch that reads it. Anything else, an entity, a collection or a
+    ///         type this rewrite does not know as a scalar, keeps the guard.
+    ///     </para>
     /// </remarks>
     private static Expression Guarded(
         Expression shipped, Expression fragment, IReadOnlyDictionary<Expression, Expression> guards)
-        => guards.TryGetValue(fragment, out Expression? guard)
-            ? Expression.Condition(
-                guard,
-                shipped,
-                Expression.Constant(
-                    shipped.Type.IsValueType ? Activator.CreateInstance(shipped.Type) : null, shipped.Type))
-            : shipped;
+    {
+        if (!guards.TryGetValue(fragment, out Expression? guard))
+        {
+            return shipped;
+        }
+
+        if (NullableScalars.TryGetValue(shipped.Type, out Type? nullable))
+        {
+            return Expression.Convert(shipped, nullable);
+        }
+
+        if (shipped.Type == typeof(string) || NullableScalars.ContainsValue(shipped.Type))
+        {
+            return shipped;
+        }
+
+        return Expression.Condition(
+            guard,
+            shipped,
+            Expression.Constant(
+                shipped.Type.IsValueType ? Activator.CreateInstance(shipped.Type) : null, shipped.Type));
+    }
+
+    /// <summary>
+    ///     A slot read back as the type of the fragment it carries, where <see cref="Guarded" />
+    ///     sent a non-nullable scalar as its nullable type.
+    /// </summary>
+    private static Expression ReadBack(Expression slot, Expression fragment)
+        => slot.Type != fragment.Type && Nullable.GetUnderlyingType(slot.Type) == fragment.Type
+            ? Expression.Convert(slot, fragment.Type)
+            : slot;
 
     private static IEnumerable<Expression> ChildrenOf(Expression node)
     {

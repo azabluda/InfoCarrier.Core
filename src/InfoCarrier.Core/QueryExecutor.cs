@@ -719,11 +719,55 @@ internal sealed class QueryExecutor<TElement>
         /// </summary>
         private bool _indexIntoACollectionParameter;
 
+        /// <summary>
+        ///     The query parameter being substituted, while <see cref="Substitute" /> runs for one, so
+        ///     that <see cref="Boxed" /> gives every read of it the same box.
+        /// </summary>
+        private string? _parameterName;
+
+        /// <summary>
+        ///     One box per query parameter and type, for this execution.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>One parameter stays one parameter.</b> EF's funcletizer on the client gives a
+        ///         captured variable the query reads twice ONE parameter, <c>@title</c> in both places.
+        ///         A box per read gave the server's funcletizer two values, and it keeps one parameter
+        ///         only for values its <c>ExpressionEqualityComparer</c> finds equal, so the server ran
+        ///         <c>@p0 ... @p1</c> where plain EF runs <c>@p0 ... @p0</c>. Found by #167's slow run
+        ///         in about 54 methods, EF's own
+        ///         <c>Using_same_parameter_twice_in_query_generates_one_sql_parameter</c> among them;
+        ///         <c>ServerParameterizationTest.A_captured_variable_read_twice_is_one_parameter</c> is
+        ///         the promise.
+        ///     </para>
+        ///     <para>
+        ///         <b>The same box object reaches the server as one object</b>, because
+        ///         <see cref="DynamicValueMapper" /> sends a back-reference for an object it has
+        ///         already mapped in the same message. So the two reads compare equal there, and EF
+        ///         gives them one parameter, as its own client does.
+        ///     </para>
+        /// </remarks>
+        private readonly Dictionary<(string Name, Type Type), object> _boxes = [];
+
         protected override Expression VisitExtension(Expression node)
             => node is QueryParameterExpression queryParameter
                 && _queryContext.Parameters.TryGetValue(queryParameter.Name, out object? value)
-                    ? Substitute(WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
+                    ? SubstituteParameter(queryParameter.Name, WithoutNullEntities(value, queryParameter.Type), queryParameter.Type)
                     : base.VisitExtension(node);
+
+        private Expression SubstituteParameter(string name, object? value, Type parameterType)
+        {
+            string? outer = _parameterName;
+            _parameterName = name;
+            try
+            {
+                return Substitute(value, parameterType);
+            }
+            finally
+            {
+                _parameterName = outer;
+            }
+        }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
@@ -1181,10 +1225,20 @@ internal sealed class QueryExecutor<TElement>
             PropertyInfo[] members =
                 [.. constructor.GetParameters().Select(p => anonymousType.GetProperty(p.Name!)!)];
 
-            return Expression.New(
-                constructor,
-                members.Select(m => Substitute(m.GetValue(value), m.PropertyType)),
-                members);
+            // A member is not a query parameter of its own, so it gets a box of its own.
+            string? outer = _parameterName;
+            _parameterName = null;
+            try
+            {
+                return Expression.New(
+                    constructor,
+                    [.. members.Select(m => Substitute(m.GetValue(value), m.PropertyType))],
+                    members);
+            }
+            finally
+            {
+                _parameterName = outer;
+            }
         }
 
         /// <summary>
@@ -1280,12 +1334,23 @@ internal sealed class QueryExecutor<TElement>
         ///     parameter: a member read over a constant, which is what a captured variable is
         ///     (B22).
         /// </summary>
-        private static Expression Boxed(object? value, Type parameterType)
-            => Expression.Property(
-                Expression.Constant(
-                    Activator.CreateInstance(typeof(ParameterBox<>).MakeGenericType(parameterType), value),
-                    typeof(ParameterBox<>).MakeGenericType(parameterType)),
-                nameof(ParameterBox<object>.Value));
+        /// <remarks>
+        ///     Every read of one query parameter gets the same box; see <see cref="_boxes" />.
+        /// </remarks>
+        private Expression Boxed(object? value, Type parameterType)
+        {
+            Type boxType = typeof(ParameterBox<>).MakeGenericType(parameterType);
+            if (_parameterName is null || !_boxes.TryGetValue((_parameterName, parameterType), out object? box))
+            {
+                box = Activator.CreateInstance(boxType, value)!;
+                if (_parameterName is not null)
+                {
+                    _boxes[(_parameterName, parameterType)] = box;
+                }
+            }
+
+            return Expression.Property(Expression.Constant(box, boxType), nameof(ParameterBox<object>.Value));
+        }
 
         private static Type? SequenceElementType(Type type)
             => type.IsArray
@@ -1301,7 +1366,7 @@ internal sealed class QueryExecutor<TElement>
         {
             if (IsQueryParameter(_queryContext, node, out object? value))
             {
-                return Substitute(value, node.Type);
+                return SubstituteParameter(node.Name!, value, node.Type);
             }
 
             return base.VisitParameter(node);

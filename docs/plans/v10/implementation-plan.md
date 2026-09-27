@@ -7031,9 +7031,18 @@ plain-EF run:
   misses rows, 118 methods of this repository's own classes, 13 of the harness, 6 false alarms of
   decision 3's reverse half; and 22 methods that plain EF on SQLite refuses and InfoCarrier answers.
 
-**Triage is deferred (owner, 2026-09-26), and the slow run stays red until it happens.** No
-InfoCarrier reason is added in this phase, the 22 "InfoCarrier answers" methods included. The slow
-run is not a gate (decision 5), so a red there blocks nothing.
+**Every red family goes through the loop, and a fix in the product comes before a reason (owner,
+2026-09-26).** Until H6 this paragraph read: "Triage is deferred (owner, 2026-09-26), and the slow
+run stays red until it happens. No InfoCarrier reason is added in this phase, the 22 "InfoCarrier
+answers" methods included." The owner reversed it the same day, after H5 showed the loop working:
+convert all remaining families, not only the largest, and "slow reds don't necessarily need to be
+attributed; the best way to deal with them is to fix the bug in prod". So a red is a defect report
+first. An `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason flagged `SqlDiffers`,
+`AnswerNotRefusal` or `RefusedEarlier` is the fallback where no fix is possible, never a way to turn
+the slow run green in bulk. The 22 methods plain EF on SQLite refuses and this provider answers are
+the exception to "fix first": aligning them changes what a user gets today, and
+`website/docs/limitations.md` says this provider answers such queries, so their cost goes to the
+owner before any code. The slow run is not a gate (decision 5), so a red there blocks nothing.
 
 ### The whole permanent footprint
 
@@ -7089,12 +7098,27 @@ claims a runtime difference. The amendment proposed:
    provider's behaviour, and never a skip. A statement difference needs `SqlDiffers`; an outcome
    difference needs one of the other two. The forward half is unmeasured under this rule: the 13
    methods the spike found green, each with a reason and a difference, are checked in H3.
+   **Since 2026-09-27 the forward half also reads `Other`** (the owner, H19): a difference none of
+   the three describes is stated in the reason's `DeviationNote`, which the audit requires with
+   `Other`, and the reason covers a difference of either kind. The reverse half does not read it,
+   because `Other` also marks a body that runs nothing different. Until then this point read
+   "Both halves read only an InfoCarrier reason whose `Deviation` carries `SqlDiffers`,
+   `AnswerNotRefusal` or `RefusedEarlier`", and eight methods whose difference none of the three
+   described stayed red.
 2. **The comparison covers the classes that run an EF specification base.** This repository's own
    classes (`ServerSqlTest`, `SqliteSmokeTest`, `ServerParameterizationTest` and the others) assert
    this provider directly and have no plain-EF counterpart. A plain-EF run that still crosses the
    wire is red, which is how the spike found them.
-3. **Tier B only.** Tier C would need a Firebird plain-EF client, and Tier D has its own `Direct*`
-   controls. Either is a later option, as a nightly slow run in CI is.
+3. **Tiers B and C.** Tier D has its own `Direct*` controls, and is a later option, as a nightly slow
+   run in CI is. Until 2026-09-27 this point read "**Tier B only.** Tier C would need a Firebird
+   plain-EF client, and Tier D has its own `Direct*` controls. Either is a later option". The owner
+   took up Tier C that day (H17), and the Firebird plain-EF client is the provider with the
+   server's own correction to its SQL generator. **Tier A stays outside, and the owner gave the
+   reason on 2026-09-27**: its store is EF's InMemory provider, which runs no statement, so the
+   command capture has nothing to record and the comparison could see only an outcome that
+   differs. It cannot mine Tier A for the defects it finds on Tier B: a filter left on the client,
+   a column read too many, a subquery EF would not write. Moving bases from Tier A to Tier B is
+   what would put them in reach, and that is a scope decision for the owner.
 
 ### Steps
 
@@ -7161,6 +7185,373 @@ claims a runtime difference. The amendment proposed:
       - `DeviationKind.SqlDiffers`, `SqlCapture.Compare` and `SameStatements` from `sql-capture`.
 
       Done when a slow run of Tier B is red only for differences, and a normal run is unchanged.
+- [x] **H5. The loop, shown on one finding: a captured variable read twice is one parameter.**
+      The owner asked to see the mechanism in real action before any of it reaches `main`, and
+      that "the best way to deal with a slow red is to fix the bug in prod" (2026-09-26). So one
+      family went through the whole loop, on the branch `live-comparison-one-parameter`, on top of
+      H3:
+
+      1. **The slow run showed it red**: 187 red methods after H3, EF's own
+         `Using_same_parameter_twice_in_query_generates_one_sql_parameter` among them, plain EF
+         sending `@p0 ... @p0` where InfoCarrier sent `@p0 ... @p1`.
+      2. **A promise went red in a normal run**:
+         `ServerParameterizationTest.A_captured_variable_read_twice_is_one_parameter`, compared
+         positionally with `SqlNormalizer`, because the class's own normalization renames every
+         parameter to `@p` and none of its promises could see it. Seen red with only the test
+         committed.
+      3. **The fix**: `SubstituteParametersExpressionVisitor` gives every read of one query
+         parameter the same `ParameterBox<T>`, where it made a box per read. The mapper sends a
+         back-reference for an object it has already mapped in the same message, so the server
+         rebuilds one box, and EF's funcletizer, which keeps one parameter for values its
+         `ExpressionEqualityComparer` finds equal, gives the two reads one parameter. No public
+         type and no wire format changed.
+      4. **The next slow run**: `Passed: 19204, Failed: 249, Skipped: 155, Total: 19608`, against
+         `Failed: 367` before. **59 methods left the red list and none joined it**, and no test
+         that stayed red changed its verdict; the family also held the four bulk updates with
+         `Skip(n).Take(n)` and 20 Gears of War methods.
+
+      Normal run, `eng/measure.sh one-parameter h3`: **FAILING 0, TOTAL 29915**, FIXED none, BROKEN
+      none, REASONS unchanged. `trim-ratchet.sh` OK at 100 <= 100. `InfoCarrier.Core.TransportTests`
+      **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5
+      warnings, 0 errors.
+- [x] **H6. Operators above a client-side rebuild move below it.** The first family after the
+      owner's "convert all of them", on the branch `live-comparison-rebuild-operators`, on top of H5.
+      The slow run after H5 grouped its 249 red tests into 128 methods, and the family that read the
+      most rows was one gap: an operator written above a projection this client rebuilds stayed on
+      the client. `Interface_casting_though_generic_method` read 831 orders where plain EF reads
+      one, `Count_on_projection_with_client_eval` read every order to count them, and
+      `Take_with_single_select_many` read 75531 rows of a cross join where plain EF reads two.
+
+      1. **Five promises in `ServerParameterizationTest`, seen red first**: a filter through an
+         interface, a terminal operator's predicate, a count above client code, paging above client
+         code, and an ordered `SelectMany` with `Take(1).Cast<object>().SingleOrDefault()`. A plain
+         filter and a plain ordering over a client type already reached the store through the
+         carrier rewrite, which is why the first two read through an interface and a terminal.
+      2. **The fix**: `ProjectionRewriter.TryMoveBelowReassembly` and `VisitOrderingChain` move a
+         `Where`, an ordering chain, `Skip`, `Take`, a terminal operator's predicate and a
+         `Count`/`LongCount`/`Any` below the rebuild, when the lambda fused with the rebuild is one
+         the server can run and reads no slot that holds a sequence (§6a of
+         `docs/projection-split.md`, whose §3.4 has the amendment). `WithRowLimitForTerminalOperator`
+         looks through `Cast`.
+      3. **The next slow run**: `Passed: 19249, Failed: 209, Skipped: 155, Total: 19613`, against
+         `Failed: 249`. **20 methods left the red list and none joined it**, and none of the 108 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh rebuild-operators2 one-parameter`: **FAILING 0, TOTAL 29920**,
+      FIXED none, BROKEN none, REASONS unchanged. The first measurement broke one test,
+      `InMemorySmokeTest.A_split_that_pages_on_the_client_names_what_stayed_behind`, whose example
+      of a split that removes rows on the client was a `Take` that no longer stays there; it is
+      `A_split_that_removes_rows_on_the_client_names_what_stayed_behind` now, over `ElementAt`.
+      `trim-ratchet.sh` OK at 103 <= 103, a deliberate rise of three recorded in
+      `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total:
+      28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H7. A `FirstOrDefault` inside a projection runs on the server's tuple.** On the branch
+      `live-comparison-nested-single`, on top of H6. It is the first of the two gaps parked on
+      2026-09-26 for the slow run to show: `b.Posts.Select(p => new { p.Heading }).FirstOrDefault()`
+      inside a projection kept the operator above the rebuild, on the client, so every child row
+      travelled in a slot and this client kept one. `Lift_projection_mapping_when_pushing_down_subquery`
+      read 134 rows where plain EF reads 24 with a `ROW_NUMBER()` window.
+
+      1. **Two promises in `ServerParameterizationTest`, seen red first**: the `Lift_projection`
+         shape, whose anonymous type appears both under the operator and as a collection, and a
+         construction that reads no column. A single anonymous type under the operator already
+         reached the store through the carrier rewrite, which is why the first promise carries both.
+      2. **The fix**: `ProjectionRewriter.SingleResultSourceFinder` marks each projection inside a
+         lambda that a `FirstOrDefault` or `SingleOrDefault` reads one row of, and its tuple is the
+         reference-typed family, so that "no row" is `null`. `OneRowRebuilt` runs the operator on
+         that tuple and rebuilds the row on the client through an invocation, which the outer rewrite
+         lifts whole into a slot of its own.
+      3. **The next slow run**: `Passed: 19291, Failed: 169, Skipped: 155, Total: 19615`, against
+         `Failed: 209`. **20 methods left the red list and none joined it**, and none of the 88 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh nested-single rebuild-operators2`: **FAILING 0, TOTAL 29922**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104, a deliberate
+      rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+- [x] **H8. A subquery that reads nothing of the row runs in the projection's statement.** On the
+      branch `live-comparison-closed-subquery`, on top of H7. The second gap parked on 2026-09-26:
+      `Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy` ran two statements where plain
+      EF runs one with a scalar subquery, and the second statement had `OFFSET @p` where EF writes
+      `OFFSET 1`. The subquery is closed, so `ProjectionRewriter.CollectFragments` left it in the
+      client-side rebuild like a constant, and the client ran it on its own.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_subquery_reading_nothing_of_the_row_runs_in_the_same_statement`.
+      2. **The fix**: `ReadsTheStore` makes a closed subtree that contains a query root a fragment,
+         the exception `CallsMappedFunction` already makes for a store function.
+      3. **The next slow run**: `Passed: 19296, Failed: 165, Skipped: 155, Total: 19616`, against
+         `Failed: 169`. 163 of the 165 are comparison reds in 85 methods: **3 methods left the red
+         list and none joined it**, and none of those that stayed red changed its verdict or its
+         read counts. The other 2 are `NorthwindGroupBy.Complex_query_with_groupBy_in_subquery3`,
+         one of the 22 methods plain EF on SQLite refuses: its subquery now reaches the store in
+         the projection's statement, and SQLite refuses it with EF's own `ApplyNotSupported`. EF's
+         `NorthwindGroupByQuerySqliteTest` overrides it with exactly that assertion, so the override
+         is adopted, as the rule for a newly red SQLite test says, and 21 of the 22 remain.
+
+      Normal run, `eng/measure.sh closed-subquery nested-single`: **FAILING 2, TOTAL 29923**, and the
+      2 are those two tests, BROKEN with `ApplyNotSupported`; the class with EF's override adopted
+      then ran green on its own (below). `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H9. A scalar under a null check travels as the column, with no `CASE`.** On the branch
+      `live-comparison-unguarded-slots`, on top of H8. A value lifted out of a branch of
+      `x.Nav != null ? new { … } : null` travelled as `CASE WHEN test THEN value ELSE default END`,
+      so that a non-nullable slot never received a `NULL` from an outer join. Plain EF projects the
+      column as it stands and reads it as nullable: about fifteen methods, the eight
+      `Null_check_in_*_projection_should_not_be_removed` among them.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_value_under_a_null_check_is_read_as_the_column`.
+      2. **The fix**: `ProjectionRewriter.Guarded` sends a string or a nullable scalar as it is, and a
+         non-nullable scalar converted to its nullable type, which EF translates to the bare column;
+         `ReadBack` converts the slot back on the client, down the branch that reads it. An entity,
+         a collection, an enum and any type not in `NullableScalars` keep the guard. The table is
+         spelt out rather than built with `MakeGenericType`, so the trim count does not move.
+      3. **The next slow run**: `Passed: 19328, Failed: 134, Skipped: 155, Total: 19617`, against
+         `Failed: 165`. **15 methods left the red list and none joined it**, and none of the 70 that
+         stayed red changed its verdict or its read counts. All 134 are comparison reds.
+
+      The Gears of War, complex-navigation, owned and ad-hoc classes on all three tiers first,
+      because the guard was added for 26 Gears of War failures: **Passed: 8251, Failed: 0,
+      Skipped: 21, Total: 8272**. Normal run, `eng/measure.sh unguarded-slots closed-subquery`:
+      **FAILING 0, TOTAL 29924**, FIXED the two tests H8 converged, BROKEN none. `trim-ratchet.sh`
+      OK at 104 <= 104. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**.
+      `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H10. A constant in a projection EF translates whole is projected by the store.** On the
+      branch `live-comparison-projected-constants`, on top of H9. EF binds a projection made only
+      of constructions whose every value translates in one mode and puts each value in the
+      statement, a constant or a captured value included; a projection with client code or a
+      conditional keeps its constants on the client. This client kept them on the client always:
+      `Select_anonymous_literal` asked the store for `1` where EF asks for `10`, and
+      `Select_null_parameter` for no column where EF projects `@p0`.
+
+      1. **Four promises in `ServerParameterizationTest`**, three seen red first: constants beside a
+         column, a constant alone, a captured value; and a control, a constant beside client code,
+         green before and after, because EF keeps that one on the client too.
+      2. **The fix**: `ProjectionRewriter.TranslatableLeaves` lifts every closed scalar of a
+         projection made only of constructions into the tuple, in order, when EF would translate the
+         projection whole. A closed construction holding a captured value is not decomposed, because
+         EF's funcletizer lifts it whole into one parameter no statement can project, and
+         `A_projection_reading_no_column_matches_the_direct_query` pins that it stays `SELECT 1`.
+      3. **The next slow run**: `Passed: 19350, Failed: 116, Skipped: 155, Total: 19621`, against
+         `Failed: 134`. **9 methods left the red list and none joined it**, and none of the 61 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 11823, Failed: 0, Skipped: 34, Total:
+      11857**. Normal run, `eng/measure.sh projected-constants unguarded-slots`: **FAILING 0, TOTAL
+      29928**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H11. A member read through a construction is the value it was built from.** On the
+      branch `live-comparison-member-folding`, on top of H10. `where new { Name =
+      g.LeaderNickname, Squad = g.LeaderSquadId }.Name == "Marcus"` names a type only this client
+      has, so the filter ran on the client over every row, where EF reads `.Name` through the
+      construction and writes the filter: `Where_member_access_on_anonymous_type`. The same read
+      through `(test ? new Dto { … } : null).Member`, with the DTO's members typed as interfaces so
+      the carrier rewrite cannot retype them, kept the filter of
+      `Filter_on_nested_DTO_with_interface_gets_simplified_correctly` on the client.
+
+      1. **Two promises in `ServerParameterizationTest`, both seen red with the fix stashed**: a
+         member of a construction in a filter, and a member through a null-checked construction
+         held through an interface.
+      2. **The fix**: `MemberReadFolder`, EF's own `ReplacingExpressionVisitor` used with nothing to
+         replace, whose member visit folds a read through a construction, plus the conditional
+         shape with a `null` branch whose member type can hold a `null`. It runs over the whole
+         query before the split, and inside `ProjectionRewriter.Fuse`.
+      3. **The next slow run**: `Passed: 19358, Failed: 110, Skipped: 155, Total: 19623`, against
+         `Failed: 116`. **3 methods left the red list and none joined it**, and none of the 58 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18744, Failed: 0, Skipped: 46, Total:
+      18790**. Normal run, `eng/measure.sh member-folding projected-constants`: **FAILING 0, TOTAL
+      29930**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H12. A `GroupBy` on an empty key aggregates at the store.** On the branch
+      `live-comparison-empty-group-key`, on top of H11. `GroupBy(o => new { })` keys every row on
+      one empty anonymous object. The carrier rewrite gives a key of the caller's anonymous type a
+      tuple, and skipped a key with no member, because a tuple needs a slot. The grouping stayed on
+      the client and the server sent the whole table for one aggregate:
+      `GroupBy_empty_key_Aggregate` read 831 orders where plain EF reads one row, and the two
+      `Group_by_multiple_aggregate_joining_different_tables` methods read every parent with both
+      joins.
+
+      1. **Two promises in `ServerParameterizationTest`, seen red first**: an aggregate over an empty
+         key, and the same with `g.Key` projected.
+      2. **The fix**: `TransparentIdentifierRewriter` re-carries an empty anonymous type as a tuple
+         of one constant slot, which EF groups by as it groups by the empty key. A member of that
+         type takes no slot in a tuple that holds it, because plain EF projects no column for such
+         a `g.Key`; the client builds the empty object from nothing.
+      3. **The next slow run**: `Passed: 19368, Failed: 102, Skipped: 155, Total: 19625`, against
+         `Failed: 110`. **4 methods left the red list and none joined it**, and none of the 54 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18746, Failed: 0, Skipped: 46, Total:
+      18792**. Normal run, `eng/measure.sh empty-group-key member-folding`: **FAILING 0, TOTAL
+      29932**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 104 <= 104.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H13. `Last` above a client-side rebuild reverses the ordering at the store.** On the
+      branch `live-comparison-last-row`, on top of H12. `First` and `Single` above a projection
+      this client rebuilds sent their row limit to the server, and `Last` did not, because it needs
+      the ordering reversed: the server sent every row and this client kept the last
+      (`Return_type_of_singular_operator_is_preserved`). EF writes `ORDER BY ... DESC LIMIT 1`.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_Last_over_a_client_type_reads_one_row_at_the_store`, over an `OrderBy` and a
+         `ThenByDescending`.
+      2. **The fix**: `QuerySplitter.WithRowLimitForTerminalOperator` handles `Last` and
+         `LastOrDefault`: `WithOrderingReversed` turns the shipped query's ordering chain round,
+         through the projections above it, and a limit of one follows. Paging under `Last`, and a
+         query with no ordering, stay as they were. The remark on `RowsForTerminalOperator` that
+         called `Last` absent is corrected, quoting it.
+      3. **The next slow run**: `Passed: 19371, Failed: 100, Skipped: 155, Total: 19626`, against
+         `Failed: 102`. **1 method left the red list and none joined it**, and none of the 53 that
+         stayed red changed its verdict or its read counts.
+
+      The query classes on all three tiers first: **Passed: 18747, Failed: 0, Skipped: 46, Total:
+      18793**. Normal run, `eng/measure.sh last-row empty-group-key`: **FAILING 0, TOTAL 29933**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 105 <= 105, a deliberate
+      rise of one recorded in `eng/trim-baseline.txt`. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+- [x] **H14. `EnsureCreated` runs no statement on this client: a reason, not a fix.** On the branch
+      `live-comparison-ensure-created`, on top of H13. `Throws_on_concurrent_query_list` and
+      `_first` pass, and the store sees one statement fewer for each: the base calls
+      `EnsureCreatedResilientlyAsync()`, EF's SQLite creator answers it with
+      `SELECT COUNT(*) FROM "sqlite_master" …`, and `InfoCarrierDatabaseCreator` reports success and
+      runs nothing, because schema operations are the server's. The fix would be a remote schema
+      operation, which this provider does not offer, so this is the fallback the owner's rule allows:
+      two overrides with EF's body and an `[InfoCarrierDesign]` reason flagged `SqlDiffers`, naming
+      `docs/architecture.md` D7. Test only.
+
+      Slow run of Tier B: **`Passed: 19375, Failed: 96, Skipped: 155, Total: 19626`**, against
+      `Failed: 100`. **2 methods left the red list and none joined it**, and none of the 51 that
+      stayed red changed its verdict or its read counts. The class with `OverrideAuditTest`: **Passed:
+      936, Failed: 0, Skipped: 1, Total: 937**. Normal run, `eng/measure.sh ensure-created last-row`:
+      **FAILING 0, TOTAL 29933**, FIXED none, BROKEN none, REASONS unchanged.
+- [x] **H15. A `SelectMany` over a rebuilt inner projection flattens the server's tuples.** On the
+      branch `live-comparison-selectmany-rebuild`, on top of H14. Inside a projection,
+      `c.Orders.SelectMany(o => o.OrderDetails.Where(…).Select(od => new Dto(…)))` kept the inner
+      rebuild inside the collection selector, so the `SelectMany` read client code and could not
+      ship. The outer projection then carried every order with every detail, and this client ran the
+      filter: `SelectMany_with_client_eval_with_constructor` read 70 rows where plain EF reads 66.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_filter_inside_a_nested_SelectMany_over_a_client_type_runs_at_the_store`, over blogs,
+         posts and tags.
+      2. **The fix**: `ProjectionRewriter.TryMoveBelowReassembly` moves the rebuild above a
+         `SelectMany` whose collection selector returns a reassembly that does not read the
+         selector's row. `TryHoistCollectionProjection` already did this for a `Queryable`
+         `SelectMany` before it is visited; this covers the `Enumerable` one inside a projection.
+      3. **The next slow run**: `Passed: 19378, Failed: 94, Skipped: 155, Total: 19627`, against
+         `Failed: 96`. **1 method left the red list and none joined it**, and none of the 50 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh selectmany-rebuild ensure-created`: **FAILING 0, TOTAL 29934**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 105 <= 105: the move is
+      in a member that already carried its diagnostic. `InfoCarrier.Core.TransportTests` **Passed:
+      28, Failed: 0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+- [x] **H16. A final `GroupBy` of a client type runs at the server.** On the branch
+      `live-comparison-final-groupby`, on top of H15. A `GroupBy` that ends the query returns its
+      groups, so a key or an element of a client type kept it on the client with its element
+      selector: the server sent every column of every row, unordered, where EF orders by the key and
+      reads only what the element needs. Seven `Final_GroupBy_*` methods of
+      `NorthwindGroupByQueryTestBase`.
+
+      1. **Three promises in `ServerParameterizationTest`, seen red first**:
+         `A_final_GroupBy_on_an_anonymous_key_groups_at_the_store`,
+         `A_final_GroupBy_building_its_elements_reads_only_their_columns` and
+         `A_final_GroupBy_over_a_client_type_groups_at_the_store`.
+      2. **The fix**: `ProjectionRewriter.TryGroupAtTheStore` groups at the server by the key's values
+         and over the element's values, a tuple of each where the type is the client's, and the
+         client rebuilds the key and every element of each group with the new
+         `WireGrouping.Rebuilt`. Over a rebuild, the key is fused with it first. The split of a body
+         into a tuple and its rebuild moved out of `VisitMethodCall` into `Carry`, which both paths
+         use. `docs/projection-split.md` §3.4 records it, with H15.
+      3. **The next slow run**: `Passed: 19395, Failed: 80, Skipped: 155, Total: 19630`, against
+         `Failed: 94`. **7 methods left the red list and none joined it**, and none of the 43 that
+         stayed red changed its verdict or its read counts.
+
+      **Found on the way, and recorded as `docs/upstream-defects.md` §1.13**: plain EF Core throws
+      `ArgumentNullException` for a final `GroupBy` whose key holds the whole primary key,
+      `GroupBy(b => b.Id)` included. Such a query now meets EF's exception over the wire, where
+      this client used to group the rows itself.
+
+      Every class with `GroupBy` in its name, all tiers: **Passed: 1055, Failed: 0, Skipped: 23,
+      Total: 1078**. Normal run, `eng/measure.sh final-groupby selectmany-rebuild`: **FAILING 0,
+      TOTAL 29937**, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106,
+      a deliberate rise of one recorded in `eng/trim-baseline.txt`.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H17. The slow mode covers Tier C.** On the branch `live-comparison-tier-c`, on top of H16,
+      at the owner's request of 2026-09-27. `LiveComparison.Covers` takes Tier C's namespace beside
+      Tier B's. The Firebird store gets a plain-EF client: one shared connection opened once the
+      store is initialized, and the settings of the Firebird provider's own `FbTestStore`. Its
+      provider services carry the server's `FirebirdLateralQuerySqlGenerator` correction too,
+      through one `AddFirebirdServices` for both, because without it plain EF fails every correlated
+      table-valued function on the store defect the correction exists for. Point 3 of the amendment
+      above says so, quoting what it said before. Test only.
+
+      Slow run of Tier C: **`Passed: 108, Failed: 1, Skipped: 1, Total: 110`**. Every test of
+      `UdfDbFunctionInfoCarrierTest` found its plain-EF run. The one red,
+      `Scalar_Function_ClientEval_Method_As_Translateable_Method_Parameter_Instance`, runs the same
+      statement and counts one more `Read()`: plain EF stops reading when the client method in the
+      projection throws, and this provider's server reads to the end first. It stays red for the
+      owner's triage. Normal run, `eng/measure.sh tier-c final-groupby`: **FAILING 0, TOTAL 29937**,
+      FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5
+      warnings, 0 errors.
+- [x] **H18. A projection that reads nothing carries no column.** On the branch
+      `live-comparison-no-column-row`, on top of H17, with the owner's yes of 2026-09-27. A
+      projected collection whose element reads nothing, `b.Posts.Select(p => new BlogCard())`, was
+      carried by a tuple of `1`, and the store projected that `1` beside the keys plain EF projects.
+      That was an accepted deviation: `ServerSqlTest` pinned it, because "the carrier has to hold
+      something" and a literal "reads no column and changes no plan". The first reason no longer
+      holds, and the owner chose EF's statement.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_projected_collection_reading_no_column_projects_none_for_it`.
+      2. **The fix**: `ProjectionRewriter.RowPresence` is an empty `new object()`, which EF binds to no
+         column. `object` is on the allowlist and constructs nothing else. At the root EF writes
+         `SELECT 1` either way. The pinned promise is now
+         `A_projected_collection_reading_no_column_projects_the_keys_alone`, and it and
+         `docs/projection-split.md` §3.2 quote what they said before.
+      3. **The next slow run**: `Passed: 19400, Failed: 76, Skipped: 155, Total: 19631`, against
+         `Failed: 80`. **2 methods left the red list and none joined it**, and none of the 41 that
+         stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh no-column-row tier-c`: **FAILING 0, TOTAL 29938**, FIXED none,
+      BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build
+      with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H19. `Other` covers a difference the three flags do not describe.** On the branch
+      `live-comparison-other-reason`, on top of H18, with the owner's yes of 2026-09-27. Eight
+      methods carried an InfoCarrier reason whose difference none of `SqlDiffers`,
+      `AnswerNotRefusal` and `RefusedEarlier` described, and the slow run read those three alone:
+      three raw-SQL refusals, two connection tests, #52, #113, and a refusal whose message prints a
+      tuple. `LiveComparison` now reads `Other` as covering a difference of either kind, stated in the
+      `DeviationNote` the audit requires with it; the reverse check does not read it, because `Other`
+      also marks a body that runs nothing different. Point 1 of the amendment above says so, quoting
+      what it said. Two of the eight already carried `Other`. The three raw-SQL tests and the two
+      connection tests get `Other` with a note, and #113 gets `AnswerNotRefusal`, which describes it
+      exactly. Tier C's one red gets an `[InfoCarrierDesign(10)]` reason flagged `SqlDiffers`, whose
+      definition includes a reader's reads: the server reads to the end before the client evaluates
+      the projection. Test only.
+
+      Slow run of Tier B: **`Passed: 19414, Failed: 62, Skipped: 155, Total: 19631`**, against
+      `Failed: 76`. **8 methods left the red list and none joined it**, and none of the 33 that
+      stayed red changed its verdict or its read counts. Slow run of Tier C: **`Passed: 109, Failed: 0,
+      Skipped: 1, Total: 110`**. `OverrideAuditTest` **Passed: 1, Failed: 0, Total: 1**. Normal run,
+      `eng/measure.sh other-reason no-column-row`: **FAILING 0, TOTAL 29938**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H19a. ADR-014 records what H6, H17 and H19 changed.** Merged with `main` for the pull
+      request of H5 to H19, the stack met H2's amendment for the first time, and three of its
+      sentences had been reversed on the branches with the owner's yes: triage deferred (H6), Tier B
+      only (H17), three flags only (H19). A dated amendment of 2026-09-28 records the three, and
+      `CLAUDE.md` names `Other` and drops "its triage is deferred". Docs only.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
@@ -7170,5 +7561,9 @@ stack, and one for H4. The owner saw the slow run work and chose the four on 202
 H3 (#171), H5 to H19, H20 to H30, and H31 to H33a, each merged with `--no-ff` so that every step
 keeps its commit. Until then this read "Three pull requests and one direct push: H0/H1, H3 and H4",
 and "No code of this phase lands on `main` until the owner has seen the mechanism in real action"
-(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). The two
-parked SQL gaps and the parameter-numbering family wait for the triage, which starts at H5.
+(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area").
+
+The triage is a step per family from H5 on, with its red promise, its fix and one commit, on a
+branch stacked on the step before. Until H6 this read: "The two parked SQL gaps and the
+parameter-numbering family wait for the triage, and each then gets a red promise, a fix and a pull
+request of its own."

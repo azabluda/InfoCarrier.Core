@@ -44,6 +44,22 @@ namespace InfoCarrier.Core.FunctionalTests.Firebird.Query;
 public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture fixture)
     : UdfDbFunctionTestBase<UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    /// <remarks>
+    ///     <b>The body is EF's; the server reads one row more than plain EF does.</b> The query's
+    ///     projection calls a client method that throws <c>NotImplementedException</c>. Plain EF reads
+    ///     the one row, calls the method while it builds that row, and stops. This client's server
+    ///     reads the result to its end before the client evaluates the projection, which is one more
+    ///     <c>Read()</c> on the same statement. Found by #167's slow run of Tier C, 2026-09-27.
+    /// </remarks>
+    [InfoCarrierDesign(
+        10,
+        Justification = "The client evaluates the projection over the rows the server has already read to the end, "
+            + "so the reader runs past the row on which plain EF stops.",
+        Deviation = DeviationKind.SqlDiffers)]
+    public override void Scalar_Function_ClientEval_Method_As_Translateable_Method_Parameter_Instance()
+        => base.Scalar_Function_ClientEval_Method_As_Translateable_Method_Parameter_Instance();
+
     /// <summary>
     ///     The Tier C fixture for EF's user-defined function context.
     /// </summary>

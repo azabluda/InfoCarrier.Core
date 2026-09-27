@@ -1172,3 +1172,29 @@ run only.
 **Triage is deferred by the owner, and the slow run stays red until it happens.** No InfoCarrier
 reason is added to make it green, including for the 22 methods whose query plain EF on SQLite
 refuses and InfoCarrier answers.
+
+### Amendment 2026-09-28 — the triage started, Tier C is compared, and `Other` covers a difference
+
+Three changes to the amendment above, each made with the owner's yes on a branch that did not yet
+hold it, and recorded here when that branch reached `main` (H6, H17 and H19 in Phase H of
+`plans/v10/implementation-plan.md`).
+
+**The triage is not deferred.** The amendment above said "Triage is deferred by the owner, and the
+slow run stays red until it happens. No InfoCarrier reason is added to make it green". The owner
+reversed that on 2026-09-26, after the first family (H5) went through the loop: "slow reds don't
+necessarily need to be attributed; the best way to deal with them is to fix the bug in prod". So a
+red is a defect report first, and a reason is the fallback where no fix is possible. The methods
+plain EF on SQLite refuses and this provider answers are the exception: aligning them changes what a
+user gets today, so their cost goes to the owner before any code.
+
+**Tier C is compared too** (2026-09-27). The amendment above said "The scope is Tier B; Tier C would
+need a Firebird plain-EF client". That client is the Firebird provider with the server's own
+correction to its SQL generator. Tier A stays outside: its store runs no statement, so the
+comparison could see only an outcome that differs. Tier D keeps its `Direct*` controls.
+
+**Decision 3 also reads `DeviationKind.Other`, for a difference of either kind** (2026-09-27). The
+amendment above said it reads only `SqlDiffers`, `AnswerNotRefusal` and `RefusedEarlier`. Eight
+methods differed in ways none of the three describes; such a difference is now stated in the
+reason's `DeviationNote`, which the audit requires with `Other`. The reverse half does not read
+`Other`, because `Other` also describes a body that differs from upstream's while running nothing
+different.

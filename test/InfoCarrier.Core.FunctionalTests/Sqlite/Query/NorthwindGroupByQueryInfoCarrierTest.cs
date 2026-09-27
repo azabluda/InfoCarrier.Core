@@ -25,9 +25,10 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         over" once a relational backend landed. The relational base adds none of its own.
 ///     </para>
 ///     <para>
-///         The seven <c>ApplyNotSupported</c> overrides are EF Core's own — <c>APPLY</c> is not
+///         The eight <c>ApplyNotSupported</c> overrides are EF Core's own — <c>APPLY</c> is not
 ///         SQLite syntax — adopted after measuring rather than copied in advance, and every one is
-///         convergence with <c>NorthwindGroupByQuerySqliteTest</c>.
+///         convergence with <c>NorthwindGroupByQuerySqliteTest</c>. This said "seven" until
+///         2026-09-26, when <c>Complex_query_with_groupBy_in_subquery3</c> converged.
 ///     </para>
 ///     <para>
 ///         <b><c>Final_GroupBy_nominal_type_entity</c> runs EF's own test since 2026-09-22.</b> Until
@@ -87,6 +88,18 @@ public class NorthwindGroupByQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqlit
         Justification = Upstream.GaveNoReason)]
     public override Task Complex_query_with_group_by_in_subquery5(bool async)
         => AssertApplyNotSupported(() => base.Complex_query_with_group_by_in_subquery5(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Converged on 2026-09-26 (#167, step H8). The subquery reads nothing of the customer, so
+    ///     this client ran it as a statement of its own and answered; it is part of the projection's
+    ///     statement now, as in plain EF Core, and the store refuses it the same way.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindGroupByQuerySqliteTest.cs", 38, 39,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Complex_query_with_groupBy_in_subquery3(bool async)
+        => AssertApplyNotSupported(() => base.Complex_query_with_groupBy_in_subquery3(async));
 
     /// <inheritdoc />
     [StoreLimit(

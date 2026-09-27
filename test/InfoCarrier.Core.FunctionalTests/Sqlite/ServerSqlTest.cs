@@ -60,8 +60,8 @@ FROM "Tickets" AS "t"
 """);
 
     /// <summary>
-    ///     A projected collection whose element reads nothing from the row asks the store for one
-    ///     constant, and for no column of that collection.
+    ///     A projected collection whose element reads nothing from the row asks the store for the
+    ///     keys alone, and for no column of that collection.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -70,18 +70,24 @@ FROM "Tickets" AS "t"
     ///         the element yields no fragment, so the rewrite gave up and the seat travelled whole.
     ///     </para>
     ///     <para>
-    ///         <b>A promise and not a comparison, because one constant remains.</b> Plain EF Core
-    ///         projects the two keys and nothing else here, since the element is a parameter to it.
-    ///         This client projects <c>1</c> as well: the carrier has to hold something, and a
-    ///         member-less tuple is neither on the allowlist nor buildable by
-    ///         <see cref="TupleCarrier" />. A literal in a projection list reads no column and
-    ///         changes no plan, so it is priced and accepted rather than chased.
+    ///         <b>The keys and nothing else since 2026-09-27</b>, which is what plain EF Core
+    ///         projects here, since the element is a parameter to it. The carrier is an empty
+    ///         <c>new object()</c>, which EF binds to no column. Until that day this was named
+    ///         <c>A_projected_collection_reading_no_column_sends_one_constant</c>, expected a
+    ///         <c>1</c> after the ticket's key, and read: "A promise and not a comparison, because one
+    ///         constant remains. [...] the carrier has to hold something, and a member-less tuple is
+    ///         neither on the allowlist nor buildable by <see cref="TupleCarrier" />. A literal in a
+    ///         projection list reads no column and changes no plan, so it is priced and accepted
+    ///         rather than chased." Both statements are still true of a tuple; the owner chose EF's
+    ///         statement once a carrier without a tuple was found. #167's slow run found the
+    ///         constant in <c>MemberInit_in_projection_without_arguments</c> and
+    ///         <c>OwnsMany_correlated_projection</c>.
     ///         <c>ServerParameterizationTest.A_projection_reading_no_column_matches_the_direct_query</c>
-    ///         is the unnested shape, which does equal EF's statement.
+    ///         is the unnested shape.
     ///     </para>
     /// </remarks>
     [ConditionalFact]
-    public Task A_projected_collection_reading_no_column_sends_one_constant()
+    public Task A_projected_collection_reading_no_column_projects_the_keys_alone()
     {
         bool flag = true;
 
@@ -90,7 +96,7 @@ FROM "Tickets" AS "t"
                 .Select(t => new { t.Subject, Flags = t.Seats.Select(s => new { F = flag }).ToList() })
                 .ToListAsync(),
             """
-SELECT "t"."Subject", "t"."Id", 1, "s"."Id"
+SELECT "t"."Subject", "t"."Id", "s"."Id"
 FROM "Tickets" AS "t"
 LEFT JOIN "Seats" AS "s" ON "t"."Id" = "s"."TicketId"
 ORDER BY "t"."Id"

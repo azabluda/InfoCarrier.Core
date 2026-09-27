@@ -129,10 +129,27 @@ minimal-column payload of requirements §3.3 is not a later optimization but the
 **One projection escaped that sentence until 2026-09-22**, and it is the one that needs no value at
 all. A body reading nothing from the row yields no fragment, so the rewrite gave up and the plain
 cut shipped the maximal `ServerOk` subtree, which is the query root: `Select(b => new { F = flag })`
-read every column the entity has, where EF's own client writes `SELECT 1`. The carrier now holds a
-single constant in that case and the reassembly reads none of it, so the sentence above is true of
-a projection that needs no value too. Both answers were always right, which is why the suite could
-not see it and only a comparison with EF's statement did.
+read every column the entity has, where EF's own client writes `SELECT 1`. The carrier now holds
+nothing in that case and the reassembly reads none of it, so the sentence above is true of a
+projection that needs no value too. Both answers were always right, which is why the suite could
+not see it and only a comparison with EF's statement did. **Since 2026-09-27 the carrier is an
+empty `new object()`**, which EF binds to no column at all; until then this read "The carrier now
+holds a single constant in that case", a tuple of `1`, which a projected collection put into the
+statement beside the keys EF projects (`MemberInit_in_projection_without_arguments`, found by
+#167's slow run). At the root EF writes `SELECT 1` either way.
+
+**Amendment 2026-09-26 — a constant is a value too, when EF would translate the projection
+whole.** EF binds a projection made only of constructions whose every value translates in one mode,
+and puts each value in the statement, a constant or a captured value included:
+`Select(c => new { c.CustomerID, ConstantTrue = true })` is `SELECT "c"."CustomerID", 1`, and
+`Select(c => new { Ten = 10 })` is `SELECT 10`, not the stand-in `1`. A projection with client code
+or a conditional in it is bound in EF's other mode, which keeps constants on the client, and so does
+this rewrite. `ProjectionRewriter.TranslatableLeaves` makes the difference; #167's slow run found
+it in nine methods. A body with no value at all, `new OrderDto()`, is carried by an empty
+`new object()` since 2026-09-27, and EF projects nothing for it, as it projects nothing for the
+caller's own construction. Until then this read "The stand-in `1` remains for a body with no value
+at all, `new OrderDto()`, where EF projects nothing and a tuple has to hold something"; a carrier
+that is not a tuple does not have to.
 
 ### 3.3 Which operators are rewritten
 
@@ -230,7 +247,45 @@ running Tier B a second time with InfoCarrier removed and comparing each test me
 `Multi_level_includes_are_applied_with_skip` had read every order of every customer whose key
 starts with "A".
 
-The general case stays deferred, and §7 still holds it.
+**Amendment 2026-09-26 — the operators written above a rebuild move below it.** Until this date
+the line after this paragraph read "The general case stays deferred, and §7 still holds it." #167's
+slow run, which runs each Tier B test with plain EF Core and through this provider and compares the
+two, showed what that cost: `Select(x => new Dto { Id = x.OrderID }).Where(d => ((IHaveId)d).Id ==
+10252)` read all 831 orders where EF reads one, `Select(o => new { Id = CodeFormat(o.OrderID)
+}).Count()` read every order to count them, and EF's `Take_with_single_select_many` read 75531 rows
+of a cross join where EF reads two. `ProjectionRewriter.TryMoveBelowReassembly` and
+`VisitOrderingChain` now move these onto the server's tuple:
+
+- `Count`, `LongCount` and `Any` without a predicate drop the rebuild, because they read no value
+  of it. EF drops the projection under them too, so client code in it is never called.
+- `Skip` and `Take` move below, for the reason paging under a terminal operator does.
+- `Where` and an ordering chain move below when their lambda, fused with the rebuild, is one the
+  server can run. EF's `ReplacingExpressionVisitor` does the fusion and folds
+  `new Dto { Id = row.Item1 }.Id` to `row.Item1`, through a cast to an interface too.
+- A predicate given to a terminal operator is a `Where` under the operator, as EF normalizes it.
+- `FirstOrDefault` and `SingleOrDefault` without a predicate, inside a projection, run on the
+  server's tuple (`OneRowRebuilt`, the same day, H7). Their projection is carried in the
+  reference-typed `Tuple` family, so that "no row" reads as `null`, and the client rebuilds the one
+  row it gets. Before, the whole collection travelled in a slot and the client kept its first
+  element: `Lift_projection_mapping_when_pushing_down_subquery` read 134 rows where EF reads 24.
+- A `SelectMany` whose collection selector returns a rebuild flattens the server's tuples, and the
+  rebuild goes above it (2026-09-27, H15). Inside a projection the rebuild kept the `SelectMany` on
+  the client, and the outer projection carried every inner row the filter under it was about to
+  drop: `SelectMany_with_client_eval_with_constructor` read 70 rows where EF reads 66.
+- A `GroupBy` that ends the query runs at the server when its key or its element is a client type
+  (`TryGroupAtTheStore`, 2026-09-27, H16). The server groups by the key's values and over the
+  element's values, a tuple of each where the type is the client's, and the client rebuilds the key
+  and every element of each group (`WireGrouping.Rebuilt`). Over a rebuild, the key is fused with it
+  first, and the element is the rebuild. Before, the `GroupBy` and its element selector stayed on
+  the client: the server sent every column of every row, unordered, where EF orders by the key and
+  reads only what the element needs.
+
+**What stays on the client** is an operator whose lambda still needs the rebuild or client code,
+and one whose fused lambda reads a slot that holds a sequence. The second is §6a's lesson: a slot
+can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
+provider translates. `QuerySplitter` judges what stays exactly as before.
+
+The general case of §7, an arbitrary operator over any client-typed element, is still deferred.
 
 ### 3.5 Frontier and fallback
 
@@ -349,7 +404,7 @@ of EF's transparent-identifier handling to hand the server a tree its own normal
 
 | Item | Why deferred | Where |
 |---|---|---|
-| Operator pushdown past the boundary (`Take`/`OrderBy` on tuples) | Correctness first; needs the residual→tuple slot map to be invertible | performance backlog |
+| Operator pushdown past the boundary for any operator over any client-typed element (`Where`, orderings, paging, counting, `Distinct` and `Select` over a rebuild are done, §3.4) | Correctness first; needs the residual→tuple slot map to be invertible | performance backlog |
 | Streaming the residual | Residual evaluation buffers; `IAsyncEnumerable` results are M8/W4 | M8 |
 | Compiled split cache | Depends on ADR-008 constraint 6 canonical form | M8 |
 | `EF.Property` in a residual | Requires shipping shadow state per row | M6 |

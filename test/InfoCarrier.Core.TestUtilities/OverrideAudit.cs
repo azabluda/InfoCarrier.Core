@@ -66,7 +66,9 @@ public static class OverrideAudit
 
     /// <summary>
     ///     The deviations that are this provider's behaviour, legal only on an InfoCarrier reason. A
-    ///     slow run reads exactly these, and no other reason (ADR-014, amendment 2026-09-26).
+    ///     slow run reads these, and no other reason (ADR-014, amendment 2026-09-26), and since
+    ///     2026-09-27 <see cref="DeviationKind.Other" /> as well, which is not in this set because a
+    ///     store reason may carry it too.
     /// </summary>
     internal const DeviationKind InfoCarrierBehaviour =
         DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier | DeviationKind.SqlDiffers;

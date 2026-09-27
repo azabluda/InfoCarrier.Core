@@ -52,7 +52,9 @@ public sealed class QuerySplitter
     ///     absent on purpose: the predicate runs before the limit, so a limit sent in its place would
     ///     answer from the wrong rows. <c>ElementAt</c> and <c>Last</c> are absent too — the first
     ///     needs a <c>Skip</c> the client's own operator would then repeat, and the second needs the
-    ///     ordering reversed, which is what EF does for it.
+    ///     ordering reversed, which is what EF does for it. Since 2026-09-26
+    ///     <c>WithRowLimitForTerminalOperator</c> does that reversal for <c>Last</c> and
+    ///     <c>LastOrDefault</c> and sends a limit of one; this said only "absent" until then.
     /// </remarks>
     private static readonly Dictionary<string, int> RowsForTerminalOperator = new(StringComparer.Ordinal)
     {
@@ -68,6 +70,24 @@ public sealed class QuerySplitter
     /// </summary>
     private static readonly MethodInfo TakeMethod =
         ((Func<IQueryable<object>, int, IQueryable<object>>)Queryable.Take).Method.GetGenericMethodDefinition();
+
+    // The four ordering operators `WithOrderingReversed` turns round, from delegates for the reason
+    // `TakeMethod` is.
+    private static readonly MethodInfo OrderByMethod =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, IOrderedQueryable<object>>)Queryable.OrderBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo OrderByDescendingMethod =
+        ((Func<IQueryable<object>, Expression<Func<object, object>>, IOrderedQueryable<object>>)Queryable.OrderByDescending)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo ThenByMethod =
+        ((Func<IOrderedQueryable<object>, Expression<Func<object, object>>, IOrderedQueryable<object>>)Queryable.ThenBy)
+            .Method.GetGenericMethodDefinition();
+
+    private static readonly MethodInfo ThenByDescendingMethod =
+        ((Func<IOrderedQueryable<object>, Expression<Func<object, object>>, IOrderedQueryable<object>>)Queryable.ThenByDescending)
+            .Method.GetGenericMethodDefinition();
 
     /// <summary>
     ///     <see cref="EF.Constant{T}(T)" />, so the row limit reaches SQL as <c>LIMIT 1</c> and not as
@@ -230,6 +250,11 @@ public sealed class QuerySplitter
 
         query = CollectionExpressionNormalizer.Normalize(query, _allowlist);
 
+        // `new { Name = x }.Name` is `x`, as EF reads it before translating, and a construction
+        // of a client type that nothing else reads no longer keeps the operator holding it on the
+        // client. See `MemberReadFolder` (#167's slow run, 2026-09-26).
+        query = MemberReadFolder.Fold(query);
+
         // Flatten `GroupJoin` + `SelectMany` into a single join first (ADR-011). The transparent
         // identifier between them holds the *grouping*, which the carrier re-carry below must
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
@@ -341,6 +366,59 @@ public sealed class QuerySplitter
             [.. augmented.Select(ToServerQuery)],
             Expression.Lambda(residualBody, parameters),
             isPassThrough: false);
+    }
+
+    /// <summary>
+    ///     The shipped query with its ordering reversed, through the projections above it, or
+    ///     <see langword="null" /> when it has no ordering to reverse.
+    /// </summary>
+    /// <remarks>
+    ///     Each ordering operator of the chain changes direction, as EF's <c>ReverseOrderings</c>
+    ///     does for <c>Last</c>. A projection keeps the order of its rows, so the chain can sit under
+    ///     the tuple the server projects.
+    /// </remarks>
+    private static Expression? WithOrderingReversed(Expression shipped)
+    {
+        if (shipped is not MethodCallExpression { Arguments.Count: 2 } call || call.Method.DeclaringType != typeof(Queryable))
+        {
+            return null;
+        }
+
+        if (call.Method.Name == nameof(Queryable.Select))
+        {
+            return WithOrderingReversed(call.Arguments[0]) is { } below
+                ? call.Update(call.Object, [below, call.Arguments[1]])
+                : null;
+        }
+
+        MethodInfo? reversed = call.Method.Name switch
+        {
+            nameof(Queryable.OrderBy) => OrderByDescendingMethod,
+            nameof(Queryable.OrderByDescending) => OrderByMethod,
+            nameof(Queryable.ThenBy) => ThenByDescendingMethod,
+            nameof(Queryable.ThenByDescending) => ThenByMethod,
+            _ => null,
+        };
+
+        if (reversed is null)
+        {
+            return null;
+        }
+
+        // A ThenBy's source is the rest of the chain, which turns round with it; an OrderBy starts it.
+        Expression source = call.Arguments[0];
+        if (call.Method.Name is nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending))
+        {
+            if (WithOrderingReversed(source) is not { } rest)
+            {
+                return null;
+            }
+
+            source = rest;
+        }
+
+        return Expression.Call(
+            reversed.MakeGenericMethod(call.Method.GetGenericArguments()), source, call.Arguments[1]);
     }
 
     /// <summary>
@@ -457,10 +535,23 @@ public sealed class QuerySplitter
         IReadOnlyList<Expression> augmented)
     {
         if (residual is not MethodCallExpression { Method.DeclaringType: var declaring, Arguments.Count: 1 } terminal
-            || declaring != typeof(Queryable)
-            || !RowsForTerminalOperator.TryGetValue(terminal.Method.Name, out int rows))
+            || declaring != typeof(Queryable))
         {
             return (residual, augmented);
+        }
+
+        // `Last` takes one row once the ordering is reversed, which is how EF translates it
+        // (#167's slow run, 2026-09-26: `Return_type_of_singular_operator_is_preserved` read every
+        // matching customer and kept the last). The client's own `Last` then runs over that row.
+        bool last = terminal.Method.Name is nameof(Queryable.Last) or nameof(Queryable.LastOrDefault);
+        if (!RowsForTerminalOperator.TryGetValue(terminal.Method.Name, out int rows))
+        {
+            if (!last)
+            {
+                return (residual, augmented);
+            }
+
+            rows = 1;
         }
 
         // Down through the client's own projections, which are all it may run, and the paging
@@ -468,9 +559,22 @@ public sealed class QuerySplitter
         var paging = new List<MethodCallExpression>();
         Expression source = terminal.Arguments[0];
         while (source is MethodCallExpression { Method.DeclaringType: var operatorDeclaring } call
-               && operatorDeclaring == typeof(Queryable)
-               && call.Arguments.Count == 2)
+               && operatorDeclaring == typeof(Queryable))
         {
+            // `Cast` is row for row too, and `Take(1).Cast<object>().Single()` is how EF's own
+            // `Take_with_single_select_many` is written. The client runs it, and the rows it casts
+            // are the ones the limit bounds (#167's slow run, 2026-09-26).
+            if (call.Method.Name == nameof(Queryable.Cast) && call.Arguments.Count == 1)
+            {
+                source = call.Arguments[0];
+                continue;
+            }
+
+            if (call.Arguments.Count != 2)
+            {
+                break;
+            }
+
             if (call.Method.Name == nameof(Queryable.Select))
             {
                 source = call.Arguments[0];
@@ -496,6 +600,20 @@ public sealed class QuerySplitter
             {
                 Type element = ElementTypeOf(augmented[i].Type);
                 Expression shipped = augmented[i];
+
+                // Paging under `Last` would have to run before the reversal, which this does not
+                // attempt; and without an ordering there is nothing to reverse, which EF refuses.
+                // Either way the rows stay as they were.
+                if (last)
+                {
+                    if (paging.Count > 0 || WithOrderingReversed(shipped) is not { } reversed)
+                    {
+                        return (residual, augmented);
+                    }
+
+                    shipped = reversed;
+                }
+
                 for (int j = paging.Count - 1; j >= 0; j--)
                 {
                     shipped = Expression.Call(

@@ -434,6 +434,618 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A captured variable the query reads twice is ONE parameter over the wire, as it is in plain
+    ///     EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF's funcletizer gives both reads of <c>title</c> one parameter on the client. The
+    ///         client then replaced each read with a <see cref="ParameterBox{T}" /> of its own, and
+    ///         the server's funcletizer, which keeps one parameter only for values that compare
+    ///         equal, saw two: <c>@p0 ... @p1</c> where plain EF sends <c>@p0 ... @p0</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Using_same_parameter_twice_in_query_generates_one_sql_parameter</c> and about 54
+    ///         methods more of the same shape, among them the bulk deletes with
+    ///         <c>Skip(n).Take(n)</c>. Compared positionally with <see cref="SqlNormalizer" />,
+    ///         because this class's own normalization renames every parameter to <c>@p</c>, which is
+    ///         why none of its promises saw it.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_captured_variable_read_twice_is_one_parameter()
+    {
+        string title = "beta";
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => b.Title == title || b.Title + b.Title == title)
+                .Select(b => b.Id)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A filter written above a projection into a client type runs at the store, as it does in
+    ///     plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A filter that reads <see cref="BlogCard" /> directly already reached the store, because
+    ///         the carrier rewrite replaces the type with a tuple all the way up to the result. One
+    ///         that reads it through an interface did not: the interface cannot be retyped, so the
+    ///         projection became a server-side tuple and a client-side rebuild, and the <c>Where</c>
+    ///         above the rebuild ran on the client over every row the server sent. The server read
+    ///         the whole table where EF's own client writes <c>WHERE "b"."Title" = 'beta'</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Interface_casting_though_generic_method</c>
+    ///         (831 rows read where plain EF reads one).
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_filter_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .Where(c => ((IHasTitle)c).Title == "beta")
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A predicate given to a terminal operator above a projection into a client type runs at
+    ///     the store, with the terminal operator's row limit.
+    /// </summary>
+    /// <inheritdoc cref="A_filter_over_a_client_type_runs_at_the_store" />
+    [ConditionalFact]
+    public async Task A_terminal_predicate_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .FirstOrDefaultAsync(c => c.Title == "beta"));
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A count above a projection that calls client code counts at the store, and the client
+    ///     code is never called, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     The count does not depend on what the projection computes, and EF drops the projection
+    ///     under it. This client kept it: the server sent the column the client method reads, for
+    ///     every row, and the client counted them. Found by #167's slow run, as EF's own
+    ///     <c>Count_on_projection_with_client_eval</c>, <c>GroupBy_nominal_type_count</c> and the
+    ///     six <c>GroupJoin_in_subquery_with_client_projection</c> methods, the last of which read
+    ///     every row of two tables for a count compared in a filter.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_count_over_a_client_computed_projection_counts_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { Loud = Shout(b.Title) })
+                .CountAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     Paging above a projection that calls client code runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     The client projection is row for row, so the offset and the limit select the same rows
+    ///     below it as above it, and EF applies them in SQL. Found by #167's slow run, as EF's own
+    ///     six <c>Client_method_*_loads_owned_navigations</c> methods.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task Paging_over_a_client_computed_projection_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => Shout(b.Title))
+                .Skip(1)
+                .Take(1)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>FirstOrDefault</c> inside a projection, over a projection into a client type, reads
+    ///     one row per owner at the store, as it does in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The inner projection became a server-side tuple and a client-side rebuild, and the
+    ///         <c>FirstOrDefault</c> above the rebuild stayed with it on the client. So the whole
+    ///         collection travelled in a slot of the outer tuple, every post of every blog, and this
+    ///         client kept the first. EF's own client writes a <c>ROW_NUMBER()</c> window and reads
+    ///         one post per blog.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Lift_projection_mapping_when_pushing_down_subquery</c>,
+    ///         <c>Select_subquery_single_nested_subquery</c> and its <c>2</c>, four classes each, and
+    ///         <c>Select_collection_FirstOrDefault_project_anonymous_type_client_eval</c>. The first
+    ///         two were parked on 2026-09-26 for the slow run to show them.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_nested_FirstOrDefault_over_a_client_type_reads_one_row_per_owner()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Take(25)
+                .Select(b => new
+                {
+                    b.Id,
+                    First = b.Posts.Select(p => new { p.Heading }).FirstOrDefault(),
+                    All = b.Posts.Select(p => new { p.Heading }),
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>FirstOrDefault</c> inside a projection, over a construction that reads nothing from
+    ///     the row, reads one row per owner at the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own
+    ///     <c>Select_subquery_projecting_single_constant_of_non_mapped_type</c> and its <c>null</c>
+    ///     variant, in the TPC and TPT Gears of War classes.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_nested_FirstOrDefault_reading_no_column_reads_one_row_per_owner()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Title, Card = b.Posts.Where(p => p.Id > 0).Select(p => new BlogCard()).FirstOrDefault() })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A subquery in a projection that reads nothing of the row runs in the same statement, as it
+    ///     does in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The projection into a client type is rewritten into a server-side tuple of the values
+    ///         that read the row. A value that reads nothing of it stayed in the client-side rebuild,
+    ///         which is right for a constant, and the client then ran this subquery as a statement
+    ///         of its own. EF's own client writes it as a scalar subquery in the one statement, with
+    ///         its <c>OFFSET 1</c> a literal; the second statement had <c>OFFSET @p</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Subquery_with_Distinct_Skip_FirstOrDefault_without_OrderBy</c>, in two classes. It
+    ///         was parked on 2026-09-26 for the slow run to show it.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_subquery_reading_nothing_of_the_row_runs_in_the_same_statement()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => b.Id < 3)
+                .Select(b => new
+                {
+                    b.Id,
+                    Second = context.Set<Blog>().OrderBy(o => o.Id).Skip(1).FirstOrDefault()!.Title,
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A value read inside a conditional of a client-typed projection is read as the column,
+    ///     as plain EF Core reads it, with no <c>CASE</c> around it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each value from a branch of <c>p.Blog != null ? new { … } : null</c> travelled as
+    ///         <c>CASE WHEN test THEN value ELSE default END</c>, so that a non-nullable slot never
+    ///         received a <c>NULL</c> from an outer join. EF projects the column as it stands and
+    ///         reads it as nullable; the conditional runs on the client either way.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, in about fifteen methods: the eight
+    ///         <c>Null_check_in_*_projection_should_not_be_removed</c>,
+    ///         <c>Select_conditional_with_anonymous_type*</c>, <c>Projecting_nullable_struct</c>,
+    ///         <c>Owned_entity_with_all_null_properties_in_compared_to_null_in_conditional_projection</c>
+    ///         and <c>Correlated_subquery_with_owned_navigation_being_compared_to_null_works</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_value_under_a_null_check_is_read_as_the_column()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new
+                {
+                    b.Id,
+                    Newest = b.Title != null ? new { b.Id, b.Title } : null,
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A constant in a projection that translates whole is projected by the store, as plain EF
+    ///     Core projects it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF binds a projection of constructions whose every value translates in one mode, and
+    ///         puts each value in the statement, a constant included: <c>SELECT "b"."Id", 1, 'x', 42</c>.
+    ///         Only a projection with client code in it keeps its constants on the client. This
+    ///         client kept them there always, because a value that reads nothing of the row was not
+    ///         a fragment.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Select_anonymous_literal</c>,
+    ///         <c>Select_anonymous_bool_constant_true</c>, <c>Projection_when_arithmetic_expressions</c>,
+    ///         <c>Ternary_should_not_evaluate_both_sides</c>, <c>Null_Coalesce_Short_Circuit</c> and
+    ///         <c>Select_null_parameter</c> among others.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_constant_in_a_translatable_projection_is_projected_by_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Flag = true, Label = "x", Answer = 42 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A projection of a constant alone projects the constant, not a stand-in.
+    /// </summary>
+    /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
+    [ConditionalFact]
+    public async Task A_projection_of_a_constant_alone_projects_the_constant()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { Ten = 10 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A captured value in a projection that translates whole is a parameter of the statement.
+    /// </summary>
+    /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
+    [ConditionalFact]
+    public async Task A_captured_value_in_a_translatable_projection_is_projected_by_the_store()
+    {
+        int? answer = 42;
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Answer = answer })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     The control: a projection with client code in it keeps its constants on the client, as
+    ///     plain EF Core keeps them.
+    /// </summary>
+    [ConditionalFact]
+    public async Task A_constant_beside_client_code_stays_on_the_client()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Id, Loud = Shout(b.Title), Answer = 42 })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A member read out of a construction in a filter is the value it was built from, and the
+    ///     filter runs at the store, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>where new { Name = g.LeaderNickname }.Name == "Marcus"</c> names a type only this
+    ///         client has, so the filter could not ship and ran on the client over every row. EF
+    ///         reads <c>.Name</c> through the construction to <c>g.LeaderNickname</c> and writes the
+    ///         filter.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Where_member_access_on_anonymous_type</c>
+    ///         in the TPC and TPT Gears of War classes.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_member_of_a_construction_in_a_filter_is_read_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Where(b => new { Name = b.Title, b.Id }.Name == "beta")
+                .Select(b => b.Id)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A member read through a construction under a null check, in a filter above a projection
+    ///     into a client type, runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     EF reads <c>(test ? new Dto { … } : null).Member</c> as <c>test ? value : null</c>. Found by
+    ///     #167's slow run, as EF's own
+    ///     <c>Filter_on_nested_DTO_with_interface_gets_simplified_correctly</c>.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_member_through_a_null_checked_construction_in_a_filter_is_read_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCardHolder
+                {
+                    Id = b.Id,
+                    Card = b.Title != null ? new BlogCard { Id = b.Id, Title = b.Title } : null,
+                })
+                .Where(h => h.Card!.Title == "beta")
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> on an empty key aggregates at the store, as in plain EF Core.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GroupBy(o =&gt; new { })</c> keys every row on one empty anonymous object. The
+    ///         carrier rewrite gives a key of the caller's anonymous type a tuple, and skipped a key
+    ///         with no member, because a tuple needs at least one slot. So the grouping stayed on
+    ///         the client, and the server sent the whole table for one aggregate:
+    ///         <c>GroupBy_empty_key_Aggregate</c> read 831 orders where EF reads one row.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as that test, its <c>_Key</c> variant and the two
+    ///         <c>Group_by_multiple_aggregate_joining_different_tables</c> methods.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_group_by_an_empty_key_aggregates_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { })
+                .Select(g => g.Sum(b => b.Id))
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> on an empty key whose key is projected aggregates at the store too.
+    /// </summary>
+    /// <inheritdoc cref="A_group_by_an_empty_key_aggregates_at_the_store" />
+    [ConditionalFact]
+    public async Task A_group_by_an_empty_key_projecting_the_key_aggregates_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { })
+                .Select(g => new { g.Key, Sum = g.Sum(b => b.Id) })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     <c>Last</c> above a projection into a client type reverses the ordering at the store and
+    ///     reads one row, as plain EF Core does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>First</c> and <c>Single</c> above a client-side rebuild send their row limit to
+    ///         the server, and <c>Last</c> did not, because it needs the ordering reversed: the
+    ///         server sent every row and this client kept the last. EF writes
+    ///         <c>ORDER BY ... DESC LIMIT 1</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own
+    ///         <c>Return_type_of_singular_operator_is_preserved</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_Last_over_a_client_type_reads_one_row_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Title)
+                .ThenByDescending(b => b.Id)
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .LastOrDefaultAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A filter inside a <c>SelectMany</c> over a navigation, whose elements are built into a
+    ///     client type, runs at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The inner projection became a server-side tuple and a client-side rebuild, inside the
+    ///         <c>SelectMany</c>'s collection selector. So the <c>SelectMany</c> read the rebuild and
+    ///         could not ship, and the outer projection shipped each blog's posts with every tag of
+    ///         every post. This client then filtered the tags and built the cards; plain EF filters
+    ///         at the store.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>SelectMany_with_client_eval_with_constructor</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_filter_inside_a_nested_SelectMany_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => new
+                {
+                    b.Id,
+                    Cards = b.Posts
+                        .SelectMany(p => p.Tags
+                            .Where(t => t.Id < 10)
+                            .Select(t => new BlogCard { Id = t.Id, Title = t.Label }))
+                        .ToArray(),
+                })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, keyed on an anonymous type, groups at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The groups are the result, so their key is a type the server does not have. The
+    ///         <c>GroupBy</c> stayed on the client, over every row in the store's own order; plain EF
+    ///         orders the rows by the key and reads the groups off them.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>Final_GroupBy_multiple_properties_entity</c>
+    ///         and <c>Final_GroupBy_complex_key_entity</c>.
+    ///     </para>
+    ///     <para>
+    ///         The key leaves out <c>Id</c> because plain EF Core 10 throws
+    ///         <c>ArgumentNullException</c> in <c>SelectExpression.ApplyProjection</c> for a final
+    ///         <c>GroupBy</c> of this model whose key holds the primary key, <c>GroupBy(b =&gt; b.Id)</c>
+    ///         included. The wire now meets the same exception there, where the client used to group.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_on_an_anonymous_key_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => new { b.Title, Inner = new { Length = b.Title!.Length, Constant = 1 } })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, whose element selector builds an anonymous type,
+    ///     reads only what the element needs, at the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own
+    ///     <c>Final_GroupBy_property_anonymous_type_element_selector</c>: the element selector stayed
+    ///     on the client with the <c>GroupBy</c>, so every column of every customer travelled, where
+    ///     plain EF reads three.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_building_its_elements_reads_only_their_columns()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .GroupBy(b => b.Title, b => new { b.Id })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A <c>GroupBy</c> that ends the query, over a projection into a client type, groups at
+    ///     the store.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own <c>Final_GroupBy_property_anonymous_type</c> and the
+    ///     three <c>Final_GroupBy_property_entity_projecting_collection</c> methods.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_final_GroupBy_over_a_client_type_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new BlogCard { Id = b.Id, Title = b.Title })
+                .GroupBy(c => c.Title)
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A projected collection whose elements read nothing of their row projects no column for
+    ///     them, as plain EF Core projects none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>b.Posts.Select(p =&gt; new BlogCard())</c> has no value for the server to compute, so
+    ///         its tuple held the stand-in <c>1</c>, and the store projected that constant beside the
+    ///         key EF reads to form the collection. Plain EF projects the key alone.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run, as EF's own <c>MemberInit_in_projection_without_arguments</c>
+    ///         and <c>OwnsMany_correlated_projection</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projected_collection_reading_no_column_projects_none_for_it()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .OrderBy(b => b.Id)
+                .Select(b => new { b.Id, Cards = b.Posts.Select(p => new BlogCard()).ToList() })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     An ordering above a projection into a client type runs at the store, and so does the
+    ///     limit above it.
+    /// </summary>
+    /// <remarks>
+    ///     Found by #167's slow run, as EF's own <c>Take_with_single_select_many</c>: a
+    ///     <c>SelectMany</c> ordered by the members of the anonymous type it builds, then
+    ///     <c>Take(1)</c>, <c>Cast&lt;object&gt;()</c> and <c>Single()</c>. Plain EF read two rows of
+    ///     the cross join; this client read all 75531 and ordered, paged and checked them on the
+    ///     client.
+    /// </remarks>
+    [ConditionalFact]
+    public async Task An_ordering_over_a_client_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => (from b in context.Set<Blog>()
+                        from o in context.Set<Blog>()
+                        orderby b.Id, o.Id
+                        select new { b, o })
+                .Take(1)
+                .Cast<object>()
+                .SingleOrDefaultAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     A collection the box cannot hand back, category 3 of issue #62.
     /// </summary>
     /// <remarks>
@@ -1587,6 +2199,86 @@ public partial class ServerParameterizationTest
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="run" /> against the client context and again against the server
+    ///     context, and returns the one statement the store saw for each, with its parameters, table
+    ///     aliases and column aliases made positional by <see cref="SqlNormalizer" />.
+    /// </summary>
+    /// <remarks>
+    ///     Positional, not renamed: two uses of one parameter stay <c>@p0 ... @p0</c> and two
+    ///     parameters stay <c>@p0 ... @p1</c>, which <see cref="Normalize" /> makes the same.
+    /// </remarks>
+    private async Task<(string OverTheWire, string Directly)> PositionalStatementBothWays(Func<DbContext, Task> run)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await store.InitializeAsync(
+            store.ServiceProvider,
+            store.CreateDbContext,
+            seed: async context =>
+            {
+                context.AddRange(
+                    new Blog { Id = 1, Title = "alpha" },
+                    new Blog { Id = 2, Title = "beta" });
+                await context.SaveChangesAsync();
+            });
+
+        Drain();
+
+        await using (SqliteSmokeContext client = new(
+            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+        {
+            await run(client);
+        }
+
+        string overTheWire = PositionalStatement(Drain());
+
+        using (DbContext server = store.CreateDbContext())
+        {
+            await run(server);
+        }
+
+        return (overTheWire, PositionalStatement(Drain()));
+    }
+
+    /// <summary>The one statement in <paramref name="logged" />, made positional by <see cref="SqlNormalizer" />.</summary>
+    private static string PositionalStatement(string[] logged)
+    {
+        string entry = Assert.Single(logged);
+        string[] lines = entry.Split('\n');
+        int start = Array.FindIndex(lines, l => l.TrimStart().StartsWith("SELECT", StringComparison.Ordinal));
+        Assert.True(start >= 0, "no SELECT found in: " + entry);
+        return SqlNormalizer.Normalize(string.Join('\n', lines[start..].Select(l => l.Trim())));
+    }
+
+    /// <summary>Client code: a method the server has no way to run, because no model maps it.</summary>
+    private static string? Shout(string? title)
+        => title?.ToUpperInvariant();
+
+    /// <summary>An interface only this client has, which a filter can read a rebuilt row through.</summary>
+    private interface IHasTitle
+    {
+        string? Title { get; }
+    }
+
+    /// <summary>
+    ///     A client type holding another through an interface, so a filter reads through a cast the
+    ///     carrier rewrite cannot retype, as in EF's own <c>Context31961</c>.
+    /// </summary>
+    private sealed class BlogCardHolder
+    {
+        public int Id { get; init; }
+
+        public IHasTitle? Card { get; init; }
+    }
+
+    /// <summary>A type only this client has, so a projection into it is rebuilt on the client.</summary>
+    private sealed class BlogCard : IHasTitle
+    {
+        public int Id { get; init; }
+
+        public string? Title { get; init; }
     }
 
     /// <summary>

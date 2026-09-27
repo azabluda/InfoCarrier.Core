@@ -137,7 +137,7 @@ public class FromSqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<
         Decisions.Architecture,
         Decisions.ClientServices,
         Justification = ClientHasNoConnection,
-        Deviation = DeviationKind.QueryWrittenOut,
+        Deviation = DeviationKind.QueryWrittenOut | DeviationKind.Other,
         DeviationNote = NoConnectionToObserve)]
     public override Task Include_closed_connection_opened_by_it_when_buffering(bool async)
         => AssertClientHasNoConnection();
@@ -147,7 +147,7 @@ public class FromSqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<
         Decisions.Architecture,
         Decisions.ClientServices,
         Justification = ClientHasNoConnection,
-        Deviation = DeviationKind.QueryWrittenOut,
+        Deviation = DeviationKind.QueryWrittenOut | DeviationKind.Other,
         DeviationNote = NoConnectionToObserve)]
     public override Task Include_does_not_close_user_opened_connection_for_empty_result(bool async)
         => AssertClientHasNoConnection();

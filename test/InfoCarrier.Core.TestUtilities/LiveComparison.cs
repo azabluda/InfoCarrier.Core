@@ -27,9 +27,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         is matched with it by position inside the test case.
 ///     </para>
 ///     <para>
-///         <b>Which tests</b> (ADR-014, amendment 2026-09-26): Tier B's classes that run an EF
-///         specification base. This repository's own classes assert the provider directly and have
-///         no plain-EF counterpart, and they run once.
+///         <b>Which tests</b> (ADR-014, amendment 2026-09-26): the classes of Tiers B and C that run
+///         an EF specification base. This repository's own classes assert the provider directly and
+///         have no plain-EF counterpart, and they run once. Until 2026-09-27 this read "Tier B's
+///         classes that run an EF specification base"; the owner extended it to Tier C that day, whose
+///         plain-EF client is the Firebird provider with the server's own correction to its SQL
+///         generator. <b>Tier A is outside because it cannot be mined</b> (the owner, the same day):
+///         EF's InMemory provider runs no statement, so there is nothing to capture and only an
+///         outcome could differ.
 ///     </para>
 ///     <para>
 ///         <b>When a test is red</b>, by the same amendment. A row whose statements differ needs a
@@ -40,6 +45,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         no row that differs in its kind is red too. A skip is never read, and no other reason
 ///         is. A row with no plain-EF run to compare with is red. <b>A red is a defect report
 ///         first</b>: fixing the provider is the way to make it green, and a reason the fallback.
+///     </para>
+///     <para>
+///         <b><see cref="DeviationKind.Other" /> covers a difference of either kind, since
+///         2026-09-27</b> (the owner): a difference none of the three flags describes is stated in
+///         the reason's <see cref="OverrideReasonAttribute.DeviationNote" />, which the audit requires
+///         with it. Such a reason is not red for lacking a difference, because <c>Other</c> also
+///         describes a body that differs from upstream's in a way that runs nothing different.
+///         Until that day the slow run read the three flags alone.
 ///     </para>
 /// </remarks>
 public static class LiveComparison
@@ -53,7 +66,11 @@ public static class LiveComparison
     /// <summary>The last line of every red message.</summary>
     public const string Footer = "[/live-compare]";
 
-    private const string TierBNamespace = "InfoCarrier.Core.FunctionalTests.Sqlite";
+    private static readonly string[] ComparedNamespaces =
+    [
+        "InfoCarrier.Core.FunctionalTests.Sqlite",
+        "InfoCarrier.Core.FunctionalTests.Firebird",
+    ];
 
     private const DeviationKind OutcomeReasons = DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier;
 
@@ -65,7 +82,7 @@ public static class LiveComparison
     /// <summary>Whether this run is a slow one.</summary>
     public static bool IsEnabled { get; } = Environment.GetEnvironmentVariable(Variable) == "1";
 
-    /// <summary>Whether the class runs twice in a slow run: a Tier B class that runs an EF specification base.</summary>
+    /// <summary>Whether the class runs twice in a slow run: a Tier B or Tier C class that runs an EF specification base.</summary>
     public static bool Covers(Type testClass)
     {
         ArgumentNullException.ThrowIfNull(testClass);
@@ -73,7 +90,7 @@ public static class LiveComparison
         return Covered.GetOrAdd(
             testClass,
             type => type.Namespace is { } space
-                && (space == TierBNamespace || space.StartsWith(TierBNamespace + ".", StringComparison.Ordinal))
+                && ComparedNamespaces.Any(tier => space == tier || space.StartsWith(tier + ".", StringComparison.Ordinal))
                 && RunsSpecificationBase(type));
     }
 
@@ -219,18 +236,20 @@ public static class LiveComparison
             }
 
             DeviationKind reasons = ReasonsOf(test.TestClass, test.MethodName);
-            bool coversStatements = reasons.HasFlag(DeviationKind.SqlDiffers);
-            bool coversOutcome = (reasons & OutcomeReasons) != 0;
+            bool claimsOther = reasons.HasFlag(DeviationKind.Other);
+            bool claimsStatements = reasons.HasFlag(DeviationKind.SqlDiffers);
+            bool claimsOutcome = (reasons & OutcomeReasons) != 0;
             string name = $"{test.TestClass.Name}.{test.MethodName}";
 
             (string? label, string? why) =
                 verdict is "no-plain-ef-run" or "unmatched" or "plain-ef-run-used-infocarrier"
                     ? ("no-plain-ef-run", $"The slow run has no plain-EF run of this test to compare with ({verdict}).")
-                : (statements && !coversStatements) || (outcome && !coversOutcome)
+                : (statements && !(claimsStatements || claimsOther)) || (outcome && !(claimsOutcome || claimsOther))
                     ? ("difference-without-reason",
                         $"This test runs differently through InfoCarrier than with plain EF Core, and {name} carries no InfoCarrier reason flagged for it: "
-                        + "SqlDiffers for a statement difference, AnswerNotRefusal or RefusedEarlier for an outcome difference.")
-                : lastRowOfMethod && ((coversStatements && !anyStatements) || (coversOutcome && !anyOutcome))
+                        + "SqlDiffers for a statement difference, AnswerNotRefusal or RefusedEarlier for an outcome difference, "
+                        + "or Other with a note for a difference none of them describes.")
+                : lastRowOfMethod && ((claimsStatements && !anyStatements) || (claimsOutcome && !anyOutcome))
                     ? ("reason-without-difference",
                         $"{name} carries an InfoCarrier reason flagged {reasons & (DeviationKind.SqlDiffers | OutcomeReasons)}, and no row of it differs in that way from plain EF Core, so the reason suppresses nothing.")
                 : (null, null);
@@ -327,7 +346,8 @@ public static class LiveComparison
     }
 
     // The flags of the method's InfoCarrier reasons that a slow run reads: this provider's
-    // behaviour, never a skip, never another reason (ADR-014, amendment 2026-09-26).
+    // behaviour, never a skip, never another reason (ADR-014, amendment 2026-09-26), and `Other`
+    // with its note since 2026-09-27.
     private static DeviationKind ReasonsOf(Type testClass, string methodName)
         => Reasons.GetOrAdd(
             (testClass, methodName),
@@ -336,7 +356,9 @@ public static class LiveComparison
                 .Where(m => m.Name == key.Item2)
                 .SelectMany(m => m.GetCustomAttributes<OverrideReasonAttribute>(inherit: true))
                 .Where(a => a is InfoCarrierDefectAttribute or InfoCarrierDesignAttribute { Skip: false })
-                .Aggregate(DeviationKind.None, (all, a) => all | (a.Deviation & OverrideAudit.InfoCarrierBehaviour)));
+                .Aggregate(
+                    DeviationKind.None,
+                    (all, a) => all | (a.Deviation & (OverrideAudit.InfoCarrierBehaviour | DeviationKind.Other))));
 
     private static bool SameBag(IEnumerable<ComparedCommand> x, IEnumerable<ComparedCommand> y)
         => x.Select(c => c.Text).Order(StringComparer.Ordinal)

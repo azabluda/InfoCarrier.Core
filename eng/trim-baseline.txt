@@ -254,5 +254,71 @@
 #
 # `total` rises with ours, 1144 -> 1145: EFCore is unchanged at 864.
 
-ours=100
-total=1145
+# 2026-09-26, 100 -> 103 (#167 step H6: operators above a client-side rebuild move below it, three
+# diagnostics).
+#
+# #167's slow run compares each Tier B test with plain EF Core. It found operators written above a
+# projection this client rebuilds staying on the client: `Select(x => new Dto { ... }).Where(d =>
+# ((IHaveId)d).Id == 10252)` read all 831 orders where EF reads one, a `Count()` above a projection
+# calling client code read every row to count it, and EF's `Take_with_single_select_many` read 75531
+# rows of a cross join where EF reads two. `ProjectionRewriter` now moves a `Where`, an ordering
+# chain, `Skip`, `Take`, a terminal operator's predicate and a count below the rebuild, onto the
+# tuple the server computes.
+#
+# The three are IL2060 on `MakeGenericMethod` in `TryMoveBelowReassembly`, `VisitOrderingChain` and
+# `Rebuilt`: each operator is instantiated for the tuple, whose type the caller's projection decides.
+# The premise again, as for `Distinct` and the fused `Select` above.
+#
+# IT COST FOUR AND COSTS THREE. The fourth was an IL2070 for reading `GetMethods()` through a `Type`
+# parameter; reading it off `typeof(Queryable)` and `typeof(Enumerable)` directly costs nothing.
+#
+# `total` rises with ours, 1145 -> 1148: EFCore is unchanged at 864.
+
+# 2026-09-26, 103 -> 104 (#167 step H7: a `FirstOrDefault` inside a projection runs on the server's
+# tuple, one diagnostic).
+#
+# `b.Posts.Select(p => new { p.Heading }).FirstOrDefault()` inside a projection kept the operator on
+# the client, so every child row travelled and this client kept one: EF's
+# `Lift_projection_mapping_when_pushing_down_subquery` read 134 rows where plain EF reads 24.
+# `ProjectionRewriter.OneRowRebuilt` now runs the operator on the server's tuple and rebuilds the
+# one row on the client.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: the operator is instantiated for the
+# tuple, whose type the caller's projection decides. The premise again. Its `Activator.CreateInstance`
+# for the empty case would have cost an IL2072 as well; the conditional never crosses the wire, so
+# `Expression.Default` serves and costs nothing.
+#
+# `total` rises with ours, 1148 -> 1149: EFCore is unchanged at 864.
+
+# 2026-09-26, 104 -> 105 (#167 step H13: `Last` above a client-side rebuild reverses the ordering
+# at the server, one diagnostic).
+#
+# `First` and `Single` above a projection this client rebuilds sent their row limit to the server,
+# and `Last` did not, because it needs the ordering reversed: the server sent every row and this
+# client kept the last (`Return_type_of_singular_operator_is_preserved`). EF writes
+# `ORDER BY ... DESC LIMIT 1`, and `QuerySplitter.WithOrderingReversed` now turns the shipped
+# query's ordering chain round for it.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: each reversed operator is instantiated
+# for the element and key types the caller's query decides. The four `MethodInfo`s it needs come
+# from delegates, R149's lesson, so the lookups cost nothing.
+#
+# `total` rises with ours, 1149 -> 1150: EFCore is unchanged at 864.
+
+# 2026-09-27, 105 -> 106 (#167 step H16: a final `GroupBy` of a client type runs at the server, one
+# diagnostic).
+#
+# A `GroupBy` that ends the query returns its groups, so a key or an element of a client type kept
+# it on the client with its element selector: `GroupBy(c => c.City, c => new { c.ContactName,
+# c.ContactTitle })` read every column of every customer, unordered, where EF orders by the key and
+# reads three. `ProjectionRewriter.TryGroupAtTheStore` now groups at the server over the values it
+# can carry and rebuilds each group on the client with `WireGrouping.Rebuilt`.
+#
+# The diagnostic is the IL2060 on `MakeGenericMethod` there: the `GroupBy`, the `Select` and the
+# rebuild are instantiated for the key and element types the caller's query decides. The premise
+# again. The three `MethodInfo`s come from delegates, so the lookups cost nothing.
+#
+# `total` rises with ours, 1150 -> 1151: EFCore is unchanged at 864.
+
+ours=106
+total=1151

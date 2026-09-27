@@ -48,6 +48,7 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in measure.sh
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
+INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # the slow run of Tier C, seconds
 ```
 
 ### Where the tests live
@@ -199,9 +200,11 @@ never committed and never asserted, and that includes text we captured ourselves
 committing each test's statements beside its class was built, reviewed and withdrawn on 2026-09-26.
 #167 replaces this script with a slow mode that runs each test with plain EF and through InfoCarrier
 and compares the two in memory, and every InfoCarrier reason that claims a runtime difference
-(`SqlDiffers`, `AnswerNotRefusal` or `RefusedEarlier`) must then agree with that comparison. This
-said "every InfoCarrier reason" until ADR-014's amendment of 2026-09-26: the spike's six reasons with
-no difference were skips, rewritten test bodies and a compliance test, and none claimed one.
+(`SqlDiffers`, `AnswerNotRefusal` or `RefusedEarlier`) must then agree with that comparison, both
+ways. A difference none of the three describes is `Other` with a note, which the reverse half does
+not read. This said "every InfoCarrier reason" until ADR-014's amendment of 2026-09-26: the spike's
+six reasons with no difference were skips, rewritten test bodies and a compliance test, and none
+claimed one. `Other` counts since the amendment of 2026-09-28.
 
 ### Running and reporting
 
@@ -543,8 +546,8 @@ phase lands in is decided on the issue rather than in the plan. **Phase Y is the
 preparation** — the letter is Y and not W because W1 to W6 are M5's requirement labels, used
 throughout `roadmap.md`. **Phase Z is #54's idle timeout for a server-held transaction**, the first
 of that issue's three separable properties. **Phase H is #167's live comparison with plain EF
-(ADR-014)**, approved by the owner on 2026-09-26; its triage is deferred, so a slow run is red by
-design until then. Query, projection split, `SaveChanges` and lazy loading all work end-to-end.
+(ADR-014)**, approved by the owner on 2026-09-26. **A slow-run red is a defect report first**: a fix
+in the product comes before a reason, and a red the owner has not decided stays red. Query, projection split, `SaveChanges` and lazy loading all work end-to-end.
 
 ### What may and may not be claimed
 
