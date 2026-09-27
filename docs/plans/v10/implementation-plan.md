@@ -7552,6 +7552,236 @@ claims a runtime difference. The amendment proposed:
       sentences had been reversed on the branches with the owner's yes: triage deferred (H6), Tier B
       only (H17), three flags only (H19). A dated amendment of 2026-09-28 records the three, and
       `CLAUDE.md` names `Other` and drops "its triage is deferred". Docs only.
+- [x] **H20. `GearsOfWarQuery` (TPH) moves from Tier A to Tier B.** On the branch
+      `live-comparison-move-gearsofwar`, on top of H19. **The owner's decision of 2026-09-27: move
+      the Tier A bases that make sense to Tier B**, because the slow run cannot mine a store that runs
+      no statement. `CLAUDE.md` already says "When a base could go either way, the tier that
+      translates is the one whose green means more". One base per step, each measured: the class
+      moves, its InMemory overrides go, and EF's SQLite overrides come in only where a test is
+      measured red. 37 of Tier A's 44 specification classes have an EF SQLite test class of the same
+      name.
+
+      TPH first, because its TPT and TPC siblings were already on Tier B. The class derives from
+      `GearsOfWarQueryRelationalTestBase` beside its siblings, and EF's 17 InMemory overrides and one
+      InMemory-only test went with the move. First run: **1129 of 1177 passed**, and the 22 red
+      methods were exactly the 22 its siblings override, each EF's own SQLite override: 18 `APPLY`,
+      3 `DateTimeOffset` and one engine refusal. After adopting them: **Passed: 1174, Failed: 0,
+      Skipped: 4, Total: 1178**, with `OverrideAuditTest`. `docs/upstream-defects.md` §1.4 and
+      §1.11 no longer have a Tier A override to cite, and say so, quoting what they said.
+
+      Slow run of the class: **`Passed: 1163, Failed: 10, Skipped: 4, Total: 1177`**, 5 red methods,
+      all in families already known from its siblings: `Comparison_with_value_converted_subclass`
+      (the `IPAddress` `CAST`) and four `Correlated_collection_with_groupby_*` (answered here,
+      refused by plain EF for `APPLY`). Normal run, `eng/measure.sh move-gearsofwar other-reason`:
+      **FAILING 0, TOTAL 29940**, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H21. Six Northwind query bases move to Tier B, and a seventh copy goes.** On the branch
+      `live-comparison-move-northwind`, on top of H20. `AsNoTracking`, `AsTracking`,
+      `ChangeTracking`, `CompiledQuery`, `QueryFilters` and `QueryTagging` had no override on Tier A,
+      and EF's SQLite classes have none that fails here either. The core `NorthwindDbFunctionsQuery`
+      class did not move: Tier B's relational class derives from the same base, so its 10 tests
+      already ran there and the Tier A class ran them a second time. The one harness change:
+      `NorthwindQueryInfoCarrierSqliteFixture` registers the two `NorthwindGroupByQueryTestBase` key
+      types only for the no-op customizer, because the base can be closed over no other and the
+      query-filters fixture failed every test building itself. The six classes kept their counts:
+      24, 6, 17, 32, 33 and 9.
+
+      Slow run of the six: 6 red methods, a family Tier A could never show. The five
+      `Query_with_*` tests of the compiled-query base and `QueryFilters.Compiled_query` take the
+      first row of a compiled query's `IEnumerable` with `First()`, which bounds nothing. Plain EF
+      streams and stops after one `Read()`; this client's server reads to the end. Same statement,
+      same row. Each gets an `[InfoCarrierDesign(10)]` reason flagged `SqlDiffers`: the client
+      evaluates what follows over rows the server has read to the end, and streaming is out of scope
+      for v10. After that: **`Passed: 121, Failed: 0, Total: 121`** in the slow run, and **Passed: 122,
+      Failed: 0, Total: 122** in the normal run with `OverrideAuditTest`. Normal run,
+      `eng/measure.sh move-northwind move-gearsofwar`: **FAILING 0, TOTAL 29930**, 10 fewer for the
+      duplicate, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release build with
+      `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H22. TPH `FiltersInheritance` moves to Tier B, and a Tier A copy of the core inheritance
+      base goes.** On the branch `live-comparison-move-inheritance`, on top of H21.
+      `TPHFiltersInheritanceQueryInfoCarrierTest` runs the core `FiltersInheritanceQueryTestBase` over
+      the TPH fixture, as EF's `TPHFiltersInheritanceQuerySqliteTest` does, beside its TPT and TPC
+      siblings. The Tier A `InheritanceQueryInfoCarrierTest` ran the core `InheritanceQueryTestBase`,
+      and Tier B's `TPHInheritanceQueryInfoCarrierTest` derives from that base, so its 97 tests ran
+      on both tiers. Two remarks had argued the opposite, "Two bases, one tier each" and "There is no
+      TPH member here, and its absence is the rule"; both are corrected, quoting what they said.
+
+      TPH filters: 22 tests, green, and no red in the slow run: **`Passed: 22, Failed: 0, Total:
+      22`**. With the TPH inheritance class, the audit and the compliance tests: **Passed: 122, Failed:
+      0, Skipped: 4, Total: 126**. Normal run, `eng/measure.sh move-inheritance move-northwind`:
+      **FAILING 0, TOTAL 29833**, 97 fewer for the duplicate, FIXED none, BROKEN none, REASONS
+      unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H23. `ManyToManyQuery` and its no-tracking sibling move to Tier B.** On the branch
+      `live-comparison-move-manytomany`, on top of H22. Not duplicates of the TPT and TPC classes
+      already there: those run the same tests over other mappings of the model, and EF hosts all
+      three on SQLite. The two derive from the relational bases, as EF's SQLite classes do, and gain
+      the 38 tests each that those bases add: 204 and 206 on Tier A, 242 and 244 now. First run: 8
+      red, the two `APPLY` overrides EF's SQLite classes carry, adopted with their line ranges; the
+      no-tracking file's own comment, "Sqlite does not support Apply operations", is its
+      justification. Slow run of the two: **`Passed: 478, Failed: 0, Skipped: 8, Total: 486`**. With
+      the audit and the compliance tests: **Passed: 482, Failed: 0, Skipped: 8, Total: 490**. Normal
+      run, `eng/measure.sh move-manytomany move-inheritance`: **FAILING 0, TOTAL 29909**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+- [x] **H24. The three Northwind include variants move to Tier B.** On the branch
+      `live-comparison-move-include`, on top of H23. `EFPropertyInclude`, `IncludeNoTracking` and
+      `StringInclude` each carried one override on Tier A, EF's InMemory `RightJoin` refusal, whose
+      remark said it "must be deleted, not carried over" once the base reached a relational store.
+      It was. First run: 14 methods red, 5, 5 and 4, exactly the overrides EF's three SQLite classes
+      carry: `APPLY` and `LastUsedWithoutOrderBy`, adopted with their line ranges. The classes kept
+      their counts: 238, 236 and 238. Slow run of the three: **`Passed: 712, Failed: 0, Total:
+      712`**. With the audit and the compliance tests: **Passed: 716, Failed: 0, Total: 716**. Normal
+      run, `eng/measure.sh move-include move-manytomany`: **FAILING 0, TOTAL 29909**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+- [x] **H25. The last five Tier A query bases move to Tier B.** On the branch
+      `live-comparison-move-query-rest`, on top of H24. `Ef6GroupBy`, `IncludeOneToOne`,
+      `InheritanceRelationshipsQuery`, `NullKeys` and `QueryFilterFuncletization` had no override on
+      Tier A. Base and fixture follow EF's SQLite classes: `InheritanceRelationshipsQuery` runs the
+      relational base and gains its 44 tests (94 to 138), `QueryFilterFuncletization` takes the
+      relational fixture, and the query fixtures implement `ITestSqlLoggerFactory`, as the
+      relational compliance test requires on Tier B. The others kept their counts. EF's SQLite
+      overrides for these five only add `AssertSql`, and nothing was red. `SpatialQuery` stays on
+      Tier A: on SQLite it needs SpatiaLite, which this repository does not reference.
+
+      Slow run of the five: **`Passed: 289, Failed: 4, Total: 293`**, 2 methods, a family Tier A
+      could not show. `Ef6GroupBy.Whats_new_2021_sample_2` groups a projection into an anonymous
+      type, orders the groups and takes the first element of the first: this client runs all of it
+      on the client over every person, 26 reads where plain EF reads 4. `Whats_new_2021_sample_10`
+      groups a join by an anonymous key and projects each group as a collection; this client ships
+      the join and groups here, where plain EF writes the grouping. Both stay red for a fix. With the
+      audit and the compliance tests: **Passed: 297, Failed: 0, Total: 297**. Normal run,
+      `eng/measure.sh move-query-rest move-include`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H26. The four load bases move to Tier B.** On the branch `live-comparison-move-load`, on top
+      of H25. `Load`, `FieldsOnlyLoad`, `ManyToManyLoad` and `ManyToManyFieldsLoad` had no override
+      on Tier A and kept their counts: 3137, 713, 358 and 124. The two many-to-many fixtures are
+      query fixtures and implement `ITestSqlLoggerFactory`, as the relational compliance test
+      requires on Tier B. Slow run of the four: **`Passed: 4332, Failed: 0, Total: 4332`**, no
+      red. With the audit and the compliance tests: **Passed: 4, Failed: 0, Total: 4**. Normal run,
+      `eng/measure.sh move-load move-query-rest`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H27. Five end-to-end bases move to Tier B.** On the branch `live-comparison-move-endtoend`,
+      on top of H26. `CompositeKeyEndToEnd`, `NotificationEntities`, `OverzealousInitialization`,
+      `ValueConvertersEndToEnd` and `Find` had no override on Tier A and kept their counts: 3, 2, 1,
+      27 and 411. What SQLite needed is what EF's own SQLite classes do: `Find`'s fixture takes
+      `FindSqliteFixture`'s owned-key configuration, without which the seed failed on `NOT NULL
+      constraint failed: IntKey_NestedOwnedCollection` (EF's issue #26708), and
+      `Can_use_generated_values_in_composite_key_end_to_end` takes EF's skip, "Not supported on
+      Sqlite", with its upstream reference. Slow run of the five: **`Passed: 444, Failed: 0, Total:
+      444`**, no red. With the audit and the compliance tests: **Passed: 448, Failed: 0, Total: 448**.
+      Normal run, `eng/measure.sh move-endtoend move-load`: **FAILING 0, TOTAL 29953**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
+
+      **The full slow run after the moves**, Tiers B and C at H27: **`Passed: 27084, Failed: 76,
+      Skipped: 168, Total: 27328`**, 40 methods: the 33 left after H19 and the 7 the moved bases
+      brought, 5 of them in known families and the two `Ef6GroupBy` ones. The Tier A bases that stay
+      need their SQLite counterparts built one by one, and are not moved yet: `Serialization` and
+      `DataBinding` build a server model over InMemory's conventions, `WithConstructors` produces
+      keyless rows with an InMemory defining query, `MaterializationInterception`, `Interception`,
+      `MusicStore`, `FieldMapping`, `Seeding`, `MonsterFixup` and `JsonTypes` each carry an
+      InMemory arrangement of their own. `Spatial` and `SpatialQuery` need SpatiaLite, and
+      `CompiledModel` runs no statement.
+- [x] **H28. A query ending in `First` over an anonymous type it groups runs at the store.** On the
+      branch `live-comparison-terminal-carrier`, on top of H27. `TransparentIdentifierRewriter` found
+      the carrier that reaches the result only when the root is a queryable. When the query ends in
+      `First`, `Single` or `Last`, the root's type is the carrier itself, so the carrier was struck
+      out for being reachable from the result, and every operator after the projection ran on the
+      client: `Ef6GroupBy.Whats_new_2021_sample_2` read 26 rows where plain EF reads 4.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_First_over_a_grouped_anonymous_type_runs_at_the_store`.
+      2. **The fix**: the carrier is also found under a root `First`, `Single` or `Last`, or an
+         `...OrDefault` sibling, which gets the reference-typed tuple so that "no row" stays
+         `null`. `RebuildAtRoot` puts the rebuild between the operator and its source, a predicate
+         becoming a `Where` below it, and hands the rebuild back separately so `ProjectionRewriter`
+         preserves it. Each operator is named by a constant, which keeps the trim count: the first
+         version passed the operator's name and cost three diagnostics.
+      3. **The next slow run**, Tiers B and C: **`Passed: 27087, Failed: 74, Skipped: 168, Total:
+         27329`**. **1 method left the red list and none joined it**, and none of the 39 that stayed
+         red changed its verdict or its read counts. After the trim correction, `Ef6GroupBy` again
+         in slow mode: only `Whats_new_2021_sample_10` red.
+
+      Normal run, `eng/measure.sh terminal-carrier move-endtoend`: **FAILING 0, TOTAL 29954**,
+      FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H29. A grouping projected as a collection of an anonymous type groups at the store.** On the
+      branch `live-comparison-each-carrier`, on top of H28. `TransparentIdentifierRewriter` re-carries
+      the anonymous grouping key and the result in tuples, and its rebuild of the result recursed
+      into a nested carrier held directly, never into a collection of one. For
+      `new { g.Key.Id, Values = g.Select(t => new { … }) }` it handed a sequence of tuples to a member
+      declared as a sequence of the anonymous type, the expression API refused it, and the pass fell
+      back to the query as written: the grouping and everything above it ran on the client over
+      every row of the join, `Ef6GroupBy.Whats_new_2021_sample_10`. Probed by variants: with a key of
+      the caller's own, or a collection of scalars, the same query was at the store already.
+
+      1. **A promise in `ServerParameterizationTest`, seen red first**:
+         `A_grouping_projected_as_a_collection_of_a_client_type_groups_at_the_store`.
+      2. **The fix**: `RebuildEach` rebuilds such a member element by element, into a list, through
+         one helper method rather than `Select` and `ToList`. `RewriteVerifier` counts each
+         `Enumerable` operator left to the client as query work, and those two cancelled what the
+         rewrite moved: three operators on the client before, three after, and the rewrite was
+         discarded. A null collection stays null, which the first measure found in six tests of
+         `Accessing_property_of_optional_navigation_in_child_projection_works`.
+      3. **17 methods converge with EF's refusal**, and each takes EF's own SQLite override with its
+         line range: the four `Correlated_collection_with_groupby_*` in each Gears of War class,
+         `Complex_query_with_groupBy_in_subquery1`, `2` and `4`, and the two
+         `Correlated_collection_after_groupby_with_complex_projection_*`. This client answered them by
+         grouping on the client; now the server's EF translates them and SQLite refuses the `APPLY`
+         they need, as it does for plain EF Core. They were on the slow run's red list as an answer
+         where plain EF refuses, the family that waits for the owner; the owner's rule of 2026-09-17
+         and 2026-09-22 is to match EF.
+      4. **The next slow run**, Tiers B and C: **`Passed: 27124, Failed: 38, Skipped: 168, Total:
+         27330`**, 21 methods. **18 methods left the red list and none joined it**: `sample_10` and
+         the 17 above. None of the 21 that stayed red changed its verdict or its read counts.
+
+      Normal run, `eng/measure.sh each-carrier terminal-carrier`: **FAILING 0, TOTAL 29955**, FIXED
+      none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
+      `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release
+      build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors.
+- [x] **H30. Five more Tier A bases move to Tier B, and three stay, measured.** On the branch
+      `live-comparison-move-app`, on top of H29, at the owner's request of 2026-09-27 to move the
+      rest that make sense. `MusicStore`, `FieldMapping`, `WithConstructors`, `Serialization` with
+      `DataBinding`, and `QueryExpressionInterception` (two classes) with
+      `MaterializationInterception` kept their counts: 18, 167, 41, 6, 58, 8, 8 and 28. Each follows
+      EF's SQLite class. Their transactions are real now, and `FieldMapping` and `WithConstructors`
+      enlist the second context through the server's token. `WithConstructors` reads its keyless
+      rows through `ToSqlQuery`, and `MaterializationInterception` maps the owned collection to
+      JSON. The F1 fixture derives from `OptimisticConcurrencyInfoCarrierTest`'s with a store of its
+      own, because that one recreates its store before every test and the classes run in parallel.
+      First run: 44 red. The four of
+      `Intercept_query_materialization_with_owned_types_projecting_collection` take EF's own `APPLY`
+      override with its line range; the other 40 are the three bases below. Slow run of the moved
+      classes, first: 6 methods red, every one the plain-EF half failing with "No database provider
+      has been configured", because the interception fixture built the service provider for
+      injected interceptors with this provider's services by name. It now asks the store factory,
+      which gives the plain-EF half SQLite's. Then: **`Passed: 334, Failed: 0, Total: 334`**.
+
+      **Three bases stay on Tier A, each measured on Tier B first:**
+      1. `SaveChangesInterception`, two classes: 32 of 112 red, because SQLite checks concurrency
+         and InMemory does not. A client's interceptor never sees `ThrowingConcurrencyException`,
+         which EF raises in the update pipeline, here the server's, so it cannot suppress it. And
+         the caller catches an exception the client throws with the server's inside, while the
+         interceptor sees another. What the save protocol should carry is a question for the owner.
+      2. `MonsterFixup`: 6 of 12 red. The base chooses a query SQLite can translate by the client's
+         `Database.ProviderName` (EF's issue #16428), the client names this provider, and SQLite is
+         sent the one it cannot translate. An assumption about the topology in EF's test, with no
+         upstream test to reference for an override.
+      3. `Seeding`: 2 of 4 red, `no such table: Seed`. The base cleans the store and calls
+         `EnsureCreated` on the client, which creates nothing by design. InMemory's clean recreates
+         the store itself, and SQLite's drops its tables.
+
+      `JsonTypes`, `CompiledModel`, `Spatial` and `SpatialQuery` stay for the reasons recorded
+      before: the relational `JsonTypes` and `CompiledModel` bases were adopted and reverted on
+      Tier B (104 of 576 and 13 of 14 red), both wanting the backing provider's store types on the
+      client's model, and the spatial bases were measured worse on SQLite (C52). Each of the three
+      classes above now says on itself why it stays.
+
+      Normal run, `eng/measure.sh move-app each-carrier`: **FAILING 0, TOTAL 29955**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build of the test project with
+      `--no-incremental`: 0 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

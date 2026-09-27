@@ -4,27 +4,34 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
 /// <summary>
-///     <c>QueryFilterFuncletizationTestBase</c> on Tier A.
+///     <c>QueryFilterFuncletizationTestBase</c> on ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
-///     A query filter closes over the <c>DbContext</c>, so every one of these queries carries a
-///     captured instance field into the tree. That is precisely what ADR-010's boundary rule reads
-///     — a surviving closure field access pushes the boundary in — and
-///     `SubstituteParametersExpressionVisitor` is what has to have replaced it first.
+///     <para>
+///         A query filter closes over the <c>DbContext</c>, so every one of these queries carries a
+///         captured instance field into the tree. That is precisely what ADR-010's boundary rule reads
+///         — a surviving closure field access pushes the boundary in — and
+///         `SubstituteParametersExpressionVisitor` is what has to have replaced it first.
+///     </para>
+///     <para>
+///         <b>Moved from Tier A on 2026-09-27, at the owner's request</b>, so that #167's slow run
+///         can compare it with plain EF; Tier A's store runs no statement. Base and fixture follow
+///         EF's own SQLite class.
+///     </para>
 /// </remarks>
 public class QueryFilterFuncletizationInfoCarrierTest(QueryFilterFuncletizationInfoCarrierTest.InfoCarrierFixture fixture)
     : QueryFilterFuncletizationTestBase<QueryFilterFuncletizationInfoCarrierTest.InfoCarrierFixture>(fixture)
 {
-    public class InfoCarrierFixture : QueryFilterFuncletizationFixtureBase
+    public class InfoCarrierFixture : QueryFilterFuncletizationRelationalFixture
     {
         private ITestStoreFactory? _testStoreFactory;
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InMemoryInfoCarrierTier.Instance,
+                SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 copyDbContextParameters: (client, server) => Copy(

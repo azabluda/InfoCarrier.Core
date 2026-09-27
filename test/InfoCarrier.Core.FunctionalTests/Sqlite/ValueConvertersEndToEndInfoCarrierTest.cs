@@ -4,16 +4,22 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     <c>ValueConvertersEndToEndTestBase</c> on Tier A.
+///     <c>ValueConvertersEndToEndTestBase</c> on ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
-///     A value converter is the one thing that makes a property's CLR value and its stored value
-///     differ, and this provider has a third value in play: what travels on the wire. ADR-008
-///     constraint 1 says the wire reads a scalar through its <c>IProperty</c> accessor precisely
-///     so converters are honoured; nothing adopted has measured that across a whole model of them.
+///     <para>
+///         A value converter is the one thing that makes a property's CLR value and its stored value
+///         differ, and this provider has a third value in play: what travels on the wire. ADR-008
+///         constraint 1 says the wire reads a scalar through its <c>IProperty</c> accessor precisely
+///         so converters are honoured; nothing adopted has measured that across a whole model of them.
+///     </para>
+///     <para>
+///         <b>Moved from Tier A on 2026-09-27, at the owner's request</b>, so that #167's slow run
+///         can compare it with plain EF; Tier A's store runs no statement.
+///     </para>
 /// </remarks>
 public class ValueConvertersEndToEndInfoCarrierTest(ValueConvertersEndToEndInfoCarrierTest.InfoCarrierFixture fixture)
     : ValueConvertersEndToEndTestBase<ValueConvertersEndToEndInfoCarrierTest.InfoCarrierFixture>(fixture)
@@ -24,7 +30,7 @@ public class ValueConvertersEndToEndInfoCarrierTest(ValueConvertersEndToEndInfoC
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InMemoryInfoCarrierTier.Instance,
+                SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);

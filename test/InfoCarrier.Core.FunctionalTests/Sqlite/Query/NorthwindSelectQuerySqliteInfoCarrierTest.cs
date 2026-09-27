@@ -247,6 +247,26 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
             (await Assert.ThrowsAsync<InvalidOperationException>(
                 () => base.Take_on_top_level_and_on_collection_projection_with_outer_apply(async))).Message);
 
+    // Answered here until 2026-09-27: the grouping on an anonymous key ran on the client, so the
+    // server never saw the correlated collection. See TransparentIdentifierRewriter.Rewriter.RebuildEach.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 252, 256,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Correlated_collection_after_groupby_with_complex_projection_containing_original_identifier(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Correlated_collection_after_groupby_with_complex_projection_containing_original_identifier(async))).Message);
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 325, 329,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Correlated_collection_after_groupby_with_complex_projection_not_containing_original_identifier(bool async)
+        => Assert.Equal(
+            SqliteStrings.ApplyNotSupported,
+            (await Assert.ThrowsAsync<InvalidOperationException>(
+                () => base.Correlated_collection_after_groupby_with_complex_projection_not_containing_original_identifier(async))).Message);
+
     // -------------------------------------------------------------------------------------
     // BACKING-STORE LIMITATION — not APPLY this time, and each is EF Core's own override for
     // the same backend, adopted verbatim now that the split ships the whole query.

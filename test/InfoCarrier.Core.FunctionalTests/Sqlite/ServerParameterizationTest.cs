@@ -1020,6 +1020,65 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
+    ///     A query that ends in <c>First</c> over an anonymous type it builds, groups and orders
+    ///     runs at the store, as plain EF Core runs it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The root's type is the anonymous type itself, so the pass that re-carries such a type
+    ///         in a tuple did not find it: it looked only at a root that is a queryable. Every
+    ///         operator after the projection stayed on the client, which grouped, ordered and picked
+    ///         over every row. Plain EF writes the grouping, the ordering and <c>LIMIT 1</c>.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run once <c>Ef6GroupByTestBase</c> moved to Tier B, as its
+    ///         <c>Whats_new_2021_sample_2</c>.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_First_over_a_grouped_anonymous_type_runs_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Blog>()
+                .Select(b => new { b.Title, b.Id })
+                .GroupBy(x => x.Title)
+                .OrderBy(g => g.Key)
+                .Select(g => g.First())
+                .FirstAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
+    ///     A grouping on an anonymous key, each group projected as a collection of an anonymous
+    ///     type, groups at the store.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The key is re-carried in a tuple, and so is the result, whose rebuild then has to
+    ///         rebuild each element of the collection too. It did not: the pass that re-carries
+    ///         such types fell back to the query as written, and the client grouped every row. With
+    ///         a key of the caller's own, or a collection of scalars, the same query was at the
+    ///         store already.
+    ///     </para>
+    ///     <para>
+    ///         Found by #167's slow run once <c>Ef6GroupByTestBase</c> moved to Tier B, as its
+    ///         <c>Whats_new_2021_sample_10</c>, which also joins and orders the groups.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_grouping_projected_as_a_collection_of_a_client_type_groups_at_the_store()
+    {
+        (string overTheWire, string directly) = await PositionalStatementBothWays(
+            context => context.Set<Post>()
+                .GroupBy(p => new { p.BlogId, p.Heading })
+                .Select(g => new { g.Key.BlogId, Values = g.Select(t => new { t.Id }) })
+                .ToListAsync());
+
+        Assert.Equal(directly, overTheWire);
+    }
+
+    /// <summary>
     ///     An ordering above a projection into a client type runs at the store, and so does the
     ///     limit above it.
     /// </summary>

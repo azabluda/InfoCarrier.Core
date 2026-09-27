@@ -26,6 +26,13 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 ///         the rows the test then queries for come from the <em>backend's</em> database, created
 ///         from the same seeded model.
 ///     </para>
+///     <para>
+///         <b>It stays on Tier A, measured on 2026-09-27</b>, when the other Tier A bases that could
+///         moved to Tier B for #167's slow run. There 2 of its 4 tests failed on
+///         <c>no such table: Seed</c>: the base cleans the store and then calls
+///         <c>EnsureCreated</c>, and on SQLite the clean drops the tables, which the client's
+///         <c>EnsureCreated</c> does not create again. InMemory's clean recreates the store itself.
+///     </para>
 /// </remarks>
 public class SeedingInfoCarrierTest : SeedingTestBase
 {

@@ -42,6 +42,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         first <c>Distinct</c> on the client.
 ///     </para>
 ///     <para>
+///         <b>26 since 2026-09-27</b>, in each of the three classes: the four
+///         <c>Correlated_collection_with_groupby_*</c> tests came red with EF's own
+///         <c>ApplyNotSupported</c> once a grouping on an anonymous key, projected into a collection,
+///         stopped running on the client. Until then this provider answered them, and #167's slow
+///         run had them red for it.
+///     </para>
+///     <para>
 ///         <b>No override here is this provider's own since 2026-09-22.</b> Two per class used to
 ///         replace the relational base's refusal of a correlated collection after <c>Distinct</c>
 ///         with the core base's row-by-row answer, because the projection split reassembled that
@@ -50,10 +57,12 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         refuses both queries with EF's own message and both tests inherit EF's assertion.
 ///     </para>
 ///     <para>
-///         <b>The Tier A <c>Correlated_collection_with_distinct_3_levels</c> is a different
-///         matter</b>, and it lives in <c>GearsOfWarQueryInfoCarrierTest</c>. C64 proved its
-///         assertion cannot be satisfied by any answer. <c>docs/upstream-defects.md</c> §1.4
-///         carries it.
+///         <b>The TPH class below inherits the same refusals since 2026-09-27</b>, when it moved
+///         from Tier A. Until then this paragraph read: "The Tier A
+///         <c>Correlated_collection_with_distinct_3_levels</c> is a different matter, and it lives in
+///         <c>GearsOfWarQueryInfoCarrierTest</c>. C64 proved its assertion cannot be satisfied by any
+///         answer." That is still true of the base's assertion (<c>docs/upstream-defects.md</c>
+///         §1.4), and the relational base refuses the query before the assertion runs.
 ///     </para>
 /// </remarks>
 public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTestBase<TPTGearsOfWarQueryInfoCarrierFixture>
@@ -275,6 +284,54 @@ public class TPTGearsOfWarQueryInfoCarrierTest : TPTGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_after_distinct_3_levels(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 126, 132,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 109, 115,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 117, 124,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTGearsOfWarQuerySqliteTest.cs", 163, 170,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
 }
 
 /// <inheritdoc cref="TPTGearsOfWarQueryInfoCarrierTest" />
@@ -497,11 +554,317 @@ public class TPCGearsOfWarQueryInfoCarrierTest : TPCGearsOfWarQueryRelationalTes
         Justification = Upstream.GaveNoReason)]
     public override Task Correlated_collection_after_distinct_3_levels(bool async)
         => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 126, 132,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 109, 115,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 117, 124,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCGearsOfWarQuerySqliteTest.cs", 163, 170,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
 }
 
 /// <summary>
-///     The two assertions the SQLite overrides above share. EF's TPT and TPC SQLite classes carry
-///     byte-identical override sets, so stating them once is the honest shape.
+///     The Gears of War model under TPH, on ADR-009 <b>Tier B</b>.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>Moved from Tier A on 2026-09-27, at the owner's request.</b> Tier A's store is EF's
+///         InMemory provider, which runs no statement, so #167's slow run could not compare this base
+///         with plain EF; its TPT and TPC siblings above showed how much that comparison finds. The
+///         Tier A class carried EF's own <c>GearsOfWarQueryInMemoryTest</c> overrides as a set,
+///         and every one of them described the InMemory store, so none came along. Nor did the one
+///         test that class added, <c>Select_ToString_on_non_nullable_property_of_an_optional_entity</c>:
+///         EF's InMemory class declares it and EF's SQLite class does not.
+///     </para>
+///     <para>
+///         <b>Every override below was adopted after measuring</b>, as on the siblings.
+///     </para>
+/// </remarks>
+public class GearsOfWarQueryInfoCarrierTest : GearsOfWarQueryRelationalTestBase<GearsOfWarQueryInfoCarrierFixture>
+{
+    public GearsOfWarQueryInfoCarrierTest(
+        GearsOfWarQueryInfoCarrierFixture fixture,
+        ITestOutputHelper testOutputHelper)
+        : base(fixture)
+    {
+        Fixture.TestSqlLoggerFactory.Clear();
+        Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 42, 43,
+        Justification = Upstream.GaveNoReason)]
+    public override Task DateTimeOffsetNow_minus_timespan(bool async)
+        => AssertTranslationFailed(() => base.DateTimeOffsetNow_minus_timespan(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 35, 40,
+        Justification = Upstream.GaveNoReason)]
+    public override Task DateTimeOffset_Contains_Less_than_Greater_than(bool async)
+        => AssertTranslationFailed(() => base.DateTimeOffset_Contains_Less_than_Greater_than(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: SQLite has no <c>DateTimeOffset</c> type, so this cannot translate.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 45, 50,
+        Justification = Upstream.GaveNoReason)]
+    public override Task DateTimeOffset_Date_returns_datetime(bool async)
+        => AssertTranslationFailed(() => base.DateTimeOffset_Date_returns_datetime(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 241, 250,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_via_SelectMany_with_Distinct_missing_indentifying_columns_in_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 52, 60,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_inner_subquery_predicate_references_outer_qsre(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_predicate_references_outer_qsre(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 268, 275,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_with_Distinct(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_with_Distinct(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 92, 100,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Outer_parameter_in_group_join_with_DefaultIfEmpty(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_group_join_with_DefaultIfEmpty(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 102, 109,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Outer_parameter_in_join_key(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 111, 118,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Outer_parameter_in_join_key_inner_and_outer(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Outer_parameter_in_join_key_inner_and_outer(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 164, 172,
+        Justification = Upstream.GaveNoReason)]
+    public override Task SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.SelectMany_predicate_with_non_equality_comparison_with_Take_doesnt_convert_to_join(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 140, 150,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 152, 162,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_non_nullable_scalar_contains_non_nullable_value_doesnt_need_null_expansion_negated(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 120, 128,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 130, 138,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Subquery_projecting_nullable_scalar_contains_nullable_value_needs_null_expansion_negated(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own. EF asserts <c>SqliteException</c> with
+    ///     <c>SQLite Error 1: 'no such column: s.Id'</c>; the measured message here is identical,
+    ///     wrapped by the wire, so the assertion keeps the engine's own type name and text.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 8624, 8642,
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.StoreExceptionAsData | DeviationKind.SqlNotAsserted)]
+    public override Task Where_subquery_with_ElementAt_using_column_as_index(bool async)
+        => GearsOfWarSqliteAssertions.StoreRefuses(() => base.Where_subquery_with_ElementAt_using_column_as_index(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 231, 239,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_not_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_not_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 221, 229,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_distinct_projecting_identifier_column(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_distinct_projecting_identifier_column(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 174, 182,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_inner_collection_references_element_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_inner_collection_references_element_two_levels_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 62, 70,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_inner_subquery_selector_references_outer_qsre(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_inner_subquery_selector_references_outer_qsre(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 72, 80,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_one_level_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 82, 90,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collections_nested_inner_subquery_references_outer_qsre_two_levels_up(async));
+
+    /// <inheritdoc />
+    /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 259, 266,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_after_distinct_3_levels(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_after_distinct_3_levels(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 209, 219,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_but_only_grouping_key_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 184, 194,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 196, 207,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_not_projecting_identifier_column_with_group_aggregate_in_final_projection_multiple_grouping_keys(async));
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     EF's own: this shape needs <c>APPLY</c>, which SQLite does not have. It answered here
+    ///     until 2026-09-27, when the grouping on an anonymous key ran on the client; see
+    ///     <c>TransparentIdentifierRewriter.Rewriter.RebuildEach</c>.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/GearsOfWarQuerySqliteTest.cs", 8048, 8059,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(bool async)
+        => GearsOfWarSqliteAssertions.ApplyNotSupported(() => base.Correlated_collection_with_groupby_with_complex_grouping_key_not_projecting_identifier_column_with_group_aggregate_in_final_projection(async));
+}
+
+/// <summary>
+///     The two assertions the SQLite overrides above share. EF's TPH, TPT and TPC SQLite classes
+///     carry the same failing override sets, so stating them once is the honest shape.
 /// </summary>
 internal static class GearsOfWarSqliteAssertions
 {
@@ -513,6 +876,22 @@ internal static class GearsOfWarSqliteAssertions
 
     internal static Task StoreRefuses(Func<Task> query)
         => SqliteStoreRefusal.AssertAsync(query, "no such column");
+}
+
+/// <summary>
+///     The TPH Gears of War fixture, wired to a SQLite backend behind the wire.
+/// </summary>
+public class GearsOfWarQueryInfoCarrierFixture : GearsOfWarQueryRelationalFixture
+{
+    private ITestStoreFactory? _testStoreFactory;
+
+    /// <inheritdoc />
+    protected override ITestStoreFactory TestStoreFactory
+        => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
+            SqliteInfoCarrierTier.Instance,
+            ContextType,
+            (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+            configureConventions: ConfigureConventions);
 }
 
 /// <summary>

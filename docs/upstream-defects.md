@@ -122,11 +122,15 @@ EXPECTED-vs-ITSELF: EqualException
 same Squad instance both times: True
 ```
 
-**What it blocks here.** Two spec tests on the InMemory tier —
+**What it blocks here.** Nothing since 2026-09-27, when the base moved from the InMemory tier to
+Tier B at the owner's request. EF's relational base refuses the query with
+`DistinctOnCollectionNotSupported` before the assertion runs, and the test inherits that refusal,
+as its TPT and TPC siblings do. Until that day this read: "Two spec tests on the InMemory tier —
 `GearsOfWarQueryInfoCarrierTest.Correlated_collection_with_distinct_3_levels`, both async values.
 They were red until 2026-09-15 and carry `[StoreDefect("1.4", …)]` since, comparing the collection as
-a sequence. They were the whole of this suite's "wrong answer" class, and the answers are right: a side-by-side
-dump matched squad for squad, member for member, weapon count for weapon count.
+a sequence. They were the whole of this suite's "wrong answer" class, and the answers are right: a
+side-by-side dump matched squad for squad, member for member, weapon count for weapon count." No
+override cites this section now.
 
 **Why no other provider notices.** Every one of them refuses the query before the assertion runs —
 InMemory with `DistinctOnSubqueryNotSupported`, every relational provider with
@@ -351,7 +355,9 @@ Tier A override that copies one carries `[StoreDefect("1.11", …)]` with the li
 **What it blocks.** Nothing in InfoCarrier. Tier A's store is EF's InMemory provider, so these reach
 the wire as the store's answer and cross it unchanged. **It bounds what Tier A can prove**, as 1.6
 does for Tier D: where the store crashes, the tier cannot tell whether the wire would have carried
-the correct answer.
+the correct answer. **The four `GearsOfWarQueryTestBase` rows cite no override since 2026-09-27**,
+when that base moved to Tier B, where SQLite runs each of those tests; the rows stay as EF's own
+record of its InMemory provider.
 
 ### 1.12 EF's relational pipeline leaves a primitive-collection parameter without a type mapping
 

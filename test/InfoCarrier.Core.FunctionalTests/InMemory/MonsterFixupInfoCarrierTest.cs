@@ -21,6 +21,14 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 ///         <c>MonsterFixupSnapshotInMemoryTest</c>'s and describe the backing store: InMemory
 ///         generates those keys at <c>Add</c> time (S3c-8), so the model has to say so.
 ///     </para>
+///     <para>
+///         <b>It stays on Tier A, measured on 2026-09-27</b>, when the other Tier A bases that could
+///         moved to Tier B for #167's slow run. With EF's SQLite key configuration, 6 of its 12 tests
+///         were red there. <c>SimpleVerification</c> chooses between two queries by the client's
+///         <c>Database.ProviderName</c>, reading the photos to the client first only for SQLite (EF's
+///         issue #16428). The client names this provider, so SQLite is sent the other query,
+///         <c>OrderBy(p =&gt; p.Photo.First().ToString())</c>, which it cannot translate.
+///     </para>
 /// </remarks>
 public class MonsterFixupInfoCarrierTest(MonsterFixupInfoCarrierTest.MonsterFixupInfoCarrierFixture fixture)
     : MonsterFixupTestBase<MonsterFixupInfoCarrierTest.MonsterFixupInfoCarrierFixture>(fixture)
