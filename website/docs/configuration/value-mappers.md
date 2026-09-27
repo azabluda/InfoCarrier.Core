@@ -34,6 +34,11 @@ dependency in the package for a type most callers never use. Spatial types are f
 you supply the mapper, which is about thirty lines. There is a worked one in the repository's test
 utilities.
 
+A spatial aggregate such as `UnaryUnionOp.Union(g.Select(s => s.Location))` names a NetTopologySuite
+class that your model never mentions. Register that class on both halves, `AllowTypes(typeof(UnaryUnionOp))` on
+the client and `AddInfoCarrierAllowedTypes(typeof(UnaryUnionOp))` on the server. Without it the
+query still answers, but the server sends every row and the client computes the aggregate.
+
 ## Writing one
 
 Two methods, both of which may decline. A value no mapper claims falls through to exactly the

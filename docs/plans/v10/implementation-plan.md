@@ -7838,6 +7838,59 @@ claims a runtime difference. The amendment proposed:
       Slow run of the two classes: **`Passed: 112, Failed: 0, Total: 112`**, no red. Normal run,
       `eng/measure.sh server-suppression concurrency-interception`: **FAILING 0, TOTAL 29957**,
       FIXED none, BROKEN none, REASONS unchanged.
+- [x] **H33. A geometry from a spatial SQL store crosses the wire, tested on Windows only.** On the
+      branch `live-comparison-spatial`, on top of H32. The owner asked on 2026-09-27 whether the Tier A
+      bases gain anything on Tier B, and a probe of each answered: `SpatialQuery` on SQLite with
+      SpatiaLite found two things Tier A cannot show, because InMemory holds a geometry as an object
+      and runs no SQL.
+      1. **A geometry read from SpatiaLite failed on the client, and a saved one failed on the
+         server**, `JsonException` and `InvalidCastException`. `PrimitiveCoercion.JsonForm` took a
+         property's JSON reader from its type mapping, and the two halves' mappings come from two
+         providers: SQLite's spatial plugin declares a WKT reader of its own, this client's mapping
+         has none. It now takes a mapping's reader only when EF Core's own assembly declares it.
+         Removing the mapping's reader altogether was tried first and broke 90 of
+         `GearsOfWarQueryTestBase`'s, where SQLite converts `IPAddress` to a string through a reader
+         EF Core declares and both halves agree on it. EF's `SpatialQueryTestBase` on SpatiaLite
+         went from 162 of 168 to 166 of 168; the two left are `Normalized`, which EF's SQLite class
+         skips.
+      2. **The spatial aggregates ran on the client**, `UnaryUnionOp.Union` and its three siblings:
+         the server sent every point where plain EF writes `GUnion(...)` with the `GROUP BY`. Not a
+         defect: the class is one the model does not imply. Registered on both halves, the
+         statement is plain EF's, which is the configuration tested, as the owner asked in H32; the
+         unregistered one is pinned. `website/docs/configuration/value-mappers.md` says so.
+
+      **Spatial stays on Tier A** (the owner, 2026-09-27), because the trial on the branch
+      `ci-probe-spatialite` (deleted, H33a) showed that Ubuntu's `libsqlite3-mod-spatialite` installs on
+      `ubuntu-latest` but crashes the test host when loaded into the SQLite EF's package bundles:
+      GitHub runs 36347916260 and 36348293565, the second loading SpatiaLite and nothing else. The
+      four tests are `Sqlite/SpatialiteServerTest`, under `[SpatialiteRequired]`, which is met on
+      Windows only and loads nothing elsewhere; the two geometry tests were red before the fix. The
+      test project references `Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite`, which brings
+      `mod_spatialite` for Windows. CLAUDE.md records both.
+
+      The other Tier A bases, probed the same way and not moved: `MonsterFixup` with a probe-only
+      provider name, 12 of 12 and no slow-run red; `JsonTypes`, 63 slow-run reds, each plain EF on
+      SQLite failing and this client passing, with no statement on either side; `CompiledModel`,
+      refused by the SQLite server; `Seeding`, whose main test builds its client by hand, so both
+      halves of a slow run are this client.
+
+      Normal run on Windows, `eng/measure.sh spatial server-suppression`: **FAILING 0, TOTAL 29961**,
+      the four new tests, FIXED none, BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at
+      106 <= 106. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true`
+      Release build after deleting the product's `obj` and `bin`: 5 warnings, 0 errors. Docs: 0
+      over budget, 0 broken links.
+- [x] **H33a. The SpatiaLite condition cites runs, and its Windows check is measured.** On the
+      branch `live-comparison-spatial`, on top of H33. The owner had the trial branches
+      `ci-probe-spatialite` and `ci-probe-spatial-skip` deleted on 2026-09-27, so CLAUDE.md and
+      `SpatialiteRequiredAttribute` cite run 36348293565 instead; GitHub keeps a deleted branch's
+      runs. The owner then asked for H33 to run on Ubuntu without the Windows check: run
+      36351274149 passed every job, with the spec project at **Passed: 29489, Failed: 0, Skipped:
+      234, Total: 29723**, the figures of the run with the check (36350307095). The runner has no
+      SpatiaLite, so the load fails and `SpatialiteLoader.TryLoad` returns false. **The check
+      therefore guards only a machine with Ubuntu's package installed**, where the load crashes the
+      host, and it stays until the owner says otherwise. Seen on the way: xUnit printed the four skips' reason, and the TRX
+      records none of the four, as passed or as skipped, in either run, which is why CI's total is
+      four below the Windows one. The attribute's remark says both. Comments only, so no run.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
