@@ -36,10 +36,6 @@ public static class FromSqlAssertions
     private const string RefusedNode = "FromSqlQueryRootExpression";
 
     /// <summary>Asserts that <paramref name="query" /> is refused.</summary>
-    public static void NotSupported(Action query)
-        => Assert.Contains(RefusedNode, Assert.Throws<InvalidOperationException>(query).Message);
-
-    /// <summary>Asserts that <paramref name="query" /> is refused.</summary>
     public static async Task NotSupportedAsync(Func<Task> query)
         => Assert.Contains(
             RefusedNode,

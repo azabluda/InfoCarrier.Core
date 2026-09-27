@@ -7913,6 +7913,12 @@ claims a runtime difference. The amendment proposed:
       tests of `ServerSqlLogTest` fewer, FIXED none, BROKEN none, REASONS unchanged. `CI=true`
       Release build of the spec project: 0 warnings, 0 errors. `doc-links.py`: 0 broken. Test and
       docs only.
+- [x] **H4a. Two unused test helpers go.** In the pull request of H4, as the owner asked on
+      2026-09-28 ("all items fit in upcoming h4 PR"). `roslyn-codelens` found no reference to
+      `FromSqlAssertions.NotSupported`, the synchronous twin of `NotSupportedAsync`, which has two
+      callers, and none to `Decisions.NotSupported`, a heading constant no override names; nothing
+      reads `Decisions` by reflection. Both predate the stack. `CI=true` Release build of both test
+      projects: 0 warnings, 0 errors.
 
 **Six pull requests and one direct push**: H2 on `main`, because it is docs only; five for the
 stack, and one for H4. The owner saw the slow run work and chose four on 2026-09-28: H0/H1 with H3
