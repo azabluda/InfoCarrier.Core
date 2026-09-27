@@ -1116,3 +1116,59 @@ prototype on `experiment/direct-baseline` found 54 such methods.
   stays the investigation.
 - `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py`, `ServerSqlLog` and its markers stay until the slow
   mode replaces them, and go in the same series that lands it.
+
+### Amendment 2026-09-26 — the spike ran, and decision 3 reads only the reasons that claim a difference
+
+**The consequence "running a test twice with a second set of class fixtures is not proven" is
+closed.** The spike on `experiment/live-comparison` ran the three classes this ADR names, then the
+whole of Tier B: `Passed: 19451, Failed: 0, Skipped: 155, Total: 19606` with the comparison
+reporting only, and `Passed: 18907, Failed: 544` with it turning differences red. Every wire test
+found its plain-EF run, and every one of the 35 suspects of `experiment/direct-baseline` was among
+the differences. Phase H in `plans/v10/implementation-plan.md` is the order of work, approved by the
+owner on the same day with this amendment.
+
+**Decision 3 reads only an InfoCarrier reason whose `Deviation` carries `SqlDiffers`,
+`AnswerNotRefusal` or `RefusedEarlier`, and never a skip.** It said until today that a difference
+needs "an `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason" and that "if no row differs, such a
+reason is red too". The spike found 6 methods red as a reason with no difference, and all 6 were
+false alarms: two skips, whose empty body cannot differ; two `QueryWrittenOut` bodies, rewritten for
+the transaction helper and not for any SQL; and a compliance test that runs no SQL. None of them
+claims a runtime difference. A statement difference now needs `SqlDiffers`, and an outcome
+difference one of the other two, which are the three `OverrideAudit` already calls this provider's
+behaviour.
+
+**The rationale still holds, and this is what keeps it exact.** It says the reasons become "an
+exact, checked statement of where this provider differs from plain EF". A reason that claims a
+difference the comparison can see is still checked both ways. A reason about something the
+comparison cannot see, the test's own body or a harness detail, was never a statement about the
+server's SQL, and checking it against the SQL made the check wrong rather than strict.
+
+**Decision 2 covers the classes that run an EF specification base.** It said "runs each test
+twice". This repository's own classes, `ServerSqlTest`, `SqliteSmokeTest`,
+`ServerParameterizationTest` and the others, assert the provider directly and have no plain-EF
+counterpart: in the spike their plain-EF run built an InfoCarrier client by hand and compared
+InfoCarrier with itself. A plain-EF run that crosses the wire is red, which is how they were found.
+The scope is Tier B; Tier C would need a Firebird plain-EF client, and Tier D has its own `Direct*`
+controls.
+
+**Two corrections of the decision's mechanics, measured in the spike.**
+
+- **The comparison runs when the test's result arrives, not in `After`.** Decision 2 said "`After`
+  compares the two captures", including "the test's outcome", which `After` cannot know. The
+  comparison now runs where xUnit reports the result, and a pass it rejects is reported as a
+  failure. `After` still closes the test, so a statement in the class's `DisposeAsync` belongs to
+  no test.
+- **A slow run writes no file** (owner, 2026-09-26: "file output adds no value"). Everything a red
+  test has to say is in its failure message, in a fixed format that a person reads in the console
+  and a script parses out of the console or the TRX. Phase H documents the format.
+
+**What a count means is narrower than the rationale suggests.** Every one of the 35 methods that
+differed only in a count was an artifact of EF's own `ReadCount`: `GroupBySingleQueryingEnumerable`
+reads a group's first row through `RelationalDataReader.Read`, which counts, and the rest through
+the raw `DbDataReader`, which does not, so plain EF reports 2 reads for a final `GroupBy` of 92
+rows. The count is still compared, with a reader of our own that counts every `Read` in the slow
+run only.
+
+**Triage is deferred by the owner, and the slow run stays red until it happens.** No InfoCarrier
+reason is added to make it green, including for the 22 methods whose query plain EF on SQLite
+refuses and InfoCarrier answers.
