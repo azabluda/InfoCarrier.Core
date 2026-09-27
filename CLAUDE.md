@@ -548,14 +548,17 @@ it: `InfoCarrierComplianceTest` scans the core specification assembly against Ti
 are 0, and both tests must stay green.** Those tests, not a list in this file, are the answer to
 "which bases are in".
 
-**Every milestone is closed, so `docs/plans/v10/implementation-plan.md` is ISSUE-DRIVEN**: it holds
-Phases Q, R, S, T, U, V, X, Y, Z and H, each naming the GitHub issue it serves, and which release a
-phase lands in is decided on the issue rather than in the plan. **Phase Y is the 10.1 release
-preparation** — the letter is Y and not W because W1 to W6 are M5's requirement labels, used
-throughout `roadmap.md`. **Phase Z is #54's idle timeout for a server-held transaction**, the first
-of that issue's three separable properties. **Phase H is #167's live comparison with plain EF
+**Every milestone and every phase is closed, so `docs/plans/v10/implementation-plan.md` holds no
+phase** (2026-09-28). The issue-driven Phases Q to H are archived in
+`docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
+the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
+the plan "is ISSUE-DRIVEN: it holds Phases Q, R, S, T, U, V, X, Y, Z and H". **Phase Y was the 10.1
+release preparation**, and its letter is Y and not W because W1 to W6 are M5's requirement labels,
+used throughout `roadmap.md`. **Phase Z was #54's idle timeout for a server-held transaction**, the
+first of that issue's three separable properties. **Phase H was #167's live comparison with plain EF
 (ADR-014)**, approved by the owner on 2026-09-26. **A slow-run red is a defect report first**: a fix
-in the product comes before a reason, and a red the owner has not decided stays red. Query, projection split, `SaveChanges` and lazy loading all work end-to-end.
+in the product comes before a reason, and a red the owner has not decided stays red. Query,
+projection split, `SaveChanges` and lazy loading all work end-to-end.
 
 ### What may and may not be claimed
 

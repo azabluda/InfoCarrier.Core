@@ -6,8 +6,8 @@ of what `CLAUDE.md` states as rules. Nothing here is an instruction; the instruc
 
 Most of what follows is closed. It is kept because the same mistakes are available again: a
 classification that was never re-checked, a count that did not move, a price paid for the wrong
-obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
-`archive/`.
+obstacle. The plan entries that produced these findings are in `archive/`, since 2026-09-28 all of
+them.
 
 ## What the residual still drops, measured across the whole suite (R173, 2026-09-04)
 
