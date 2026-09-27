@@ -7544,6 +7544,29 @@ claims a runtime difference. The amendment proposed:
       Skipped: 1, Total: 110`**. `OverrideAuditTest` **Passed: 1, Failed: 0, Total: 1**. Normal run,
       `eng/measure.sh other-reason no-column-row`: **FAILING 0, TOTAL 29938**, FIXED none, BROKEN
       none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H20. `GearsOfWarQuery` (TPH) moves from Tier A to Tier B.** On the branch
+      `live-comparison-move-gearsofwar`, on top of H19. **The owner's decision of 2026-09-27: move
+      the Tier A bases that make sense to Tier B**, because the slow run cannot mine a store that runs
+      no statement. `CLAUDE.md` already says "When a base could go either way, the tier that
+      translates is the one whose green means more". One base per step, each measured: the class
+      moves, its InMemory overrides go, and EF's SQLite overrides come in only where a test is
+      measured red. 37 of Tier A's 44 specification classes have an EF SQLite test class of the same
+      name.
+
+      TPH first, because its TPT and TPC siblings were already on Tier B. The class derives from
+      `GearsOfWarQueryRelationalTestBase` beside its siblings, and EF's 17 InMemory overrides and one
+      InMemory-only test went with the move. First run: **1129 of 1177 passed**, and the 22 red
+      methods were exactly the 22 its siblings override, each EF's own SQLite override: 18 `APPLY`,
+      3 `DateTimeOffset` and one engine refusal. After adopting them: **Passed: 1174, Failed: 0,
+      Skipped: 4, Total: 1178**, with `OverrideAuditTest`. `docs/upstream-defects.md` §1.4 and
+      §1.11 no longer have a Tier A override to cite, and say so, quoting what they said.
+
+      Slow run of the class: **`Passed: 1163, Failed: 10, Skipped: 4, Total: 1177`**, 5 red methods,
+      all in families already known from its siblings: `Comparison_with_value_converted_subclass`
+      (the `IPAddress` `CAST`) and four `Correlated_collection_with_groupby_*` (answered here,
+      refused by plain EF for `APPLY`). Normal run, `eng/measure.sh move-gearsofwar other-reason`:
+      **FAILING 0, TOTAL 29940**, FIXED none, BROKEN none, REASONS unchanged. `CI=true` Release
+      build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
