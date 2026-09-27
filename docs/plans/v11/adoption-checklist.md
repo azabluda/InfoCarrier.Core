@@ -36,6 +36,6 @@ each line against the repository again when the work starts.
   change with the pins.
 - **The slow run has no tag to move.** It compares with plain EF Core at the version the suite
   runs. `eng/ef-sql-compare.sh`, which fetched EF's tag to read its `AssertSql` text, was deleted on
-  2026-09-28. The figures in `docs/test-policy.md` are dated records of EF 10 and stay as they are.
+  2026-09-28. Its figures, now in `docs/plans/v10/findings.md`, are dated records of EF 10.
 - **`subrepos/firebird` is at `EFCore-13.0.0.0`**, the tag of the package Tier C runs, and moves
   with whatever Tier C decides.

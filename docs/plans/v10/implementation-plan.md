@@ -7919,6 +7919,15 @@ claims a runtime difference. The amendment proposed:
       callers, and none to `Decisions.NotSupported`, a heading constant no override names; nothing
       reads `Decisions` by reflection. Both predate the stack. `CI=true` Release build of both test
       projects: 0 warnings, 0 errors.
+- [x] **H4b. `test-policy.md` keeps the policy, and the text comparison's record moves to
+      `findings.md`.** In the pull request of H4, as the owner asked on 2026-09-28. After H4 the
+      comparison with EF's `AssertSql` text was a dated record, 360 lines of it in a document whose
+      job is to say what a test may assert. It moves whole, in the words it had, to a section of
+      `findings.md` dated 2026-09-15 to 2026-09-28: the test-by-test run that found two lost updates,
+      the run of 2026-09-21, the extras read case by case, and Tier C against the Firebird provider's
+      own suite. `test-policy.md` keeps the promises, the slow run as the investigation, how a
+      difference ends, and why golden text is not asserted, with one paragraph pointing at the
+      record; it goes from 860 lines to 509. `doc-links.py`: 0 broken. Docs only.
 
 **Six pull requests and one direct push**: H2 on `main`, because it is docs only; five for the
 stack, and one for H4. The owner saw the slow run work and chose four on 2026-09-28: H0/H1 with H3
