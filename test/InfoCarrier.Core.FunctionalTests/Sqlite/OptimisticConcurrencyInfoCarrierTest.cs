@@ -52,7 +52,7 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
     ///     second context runs on its own SQLite connection and gets "database is locked".
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <summary>
     ///     Restores the store before every test.
@@ -246,13 +246,8 @@ public class OptimisticConcurrencyInfoCarrierTest(OptimisticConcurrencyInfoCarri
         ///     re-runs the <c>UseSeeding</c> hook configured on the server options above, which is
         ///     the one mechanism that seeds this store.
         /// </remarks>
-        public override async Task ReseedAsync()
-        {
-            InfoCarrierBackendTestStore backend = ((IInfoCarrierClientTestStore)TestStore).Backend;
-            using DbContext context = backend.CreateDbContext();
-            await context.Database.EnsureDeletedAsync();
-            await context.Database.EnsureCreatedAsync();
-        }
+        public override Task ReseedAsync()
+            => ((IInfoCarrierClientTestStore)TestStore).Backend.RecreateAsync();
 
         /// <summary>
         ///     The construction half of <see cref="F1MaterializationInterceptor" />, and nothing else.

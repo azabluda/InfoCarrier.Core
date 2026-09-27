@@ -43,7 +43,7 @@ public class ComplexTypesTrackingInfoCarrierTest(
 {
     /// <inheritdoc />
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <inheritdoc />
     /// <remarks>

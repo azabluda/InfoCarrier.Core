@@ -1,7 +1,6 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -512,13 +511,8 @@ internal static class GearsOfWarSqliteAssertions
             (await Assert.ThrowsAsync<InvalidOperationException>(query)).Message);
 
 
-    internal static async Task StoreRefuses(Func<Task> query)
-    {
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(query);
-
-        Assert.Equal(typeof(SqliteException).FullName, exception.ServerExceptionTypeName);
-        Assert.Contains("no such column", exception.Message);
-    }
+    internal static Task StoreRefuses(Func<Task> query)
+        => SqliteStoreRefusal.AssertAsync(query, "no such column");
 }
 
 /// <summary>

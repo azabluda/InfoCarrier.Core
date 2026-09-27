@@ -64,7 +64,9 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     ///     independently.
     /// </remarks>
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => builder.UseInfoCarrier(_backend, ClientOptions(_backend));
+        => _backend.IsDirect
+            ? _backend.AddDirectClientOptions(builder)
+            : builder.UseInfoCarrier(_backend, ClientOptions(_backend));
 
     /// <summary>
     ///     The InfoCarrier client options a fixture's store implies. Shared with

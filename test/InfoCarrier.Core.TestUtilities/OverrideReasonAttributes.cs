@@ -136,6 +136,20 @@ public enum DeviationKind
     /// <summary>The base's assertion cannot state the behaviour, so the override writes the base's query out.</summary>
     QueryWrittenOut = 1 << 7,
 
+    /// <summary>
+    ///     The answer is upstream's, and the statements the server runs differ from what plain EF Core
+    ///     runs for the same test: their text, their order, a failure mark, or a reader's reads or a
+    ///     non-query's rows (#167, ADR-014 and its amendment of 2026-09-26). This provider's
+    ///     behaviour, so legal only on an InfoCarrier reason.
+    /// </summary>
+    /// <remarks>
+    ///     A slow run (<c>INFOCARRIER_LIVE_COMPARE=1</c>) checks it both ways: a statement difference
+    ///     with no reason carrying this flag is red, and a reason carrying it on a method none of whose
+    ///     rows differ is red too, so a fix that removes the difference removes the reason with it.
+    ///     A reason is the fallback: fixing the provider is the way to make such a red green.
+    /// </remarks>
+    SqlDiffers = 1 << 8,
+
     /// <summary>Anything else, described in <see cref="OverrideReasonAttribute.DeviationNote" />.</summary>
     Other = 1 << 30,
 }

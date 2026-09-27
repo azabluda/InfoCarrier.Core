@@ -54,7 +54,7 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
 
         await TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
-            (facade, transaction) => facade.UseInfoCarrierTransaction(transaction),
+            (facade, transaction) => facade.UseTestTransaction(transaction),
             async context => Assert.Contains(
                 CoreStrings.NonQueryTranslationFailedWithDetails(
                     "", RelationalStrings.ExecuteOperationOnEntitySplitting("ExecuteDelete", "MeterReading"))[21..],

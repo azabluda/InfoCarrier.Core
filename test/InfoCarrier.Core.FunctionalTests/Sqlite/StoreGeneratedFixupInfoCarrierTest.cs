@@ -44,7 +44,7 @@ public class StoreGeneratedFixupInfoCarrierTest(StoreGeneratedFixupInfoCarrierTe
 
     /// <inheritdoc />
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <summary>
     ///     The store-generated-fixup fixture, wired to a SQLite backend behind the wire.

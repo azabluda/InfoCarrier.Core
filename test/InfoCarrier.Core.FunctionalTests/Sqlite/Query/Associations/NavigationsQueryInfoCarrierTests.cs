@@ -67,7 +67,7 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsRelationalFixtureBa
     ///     with no database (ADR-013). The provider has its own enlistment (Phase T / M4).
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 // The seven Navigations facets (ADR-004), on their relational bases since R25. Adopting these

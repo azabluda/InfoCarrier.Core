@@ -37,6 +37,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         : base(name, shared)
     {
         _testStoreProperties = testStoreProperties;
+        IsDirect = DirectClient.IsEnabled;
 
         IServiceCollection services = AddServices(new ServiceCollection().AddLogging());
         if (testStoreProperties.OnAddServices is { } onAddServices)
@@ -215,6 +216,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     }
 
     /// <summary>
+    ///     Whether this store was created for the plain-EF half of a slow run, where the client is
+    ///     plain EF Core on it (#167). Read once, from <see cref="DirectClient.IsEnabled" />, when the
+    ///     store is created, so a store never changes sides.
+    /// </summary>
+    public bool IsDirect { get; }
+
+    /// <summary>
     ///     The server URL/name this store stands in for.
     /// </summary>
     public string ServerUrl => Name;
@@ -328,7 +336,46 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // the property type alone; the mechanism is EF's to find.
         //
         // The switch stays per fixture regardless, and this repository has nothing to fix.
-        builder = builder.UseInternalServiceProvider(ServiceProvider).EnableSensitiveDataLogging();
+        return AddServerContextOptions(builder.UseInternalServiceProvider(ServiceProvider));
+    }
+
+    /// <summary>
+    ///     The options of a client that is plain EF Core on this store (<see cref="DirectClient" />):
+    ///     everything the server context gets except its service provider, which the fixture's own
+    ///     replaces, and on <see cref="DirectClientConnection" />.
+    /// </summary>
+    public virtual DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => throw new NotSupportedException($"'{GetType().Name}' has no direct-client run.");
+
+    /// <summary>
+    ///     Deletes and re-creates the database through a server context, for a fixture that
+    ///     rebuilds its store before every test.
+    /// </summary>
+    /// <remarks>
+    ///     A store method and not the fixture's own <c>EnsureDeleted</c>, because the SQLite store
+    ///     has to close the plain-EF half's connection around it: an open connection keeps the
+    ///     file from being deleted (#167).
+    /// </remarks>
+    public virtual async Task RecreateAsync()
+    {
+        using DbContext context = CreateDbContext();
+        await context.Database.EnsureDeletedAsync().ConfigureAwait(false);
+        await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     The one connection every direct client context of this store shares, as EF's own relational
+    ///     test stores share one, so that one context can enlist in another's transaction.
+    /// </summary>
+    public virtual DbConnection DirectClientConnection
+        => throw new NotSupportedException($"'{GetType().Name}' has no direct-client run.");
+
+    /// <summary>
+    ///     What the server context and a direct client context both get.
+    /// </summary>
+    protected DbContextOptionsBuilder AddServerContextOptions(DbContextOptionsBuilder builder)
+    {
+        builder = builder.EnableSensitiveDataLogging();
 
         // Always recorded, and in memory: a test that asserts the server's SQL (#111) reads
         // `ServerSql` and compares it with EF's own text. One recorder per store, cleared by the
@@ -364,6 +411,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         DbContext clientContext,
         CancellationToken cancellationToken = default)
     {
+        NoteWireInDirectRun();
         using var _ = WithClientContext(clientContext);
         return await _client.QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
@@ -374,6 +422,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         DbContext clientContext,
         CancellationToken cancellationToken = default)
     {
+        NoteWireInDirectRun();
         using var _ = WithClientContext(clientContext);
         return await _client.SaveChangesAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
     }
@@ -409,7 +458,21 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
     /// <inheritdoc />
     public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-        => _client.BeginTransactionAsync(cancellationToken);
+    {
+        NoteWireInDirectRun();
+        return _client.BeginTransactionAsync(cancellationToken);
+    }
+
+    // A request that crosses the wire while the plain-EF side is set means the test built an
+    // InfoCarrier client by hand, so its "plain EF" run was not plain EF, and the slow run says so
+    // instead of comparing InfoCarrier with itself (#167). Every request of the harness passes here.
+    private static void NoteWireInDirectRun()
+    {
+        if (DirectClient.IsEnabled)
+        {
+            CurrentTest.Value?.NoteWire();
+        }
+    }
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)

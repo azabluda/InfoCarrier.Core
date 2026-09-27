@@ -59,7 +59,7 @@ public class ProxyGraphUpdatesInfoCarrierTest
         ///     </para>
         /// </remarks>
         protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-            => facade.UseInfoCarrierTransaction(transaction);
+            => facade.UseTestTransaction(transaction);
 
         public abstract class ProxyGraphUpdatesInfoCarrierFixtureBase : ProxyGraphUpdatesFixtureBase
         {

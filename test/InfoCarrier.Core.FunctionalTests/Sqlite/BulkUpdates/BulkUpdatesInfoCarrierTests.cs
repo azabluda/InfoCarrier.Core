@@ -78,7 +78,7 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
     ///     uncommitted state; the provider's own enlistment is what C3 established this needs.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 /// <summary>
@@ -113,7 +113,7 @@ public class InheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesFi
 
     /// <inheritdoc cref="NorthwindBulkUpdatesInfoCarrierFixture{TModelCustomizer}.UseTransaction" />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 public class FiltersInheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesInfoCarrierFixture
@@ -308,7 +308,7 @@ public class NonSharedModelBulkUpdatesInfoCarrierTest(NonSharedFixture fixture)
 
     /// <inheritdoc cref="NorthwindBulkUpdatesInfoCarrierFixture{TModelCustomizer}.UseTransaction" />
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <inheritdoc />
     protected override ContextFactory<TContext> CreateContextFactory<TContext>(

@@ -38,7 +38,7 @@ public class ConferencePlannerInfoCarrierTest(ConferencePlannerInfoCarrierTest.C
     ///     <c>OptimisticConcurrencyInfoCarrierTest</c> needs it.
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     public class ConferencePlannerInfoCarrierFixture : ConferencePlannerFixtureBase
     {

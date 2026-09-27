@@ -56,7 +56,7 @@ public class StoreGeneratedInfoCarrierTest(StoreGeneratedInfoCarrierTest.StoreGe
     ///     <c>OptimisticConcurrency</c> need.
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     public class StoreGeneratedInfoCarrierFixture : StoreGeneratedFixtureBase
     {

@@ -57,7 +57,7 @@ public class OwnedJsonQueryInfoCarrierFixture : OwnedJsonRelationalFixtureBase
     ///     family; see <see cref="NavigationsQueryInfoCarrierFixture.UseTransaction" />.
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 }
 
 // The six OwnedJson facets (ADR-004). R29 adopted them bare and measured 16 red of 87 -- the

@@ -42,7 +42,7 @@ public class ComplexCollectionJsonUpdateInfoCarrierTest(
     ///     have. Same override, same reason, as <c>OptimisticConcurrencyInfoCarrierTest</c>'s.
     /// </remarks>
     protected override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseInfoCarrierTransaction(transaction);
+        => facade.UseTestTransaction(transaction);
 
     /// <inheritdoc />
     /// <remarks>Nothing here asserts SQL, so there is no log to clear.</remarks>

@@ -7098,8 +7098,18 @@ claims a runtime difference. The amendment proposed:
 
 ### Steps
 
-- [ ] **H0/H1. The test identity and the command capture.** H0, H1a and H1b from `sql-capture`,
-      without the files: no `SqlCaptureFile`, no folder check, no `SqlCaptureAttribute` assertion.
+- [x] **H0/H1. The test identity and the command capture.**
+      `eng/measure.sh h0h1 to-query-string`: **FAILING 0, TOTAL 29914**, FIXED none, BROKEN none,
+      REASONS unchanged; the spec project **Passed: 29442, Skipped: 238, Total: 29680** in 6.84
+      minutes against 6.27 before, inside the 6.3 to 7.6 minutes the same suite took in earlier
+      runs. The 31 new tests pass, and the `DisposeAsync` pin was seen red with
+      `[assembly: CloseCurrentTest]` removed. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed:
+      0, Total: 28**. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+
+      H0, H1a and H1b from `sql-capture`, without the files: no `SqlCaptureFile`, no folder check,
+      no `SqlCaptureAttribute` assertion. `After` closes the test through
+      `[assembly: CloseCurrentTest]`, which is all that attribute did that goes forward, and the
+      capture's tests are `CommandCaptureTest`, a name that no longer points at the files.
       `Ordinal` and `SqlCapture.NextOrdinal` go, because the slow run matches a wire test with its
       plain-EF run by position inside the test case, which ends the review's "ordinals are never
       reset" minor. New pins: a statement in a test class's `DisposeAsync` is filed under no test,
@@ -7110,8 +7120,25 @@ claims a runtime difference. The amendment proposed:
       [Amendment 2026-09-26](../../decisions.md#amendment-2026-09-26-the-spike-ran-and-decision-3-reads-only-the-reasons-that-claim-a-difference).
       It records two corrections the spike measured as well: the comparison runs when the result
       arrives, because `After` cannot know the outcome, and a slow run writes no file.
-- [ ] **H3. The plain-EF client and the slow mode.** From the spike, with what the whole-tier run
-      found:
+- [x] **H3. The plain-EF client and the slow mode.**
+      Slow run of Tier B (`INFOCARRIER_LIVE_COMPARE=1`): **Passed: 19085, Failed: 367, Skipped:
+      155, Total: 19607** in 10 m 10 s, every failure a comparison red, in 187 methods: 157 whose
+      statements differ, 22 that plain EF on SQLite refuses and InfoCarrier answers, and 8 whose
+      InfoCarrier reason carries none of the three flags. The spike's other reds are gone: the 35
+      `GroupBy` counts, the 13 harness outcomes, the 118 methods of this repository's own classes
+      and the 6 reasons without a difference. Normal run, `eng/measure.sh h3 h0h1`: **FAILING 0,
+      TOTAL 29914**, FIXED none, BROKEN none, REASONS unchanged, 6.77 minutes.
+
+      Two things the whole-tier run found beyond the plan. **An outcome difference covers the
+      statements of its row**: when plain EF refuses and InfoCarrier answers, the statements differ
+      because the outcomes do, so an outcome reason is what such a row needs. **The plain-EF
+      connection opens once the store is initialized, and closes around a rebuild**: a pooled
+      context factory asks for it before initialization, and an open connection keeps
+      `EnsureDeleted` from deleting the file, which failed `TPTTableSplitting` and all 34 tests of
+      `OptimisticConcurrency`, whose fixture rebuilds its store through
+      `InfoCarrierBackendTestStore.RecreateAsync` now.
+
+      From the spike, with what the whole-tier run found:
       - the plain-EF client copies EF's own `SqliteTestStore`: one connection per store, opened when
         the store starts, EF's SQLite warning settings and `SingleQuery`. The spike kept the
         connection closed, so `ToListAsync_with_canceled_token` got a `TaskCanceledException` where
@@ -7138,11 +7165,10 @@ claims a runtime difference. The amendment proposed:
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.
 
-**Three pull requests and one direct push**: H0/H1, H3 and H4, and H2 on `main` because it is docs
-only. The two parked SQL gaps and the parameter-numbering family wait for the triage, and each then
-gets a red promise, a fix and a pull request of its own.
-
-**No code of this phase lands on `main` until the owner has seen the mechanism in real action**
-(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). H0/H1 is
-PR #171 and stays open. H3 is built on a branch on top of it, and the stack goes to `main` only when
-the owner accepts it. H2 is on `main` because it is a decision and not code.
+**Five pull requests and one direct push**: H2 on `main`, because it is docs only; four for the
+stack, and one for H4. The owner saw the slow run work and chose the four on 2026-09-28: H0/H1 with
+H3 (#171), H5 to H19, H20 to H30, and H31 to H33a, each merged with `--no-ff` so that every step
+keeps its commit. Until then this read "Three pull requests and one direct push: H0/H1, H3 and H4",
+and "No code of this phase lands on `main` until the owner has seen the mechanism in real action"
+(owner, 2026-09-26: "I've seen twice my own ideas going to shelve/bin in this area"). The two
+parked SQL gaps and the parameter-numbering family wait for the triage, which starts at H5.

@@ -47,6 +47,7 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in measure.sh
+INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
 ```
 
 ### Where the tests live
@@ -66,7 +67,8 @@ that shows it, and a control class that needs no override must stay green withou
 
 **`test/InfoCarrier.Core.TestUtilities` is the store-neutral half of the harness** — the client and
 server shells, the store factory, the fixture properties, the in-process transport, the geometry
-mapper, the server SQL log, the culture pin and `OverrideAudit`. It sits at the repository's 10.0.1
+mapper, the server SQL log, the culture pin, `OverrideAudit`, and `CurrentTest` with the xUnit test
+framework that sets it for every test of the spec project (#167). It sits at the repository's 10.0.1
 floor and carries no `VersionOverride`, because .NET binds an assembly by name and a higher version
 satisfies a lower reference: compile-low/run-high works and the reverse does not. **Anything that
 names a store stays in `FunctionalTests/TestUtilities/`** — the tier classes, their backend stores,
