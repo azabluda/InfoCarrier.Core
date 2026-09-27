@@ -7645,6 +7645,14 @@ claims a runtime difference. The amendment proposed:
       audit and the compliance tests: **Passed: 297, Failed: 0, Total: 297**. Normal run,
       `eng/measure.sh move-query-rest move-include`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
       none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H26. The four load bases move to Tier B.** On the branch `live-comparison-move-load`, on top
+      of H25. `Load`, `FieldsOnlyLoad`, `ManyToManyLoad` and `ManyToManyFieldsLoad` had no override
+      on Tier A and kept their counts: 3137, 713, 358 and 124. The two many-to-many fixtures are
+      query fixtures and implement `ITestSqlLoggerFactory`, as the relational compliance test
+      requires on Tier B. Slow run of the four: **`Passed: 4332, Failed: 0, Total: 4332`**, no
+      red. With the audit and the compliance tests: **Passed: 4, Failed: 0, Total: 4**. Normal run,
+      `eng/measure.sh move-load move-query-rest`: **FAILING 0, TOTAL 29953**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

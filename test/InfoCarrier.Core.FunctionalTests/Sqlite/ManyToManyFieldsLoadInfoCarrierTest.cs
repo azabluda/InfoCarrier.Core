@@ -4,26 +4,26 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
-namespace InfoCarrier.Core.FunctionalTests.InMemory;
+namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>
-///     <c>ManyToManyFieldsLoadTestBase</c> on Tier A.
+///     <c>ManyToManyFieldsLoadTestBase</c> on ADR-009 <b>Tier B</b>.
 /// </summary>
 /// <remarks>
-///     The same skip-navigation loading as `ManyToManyLoad`, over a field-only model — the
-///     intersection of the two things this batch is aimed at.
+///     <para>
+///         The same skip-navigation loading as `ManyToManyLoad`, over a field-only model — the
+///         intersection of the two things this batch is aimed at.
+///     </para>
+///     <para>
+///         <b>Moved from Tier A on 2026-09-27, at the owner's request</b>, so that #167's slow run
+///         can compare it with plain EF; Tier A's store runs no statement.
+///     </para>
 /// </remarks>
 public class ManyToManyFieldsLoadInfoCarrierTest(ManyToManyFieldsLoadInfoCarrierTest.InfoCarrierFixture fixture)
     : ManyToManyFieldsLoadTestBase<ManyToManyFieldsLoadInfoCarrierTest.InfoCarrierFixture>(fixture)
 {
-    public class InfoCarrierFixture : ManyToManyFieldsLoadFixtureBase
+    public class InfoCarrierFixture : ManyToManyFieldsLoadFixtureBase, ITestSqlLoggerFactory
     {
-        // NO `TestSqlLoggerFactory`, and losing it is what the project split bought. It lives in
-        // `EFCore.Relational.Specification.Tests`, which Tier A does not reference. It was here for
-        // `RelationalComplianceTestBase`'s second assertion (R54), and Tier A is now checked by the
-        // plain `ComplianceTestBase`, which does not ask. What it returned was the CLIENT's log
-        // anyway, and this client has no database and emits no SQL.
-
         private ITestStoreFactory? _testStoreFactory;
 
         protected override string StoreName
@@ -31,9 +31,13 @@ public class ManyToManyFieldsLoadInfoCarrierTest(ManyToManyFieldsLoadInfoCarrier
 
         protected override ITestStoreFactory TestStoreFactory
             => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-                InMemoryInfoCarrierTier.Instance,
+                SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
                 configureConventions: ConfigureConventions);
+
+        /// <inheritdoc />
+        public TestSqlLoggerFactory TestSqlLoggerFactory
+            => (TestSqlLoggerFactory)ListLoggerFactory;
     }
 }
