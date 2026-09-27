@@ -7603,6 +7603,18 @@ claims a runtime difference. The amendment proposed:
       0, Skipped: 4, Total: 126**. Normal run, `eng/measure.sh move-inheritance move-northwind`:
       **FAILING 0, TOTAL 29833**, 97 fewer for the duplicate, FIXED none, BROKEN none, REASONS
       unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H23. `ManyToManyQuery` and its no-tracking sibling move to Tier B.** On the branch
+      `live-comparison-move-manytomany`, on top of H22. Not duplicates of the TPT and TPC classes
+      already there: those run the same tests over other mappings of the model, and EF hosts all
+      three on SQLite. The two derive from the relational bases, as EF's SQLite classes do, and gain
+      the 38 tests each that those bases add: 204 and 206 on Tier A, 242 and 244 now. First run: 8
+      red, the two `APPLY` overrides EF's SQLite classes carry, adopted with their line ranges; the
+      no-tracking file's own comment, "Sqlite does not support Apply operations", is its
+      justification. Slow run of the two: **`Passed: 478, Failed: 0, Skipped: 8, Total: 486`**. With
+      the audit and the compliance tests: **Passed: 482, Failed: 0, Skipped: 8, Total: 490**. Normal
+      run, `eng/measure.sh move-manytomany move-inheritance`: **FAILING 0, TOTAL 29909**, FIXED none,
+      BROKEN none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0
+      errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

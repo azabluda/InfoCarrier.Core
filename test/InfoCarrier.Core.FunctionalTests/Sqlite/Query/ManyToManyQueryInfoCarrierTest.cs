@@ -136,6 +136,75 @@ public class TPCManyToManyNoTrackingQueryInfoCarrierTest(TPCManyToManyQueryInfoC
 }
 
 /// <summary>
+///     Many-to-many navigations over the model's own TPH hierarchy, on ADR-009 <b>Tier B</b>.
+/// </summary>
+/// <remarks>
+///     <b>Moved from Tier A on 2026-09-27, at the owner's request</b>, so that #167's slow run can
+///     compare it with plain EF; Tier A's store runs no statement. It is not a duplicate of the TPT
+///     and TPC classes above: they run the same tests over other mappings of the model, and EF
+///     hosts all three on SQLite. The Tier A class had no override; the two below are EF's own
+///     SQLite ones, adopted after they were measured red, as on the siblings.
+/// </remarks>
+public class ManyToManyQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fixture)
+    : ManyToManyQueryRelationalTestBase<ManyToManyQueryInfoCarrierFixture>(fixture)
+{
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 13, 17,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
+        => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
+            .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 19, 25,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
+        bool async)
+        => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
+            .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(async));
+}
+
+/// <inheritdoc cref="ManyToManyQueryInfoCarrierTest" />
+public class ManyToManyNoTrackingQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fixture)
+    : ManyToManyNoTrackingQueryRelationalTestBase<ManyToManyQueryInfoCarrierFixture>(fixture)
+{
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 15, 19,
+        Justification = "Sqlite does not support Apply operations")]
+    public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
+        => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
+            .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 21, 27,
+        Justification = "Sqlite does not support Apply operations")]
+    public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
+        bool async)
+        => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
+            .Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(async));
+}
+
+/// <summary>
+///     The many-to-many fixture, wired to a SQLite backend behind the wire.
+/// </summary>
+public class ManyToManyQueryInfoCarrierFixture : ManyToManyQueryRelationalFixture
+{
+    private ITestStoreFactory? _testStoreFactory;
+
+    /// <inheritdoc />
+    protected override ITestStoreFactory TestStoreFactory
+        => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
+            SqliteInfoCarrierTier.Instance,
+            ContextType,
+            (modelBuilder, context) => OnModelCreating(modelBuilder, context),
+            configureConventions: ConfigureConventions);
+}
+
+/// <summary>
 ///     The TPT many-to-many fixture, wired to a SQLite backend behind the wire.
 /// </summary>
 public class TPTManyToManyQueryInfoCarrierFixture : TPTManyToManyQueryRelationalFixture
