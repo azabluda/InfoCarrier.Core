@@ -46,6 +46,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         is. A row with no plain-EF run to compare with is red. <b>A red is a defect report
 ///         first</b>: fixing the provider is the way to make it green, and a reason the fallback.
 ///     </para>
+///     <para>
+///         <b><see cref="DeviationKind.Other" /> covers a difference of either kind, since
+///         2026-09-27</b> (the owner): a difference none of the three flags describes is stated in
+///         the reason's <see cref="OverrideReasonAttribute.DeviationNote" />, which the audit requires
+///         with it. Such a reason is not red for lacking a difference, because <c>Other</c> also
+///         describes a body that differs from upstream's in a way that runs nothing different.
+///         Until that day the slow run read the three flags alone.
+///     </para>
 /// </remarks>
 public static class LiveComparison
 {
@@ -228,18 +236,20 @@ public static class LiveComparison
             }
 
             DeviationKind reasons = ReasonsOf(test.TestClass, test.MethodName);
-            bool coversStatements = reasons.HasFlag(DeviationKind.SqlDiffers);
-            bool coversOutcome = (reasons & OutcomeReasons) != 0;
+            bool claimsOther = reasons.HasFlag(DeviationKind.Other);
+            bool claimsStatements = reasons.HasFlag(DeviationKind.SqlDiffers);
+            bool claimsOutcome = (reasons & OutcomeReasons) != 0;
             string name = $"{test.TestClass.Name}.{test.MethodName}";
 
             (string? label, string? why) =
                 verdict is "no-plain-ef-run" or "unmatched" or "plain-ef-run-used-infocarrier"
                     ? ("no-plain-ef-run", $"The slow run has no plain-EF run of this test to compare with ({verdict}).")
-                : (statements && !coversStatements) || (outcome && !coversOutcome)
+                : (statements && !(claimsStatements || claimsOther)) || (outcome && !(claimsOutcome || claimsOther))
                     ? ("difference-without-reason",
                         $"This test runs differently through InfoCarrier than with plain EF Core, and {name} carries no InfoCarrier reason flagged for it: "
-                        + "SqlDiffers for a statement difference, AnswerNotRefusal or RefusedEarlier for an outcome difference.")
-                : lastRowOfMethod && ((coversStatements && !anyStatements) || (coversOutcome && !anyOutcome))
+                        + "SqlDiffers for a statement difference, AnswerNotRefusal or RefusedEarlier for an outcome difference, "
+                        + "or Other with a note for a difference none of them describes.")
+                : lastRowOfMethod && ((claimsStatements && !anyStatements) || (claimsOutcome && !anyOutcome))
                     ? ("reason-without-difference",
                         $"{name} carries an InfoCarrier reason flagged {reasons & (DeviationKind.SqlDiffers | OutcomeReasons)}, and no row of it differs in that way from plain EF Core, so the reason suppresses nothing.")
                 : (null, null);
@@ -336,7 +346,8 @@ public static class LiveComparison
     }
 
     // The flags of the method's InfoCarrier reasons that a slow run reads: this provider's
-    // behaviour, never a skip, never another reason (ADR-014, amendment 2026-09-26).
+    // behaviour, never a skip, never another reason (ADR-014, amendment 2026-09-26), and `Other`
+    // with its note since 2026-09-27.
     private static DeviationKind ReasonsOf(Type testClass, string methodName)
         => Reasons.GetOrAdd(
             (testClass, methodName),
@@ -345,7 +356,9 @@ public static class LiveComparison
                 .Where(m => m.Name == key.Item2)
                 .SelectMany(m => m.GetCustomAttributes<OverrideReasonAttribute>(inherit: true))
                 .Where(a => a is InfoCarrierDefectAttribute or InfoCarrierDesignAttribute { Skip: false })
-                .Aggregate(DeviationKind.None, (all, a) => all | (a.Deviation & OverrideAudit.InfoCarrierBehaviour)));
+                .Aggregate(
+                    DeviationKind.None,
+                    (all, a) => all | (a.Deviation & (OverrideAudit.InfoCarrierBehaviour | DeviationKind.Other))));
 
     private static bool SameBag(IEnumerable<ComparedCommand> x, IEnumerable<ComparedCommand> y)
         => x.Select(c => c.Text).Order(StringComparer.Ordinal)

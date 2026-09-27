@@ -7098,6 +7098,13 @@ claims a runtime difference. The amendment proposed:
    provider's behaviour, and never a skip. A statement difference needs `SqlDiffers`; an outcome
    difference needs one of the other two. The forward half is unmeasured under this rule: the 13
    methods the spike found green, each with a reason and a difference, are checked in H3.
+   **Since 2026-09-27 the forward half also reads `Other`** (the owner, H19): a difference none of
+   the three describes is stated in the reason's `DeviationNote`, which the audit requires with
+   `Other`, and the reason covers a difference of either kind. The reverse half does not read it,
+   because `Other` also marks a body that runs nothing different. Until then this point read
+   "Both halves read only an InfoCarrier reason whose `Deviation` carries `SqlDiffers`,
+   `AnswerNotRefusal` or `RefusedEarlier`", and eight methods whose difference none of the three
+   described stayed red.
 2. **The comparison covers the classes that run an EF specification base.** This repository's own
    classes (`ServerSqlTest`, `SqliteSmokeTest`, `ServerParameterizationTest` and the others) assert
    this provider directly and have no plain-EF counterpart. A plain-EF run that still crosses the
@@ -7517,6 +7524,26 @@ claims a runtime difference. The amendment proposed:
       BROKEN none, REASONS unchanged. `trim-ratchet.sh` OK at 106 <= 106.
       `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true` Release build
       with `--no-incremental`: 5 warnings, 0 errors.
+- [x] **H19. `Other` covers a difference the three flags do not describe.** On the branch
+      `live-comparison-other-reason`, on top of H18, with the owner's yes of 2026-09-27. Eight
+      methods carried an InfoCarrier reason whose difference none of `SqlDiffers`,
+      `AnswerNotRefusal` and `RefusedEarlier` described, and the slow run read those three alone:
+      three raw-SQL refusals, two connection tests, #52, #113, and a refusal whose message prints a
+      tuple. `LiveComparison` now reads `Other` as covering a difference of either kind, stated in the
+      `DeviationNote` the audit requires with it; the reverse check does not read it, because `Other`
+      also marks a body that runs nothing different. Point 1 of the amendment above says so, quoting
+      what it said. Two of the eight already carried `Other`. The three raw-SQL tests and the two
+      connection tests get `Other` with a note, and #113 gets `AnswerNotRefusal`, which describes it
+      exactly. Tier C's one red gets an `[InfoCarrierDesign(10)]` reason flagged `SqlDiffers`, whose
+      definition includes a reader's reads: the server reads to the end before the client evaluates
+      the projection. Test only.
+
+      Slow run of Tier B: **`Passed: 19414, Failed: 62, Skipped: 155, Total: 19631`**, against
+      `Failed: 76`. **8 methods left the red list and none joined it**, and none of the 33 that
+      stayed red changed its verdict or its read counts. Slow run of Tier C: **`Passed: 109, Failed: 0,
+      Skipped: 1, Total: 110`**. `OverrideAuditTest` **Passed: 1, Failed: 0, Total: 1**. Normal run,
+      `eng/measure.sh other-reason no-column-row`: **FAILING 0, TOTAL 29938**, FIXED none, BROKEN
+      none, REASONS unchanged. `CI=true` Release build with `--no-incremental`: 5 warnings, 0 errors.
 - [ ] **H4. Delete what reading EF's `AssertSql` needed.** The scripts, the log and its markers,
       their rows in `CLAUDE.md`'s script table, and the passages of `docs/test-policy.md` that
       describe them. The slow run is the investigation they served.

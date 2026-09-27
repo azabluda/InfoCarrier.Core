@@ -112,7 +112,9 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     [InfoCarrierDesign(
         Decisions.SecurityReview,
         Decisions.RawSqlGrant,
-        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
+        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.",
+        Deviation = DeviationKind.Other,
+        DeviationNote = "Plain EF runs the raw SQL. This client refuses it before any statement, and the override asserts the refusal.")]
     public override Task Multiple_different_entity_type_from_different_namespaces(bool async)
         => FromSqlAssertions.NotSupportedAsync(
             () => base.Multiple_different_entity_type_from_different_namespaces(async));
@@ -161,7 +163,7 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
     ///         the measurement disproved.
     ///     </para>
     /// </remarks>
-    [InfoCarrierDefect(113)]
+    [InfoCarrierDefect(113, Deviation = DeviationKind.AnswerNotRefusal)]
     public override async Task Inlined_dbcontext_is_not_leaking()
     {
         var failure = await Assert.ThrowsAsync<Xunit.Sdk.ThrowsException>(base.Inlined_dbcontext_is_not_leaking);

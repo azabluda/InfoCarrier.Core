@@ -68,7 +68,10 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
         Decisions.SecurityReview,
         Decisions.RawSqlGrant,
         Justification = "Raw SQL is refused unless the server grants it, and this fixture does not. The refusal comes "
-            + "while the query is compiled, before the concurrency detector is reached.")]
+            + "while the query is compiled, before the concurrency detector is reached.",
+        Deviation = DeviationKind.Other,
+        DeviationNote = "Plain EF reaches the concurrency detector. This client refuses the raw SQL first, and the "
+            + "override asserts the refusal.")]
     public override async Task FromSql(bool async)
     {
         var failure = await Assert.ThrowsAsync<Xunit.Sdk.EqualException>(() => base.FromSql(async));
@@ -115,7 +118,9 @@ public class ConcurrencyDetectorDisabledInfoCarrierTest(
     [InfoCarrierDesign(
         Decisions.SecurityReview,
         Decisions.RawSqlGrant,
-        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.")]
+        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.",
+        Deviation = DeviationKind.Other,
+        DeviationNote = "Plain EF runs the raw SQL. This client refuses it before any statement, and the override asserts the refusal.")]
     public override Task FromSql(bool async)
         => FromSqlAssertions.NotSupportedAsync(() => base.FromSql(async));
 

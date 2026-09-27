@@ -151,6 +151,12 @@ public enum DeviationKind
     SqlDiffers = 1 << 8,
 
     /// <summary>Anything else, described in <see cref="OverrideReasonAttribute.DeviationNote" />.</summary>
+    /// <remarks>
+    ///     On an InfoCarrier reason, a slow run reads it as covering a statement difference or an
+    ///     outcome difference that none of the three named flags describes, stated in the note (the
+    ///     owner, 2026-09-27). It is not red for lacking a difference, because it also describes a
+    ///     body that runs nothing different.
+    /// </remarks>
     Other = 1 << 30,
 }
 
