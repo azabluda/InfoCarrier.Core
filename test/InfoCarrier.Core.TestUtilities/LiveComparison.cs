@@ -32,7 +32,9 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         have no plain-EF counterpart, and they run once. Until 2026-09-27 this read "Tier B's
 ///         classes that run an EF specification base"; the owner extended it to Tier C that day, whose
 ///         plain-EF client is the Firebird provider with the server's own correction to its SQL
-///         generator.
+///         generator. <b>Tier A is outside because it cannot be mined</b> (the owner, the same day):
+///         EF's InMemory provider runs no statement, so there is nothing to capture and only an
+///         outcome could differ.
 ///     </para>
 ///     <para>
 ///         <b>When a test is red</b>, by the same amendment. A row whose statements differ needs a

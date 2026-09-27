@@ -7106,10 +7106,12 @@ claims a runtime difference. The amendment proposed:
    run in CI is. Until 2026-09-27 this point read "**Tier B only.** Tier C would need a Firebird
    plain-EF client, and Tier D has its own `Direct*` controls. Either is a later option". The owner
    took up Tier C that day (H17), and the Firebird plain-EF client is the provider with the
-   server's own correction to its SQL generator. Tier A is not covered either, and this point has
-   never said why. What bounds its value is a fact rather than a decision: its store is EF's
-   InMemory provider, which runs no statement, so a comparison there could see only an outcome
-   that differs.
+   server's own correction to its SQL generator. **Tier A stays outside, and the owner gave the
+   reason on 2026-09-27**: its store is EF's InMemory provider, which runs no statement, so the
+   command capture has nothing to record and the comparison could see only an outcome that
+   differs. It cannot mine Tier A for the defects it finds on Tier B: a filter left on the client,
+   a column read too many, a subquery EF would not write. Moving bases from Tier A to Tier B is
+   what would put them in reach, and that is a scope decision for the owner.
 
 ### Steps
 
