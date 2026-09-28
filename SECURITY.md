@@ -28,8 +28,8 @@ vulnerability.
   the server honours it. The documented control is a query interceptor on the server.
 - A transaction token used by a caller who did not open that transaction, on a server that has not
   asked for it to be bound. A holder can query and save inside that transaction as well as end it.
-  `AddInfoCarrierHttpCallerIdentity` binds one to its opener; until a server calls it the token is
-  the only credential.
+  `AddInfoCarrierHttpCallerIdentity`, new in `10.2.0`, binds one to its opener; until a server
+  calls it the token is the only credential.
 - Expensive queries from an authenticated caller. Cap them where the caller cannot reach: a rate
   limit, a statement timeout, or a query interceptor.
 
@@ -38,4 +38,4 @@ has to build against them.
 
 ## Versions
 
-Fixes go to the `10.0` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.
+Fixes go to the `10.x` line. The `1.0` to `3.1` line last shipped on 2021-05-07 and gets none.

@@ -303,17 +303,22 @@ Both procedures below end at the same place, so the shared tail is written once.
 
 1. `git checkout release/10.1 && git pull`.
 2. Make the fix. **Confirm the pack baseline is the version you are patching**, not the one before
-   it: `grep PackageValidationBaselineVersion Directory.Build.props` must read `10.1.0` on the
-   `10.1` line. The trap is in `Directory.Build.props`'s own comment and in the list below.
-3. Gates. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, the spec suite
+   it: `grep PackageValidationBaselineVersion Directory.Build.props` must read the newest release
+   of that line, `10.1.1` before a `10.1.2`. The trap is in `Directory.Build.props`'s own comment
+   and in the list below.
+3. **Update every version a document names by hand** to the one you are about to tag: the
+   `PackageReference` examples in `getting-started/installation.md` and
+   `getting-started/upgrading-from-3-1.md`, and the EF Core floor in the installation page's
+   requirements if it moved. Before the tag, because the site is built from this branch.
+4. Gates. `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release` clean, the spec suite
    and the trim ratchet green, `dotnet pack` clean.
-4. Push. **CI runs on release lines since 2026-09-09**, so the branch is gated exactly like the
+5. Push. **CI runs on release lines since 2026-09-09**, so the branch is gated exactly like the
    trunk, and `packages.yml` puts `10.1.1-alpha.0.N` on the internal feed. Install that and try it:
    it is the last point before a version becomes permanent.
-5. Tag on **this branch**: `git tag -a v10.1.1 -m "InfoCarrier.Core 10.1.1"` then
+6. Tag on **this branch**: `git tag -a v10.1.1 -m "InfoCarrier.Core 10.1.1"` then
    `git push origin v10.1.1`. `release.yml` triggers on `v*` from any branch and carries its own
    build, tests and trim ratchet, so it does not depend on `build.yml` having run.
-6. Continue at **After either**.
+7. Continue at **After either**, publishing the site from this branch.
 
 ### A minor from `main`
 
@@ -322,36 +327,48 @@ Both procedures below end at the same place, so the shared tail is written once.
    there: the `Total tests: …` line of `eng/measure.sh`'s own summary, then
    ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing
    between two releases edits it** (2026-09-21): refreshed by hand after each run, the counts
-   drifted, and the landing page and this page disagreed.
-3. Tag on `main`: `git tag -a v10.2.0 -m "InfoCarrier.Core 10.2.0"`, `git push origin v10.2.0`.
-4. Continue at **After either**, and then cut the new line: `git checkout -b release/10.2 v10.2.0`
-   and push it. **Raise `PackageValidationBaselineVersion` to `10.2.0` on that branch too**, for
-   the reason in the list below.
-5. Publish the site from the new branch, and change the `deploy` job's `if` in `docs.yml` only if
-   you narrow it; as written it accepts any `refs/heads/release/` ref, so nothing needs editing.
+   drifted, and the landing page and this page disagreed. The new release-notes page gives the
+   same figure, from the same run.
+3. **Update every version a document names by hand** to the one you are about to tag, as in the
+   hotfix's step 3. Before the tag, because the new line is cut from it and the site is built from
+   the line.
+4. Tag on `main`: `git tag -a v10.2.0 -m "InfoCarrier.Core 10.2.0"`, `git push origin v10.2.0`.
+5. Cut the new line from the tag: `git checkout -b release/10.2 v10.2.0` and push it.
+6. Continue at **After either**, publishing the site from the new line. The `deploy` job's `if` in
+   `docs.yml` accepts any `refs/heads/release/` ref, so nothing there needs editing. Raising the
+   pack baseline covers the new line too, for the reason in the list below.
 
 ### After either
 
-6. Watch `release.yml`. It runs the gates, packs, verifies the filenames against the tag, and
+These are numbered on their own, because they are the same for both.
+
+1. Watch `release.yml`. It runs the gates, packs, verifies the filenames against the tag, and
    creates the GitHub Release.
-7. **Approve `publish-nuget` when you mean it.** It waits for a reviewer, because a pushed version
+2. **Approve `publish-nuget` when you mean it.** It waits for a reviewer, because a pushed version
    can be unlisted but never withdrawn. It pushes `InfoCarrier.Core` first, then
    `InfoCarrier.Core.AspNetCore`, which depends on it at the same version.
-8. **Apply the release body, because the workflow does not.** `gh release edit <tag> --notes-file
-   docs/release-bodies/<tag>.md`. Archive a body being replaced as `<tag>.superseded-<date>.md`
-   first, because GitHub keeps no history of one. Skipping this is invisible from the repository,
-   which is how the published `v10.0.0-preview.1` body drifted from its copy here.
-9. **Raise `PackageValidationBaselineVersion` to the version just published**, on every branch that
-   will build against it. This is the LAST step and not the first: validation downloads the
-   baseline package, so it cannot name one that is not on nuget.org yet.
-10. **Publish the site, which no push does.**
-    `gh workflow run Docs --ref release/10.1`, using the line you want readers to see. Confirm
-    `Deploy: success` rather than `skipped` in `gh run list --workflow Docs --limit 1`.
-11. Update any version a document names by hand: the `PackageReference` and Central Package
-    Management examples on the site, and the counts on the limitations and release-notes pages.
-12. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
-    **This is part of the release, not tidying afterwards.** Until it lands, `main` builds a
-    version that NuGet orders BELOW the one you just shipped; the table above measures it.
+3. **Publish the site, which no push does.** `gh workflow run Docs --ref release/10.2`, naming the
+   line you want readers to see. Confirm `Deploy: success` rather than `skipped` in
+   `gh run list --workflow Docs --limit 1`.
+4. **Apply the release body, because the workflow does not**, and only after the site: the body
+   links the new release-notes page, which is a 404 until step 3 has run. `gh release edit <tag>
+   --notes-file docs/release-bodies/<tag>.md`. Archive a body being replaced as
+   `<tag>.superseded-<date>.md` first, because GitHub keeps no history of one. Skipping this is
+   invisible from the repository, which is how the published `v10.0.0-preview.1` body drifted from
+   its copy here.
+5. **Raise `PackageValidationBaselineVersion` to the version just published**, on every branch that
+   will build against it: `main` and the line the tag is on. This comes after the publish and not
+   before it: validation downloads the baseline package, so it cannot name one that is not on
+   nuget.org yet.
+6. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
+   **This is part of the release, not tidying afterwards.** Until it lands, `main` builds a
+   version that NuGet orders BELOW the one you just shipped; the table above measures it.
+
+Until 2026-09-28 these ran in one numbering from 6 to 12, with the release body before the site
+and "update any version a document names by hand" as step 11, after the site had been published.
+That order could not work: the published site never saw the update. The `10.1.1` release skipped
+it, and for eighteen days the installation page told readers to pin `10.1.0`, which throws on EF
+Core `10.0.1` and later.
 
 The `dotnet add package` commands name no version, so they need no edit. They did until `10.0.0`,
 because the newest stable was then `3.1.1` and an unversioned install silently resolved to it.
@@ -474,7 +491,7 @@ Each of these cost something real, and none is visible from the code.
   your correction with it. Resolve those by hand. `git diff origin/release/10.1 origin/main --
   <file>` before you start; empty output means the merge is clean.
 - **Nothing publishes the site automatically.** A push to a release line builds the docs and
-  deploys nothing, by design. Forgetting step 10 leaves readers on the previous content with no
+  deploys nothing, by design. Forgetting step 3 of **After either** leaves readers on the previous content with no
   error anywhere.
 - **The `github-pages` environment only allows branches it is told about.** Enabling Pages names
   the default branch and nothing else, so the first deploy from a release line is rejected before
