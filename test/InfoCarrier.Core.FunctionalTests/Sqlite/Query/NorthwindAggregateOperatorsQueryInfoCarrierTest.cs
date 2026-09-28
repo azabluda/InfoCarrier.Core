@@ -26,10 +26,14 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         aggregates and for <c>Last</c> without an <c>ORDER BY</c>.
 ///     </para>
 ///     <para>
-///         The two overrides below are EF Core's own, adopted after measuring:
+///         The three overrides below are EF Core's own, adopted after measuring:
 ///         <c>Multiple_collection_navigation_with_FirstOrDefault_chained</c> needs <c>APPLY</c>,
-///         which is not SQLite syntax, and <c>Contains</c> over a local array of tuples has no
-///         translation. Both are convergence with EF's own <c>NorthwindAggregateOperatorsQuerySqliteTest</c>.
+///         which is not SQLite syntax, and <c>Contains</c> over a local array of tuples or of
+///         anonymous objects has no translation. All three are convergence with EF's own
+///         <c>NorthwindAggregateOperatorsQuerySqliteTest</c>. The anonymous one since 2026-09-28:
+///         until then this client answered it by reading every row and filtering here, and
+///         <c>ServerParameterizationTest.A_filter_on_a_local_list_of_anonymous_objects_is_refused_as_EF_refuses_it</c>
+///         pins the refusal.
 ///     </para>
 ///     <para>
 ///         <b>NONE OF THE THREE BELOW IS RED ON 2026-09-15</b>, and this paragraph said they were
@@ -62,4 +66,11 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
         Justification = Upstream.GaveNoReason)]
     public override Task Contains_with_local_tuple_array_closure(bool async)
         => AssertTranslationFailed(() => base.Contains_with_local_tuple_array_closure(async));
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 120, 121,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Contains_with_local_anonymous_type_array_closure(bool async)
+        => AssertTranslationFailed(() => base.Contains_with_local_anonymous_type_array_closure(async));
 }

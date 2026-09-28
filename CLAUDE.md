@@ -548,8 +548,9 @@ it: `InfoCarrierComplianceTest` scans the core specification assembly against Ti
 are 0, and both tests must stay green.** Those tests, not a list in this file, are the answer to
 "which bases are in".
 
-**Every milestone and every phase is closed, so `docs/plans/v10/implementation-plan.md` holds no
-phase** (2026-09-28). The issue-driven Phases Q to H are archived in
+**Every milestone and every planned phase is closed, so `docs/plans/v10/implementation-plan.md`
+holds only the rest of #167's triage** (2026-09-28): one step per slow-run red the owner takes up,
+from H34. The issue-driven Phases Q to H are archived in
 `docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
 the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
 the plan "is ISSUE-DRIVEN: it holds Phases Q, R, S, T, U, V, X, Y, Z and H". **Phase Y was the 10.1
