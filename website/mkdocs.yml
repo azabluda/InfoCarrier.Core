@@ -139,5 +139,6 @@ nav:
       - Multi-tenancy: multi-tenancy.md
       - Limitations: limitations.md
       - Public API: api-surface.md
+      - Release notes 10.2: release-notes/10.2.md
       - Release notes 10.1: release-notes/10.1.md
       - Release notes 10.0: release-notes/10.0.md
