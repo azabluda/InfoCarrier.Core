@@ -24,6 +24,12 @@
       THE FLOOR IS THE POINT OF THE LOWER BOUND. It is what a consumer is forced onto, so do not
       raise it to chase a patch; raise it only when this provider needs a fix that shipped in one.
       .github/dependabot.yml ignores this family for exactly that reason.
+
+      MICROSOFT.ENTITYFRAMEWORKCORE.RELATIONAL IS THE SECOND NUMBER CONSUMERS INHERIT, and carries
+      the same range for the same reason. InfoCarrier.Core has referenced it since R135
+      (2026-09-03), and until 2026-09-28 it was a bare `10.0.1` here, so 10.1.x declared it with no
+      ceiling beside an EF Core dependency that had one. The other EF packages below are test and
+      sample references and reach no nuspec.
     -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[10.0.1,11.0.0)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.1" />
@@ -31,7 +37,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite" Version="10.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="[10.0.1,11.0.0)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.1" />
 
