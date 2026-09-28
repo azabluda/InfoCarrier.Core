@@ -174,8 +174,10 @@ replaced is archived beside it as `<tag>.superseded-<date>.md` before the edit, 
 GitHub is the only one there was.
 
 **A release body must not link to a site page that has not been deployed yet.** The site publishes
-from `main` (`.github/workflows/docs.yml`), so a link to a page added on a branch is a 404 until
-that branch merges.
+only when `.github/workflows/docs.yml` is dispatched on a `release/` branch, so the release-notes
+page of a new version is a 404 until that version's line is published. `docs/versioning.md` applies
+the body after the site for this reason. This said the site publishes from `main` until 2026-09-28,
+which stopped being true on 2026-09-09.
 
 ## Before committing
 

@@ -33,10 +33,10 @@ and `SaveChanges` as a unit of work.
 <PackageReference Include="InfoCarrier.Core" Version="3.1.1" />
 
 <!-- after: the client and the shared model project -->
-<PackageReference Include="InfoCarrier.Core" Version="10.1.1" />
+<PackageReference Include="InfoCarrier.Core" Version="10.2.0" />
 
 <!-- after: the ASP.NET Core server, in addition to the above -->
-<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.1.1" />
+<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.2.0" />
 ```
 
 `Remote.Linq` and `Aqua` are gone. What remains is `Microsoft.EntityFrameworkCore` and
@@ -143,7 +143,7 @@ See [Value mappers](../configuration/value-mappers.md).
 ## A checklist
 
 1. Confirm the client can target `net10.0`.
-2. Pin `10.1.1` on both packages.
+2. Pin `10.2.0` on both packages.
 3. Drop any direct `Remote.Linq` or `Aqua` reference.
 4. `UseInfoCarrierClient` becomes `UseInfoCarrier`, and build the client from the three shipped
    objects.
