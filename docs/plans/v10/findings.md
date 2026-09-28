@@ -6,8 +6,8 @@ of what `CLAUDE.md` states as rules. Nothing here is an instruction; the instruc
 
 Most of what follows is closed. It is kept because the same mistakes are available again: a
 classification that was never re-checked, a count that did not move, a price paid for the wrong
-obstacle. The plan entries that produced these findings are in `implementation-plan.md` and
-`archive/`.
+obstacle. The plan entries that produced these findings are in `archive/`, since 2026-09-28 all of
+them.
 
 ## What the residual still drops, measured across the whole suite (R173, 2026-09-04)
 
@@ -873,6 +873,373 @@ count per skip -- 71 in a full run. It cannot destroy anyone's data, because it 
 database with no tables at all, which no store here legitimately has once seeded.
 
 **The rule: a guard that records that work *started* is not evidence its result still exists.**
+
+## The server's SQL compared with EF's `AssertSql` text, 2026-09-15 to 2026-09-28
+
+**Moved here from `docs/test-policy.md` on 2026-09-28**, when #167's slow run replaced the
+comparison and `eng/ef-sql-compare.sh`, `eng/ef-sql-diff.py` and the server SQL log were deleted
+(Phase H, H4). What follows is the record of what that comparison found, in the words it had then;
+the commands it names no longer exist.
+
+### Test by test, measured 2026-09-15
+
+**Measured 2026-09-15 on `main` at `f588004`.** Tier B ran serially with an xUnit
+`BeforeAfterTest` attribute writing each test's name into `server-sql.log`, and a deterministic
+script compared every test's statements with the `AssertSql` text of the same test in
+`EFCore.Sqlite.FunctionalTests` at `v10.0.1`: whitespace, parameter names, aliases and alias
+qualifiers ignored, literals and structure kept. **Both were committed on 2026-09-16** —
+`ServerSqlTestMarkerAttribute` beside `ServerSqlLog`, and `eng/ef-sql-diff.py`, run by
+`eng/ef-sql-compare.sh` — because they found two lost updates in one run, and because #111's own
+progress was what they measured. **All of it was deleted on 2026-09-28** (#167, H4): the slow run
+compares every test with plain EF Core instead (ADR-014), and this section and the next are the
+dated record of what the text comparison found.
+
+791 tests were paired, and 758 produced EF's statements exactly. **No statement had a literal where
+EF has a parameter.** A first, shape-only pass over the
+parallel run's log found the same, and was shown to catch the inline-collection defect by planting
+it back into a copy of the log.
+
+**Fixed on the branch that found them:**
+
+- **An owned reference in its owner's table lost its concurrency tokens.** EF checks the tokens of
+  every tracked entry that shares the row being written; the client sent only what changed, so the
+  server's `UPDATE` checked the key alone and overwrote a row someone else had changed. `Expand`
+  now sends the row-mates that carry a token, as `Unchanged`, on a relational store. EF's
+  `Property_entry_original_value_is_set` statement now matches, and
+  `ConcurrencyTokenTest.A_stale_write_is_refused_when_the_token_is_in_an_owned_reference` failed
+  before the fix. The same test for a complex property passed before and after.
+- **A write set every complex member and every JSON column.** `ModifiedProperties` names only
+  `GetProperties()`, so the server left complex members modified: a change to `Name` wrote
+  `SET "Stops", "Name", "Destination_City", "Destination_Street"`, and a concurrent change to those
+  columns was overwritten. `ChangeEntry.ModifiedComplexProperties` now names the changed members, and
+  a `null` from an older client keeps the old behaviour. All 19 `ComplexCollectionJsonUpdate`
+  statements were this; `PartialUpdateTest` failed on both mappings before the fix. **The first
+  version of the fix broke six tests, and the reason is a trap in EF's API**: the public
+  `ComplexCollectionEntry.IsModified` setter recurses through every complex element of the entity,
+  not only its own, and each element reports back to its own collection, so clearing `Employees`
+  cleared `Contacts` and setting `Contacts` set `Employees`. The server now clears one collection
+  through its own elements, before the scalar pass, which keeps EF from turning the entry unchanged.
+  After the fix the per-test comparison of those two classes found all 19 paired tests identical to
+  EF, the `Engines` concurrency statement included.
+
+- **A terminal `First()` above a client-side projection ran without EF's `LIMIT`.** The operator
+  consumes the rows the client reassembles, so it cannot ship, and nothing told the server how many
+  rows were wanted: every matching row crossed the wire for one row of answer.
+  `QuerySplitter.WithRowLimitForTerminalOperator` now sends the limit with the shipped query, as an
+  inline constant so that it lands as `LIMIT 1` exactly as EF writes it rather than as a parameter.
+  `Single` sends `LIMIT 2`, because one row cannot show that a second exists, and the client still
+  raises EF's own exceptions. Only a reassembled projection was affected: a scalar projection, an
+  entity query and a `Take` the caller wrote were already right, measured both ways. Three
+  differential cases pin it, and the trim baseline rises by one for the `MakeGenericMethod` the limit
+  needs.
+
+**That run also left three tests where an operator the type boundary leaves behind ran on the client
+over whole tables**: `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` (a join on an
+anonymous key), `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition`
+and `NorthwindGroupBy.Odata_groupby_empty_key` each read entire tables where EF runs one statement,
+because `QuerySplitter.RejectClientEvaluation` lets a translatable operator through on purpose. The
+first two are fixed: `JoinKeyRewriter` ships their composite key (#120, 2026-09-16, below). The
+third is still open and is the owner's decision.
+
+**After the fixes, a fresh serial run compared 791 paired tests again: 777 identical**, up from 758.
+Of the 14 that remain, five are refused queries the log cannot show, three are those client-side
+operators, two are the ADR-006 compiled queries, two are the mode deviation below, one is EF's
+own `IsNullOrEmpty` quirk, and one is `HasFlag`, which the pushdown fixed after that run.
+
+**A legitimate deviation**: `Check_inlined_constants_redacting` asks for
+`ParameterTranslationMode.Constant`, which the client has no builder to carry, so the server sends
+`IN (@Value1, @Value2, @Value3)` where EF sends `IN (1, 2, 3)`. No dangerous SQL, and the caller's
+rows are right.
+
+**Not findings**: five refused queries (the log records only commands that ran), EF's own
+`IsNullOrEmpty` override calling `IsNullOrWhiteSpace`, `Where_subquery_expression` (a direct run
+showed EF also sends two statements), and the ADR-006 evaluation of a compiled query's parameters,
+which stay parameters. `Contains_over_concatenated_parameter_and_constant`, for which EF's suite
+asserts no SQL, is now a case of `ServerParameterizationTest` and matches.
+
+### What the run of 2026-09-21 says
+
+On the whole tier: **791 tests paired, 790 identical, 1
+differing** (LITERAL 0, PARAMETER 0, VALUE 0, STRUCTURAL 1). It read 788 and 3 on 2026-09-20, 786
+and 5 on 2026-09-16, before the compiled-query fix below, and 784 and 7 before the join-key rewrite.
+The tier itself ran green in the same command: `Failed: 0, Passed: 19395, Skipped: 155, Total:
+19550`. What is left is one upstream accident, the last bullet. **These figures are a dated
+record**, and the script that printed them is deleted.
+
+- **One test read a whole table, and the class it stands for is decided.**
+  `NorthwindGroupBy.Odata_groupby_empty_key` read every order and grouped here, because its group
+  key is a class EF's base declares, with its own `Equals`, and nothing had named it. The run of
+  2026-09-20 left "refuse, or keep and document" to the owner. **Kept and documented (2026-09-21):**
+  an application registers such a key type on both halves, and one it forgets is an edge case of a
+  configuration the documentation tells it how to avoid. The fixture registers that one type (#133),
+  so the test runs EF's statement. The unregistered case is measured in `ServerParameterizationTest`
+  (#130, #131), described in `website/docs/guide/querying.md` (#132), and named by the `QuerySplit`
+  event (#137).
+- **Two tests that used to be in this group are fixed.**
+  `CustomConverters.Value_conversion_is_appropriately_used_for_left_join_condition` and
+  `NullSemantics.Join_uses_csharp_semantics_for_anon_objects` each ran two full-table reads where EF
+  runs one join, because a composite key is written `new { … }` and that type is the caller's.
+  `JoinKeyRewriter` gives the key a `Tuple<…>` the server already accepts, and both now run EF's own
+  statement (`docs/projection-split.md` §3.3a). `ServerSqlTest` pins it.
+- **Two compiled queries over a parameter collection are FIXED (2026-09-17)**, and the reading that
+  called them a deviation was wrong. ADR-006's capture substituted the execution's values, so the
+  SERVER's funcletizer folded an operator EF had deliberately kept symbolic: the statement's shape
+  then changed with the number of values, and a compiled query lost the one thing compiling buys.
+  `SubstituteParametersExpressionVisitor` now marks such a collection with EF's own
+  `EF.MultipleParameters`, which names EF's DEFAULT mode, so the server writes the statement EF's own
+  client writes. **An ordinary query is untouched**, because EF folds such an operator itself before
+  this client sees the tree, and the measurement that shows both is in `ServerSqlTest`. **Corrected
+  2026-09-21: not every such operator.** One that reads the row, `ids.Where(y => y == x.Id).Any()`,
+  cannot be folded, reaches this client in an ordinary query, and was marked. The mark names a mode,
+  and EF prefers it to the server's option, so a server set to `Constant` ran parameters. Only an
+  operator the server could fold is marked now, and `ServerParameterizationTest` compares all three
+  modes with plain EF Core. **Corrected again 2026-09-21: "the server writes the statement EF's own
+  client writes" held only on a server in EF's default mode.** A compiled query whose operator the
+  server could fold, `ids.Skip(1).Contains(b.Id)`, still carried the mark, so a server set to
+  `Constant` ran `SELECT 0, @p UNION ALL VALUES (1, @p)` where EF runs
+  `SELECT 0, CAST(1 AS INTEGER) UNION ALL VALUES (1, 2)`, and one set to `Parameter` ran the same
+  where EF runs `json_each(@p)`. The server now replaces the mark with EF's marker for its own mode
+  (`CollectionParameterMark`), and a marker the caller wrote keeps the caller's mode.
+  `ServerParameterizationTest` compares both, in each mode, with plain EF Core. **Corrected a third
+  time 2026-09-22: an operator that CONSUMES the list was not marked.** The server evaluated a
+  compiled `ids.Count()` and ran `WHERE "b"."Id" < @p`, where plain EF Core runs
+  `json_array_length(@p)` in `Parameter` mode and throws `UnreachableException` in the other two
+  (dotnet/efcore#37370, fixed for EF Core 11 only). A list already marked, `ids.Skip(1).Count()`,
+  reached EF's statement or EF's failure. The owner chose EF's behaviour for both, so the client marks
+  a consuming operator too, and the failure is parked until EF 11. `ServerParameterizationTest`
+  compares the statement in `Parameter` mode and the failure in the other two. **And an index,
+  2026-09-22**: the server folded a compiled `ids[1]` to `@p`, where plain EF runs `@p ->> 1` in every
+  mode, and the same fold answered §1.12's `Convert` test, which EF refuses. The client keeps a list
+  read by index as one parameter with `EF.Parameter`; the mode-named mark made a server in `Constant`
+  mode inline the list as `'[1,2,3]' ->> 1`.
+- **One test where EF's `ParameterTranslationMode` did not reach the server, now EF's on all
+  three statements** (`AdHocMiscellaneous.Check_inlined_constants_redacting`): the caller asked
+  for constants and got parameters. Accepted by the owner on 2026-09-15 as a legitimate deviation,
+  because no dangerous SQL runs and the behaviour is right. **Since 2026-09-21 the fixture gives the mode to the server's
+  builder**, as a real application configures its store, and the `Contains` statement is EF's
+  `IN (1, 2, 3)`. The `Where(…).Any()` statement sent parameters until the client stopped wrapping
+  that collection in `EF.MultipleParameters` the same day (the correction above), and it is EF's
+  statement now. With both changes the whole tier compared 790 identical of 791 paired; the one left
+  is `IsNullOrEmpty`, below.
+- **One is EF's own test bug**: `StringTranslationsSqliteTest.IsNullOrEmpty` calls
+  `base.IsNullOrWhiteSpace()` and asserts that statement. Nothing of ours to write. **Since
+  2026-09-21 the comparison does not pair it**: an EF override that runs another EF test with its
+  own `AssertSql` is listed under "not paired" instead, so it stops reappearing as a difference. It
+  has been a slip since dotnet/efcore#35319 created the file; SQL Server and Cosmos call
+  `base.IsNullOrEmpty()`, and a direct run showed the server writes plain EF Core's statement.
+
+### The extras, read case by case (2026-09-20)
+
+**The comparison drops most of what the server ran, and that remainder had been dismissed by
+sampling.** EF clears its baseline inside the test, so what EF asserts is a fragment; our marker
+covers the whole test. Matching EF's statements in order inside ours made the report readable
+(#119), and it left every unmatched statement of ours unreported and, after that rewrite, uncounted.
+The category was about 176 statements at the time and was classified by looking at a few.
+
+`eng/ef-sql-diff.py --extras` read it. The statements were grouped by SQL **shape**, so one shape
+was read once however many tests ran it, every extra belonged to a group, and the groups were
+ordered unbounded reads first, because a table crossing the wire is what this instrument existed to
+find. `--survey` was the same reading with nothing subtracted, for a tier upstream gives no
+baseline for.
+
+**The totals below are one run's, and the statement total is not comparable with another run's.
+Compare the `reads:` line**, which the report prints apart from the writes for exactly this reason.
+The writes include each run's fixture **seeding**, and which fixtures seed is a property of the
+machine rather than of the product: the Tier B store is file-backed and is not deleted on disposal,
+so a fixture whose `.db` survives the startup sweep reads it instead of seeding it. Measured across
+two serial runs of the same tier, 2026-09-22 and 2026-09-23, over the same 19 419 and 19 420 tests:
+the total fell from **4157 statements to 3002, a 28% fall that says nothing at all**, because the
+reads were **397 statements in 59 shapes both times** and the whole difference was writes, 3760
+against 2605 — `INSERT`s into the many-to-many join tables in one run and into the conference
+planner's in the other.
+
+**The whole remainder, on the run of 2026-09-20: 2683 statements in 280 shapes** — 4 unbounded
+reads, 60 other reads, 216 writes (196 `INSERT`, 20 `UPDATE`, no `DELETE`). Read group by group:
+
+- **No write is unbounded.** All 20 `UPDATE` shapes were printed and each carries a key predicate,
+  simple or composite. There is no `DELETE` at all.
+- **Three of the four unbounded reads are the test's own.** `Set<Kiwi>()` and `Set<Coke>()` are read
+  by EF's `BulkUpdatesAsserter`, which runs the query once before the `ExecuteUpdate` and once after
+  it, and the SQL carries no predicate because the test's query has none. The third is the
+  projection `StringTranslations.IsNullOrEmpty` asks for.
+- **The fourth is ours, and it is already known**: `NorthwindGroupBy.Odata_groupby_empty_key` reads
+  every order, which is the deferred group-key case above. **The extras found it independently**,
+  through a channel that does not use EF's assertion at all, which is the evidence that the channel
+  works.
+- **The 60 other reads are the same before-and-after reads carrying the test's own predicate**, plus
+  `SELECT EXISTS (SELECT 1 FROM "T")`, which the log shows running BEFORE a fixture's seeding
+  inserts, plus the two statements of the accepted `Check_inlined_constants_redacting` deviation.
+- **The repeats are seeding.** 65 shapes run five or more times inside one test; 60 are the
+  fixture's `INSERT`s and 5 are the `UPDATE`s that wire up its optional and self references
+  afterwards, each keyed.
+- **The writes that carry literals rather than parameters are EF's own**, emitted on the server by
+  its seeding of `HasData` rows, one batch with `SELECT changes()` between the statements. Nothing
+  of that crosses this wire.
+
+**The `Kiwi` and `Coke` reads are classified rather than re-read, from 2026-09-23.** Under TPC each
+concrete type has its own table, so the table *is* the filter — **the *type* filter, and nothing
+else** (the owner, 2026-09-23). That distinction is the whole of the rule. A missing `WHERE` under
+TPC belongs to the schema only while the query had no other filter to lose; if it said
+`Where(k => k.Name == "x")`, then `FROM "Kiwi"` bare is a dropped filter and a whole-table
+transfer, which is the sign this instrument exists to find. **"No predicate under TPC" must never
+be read as "fine".**
+
+So the report holds the control itself, under four conditions. A flagged TPC read is looked up in
+the **same test method** of its TPH and TPT siblings, and the shape becomes `MAPPING-BOUND`, with
+the sibling's statement printed beside it, only when that sibling **narrows** the same columns
+**and its predicate is the type test and nothing else**. The bullet above was rebuilt by hand every
+time the report was read.
+
+**That last condition has to rule out a business filter standing both *beside* the type test and
+*in place of* it, and the two need different answers.** Beside it is a count — `WHERE
+"Discriminator" = 'Kiwi' AND "Name" = 'x'` has a conjunct too many. In place of it is not, because
+`WHERE "Name" = 'x'` alone is the same *shape* as a discriminator test. So the column is asked
+whose it is: **a discriminator names a column the TPC leaf table does not have, which is what TPC
+means; a dropped filter names one it does.** Measured 2026-09-23 from the log itself — `Kiwi`,
+`Coke`, `Officers`, `LocustHordes` and `Leaves` carry no `Discriminator`, while `Animals` and
+`Drinks` do. TPT's `IS NOT NULL` terms name the leaf's own key columns and cannot use that rule, so
+each must appear in a `JOIN … ON`, which is what makes it the join's key test rather than a filter
+on it. Seventeen cases pin the whole of it.
+
+**A simpler rule was tried first and is recorded in the script because it looks right**: "a column
+the TPC test class never mentions". It fails outright — `Discriminator` appears 63 times in
+`TPCInheritance` statements and 532 in `TPCGearsOfWar`, because one context holds several
+hierarchies and only some of them are TPC.
+
+On the 2026-09-22 log those two shapes are the whole of the unbounded extras and both are now
+controlled; over the whole log `--survey` reclassifies six shapes and leaves 484 flagged, which is
+the ratio to want from a narrow fact about one mapping. **Each of the four conditions was measured
+against that log**, and the docstring of `mapping_control` says what dropping one costs — dropping
+the method alone excused 162 statements across 75 tests, on nothing better than a shared column
+list.
+
+**It stays a claim about one statement.** A filter dropped on *both* sides looks clean to both, and
+that is not this report's question: the comparison against EF's own `AssertSql` is what reports a
+filter that went missing.
+
+**So the sampling verdict holds, and it is now a reading rather than a sample.** The remainder
+contains one thing of ours, and it was already on the list. Since 2026-09-28 the slow run compares
+every statement a test runs, so the remainder needs no reading of its own.
+
+### Tier C: what upstream gives us, and what the tier gives back (2026-09-20)
+
+**The Firebird provider is a reference clone now.** `subrepos/firebird` is `FirebirdSQL/NETProvider`
+at tag `EFCore-13.0.0.0`, the tag matching the `FirebirdSql.EntityFrameworkCore.Firebird` version
+this repository runs. Its two EF Core projects restore and load in `roslyn-codelens`, so what
+follows is the compiler's answer rather than a reading of text.
+
+**It records no expected SQL, so the comparison of 2026-09-15 cannot run here.** Nothing in the loaded solution
+declares an `AssertSql` helper, which is the mechanism every EF provider suite that asserts SQL
+uses, and across all 596 files of the repository the strings `AssertSql`, `AssertBaseline`,
+`AssertExecuteUpdateSql` and `ExpectedSql` appear in none (`AssertTranslationFailed`, in 7 files, is
+the control that the search works). **Its unit tests do look at the SQL and never keep a
+statement**: 21 places capture `LastCommandText` and 7 assert anything about it, each a
+`StringAssert.Contains` of a fragment such as `TRIM(`, and three of those seven are migration DDL.
+A fragment cannot be compared with a statement, so there is nothing recorded here to pair with.
+**What can be compared is a RUN of their suite**, and that is the exercise below.
+
+**What its suite does record is what it cannot do.** The functional project declares 303 test
+methods and marks 120 of them `[NotSupportedOnFirebirdFact]`, across 12 files. In
+`UdfDbFunctionFbTests`, the class this tier exists to host, it overrides 24 tests: **14
+`[NotSupportedOnFirebirdFact]`**, every one a correlated or `APPLY` shape, **9
+`[DoesNotHaveTheDataFact]`**, and one plain `[Fact]`.
+
+**This tier runs all 23 of those, and they pass.** Checked name by name against the run's own
+markers. Two things buy it: the fixture creates every routine the base names, where theirs omits
+some, and `FirebirdLateralQuerySqlGenerator` adds the branch their generator lacks. **Their defect
+is still there at `EFCore-13.0.0.0`**, read in the source: `VisitCrossApply` and `VisitOuterApply`
+wrap a `TableExpression` as `(SELECT * FROM "T") AS "t"` and pass anything else to `Visit`, and
+`VisitTableValuedFunction` then writes `"F"(args) AS "a"`, a bare function after `LATERAL`, which
+the store will not parse. Our override takes the `TableValuedFunctionExpression` case and wraps it.
+So `FirebirdLateralQuerySqlGenerator` stays (`docs/upstream-defects.md` §2).
+
+**THEIR SUITE CAN BE RUN HERE, AND ITS SQL MATCHES OURS (2026-09-20).** It needs a Firebird server
+on localhost, which this repository deliberately does not have; the embedded engine it does have
+ships `fbclient.dll` and no server binary. Both facts are true and neither one blocks the exercise,
+because the suite does not need a server: it needs a connection string that names the embedded
+engine. One file, patched behind an environment switch and reverted afterwards, is the whole of it.
+**This was a one-off and is written down rather than scripted**; a third run earns an `eng/` entry.
+
+In `subrepos/firebird`, `…FunctionalTests/TestUtilities/FbTestStore.cs` takes two changes.
+`CreateConnection` keeps its `localhost` builder and adds an embedded one, chosen when
+`INFOCARRIER_FB_CLIENT` names a client library: `ServerType = FbServerType.Embedded`, that library,
+`UserID = "SYSDBA"`, `Charset = "UTF8"`, `Pooling = false`, and an absolute `Database` path. And
+`AddProviderOptions` adds `LogTo(Console.WriteLine, …)` for `RelationalEventId.CommandExecuted` and
+`CommandError` when `INFOCARRIER_FB_PRINT_SQL` is `1`, because their suite prints nothing. Then:
+
+```bash
+root=$PWD/test/InfoCarrier.Core.FunctionalTests/bin/Release/net10.0/firebird/win-x64/V5
+cd subrepos/firebird
+INFOCARRIER_FB_CLIENT="$root/fbclient.dll" FIREBIRD="$root" INFOCARRIER_FB_PRINT_SQL=1 \
+  dotnet test src/FirebirdSql.EntityFrameworkCore.Firebird.FunctionalTests \
+  --filter "FullyQualifiedName~UdfDbFunctionFbTests" -- xUnit.ParallelizeTestCollections=false
+git checkout -- .    # ALWAYS: an edit under subrepos/ is invisible to git and must not survive
+```
+
+**Their run: 106 tests, 82 passed, 24 skipped, none failed.** Comparing the statements by SQL shape
+against ours for the same base, both runs serial (`parallel mode = none`, which the run prints):
+
+| | theirs | ours |
+|---|---|---|
+| statements | 87 | 118 |
+| shapes | 33 | 57 |
+| shapes both sides ran | 30 | 30 |
+
+- **Nothing they emit is a shape we do not.** The 3 shapes only theirs are our own queries with a
+  different routine name: their fixture calls it `GetCustWithMostOrdersAfterDate` and ours
+  `GetCustomerWithMostOrdersAfterDate`.
+- **The 27 only ours are the tests they skip.** Three are those name twins; the rest are
+  `JOIN LATERAL` and `CROSS JOIN` over a table-valued function, and the whole-table reads of
+  `Udf_with_argument_being_comparison_of_nullable_columns`.
+- **A literal where the other side has a parameter, on the 30 shapes both ran: none.** That is the
+  difference this repository weights most, and it is the reason the exercise was worth running.
+
+**So a wire-free control for this tier is priced and not built.** The `Direct*` pattern of ADR-009
+Tier D would answer the same question, and this answers it with no test code at all. Build one only
+if their suite stops being runnable.
+
+**The reading the tier got instead of a comparison, until 2026-09-27**, was
+`eng/ef-sql-diff.py --survey`, which grouped every statement in a log and needed no reference. Since
+then the slow run compares Tier C with plain EF Core on the same embedded store (H17), and the
+survey's script was deleted on 2026-09-28.
+
+**The run of 2026-09-20: 109 passed, 1 skipped, six seconds, 106 statements in 57 shapes** — 10
+unbounded reads, 45 other reads, 2 writes. Read group by group:
+
+- **Every unbounded read is the test's own, and nine of the ten are one test's expected value.**
+  `Udf_with_argument_being_comparison_of_nullable_columns` computes what it expects with
+  `from a in context.Addresses.ToList() from r in context.Orders.ToList()`, which reads `Orders`
+  once per address before the query under test runs. Eight addresses, eight reads, and EF calls
+  `ClearLog()` immediately after them. The rest are queries a test asks for outright, three of them
+  this repository's own smoke tests.
+- **The 45 other reads are the capability this tier exists for, in SQL**: `JOIN LATERAL` over a
+  table-valued function, `CROSS JOIN` with one, scalar functions in the projection, in a `WHERE`
+  and nested inside each other, and `ROWS (n)` where a row limit is asked for. Nothing came back to
+  be finished on the client.
+- **Two writes, both parameterized.** No statement changes rows without a predicate.
+- **The one skip is EF's own.** `QF_Select_Direct_In_Anonymous_distinct` is skipped upstream and
+  this repository declares no override of it, so nothing here asserts nothing.
+
+**A survey is weaker evidence than a comparison and is not a substitute for one.** It says what the
+server ran, not what a second provider would have run for the same query, so it can show a whole
+table crossing the wire and cannot show a subtly worse plan. It is what this tier has on every run;
+the comparison above is what it has when somebody spends ten minutes on it. This paragraph is
+the record of 2026-09-20: the survey was what the tier had on every run until the slow run gave it
+a comparison.
+
+**And the first reading of that run was mostly the instrument, which is the lesson worth keeping.**
+It reported 182 differing, and two defects of the tool accounted for 175 of them:
+
+- **A statement that FAILED was invisible**, because the parser read only `Executed DbCommand`. Every
+  `[StoreLimit]` test asserts a statement that fails, so each looked like a statement never run.
+- **The window was wrong.** EF clears its baseline inside the test, so what EF asserts is a fragment;
+  our marker covers the whole test, arrange and verify included. Matching EF's statements IN ORDER
+  inside ours compares what can be compared and drops what cannot.
+
+**A third defect was in the harness and the promises found it**: `DbContextOptionsBuilder.LogTo`
+keeps ONE sink, so the log and the recorder could not both use it — switching the log on emptied the
+recorder and every promise failed in that run alone. The recorder is an interceptor now, and
+`AddInterceptors` appends.
 
 ## How the rules were learned
 

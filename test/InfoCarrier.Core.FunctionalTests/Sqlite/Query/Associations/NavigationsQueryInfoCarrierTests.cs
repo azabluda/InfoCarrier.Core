@@ -87,8 +87,8 @@ public class NavigationsQueryInfoCarrierFixture : NavigationsRelationalFixtureBa
 // being honest about what that is worth here: it reads the *client's* TestSqlLoggerFactory, and
 // this client has no database and emits no SQL. No base in this family calls it with an argument
 // -- every call is the empty `AssertSql()` meaning "nothing was executed" -- so the assertion is
-// true here but trivially so, weaker than it is on SQLite rather than false. `ServerSqlLog` is
-// where the server's statements can actually be read.
+// true here but trivially so, weaker than it is on SQLite rather than false. The server's
+// statements are read by `ServerSqlRecorder`, and compared with plain EF's by the slow run of #167.
 
 public class NavigationsCollectionQueryInfoCarrierTest(
     NavigationsQueryInfoCarrierFixture fixture,

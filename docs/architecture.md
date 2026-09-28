@@ -132,11 +132,12 @@ the wire turns a parameter into a literal, reorders a join, or drops an index-fr
 `ServerParameterizationTest` is the first of these.
 
 **Reading the server's SQL at all.** `InfoCarrierTestStoreFactory` does build a
-`TestSqlLoggerFactory`, but it belongs to the *client*, which has no database and emits none. Set
-`INFOCARRIER_SERVER_SQL=1` and `InfoCarrierBackendTestStore` writes every server command to
-`server-sql.log` in the test output directory. Off in every normal run, asserts nothing, and exists
-so that a failing Tier B test can be re-run and read rather than reasoned about. `ServerSqlLog`
-records why it is a switch and a file rather than output attached to a failing test.
+`TestSqlLoggerFactory`, but it belongs to the *client*, which has no database and emits none.
+`InfoCarrierBackendTestStore` records every server command in memory, in `ServerSqlRecorder`, which
+`ServerSqlTest` asserts, and files each under the current test for the slow run of #167, which
+compares it with plain EF Core and puts what a red test needs in its failure message. Until
+2026-09-28, `INFOCARRIER_SERVER_SQL=1` also wrote every command to `server-sql.log` for
+`eng/ef-sql-compare.sh`; the slow run replaced both (ADR-014).
 
 **What is still missing** is the provenance the harness cannot have: whether a literal in the SQL
 came from a constant the caller wrote or from a parameter this provider inlined. Only

@@ -926,7 +926,7 @@ cast. On a client with no database it records no SQL and nothing in this suite a
 
 **Amended 2026-08-30.** The gate above reads as a binary — `protected virtual UseTransaction`
 adopts, non-virtual does not — and three later adoptions (R11, R14, R19 in
-[`plans/v10/implementation-plan.md`](plans/v10/implementation-plan.md)) measured cases where a
+[`plans/v10/archive/implementation-plan-post-10.0.md`](plans/v10/archive/implementation-plan-post-10.0.md)) measured cases where a
 non-virtual `UseTransaction` did **not** put the base out of reach. The disqualifying condition is
 narrower than "the base has a non-virtual `UseTransaction`": it is that **every route to the base's
 coverage passes through a relational-only member with no `protected virtual` hook above it**.
@@ -1124,7 +1124,8 @@ closed.** The spike on `experiment/live-comparison` ran the three classes this A
 whole of Tier B: `Passed: 19451, Failed: 0, Skipped: 155, Total: 19606` with the comparison
 reporting only, and `Passed: 18907, Failed: 544` with it turning differences red. Every wire test
 found its plain-EF run, and every one of the 35 suspects of `experiment/direct-baseline` was among
-the differences. Phase H in `plans/v10/implementation-plan.md` is the order of work, approved by the
+the differences. Phase H in `plans/v10/implementation-plan.md` is the order of work (archived since
+2026-09-28 in `plans/v10/archive/implementation-plan-post-10.0.md`), approved by the
 owner on the same day with this amendment.
 
 **Decision 3 reads only an InfoCarrier reason whose `Deviation` carries `SqlDiffers`,
@@ -1177,7 +1178,7 @@ refuses and InfoCarrier answers.
 
 Three changes to the amendment above, each made with the owner's yes on a branch that did not yet
 hold it, and recorded here when that branch reached `main` (H6, H17 and H19 in Phase H of
-`plans/v10/implementation-plan.md`).
+`plans/v10/archive/implementation-plan-post-10.0.md`).
 
 **The triage is not deferred.** The amendment above said "Triage is deferred by the owner, and the
 slow run stays red until it happens. No InfoCarrier reason is added to make it green". The owner

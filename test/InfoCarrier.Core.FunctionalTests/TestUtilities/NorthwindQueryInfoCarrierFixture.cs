@@ -21,7 +21,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     here to satisfy <c>RelationalComplianceTestBase</c>'s second assertion (R54), and Tier A is
 ///     now checked by the plain <c>ComplianceTestBase</c>, which does not ask. What the property
 ///     returned was the <em>client's</em> log anyway, and this client has no database and emits no
-///     SQL; <c>ServerSqlLog</c> is where the server's statements can actually be read. Tier B's
+///     SQL; <c>ServerSqlRecorder</c> is where the server's statements are read. Tier B's
 ///     <c>NorthwindQueryInfoCarrierSqliteFixture</c> still implements it, because there the
 ///     relational compliance base does ask.
 /// </remarks>

@@ -201,14 +201,14 @@ has our own model, our own query and our own expected text, and **each was shown
 was trusted**, by reverting the fix it is about. **Copying EF's `AssertSql` text into
 overrides was tried and dropped the same day**, with 580 generated and green: the set could not be
 complete, the scenario belongs to upstream, and golden text argues for conformance where the
-owner's rule allows a deviation that runs no dangerous SQL. `eng/ef-sql-compare.sh` is the
-investigation that finds new promises, and it is a report, never a gate. **A slow run's output is
-never committed and never asserted, and that includes text we captured ourselves** (ADR-014):
-committing each test's statements beside its class was built, reviewed and withdrawn on 2026-09-26.
-#167 replaces this script with a slow mode that runs each test with plain EF and through InfoCarrier
-and compares the two in memory, and every InfoCarrier reason that claims a runtime difference
-(`SqlDiffers`, `AnswerNotRefusal` or `RefusedEarlier`) must then agree with that comparison, both
-ways. A difference none of the three describes is `Other` with a note, which the reverse half does
+owner's rule allows a deviation that runs no dangerous SQL. **The slow run of #167 is the
+investigation that finds new promises, and it is a report, never a gate**: it runs each test with
+plain EF and through InfoCarrier and compares the two in memory. It replaced
+`eng/ef-sql-compare.sh`, which compared with EF's `AssertSql` text, on 2026-09-28. **A slow run's
+output is never committed and never asserted, and that includes text we captured ourselves**
+(ADR-014): committing each test's statements beside its class was built, reviewed and withdrawn on
+2026-09-26. Every InfoCarrier reason that claims a runtime difference (`SqlDiffers`,
+`AnswerNotRefusal` or `RefusedEarlier`) must agree with that comparison, both ways. A difference none of the three describes is `Other` with a note, which the reverse half does
 not read. This said "every InfoCarrier reason" until ADR-014's amendment of 2026-09-26: the spike's
 six reasons with no difference were skips, rewritten test bodies and a compliance test, and none
 claimed one. `Other` counts since the amendment of 2026-09-28.
@@ -235,8 +235,6 @@ not explain.
 | `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
 | `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: sums the spec suite's TRX counters into `counters.env`, lists failing names in the run summary, and runs `eng/spec-parity.py` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate. |
 | `eng/spec-parity.py <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory. |
-| `eng/ef-sql-compare.sh [--filter X] [--no-cache] [--keep]` | **The #111 investigation, in one command, local only.** Runs Tier B **serially** with `INFOCARRIER_SERVER_SQL` naming a fresh log and prints the disagreements with EF's own `AssertSql` text, grouped by kind. **Not a gate; always exits 0.** Each difference ends as a fix plus a promise in `Sqlite/ServerSqlTest.cs`, as a promise pinning a deviation we accept, or as nothing when it is an artifact of EF's harness. `--filter` narrows it to one class, which takes seconds. |
-| `eng/ef-sql-diff.py <server-sql.log> [--efcore <path>] [--limit N] [--extras] [--survey]` | The comparing half of the script above, on a log that already exists. Reports LITERAL, PARAMETER, VALUE and STRUCTURAL, counted per test. **`--extras` reads what EF does not assert**, grouped by shape, unbounded reads first. **`--survey` reads EVERY statement** and needs no reference, which is the mode for a tier upstream gives nothing to compare with. |
 | `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so a renamed heading breaks inbound links silently. Exit 1 if any is broken. |
 | `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
@@ -354,9 +352,9 @@ Each is cheap to avoid, and the account of what it cost is in
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
 | `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
 | `docs/versioning.md` | **How a version is decided and how a release is shipped**, including the hotfix path off a release line, and a "what has bitten us" list of traps invisible from the code. **Read it before tagging**, and before cutting a release branch. |
-| `docs/test-policy.md` | **What a test of this suite may assert, and why.** The override rule and its typed reasons, the promises this provider makes about the SQL its server runs (`Sqlite/ServerSqlTest.cs`), and the investigation that finds new ones (`eng/ef-sql-compare.sh`). **Read it before overriding a specification test or adding a golden SQL string.** |
+| `docs/test-policy.md` | **What a test of this suite may assert, and why.** The override rule and its typed reasons, the promises this provider makes about the SQL its server runs (`Sqlite/ServerSqlTest.cs`), and the investigation that finds new ones (the slow run of #167). **Read it before overriding a specification test or adding a golden SQL string.** |
 | `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. §1.6-1.10 are `MongoDB.EntityFrameworkCore` defects, whose bugs go to the **Jira `EF` project** rather than GitHub. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
-| `docs/plans/v10/findings.md` | **How every rule in this file was learned, and what each cost.** The long form of the HTTP transport, the Blazor client, complex types, JSON-mapped owned collections, spatial, `GraphUpdates`, the compiled model, the design-time services, and the five closed intermittents. |
+| `docs/plans/v10/findings.md` | **How every rule in this file was learned, and what each cost.** The long form of the HTTP transport, the Blazor client, complex types, JSON-mapped owned collections, spatial, `GraphUpdates`, the compiled model, the design-time services, the five closed intermittents, and what the comparison with EF's `AssertSql` text found until the slow run replaced it. |
 
 **Roadmap vs plan — do not mix them.** Milestone-level scope, ordering, and exit criteria go in
 `roadmap.md`, which changes only when scope changes. Per-task checkboxes go in
@@ -550,14 +548,17 @@ it: `InfoCarrierComplianceTest` scans the core specification assembly against Ti
 are 0, and both tests must stay green.** Those tests, not a list in this file, are the answer to
 "which bases are in".
 
-**Every milestone is closed, so `docs/plans/v10/implementation-plan.md` is ISSUE-DRIVEN**: it holds
-Phases Q, R, S, T, U, V, X, Y, Z and H, each naming the GitHub issue it serves, and which release a
-phase lands in is decided on the issue rather than in the plan. **Phase Y is the 10.1 release
-preparation** — the letter is Y and not W because W1 to W6 are M5's requirement labels, used
-throughout `roadmap.md`. **Phase Z is #54's idle timeout for a server-held transaction**, the first
-of that issue's three separable properties. **Phase H is #167's live comparison with plain EF
+**Every milestone and every phase is closed, so `docs/plans/v10/implementation-plan.md` holds no
+phase** (2026-09-28). The issue-driven Phases Q to H are archived in
+`docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
+the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
+the plan "is ISSUE-DRIVEN: it holds Phases Q, R, S, T, U, V, X, Y, Z and H". **Phase Y was the 10.1
+release preparation**, and its letter is Y and not W because W1 to W6 are M5's requirement labels,
+used throughout `roadmap.md`. **Phase Z was #54's idle timeout for a server-held transaction**, the
+first of that issue's three separable properties. **Phase H was #167's live comparison with plain EF
 (ADR-014)**, approved by the owner on 2026-09-26. **A slow-run red is a defect report first**: a fix
-in the product comes before a reason, and a red the owner has not decided stays red. Query, projection split, `SaveChanges` and lazy loading all work end-to-end.
+in the product comes before a reason, and a red the owner has not decided stays red. Query,
+projection split, `SaveChanges` and lazy loading all work end-to-end.
 
 ### What may and may not be claimed
 

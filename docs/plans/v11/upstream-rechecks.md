@@ -54,10 +54,11 @@ mark becomes the deviation rather than the match. Read its milestone when adopti
 ## `StringTranslationsSqliteTest.IsNullOrEmpty`: EF's test bug
 
 **Written 2026-09-21.** Since dotnet/efcore#35319 created the file, EF's SQLite override calls
-`base.IsNullOrWhiteSpace()` and asserts that statement. `eng/ef-sql-diff.py` does not pair an EF
-override that runs another EF test (`dca8acb`), and on EF 10 this is the only one. Read it at the EF
-11 tag. If EF fixed it, the comparison pairs it again and it has to match. Whether to report it is
-not decided.
+`base.IsNullOrWhiteSpace()` and asserts that statement. `eng/ef-sql-diff.py` did not pair an EF
+override that runs another EF test (`dca8acb`), and on EF 10 this was the only one. The script was
+deleted on 2026-09-28, and the slow run runs the override on both sides, so the slip cannot show
+there. Read it at the EF 11 tag only to see whether EF fixed it. Whether to report it is not
+decided.
 
 ## FirebirdSQL/NETProvider#1277: `LATERAL` over a function
 

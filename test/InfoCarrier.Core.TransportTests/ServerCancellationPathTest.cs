@@ -91,7 +91,7 @@ public sealed class CommandPathRecorder : DbCommandInterceptor
 ///     <para>
 ///         What it does not cover is Kestrel: <c>WebApplicationFactory</c> runs the pipeline in
 ///         memory, with no socket and no port, so whether a real web server reports a lost client
-///         promptly for a POST is a separate question (`implementation-plan.md`, Q2).
+///         promptly for a POST is a separate question (`archive/implementation-plan-post-10.0.md`, Q2).
 ///     </para>
 /// </remarks>
 public class ServerCancellationPathTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>

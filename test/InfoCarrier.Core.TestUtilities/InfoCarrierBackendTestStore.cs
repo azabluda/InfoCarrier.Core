@@ -382,25 +382,10 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // test class that asserts, which is how EF keeps its own log per fixture.
         //
         // An INTERCEPTOR and not a LogTo, because `LogTo` keeps one sink and a second call replaces
-        // the first: wiring both this and `ServerSqlLog` with `LogTo` emptied the recorder whenever
+        // the first: wiring both this and the server SQL log with `LogTo` emptied the recorder whenever
         // the log was switched on, and every test asserting server SQL failed in that run alone
         // (2026-09-16). `AddInterceptors` appends, so the two coexist.
         builder = builder.AddInterceptors(new ServerSqlRecordingInterceptor(ServerSql));
-
-        // Opt-in, and off in every normal run. See ServerSqlLog for why this is a switch and a
-        // file rather than output attached to a failing test.
-        //
-        // AN INTERCEPTOR TOO, since 2026-09-24, for the recorder's reason above. This was a
-        // `LogTo` until then, and any `OnAddOptions` below that called `LogTo` replaced it without
-        // a word: `ServerParameterizationTest` does, and the log held none of its statements. The
-        // interceptor writes the same text `LogTo` wrote, including a statement that FAILED, as the
-        // `LogTo` did for `CommandError` -- the statement a diagnosis most needs and the one
-        // `CommandExecuted` never carries, found while tracing the ManyToManyTracking foreign-key
-        // failure R35 uncovered.
-        if (ServerSqlLog.IsEnabled)
-        {
-            builder = builder.AddInterceptors(new ServerSqlLogInterceptor());
-        }
 
         return _testStoreProperties.OnAddOptions?.Invoke(builder) ?? builder;
     }

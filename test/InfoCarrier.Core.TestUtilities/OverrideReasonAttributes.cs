@@ -422,9 +422,6 @@ public static class Decisions
     /// <summary><c>website/docs/limitations.md</c>, which tells a consumer what is not supported.</summary>
     public const string Limitations = "website/docs/limitations.md";
 
-    /// <summary>The one unsupported scenario, a property-bag complex collection holding a primitive collection.</summary>
-    public const string NotSupported = "not-supported";
-
     /// <summary>
     ///     A concurrency exception suppressed by an interceptor on the client: the server has rolled
     ///     the save back, so nothing is written and <c>SaveChanges</c> reports 0 (the owner,
