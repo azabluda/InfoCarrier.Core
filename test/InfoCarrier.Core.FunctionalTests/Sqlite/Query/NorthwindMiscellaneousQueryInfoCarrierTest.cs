@@ -46,6 +46,13 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         that the store sees one statement fewer for each, because this client's
 ///         <c>EnsureCreated</c> runs nothing. The reason says so, flagged <c>SqlDiffers</c>.
 ///     </para>
+///     <para>
+///         <b>Three more of EF's own arrive on 2026-09-28</b>, the
+///         <c>Client_code_using_instance_*</c> refusals (#113). They passed without an override
+///         while this client answered a client projection that holds a constant object, as
+///         InMemory does; it refuses one now, as SQLite does. The "nine" and "27" above are the
+///         figures at the move.
+///     </para>
 /// </remarks>
 public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
     : NorthwindMiscellaneousQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
@@ -84,6 +91,45 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
             CoreStrings.EntityEqualityOnCompositeKeyEntitySubqueryNotSupported("==", nameof(OrderDetail)),
             (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Entity_equality_through_subquery_composite_key(async)))
             .Message);
+
+    // A client projection that holds the test class itself, which the compiler captures as a
+    // constant. EF refuses it on every store whose type mapping does not map the class, because its
+    // query cache would keep the instance alive; the base expects InMemory's answer. This client
+    // answered too until 2026-09-28, and refuses with EF's messages since (#113,
+    // CapturedConstantValidator). EF Core's own SQLite class overrides the three identically, and
+    // only the class named in the message differs.
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 375, 380,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Client_code_using_instance_method_throws(bool async)
+        => Assert.Equal(
+            CoreStrings.ClientProjectionCapturingConstantInMethodInstance(
+                "InfoCarrier.Core.FunctionalTests.Sqlite.Query.NorthwindMiscellaneousQueryInfoCarrierTest",
+                "InstanceMethod"),
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_code_using_instance_method_throws(async))).Message);
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 382, 387,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Client_code_using_instance_in_static_method(bool async)
+        => Assert.Equal(
+            CoreStrings.ClientProjectionCapturingConstantInMethodArgument(
+                "InfoCarrier.Core.FunctionalTests.Sqlite.Query.NorthwindMiscellaneousQueryInfoCarrierTest",
+                "StaticMethod"),
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_code_using_instance_in_static_method(async))).Message);
+
+    /// <inheritdoc />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindMiscellaneousQuerySqliteTest.cs", 389, 393,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Client_code_using_instance_in_anonymous_type(bool async)
+        => Assert.Equal(
+            CoreStrings.ClientProjectionCapturingConstantInTree(
+                "InfoCarrier.Core.FunctionalTests.Sqlite.Query.NorthwindMiscellaneousQueryInfoCarrierTest"),
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_code_using_instance_in_anonymous_type(async))).Message);
 
     // -------------------------------------------------------------------------------------
     // STORE LIMITATION -- SQLite has no APPLY. EF's own NorthwindMiscellaneousQuerySqliteTest

@@ -54,6 +54,42 @@ red first, the fix in the product, and the slow run again.
       Release build after deleting the product's `obj` and `bin`: 0 errors, once a nullability error
       in the new promise was fixed (`Blog.Title` is `string?`, so the local list declares it too).
 
+## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
+
+The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
+letter is the first that no earlier phase used.
+
+- [x] **D1. The client refuses a client projection that holds a constant object, with EF's three
+      messages.** A query written inside a `DbContext` that calls one of its instance methods
+      captures `this` as a constant. EF refuses it (`ClientProjectionCapturingConstantIn*`), because
+      its query cache would keep the context alive; this client answered, and the cache kept every
+      disposed context that had run the query until the entry was evicted (measured 2026-09-15).
+
+      1. **Four promises in `ServerParameterizationTest`**, each run through the wire and with
+         plain EF on the same SQLite store: the instance, argument and tree forms are refused with
+         EF's own message, and a local variable, which EF parameterizes, is still answered. The
+         three refusals failed first with "InfoCarrier answered".
+      2. **The fix is `CapturedConstantValidator`, in two moments.** `QueryExecutor` replaces each
+         parameter with its value before the split, which makes a local variable a constant as
+         well, so the constants to refuse are found on the tree as captured and looked for, by
+         reference, in the residual after the split. A copy of EF's check run on the split tree
+         refused the local variable too: the fourth promise failed that way when tried. The rule
+         is EF's (null, a type the client's mapping source maps, or an empty array passes), so it
+         refuses on every store; plain EF on InMemory does not, and no Tier A test reaches it.
+      3. **EF's own test runs unmodified**: the `[InfoCarrierDefect(113)]` override of
+         `Inlined_dbcontext_is_not_leaking` is deleted. **EF's SQLite overrides of the three
+         `Client_code_using_instance_*` tests are adopted**, with their line ranges: the base
+         expects InMemory's answer, they passed while this client answered, and they failed with
+         the fix, which is SQLite's refusal.
+
+      With `src/` reverted to `main`, exactly the three refusals and `Inlined_dbcontext_is_not_leaking`
+      fail. Normal run, `eng/measure.sh context-capture-2 release-10.2.0`: **FAILING 0, TOTAL
+      29962**, the four new promises, FIXED none, BROKEN none, REASONS unchanged; the spec project
+      **Passed: 29494, Skipped: 234, Total: 29728** and Tier D **Passed: 234, Total: 234**.
+      `trim-ratchet.sh` OK at 106 <= 106. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed:
+      0, Total: 28**. `CI=true` Release build after deleting the product's `obj` and `bin`: 0
+      errors, the 5 known Razor warnings.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

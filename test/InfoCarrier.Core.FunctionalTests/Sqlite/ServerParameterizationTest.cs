@@ -2138,6 +2138,102 @@ public partial class ServerParameterizationTest
         Assert.Empty(run.OverTheWire);
     }
 
+    /// <summary>
+    ///     A projection that calls a method of an instance the query holds as a constant is refused,
+    ///     as EF refuses it, and the store is asked nothing.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The query is written inside <see cref="BlogLabeler" />, as EF's
+    ///         <c>Inlined_dbcontext_is_not_leaking</c> writes its query inside the <c>DbContext</c>,
+    ///         so the compiler captures <c>this</c> as a constant rather than as a closure field. EF
+    ///         raises <c>ClientProjectionCapturingConstantInMethodInstance</c>, because its query
+    ///         cache would otherwise keep the instance alive. Until #113 this client answered, and
+    ///         EF's cache kept every disposed context that had run such a query.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_calling_a_method_of_a_captured_instance_is_refused_as_EF_refuses_it()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await new BlogLabeler().ByInstanceMethod(context.Set<Blog>()).ToListAsync());
+
+        AssertRefusedAsEFRefusesIt(run, "through the instance method 'Label'");
+    }
+
+    /// <summary>
+    ///     A projection that passes an instance the query holds as a constant to a method is refused,
+    ///     as EF refuses it, and the store is asked nothing.
+    /// </summary>
+    [ConditionalFact]
+    public async Task A_projection_passing_a_captured_instance_to_a_method_is_refused_as_EF_refuses_it()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await new BlogLabeler().ByArgument(context.Set<Blog>()).ToListAsync());
+
+        AssertRefusedAsEFRefusesIt(run, "is being passed as an argument to the method 'LabelWith'");
+    }
+
+    /// <summary>
+    ///     A projection that holds an instance the query captured as a constant is refused, as EF
+    ///     refuses it, and the store is asked nothing.
+    /// </summary>
+    [ConditionalFact]
+    public async Task A_projection_holding_a_captured_instance_is_refused_as_EF_refuses_it()
+    {
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await new BlogLabeler().ByItself(context.Set<Blog>()).ToListAsync());
+
+        AssertRefusedAsEFRefusesIt(run, "BlogLabeler'. This could potentially cause a memory leak");
+    }
+
+    /// <summary>
+    ///     A projection that calls a method of a local variable is answered, as EF answers it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>The control for the three refusals above, and the reason the refusal cannot read the
+    ///         tree this client splits.</b> A local variable is a closure field, which EF's
+    ///         funcletizer turns into a query parameter, and EF's check passes a parameter. This
+    ///         client replaces each parameter with its value before the split, so in the tree it
+    ///         splits the variable is a constant like <c>this</c> above. EF's own message advises
+    ///         exactly this rewrite: "consider assigning this constant to a local variable".
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_projection_calling_a_method_of_a_local_variable_is_answered_as_EF_answers_it()
+    {
+        var labeler = new BlogLabeler();
+        var answers = new List<List<string>>();
+
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => answers.Add(
+                await context.Set<Blog>().OrderBy(b => b.Id).Select(b => labeler.Label(b)).ToListAsync()));
+
+        Assert.Null(run.WireError);
+        Assert.Null(run.DirectError);
+        Assert.Equal(["#1", "#2", "#3"], answers[0]);
+        Assert.Equal(answers[1], answers[0]);
+    }
+
+    /// <summary>
+    ///     Asserts that plain EF Core refused the query with a message containing
+    ///     <paramref name="expected" />, that this client refused it with the same message, and that
+    ///     the store was asked nothing over the wire.
+    /// </summary>
+    private static void AssertRefusedAsEFRefusesIt(Run run, string expected)
+    {
+        Assert.True(run.DirectError is not null, "plain EF Core answered: " + string.Join(" | ", run.Directly));
+        Assert.True(run.WireError is not null, "InfoCarrier answered: " + string.Join(" | ", run.OverTheWire));
+        Assert.Contains(expected, run.DirectError.Message, StringComparison.Ordinal);
+        Assert.Equal(run.DirectError.Message, run.WireError.Message);
+        Assert.Empty(run.OverTheWire);
+    }
+
     private static IQueryable<int> JoinOnTitle(IQueryable<Blog> blogs, IQueryable<Post> posts)
         => blogs.Join(
             posts,
@@ -2367,6 +2463,28 @@ public partial class ServerParameterizationTest
         public int Id { get; init; }
 
         public string? Title { get; init; }
+    }
+
+    /// <summary>
+    ///     Queries written inside an instance, so the compiler captures the instance as a constant,
+    ///     as it captures the <c>DbContext</c> in EF's <c>Context7222.RunQuery</c>.
+    /// </summary>
+    private sealed class BlogLabeler
+    {
+        public static string LabelWith(Blog blog, BlogLabeler labeler)
+            => labeler.Label(blog);
+
+        public IQueryable<string> ByInstanceMethod(IQueryable<Blog> blogs)
+            => blogs.Select(b => Label(b));
+
+        public IQueryable<string> ByArgument(IQueryable<Blog> blogs)
+            => blogs.Select(b => LabelWith(b, this));
+
+        public IQueryable<Tuple<int, BlogLabeler>> ByItself(IQueryable<Blog> blogs)
+            => blogs.Select(b => new Tuple<int, BlogLabeler>(b.Id, this));
+
+        public string Label(Blog blog)
+            => "#" + blog.Id;
     }
 
     /// <summary>

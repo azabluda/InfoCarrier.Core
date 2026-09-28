@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
@@ -69,6 +70,12 @@ internal sealed class QueryExecutor<TElement>
         _expressionSerializer = expressionSerializer;
         _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
 
+        // Before the substitution below, because after it a closure-captured value is a constant
+        // too, and EF lets that one pass (#113). See `CapturedConstantValidator`.
+        IReadOnlySet<ConstantExpression> refusableConstants = CapturedConstantValidator.FindRefusable(
+            query,
+            queryContext.Context.GetInfrastructure().GetRequiredService<ITypeMappingSource>());
+
         // Substitute compiled-query parameters as plain constants (research-findings §6).
         Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
 
@@ -113,6 +120,7 @@ internal sealed class QueryExecutor<TElement>
         };
 
         _split = splitter.Split(substituted);
+        CapturedConstantValidator.Validate(_split.Residual, refusableConstants);
 
         // Read AFTER the split, because the splitter records it while stripping. See
         // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.

@@ -550,8 +550,10 @@ are 0, and both tests must stay green.** Those tests, not a list in this file, a
 "which bases are in".
 
 **Every milestone and every planned phase is closed, so `docs/plans/v10/implementation-plan.md`
-holds only the rest of the slow run's triage, #182** (2026-09-28): one step per slow-run red the
-owner takes up, from H34. #167 built the slow run and closed with 10.2.0, which shipped it; #182
+holds the rest of the slow run's triage, #182** (2026-09-28): one step per slow-run red the
+owner takes up, from H34. **It also holds Phase D, #113**, the first issue phase after 10.2.0, whose
+letter is the first no earlier phase used; this said "holds only the rest of the slow run's triage"
+until Phase D opened, the same day. #167 built the slow run and closed with 10.2.0, which shipped it; #182
 holds the 20 methods it still shows. The issue-driven Phases Q to H are archived in
 `docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
 the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
