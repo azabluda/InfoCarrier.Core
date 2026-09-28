@@ -79,7 +79,7 @@ class and one more arm of that switch.
 | `[StoreDefect("1.6")]` | crashes, or answers wrongly; the argument is the section of `docs/upstream-defects.md` that records it | `DEFECT 1.6` |
 | `[StoreIssue(IssueTracker.EfCore, 36400)]` | behaves in a way a tracker entry already covers | `ISSUE dotnet/efcore#36400` |
 | `[InfoCarrierDesign(10)]` | nothing: this provider differs on purpose, by a recorded decision | `DESIGN ADR-010` |
-| `[InfoCarrierDefect(113)]` | nothing: the failure is ours and is not fixed yet | `INFOCARRIER DEFECT #113` |
+| `[InfoCarrierDefect(52)]` | nothing: the failure is ours and is not fixed yet | `INFOCARRIER DEFECT #52` |
 
 **A crash or a wrong answer is never `[StoreLimit]`.** A store that means "no" says so. A
 `NullReferenceException` is a `[StoreDefect]` even when the store would refuse the same query on a
@@ -326,7 +326,9 @@ exception crosses the wire as `InfoCarrierServerException`.
   that ran that query stays reachable after disposal until EF's memory cache is compacted, while a
   context that ran a plain query is collected. The first probe could not see it because pooled
   contexts outlive every test; contexts built directly could. It had been labelled `DESIGN ADR-010`
-  and skipped, with a justification the measurement disproved.
+  and skipped, with a justification the measurement disproved. **Fixed 2026-09-28**: the client
+  refuses that query with EF's own message (`CapturedConstantValidator`), and EF's test runs with no
+  override.
 
 **Three suspected defects were measured and are not defects.** `AsSplitQuery` is honoured: the
 server runs two statements where a single query runs one, so R47's "silently ignored" was wrong. A

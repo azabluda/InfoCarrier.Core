@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -36,8 +35,11 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         cache they read, which this client never fills because it stops at
 ///         <c>IDatabase.CompileQuery</c> (ADR-006). <b>This said the client "is not a relational
 ///         provider on either tier" until 2026-09-15</b>, which R135 had made false; the reason
-///         survives on ADR-006 instead. The fourth is not a cache test and does not skip any more;
-///         it is InfoCarrier defect #113, and its own remark says what was measured.
+///         survives on ADR-006 instead. The fourth, <c>Inlined_dbcontext_is_not_leaking</c>, is not
+///         a cache test and has no override since 2026-09-28, when this client began to refuse its
+///         query with EF's own message (#113, <c>CapturedConstantValidator</c>). Until then it said
+///         "it is InfoCarrier defect #113, and its own remark says what was measured": the context
+///         a disposed query had captured stayed reachable from EF's query cache.
 ///     </para>
 ///     <para>
 ///         <b>Until 2026-09-15 this paragraph called <c>Multiple_different_entity_type_from_different_namespaces</c>
@@ -144,32 +146,6 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
         Skip = true)]
     public override Task Explicitly_compiled_query_does_not_add_cache_entry()
         => Task.CompletedTask;
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <para>
-    ///         <b>Not a command-cache test, whatever this remark said before 2026-09-15.</b> EF refuses
-    ///         a client projection that calls an instance method of the <c>DbContext</c>, because the
-    ///         cache would hold that context, and the base asserts the refusal. This client does not
-    ///         refuse, so the base's own <c>Assert.Throws</c> finds nothing thrown, and that is what is
-    ///         asserted.
-    ///     </para>
-    ///     <para>
-    ///         <b>An InfoCarrier defect, #113.</b> Measured 2026-09-15 with contexts that are not
-    ///         pooled: a context that ran this query stays reachable after it is disposed, and only
-    ///         compacting EF's memory cache releases it, while a context that ran a plain query is
-    ///         collected. The answer is right; the memory is not released. Until the same day this
-    ///         override skipped, labelled DESIGN with the claim that no cache held a context, which
-    ///         the measurement disproved.
-    ///     </para>
-    /// </remarks>
-    [InfoCarrierDefect(113, Deviation = DeviationKind.AnswerNotRefusal)]
-    public override async Task Inlined_dbcontext_is_not_leaking()
-    {
-        var failure = await Assert.ThrowsAsync<Xunit.Sdk.ThrowsException>(base.Inlined_dbcontext_is_not_leaking);
-
-        Assert.Contains("No exception was thrown", failure.Message, StringComparison.Ordinal);
-    }
 
     /// <inheritdoc />
     /// <remarks>EF's InMemory class's, for the same reason as the first. Measured: 1 where the base expects 2.</remarks>

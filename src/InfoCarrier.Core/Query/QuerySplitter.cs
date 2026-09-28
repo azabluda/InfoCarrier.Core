@@ -1252,7 +1252,7 @@ public sealed class QuerySplitter
     ///     EF has this as <c>SharedTypeExtensions.DisplayName</c>, but that is a shared source
     ///     file rather than a referenceable API, so it is reproduced here rather than reached for.
     /// </remarks>
-    private static string DisplayName(Type type)
+    internal static string DisplayName(Type type)
     {
         if (!type.IsGenericType)
         {
