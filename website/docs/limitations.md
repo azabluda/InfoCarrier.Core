@@ -10,9 +10,14 @@ the client for something only a database has, assert a refusal this provider doe
 or are EF Core defects that every provider hits and this one reports with a different exception
 type.
 
-No test fails. Where this provider answers differently from EF Core, the test that covers it says
-so, and this page names the differences you can observe. The skipped tests are EF Core's own: EF
-skips them itself for the store behind them, and none is a suppression added here.
+```
+Total tests: 29958, Failed: 0
+```
+
+Measured against `10.2.0`. No test fails. Where this provider answers differently from EF Core, the
+test that covers it says so, and this page names the differences you can observe. The skipped tests
+are EF Core's own: EF skips them itself for the store behind them, and none is a suppression added
+here.
 
 ## Not supported
 
