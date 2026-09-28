@@ -504,21 +504,22 @@ keeps the `InfoCarrier.Core.Relational` **namespace**, and `InfoCarrier.Core` ca
 split is a folder move plus one `PackageReference` line**, and the supersession lists the three
 measurable conditions that would call for it.
 
-**Publishing the site is an explicit act: `gh workflow run Docs --ref release/10.1`.** The `deploy`
+**Publishing the site is an explicit act: `gh workflow run Docs --ref release/10.2`.** The `deploy`
 job requires `workflow_dispatch` and a `refs/heads/release/` ref, so no push publishes anything and
 `main` cannot publish at all. A push still BUILDS, which keeps `--strict` gating every commit and
 every pull request. **The branch dispatched from is the choice of what to publish**, so a new minor
-needs no edit to the workflow: cut `release/10.2` and dispatch on it. The site can therefore go
+needs no edit to the workflow: cut `release/10.3` and dispatch on it. The site can therefore go
 stale, and that is the accepted trade.
 
-**The site publishes from `release/10.1`, not from `main`.** `main` runs ahead of nuget.org, and an
+**The site publishes from `release/10.2`, not from `main`**, and did from `release/10.1` until
+10.2.0 shipped on 2026-09-28. `main` runs ahead of nuget.org, and an
 unversioned site built from it tells every reader to call APIs their package does not contain — which
 has happened: a 10.2.0 server timeout was put in front of 10.1.0 readers, and a sentence true of
 their version was deleted for being false on `main`.
 
 **So the branch model is maintenance branches, and fixes ORIGINATE ON THE RELEASE BRANCH and are
 MERGED UP** (the Symfony and Linux direction, chosen over .NET's fix-main-then-backport). A
-correction to what the shipped release does is a commit on `release/10.1`, merged into `main`; `main`
+correction to what the shipped release does is a commit on `release/10.2`, merged into `main`; `main`
 is for the next minor. `release/2.2` and `release/3.1` are the v1 line and predate this.
 **`build.yml` and `packages.yml` run on `release/**`**, so a release line is gated exactly like the
 trunk and publishes a candidate to the internal feed before any tag makes a version permanent. **The
@@ -549,8 +550,9 @@ are 0, and both tests must stay green.** Those tests, not a list in this file, a
 "which bases are in".
 
 **Every milestone and every planned phase is closed, so `docs/plans/v10/implementation-plan.md`
-holds only the rest of #167's triage** (2026-09-28): one step per slow-run red the owner takes up,
-from H34. The issue-driven Phases Q to H are archived in
+holds only the rest of the slow run's triage, #182** (2026-09-28): one step per slow-run red the
+owner takes up, from H34. #167 built the slow run and closed with 10.2.0, which shipped it; #182
+holds the 20 methods it still shows. The issue-driven Phases Q to H are archived in
 `docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
 the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
 the plan "is ISSUE-DRIVEN: it holds Phases Q, R, S, T, U, V, X, Y, Z and H". **Phase Y was the 10.1

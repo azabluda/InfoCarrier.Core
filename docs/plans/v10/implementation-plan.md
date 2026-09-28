@@ -1,10 +1,10 @@
-﻿# Implementation plan — the rest of #167's triage
+﻿# Implementation plan — the rest of the slow run's triage (#182)
 
 Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
 
 **Every milestone closed on 2026-08-24, and the issue-driven phases that followed, Q to H, were done
 when H4 merged.** Their plan is archived with the milestones' and never edited again. What is open
-is the rest of #167's triage, below. A new phase starts here too, as a section that names the GitHub
+is the rest of the slow run's triage, below, which #182 holds since #167 closed with 10.2.0. A new phase starts here too, as a section that names the GitHub
 issue it serves, with one checkbox per step, ticked in the commit that does the work. Which release
 it lands in is decided on the issue, not here.
 
@@ -16,7 +16,7 @@ it lands in is decided on the issue, not here.
 | M9 — provider neutrality (Phase J) | [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md) |
 | Post-10.0, issue-driven (Phases Q, R, V, S, T, U, Y, Z, X and H) | [`archive/implementation-plan-post-10.0.md`](archive/implementation-plan-post-10.0.md) |
 
-## Phase H, continued — the reds #167's slow run still shows
+## Phase H, continued — the reds the slow run still shows (#182)
 
 H0 to H4 are in the archive. After H29 the slow run of Tiers B and C was red in 21 methods, each a
 decision for the owner and deferred: 8 where this provider answers a query plain EF refuses, and 13
