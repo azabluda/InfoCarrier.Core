@@ -1737,6 +1737,11 @@ public sealed class QuerySplitter
                 {
                     RejectDeadCoalesce(node);
                 }
+
+                if (_found is null)
+                {
+                    RejectContainsOverUnshippableLocalCollection(node);
+                }
             }
 
             if (_found is null && _clientProjectedSources.Count > 0)
@@ -1950,6 +1955,49 @@ public sealed class QuerySplitter
         }
 
         /// <summary>
+        ///     Refuses a row-deciding argument that asks whether a LOCAL collection contains a value
+        ///     of a type the wire cannot carry, which EF cannot translate either.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>The same silent full-table read as <see cref="RejectDeadCoalesce" />, through
+        ///         the same exemption.</b> <c>Where(o =&gt; ids.Contains(new { o.OrderID,
+        ///         o.ProductID }))</c> over a captured list of anonymous objects cannot ship, because
+        ///         the wire carries no anonymous value, so the <c>Where</c> stays here; and
+        ///         <see cref="ClientCodeFinder.VisitNew" /> exempts the construction, for the
+        ///         composite keys EF translates. The server sent every row: EF's
+        ///         <c>Contains_with_local_anonymous_type_array_closure</c> read all 2156 rows of
+        ///         <c>"Order Details"</c> where plain EF raises <c>TranslationFailed</c>. Found by
+        ///         #167's slow run, fixed for 10.2.0 at the owner's request of 2026-09-28.
+        ///     </para>
+        ///     <para>
+        ///         <b>So the test is the collection, not the construction.</b> EF translates
+        ///         <c>Contains</c> over a local collection of scalars, and refuses one of objects it
+        ///         has no mapping for. The element type decides: one the allowlist carries is left
+        ///         alone, because the operator can then ship and the server's EF gives its own
+        ///         answer, and a registered type is the caller asking for exactly that. A collection
+        ///         that is itself a query is the server's to translate, and is never local.
+        ///     </para>
+        ///     <para><b>Relational only</b>, for <see cref="RejectUnshippableOrderingKey" />'s reason.</para>
+        /// </remarks>
+        private void RejectContainsOverUnshippableLocalCollection(MethodCallExpression node)
+        {
+            if (!_serverStoreIsRelational)
+            {
+                return;
+            }
+
+            foreach (Expression argument in RowDecidingArguments(node))
+            {
+                if (LocalContainsFinder.Find(argument, allowlist))
+                {
+                    _found = (node, null);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
         ///     Refuses an operator that applies a row-deciding lambda to a sequence some earlier
         ///     projection computed with client code.
         /// </summary>
@@ -2151,6 +2199,54 @@ public sealed class QuerySplitter
 
             return node;
         }
+    }
+
+    /// <summary>
+    ///     Finds <c>Contains</c> over a local collection whose element type the wire cannot carry.
+    /// </summary>
+    /// <remarks>
+    ///     Three shapes reach here: <c>Enumerable.Contains(list, value)</c>, an instance
+    ///     <c>list.Contains(value)</c> on a collection type, and
+    ///     <c>MemoryExtensions.Contains(span, value)</c>, which C# 14 binds for an array. The value's
+    ///     type is the element type in all three, and a collection whose type is a query is left to
+    ///     the server.
+    /// </remarks>
+    private sealed class LocalContainsFinder(TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        private bool _found;
+
+        public static bool Find(Expression expression, TypeAllowlist allowlist)
+        {
+            var finder = new LocalContainsFinder(allowlist);
+            finder.Visit(expression);
+            return finder._found;
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (!_found
+                && node.Method.Name == nameof(Enumerable.Contains)
+                && CollectionAndValue(node) is var (collection, value)
+                && !typeof(IQueryable).IsAssignableFrom(collection.Type)
+                && !value.Type.IsGenericParameter
+                && !allowlist.IsAllowed(value.Type))
+            {
+                _found = true;
+                return node;
+            }
+
+            return _found ? node : base.VisitMethodCall(node);
+        }
+
+        private static (Expression Collection, Expression Value)? CollectionAndValue(MethodCallExpression node)
+            => node switch
+            {
+                { Object: null, Arguments.Count: 2 } => (node.Arguments[0], node.Arguments[1]),
+                { Object: { } target, Arguments.Count: 1 }
+                    when typeof(System.Collections.IEnumerable).IsAssignableFrom(target.Type)
+                        && target.Type != typeof(string) => (target, node.Arguments[0]),
+                _ => null,
+            };
     }
 
     private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false)

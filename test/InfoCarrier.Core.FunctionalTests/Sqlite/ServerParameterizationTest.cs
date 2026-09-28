@@ -2108,6 +2108,36 @@ public partial class ServerParameterizationTest
         Assert.Empty(registered.OverTheWire);
     }
 
+    /// <summary>
+    ///     A filter on a local list of anonymous objects is refused, as EF refuses it, and the store
+    ///     is asked nothing.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         EF cannot translate <c>Contains</c> over a list of anonymous objects and raises
+    ///         <c>TranslationFailed</c>. Until 2026-09-28 this client answered instead: the anonymous
+    ///         type kept the <c>Where</c> here, the guard against client evaluation read that as the
+    ///         type boundary rather than a translation failure, and the server sent every row. EF's
+    ///         <c>Contains_with_local_anonymous_type_array_closure</c> read all 2156 rows of
+    ///         <c>"Order Details"</c> that way. Found by the slow run of #167; the owner took it into
+    ///         10.2.0 on 2026-09-28.
+    ///     </para>
+    /// </remarks>
+    [ConditionalFact]
+    public async Task A_filter_on_a_local_list_of_anonymous_objects_is_refused_as_EF_refuses_it()
+    {
+        var keys = new[] { new { Id = 1, Title = (string?)"alpha" }, new { Id = 3, Title = (string?)"beta" } };
+
+        Run run = await RunBothWays(
+            allowedTypes: null,
+            async context => _ = await context.Set<Blog>().Where(b => keys.Contains(new { b.Id, b.Title })).ToListAsync());
+
+        Assert.True(run.DirectError is not null, "plain EF Core answered: " + string.Join(" | ", run.Directly));
+        Assert.True(run.WireError is not null, "InfoCarrier answered: " + string.Join(" | ", run.OverTheWire));
+        Assert.Equal(run.DirectError.GetType(), run.WireError.GetType());
+        Assert.Empty(run.OverTheWire);
+    }
+
     private static IQueryable<int> JoinOnTitle(IQueryable<Blog> blogs, IQueryable<Post> posts)
         => blogs.Join(
             posts,
