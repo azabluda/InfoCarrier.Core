@@ -12,8 +12,10 @@ each line against the repository again when the work starts.
   test, so every test EF 11 turns red ends as a fix, or as an override with a typed reason that
   `OverrideAudit` accepts ([`docs/test-policy.md`](../../test-policy.md)). There is nothing to
   re-baseline.
-- **`Microsoft.EntityFrameworkCore` "at `[10.0.0,11.0.0)`"** is `[10.0.1,11.0.0)`, and the seven
-  other EF packages are pinned at `10.0.1`, not `10.0.0`.
+- **`Microsoft.EntityFrameworkCore` "at `[10.0.0,11.0.0)`"** is `[10.0.1,11.0.0)`, and so is
+  `Microsoft.EntityFrameworkCore.Relational` since 2026-09-28: both reach the nuspec, so both ranges
+  move to `[11.0.x,12.0.0)` together. The seven other EF packages are pinned at `10.0.1`, not
+  `10.0.0`.
 - **`subrepos/efcore` "at `release/10.0`, `v10.0.0`"** is at `v10.0.1`, the version of the
   specification packages.
 
