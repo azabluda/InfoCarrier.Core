@@ -43,8 +43,8 @@ same code, which is what makes the wire format meaningful. See
 
     ```xml
     <ItemGroup>
-      <PackageReference Include="InfoCarrier.Core" Version="10.1.0" />
-      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.1.0" />
+      <PackageReference Include="InfoCarrier.Core" Version="10.1.1" />
+      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.1.1" />
     </ItemGroup>
     ```
 
@@ -81,7 +81,7 @@ Both packages land in `artifacts/pack`. Every other project in the solution opts
 | | |
 |---|---|
 | Runtime | .NET 10 |
-| EF Core | 10.0 |
+| EF Core | 10.0.1 or later |
 | Server-side provider | any: SQL Server, PostgreSQL, SQLite, InMemory … |
 | Client platforms | anywhere .NET 10 runs, including Blazor WebAssembly |
 
@@ -91,4 +91,4 @@ browser: see [Blazor WebAssembly](../platforms/blazor-webassembly.md).
 
 ## Versioning
 
-The version tracks EF Core's major, as every EF Core provider does. `10.0.x` targets EF Core 10.
+The version tracks EF Core's major, as every EF Core provider does. `10.x` targets EF Core 10.
