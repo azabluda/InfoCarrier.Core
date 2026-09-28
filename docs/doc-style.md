@@ -160,7 +160,11 @@ documentation. One clause of identity is the budget, and then the news.
 
 The shape is one clause of identity, then **six lines at most, one per major change**, then the
 install command and the links. About 150 words. No group headings and no bold lead-in on the list
-items: with six lines there is nothing to group, and rule 3 applies here too.
+items: with six lines there is nothing to group, and rule 3 applies here too. Each line ends with the
+pull requests it came from, as `(#115, #109)`, which GitHub links; an issue stands in where the
+work reached `main` without one. The owner asked for them on 2026-09-28, for the 10.2 body. They
+name where a change came from and do not turn the six lines into a changelog, which is what the
+superseded `10.0.0` body was.
 
 **Major means a reader has to act on it or decide something.** Not compatible, the target framework,
 a dropped dependency, something that now ships that did not, a new boundary, and how it is verified.
