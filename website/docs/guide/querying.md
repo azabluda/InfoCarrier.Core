@@ -116,9 +116,8 @@ int matching = await query.CountAsync();
    server pages an unordered set while the client sorts the page: one page of the wrong rows, in
    the right order.
 
-Page before you project. When the client has to rebuild the projection, the
-`Skip` and `Take` above it are rebuilt with it, so the server sends every matching row and the
-client keeps one page. The answer is right and the whole result set crosses the wire.
+`Skip` and `Take` written after the `Select` run in the database too, even when the projection
+calls a method of your own.
 
 ## Bulk operations
 
