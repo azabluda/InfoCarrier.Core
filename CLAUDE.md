@@ -551,9 +551,9 @@ are 0, and both tests must stay green.** Those tests, not a list in this file, a
 
 **Every milestone and every planned phase is closed, so `docs/plans/v10/implementation-plan.md`
 holds the rest of the slow run's triage, #182** (2026-09-28): one step per slow-run red the
-owner takes up, from H34. **It also holds Phase D, #113**, the first issue phase after 10.2.0, whose
-letter is the first no earlier phase used; this said "holds only the rest of the slow run's triage"
-until Phase D opened, the same day. #167 built the slow run and closed with 10.2.0, which shipped it; #182
+owner takes up, from H34. **It also holds the issue phases opened after 10.2.0: D (#113), E (#48)
+and F (#52)**, lettered from the first no earlier phase used; this said "holds only the rest of the
+slow run's triage" until Phase D opened on 2026-09-28, and named Phase D alone until 2026-09-29. #167 built the slow run and closed with 10.2.0, which shipped it; #182
 holds the 20 methods it still shows. The issue-driven Phases Q to H are archived in
 `docs/plans/v10/archive/implementation-plan-post-10.0.md`. A new phase starts in the plan and names
 the GitHub issue it serves; which release it lands in is decided on the issue. Until then this said
@@ -619,10 +619,13 @@ crosses this wire. A non-relational backend tier is recorded as future scope wit
   client, for reads and for `ExecuteUpdate`/`ExecuteDelete` alike. The documented control is a
   server-side query interceptor. **Read `docs/plans/v10/cold-read-findings.md` §1 before touching the
   security or tenancy prose**, and never let a user-facing page claim the filter is the boundary.
-- **Two `ComplexTypesTracking` parameterizations**: a property-bag complex *collection* on an `Added`
-  entity. It is an upstream defect on a path only this provider takes, and the route around it has to
-  reproduce constructor binding, so it is priced and not taken. Its override asserts the defect's
-  exception and carries `[InfoCarrierDefect(52)]`.
+- **Reading an entity whose property-bag complex type holds a list fails, as it does in plain EF
+  Core** (`docs/upstream-defects.md` 1.1). **Inserting one works since 2026-09-29 (#52)**: the server
+  builds the entity with EF's empty materializer, which does EF's constructor binding and reaches no
+  defective branch, and restores the bag's member types the wire loses. This said the insert was
+  "an upstream defect on a path only this provider takes ... the route around it has to reproduce
+  constructor binding, so it is priced and not taken" until then; the empty materializer made the
+  price small, and plain EF turned out to reach the defect too, through any query of such an entity.
 
 ### The test stores, and flakiness
 

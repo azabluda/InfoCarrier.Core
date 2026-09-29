@@ -149,8 +149,9 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 {
                     if (entityType.FindComplexProperty(value.Name) is { } complexProperty)
                     {
-                        complexValues.Add(
-                            (complexProperty, _mapper.FromPropertyValue(value, complexProperty.ClrType)));
+                        object? complexValue = _mapper.FromPropertyValue(value, complexProperty.ClrType);
+                        RestorePropertyBagMemberTypes(complexProperty, complexValue);
+                        complexValues.Add((complexProperty, complexValue));
                     }
 
                     continue;
@@ -1230,8 +1231,145 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             }
         }
 
-        return runtimeType.GetOrCreateMaterializer(_context.GetService<IStructuralTypeMaterializerSource>())(
-            new MaterializationContext(new ValueBuffer(buffer), _context));
+        var source = _context.GetService<IStructuralTypeMaterializerSource>();
+        var materializationContext = new MaterializationContext(new ValueBuffer(buffer), _context);
+
+        // AROUND EF'S DEFECT, docs/upstream-defects.md 1.1 (#52). EF's full materializer fills a
+        // property-bag complex type's primitive-collection member through `Expression.Property` on
+        // the `Item[string]` indexer, which .NET refuses. The empty materializer does EF's own
+        // constructor binding and fills nothing, so it never reaches that branch; the values then go
+        // on the object as the full materializer would have put them, and the caller sets the
+        // complex values through their members, as it does for every entity. Only where the
+        // constructor takes no property value, because only the full materializer can bind one.
+        if (entityType.ServiceOnlyConstructorBinding is not null && HasPropertyBagComplexType(entityType))
+        {
+            object instance = runtimeType.GetOrCreateEmptyMaterializer(source)(materializationContext);
+            var shadowWrittenLater = new List<(IProperty Property, object? Value)>();
+
+            foreach (IProperty property in entityType.GetProperties())
+            {
+                if (property.GetIndex() is >= 0 and var index)
+                {
+                    SetOnEntity(instance, property, buffer[index], shadowWrittenLater);
+                }
+            }
+
+            return instance;
+        }
+
+        return runtimeType.GetOrCreateMaterializer(source)(materializationContext);
+    }
+
+    private static bool HasPropertyBagComplexType(ITypeBase type)
+        => type.GetComplexProperties().Any(
+            p => p.ComplexType.IsPropertyBag || HasPropertyBagComplexType(p.ComplexType));
+
+    /// <summary>
+    ///     Gives each member of a property-bag complex value the CLR type its model declares (#52).
+    /// </summary>
+    /// <remarks>
+    ///     A bag is a <c>Dictionary&lt;string, object&gt;</c>, so the wire walks it as a dictionary and
+    ///     each member arrives in whatever shape its <c>object</c> slot took: a <c>List&lt;string&gt;</c>
+    ///     comes back a <c>List&lt;object&gt;</c>, and EF's snapshot of the new entry then casts it to
+    ///     the declared type and throws <c>InvalidCastException</c>. An ordinary property never meets
+    ///     this, because it travels through <see cref="PrimitiveCoercion" /> with its model property in
+    ///     hand. The model declares every member of a bag, so the types are restored from it, in place,
+    ///     through complex collections and nested complex values alike.
+    /// </remarks>
+    private void RestorePropertyBagMemberTypes(IComplexProperty complexProperty, object? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        if (complexProperty.IsCollection)
+        {
+            if (value is System.Collections.IEnumerable elements)
+            {
+                foreach (object? element in elements)
+                {
+                    RestorePropertyBagMemberTypes(complexProperty.ComplexType, element);
+                }
+            }
+
+            return;
+        }
+
+        RestorePropertyBagMemberTypes(complexProperty.ComplexType, value);
+    }
+
+    private void RestorePropertyBagMemberTypes(IComplexType complexType, object? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        if (complexType.IsPropertyBag && value is IDictionary<string, object?> bag)
+        {
+            foreach (IProperty member in complexType.GetProperties())
+            {
+                if (bag.TryGetValue(member.Name, out object? memberValue)
+                    && memberValue is not null
+                    && !member.ClrType.IsInstanceOfType(memberValue))
+                {
+                    bag[member.Name] = WithModelType(member, memberValue);
+                }
+            }
+
+            foreach (IComplexProperty nested in complexType.GetComplexProperties())
+            {
+                if (bag.TryGetValue(nested.Name, out object? nestedValue))
+                {
+                    RestorePropertyBagMemberTypes(nested, nestedValue);
+                }
+            }
+
+            return;
+        }
+
+        foreach (IComplexProperty nested in complexType.GetComplexProperties())
+        {
+            RestorePropertyBagMemberTypes(nested, nested.GetGetter().GetClrValue(value));
+        }
+    }
+
+    /// <summary>
+    ///     One member value as its declared type. A primitive collection is rebuilt through its JSON
+    ///     form, element by element, which is the form <see cref="PrimitiveCoercion.FromWireValue" />
+    ///     already reads for an ordinary property; anything else is coerced directly.
+    /// </summary>
+    private object? WithModelType(IProperty member, object value)
+    {
+        if (member.GetElementType() is { } element
+            && value is System.Collections.IEnumerable items and not string
+            && _context.GetService<Microsoft.EntityFrameworkCore.Storage.Json.IJsonValueReaderWriterSource>()
+                .FindReaderWriter(Nullable.GetUnderlyingType(element.ClrType) ?? element.ClrType) is { } elementJson)
+        {
+            var json = new System.Buffers.ArrayBufferWriter<byte>();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(json))
+            {
+                writer.WriteStartArray();
+                foreach (object? item in items)
+                {
+                    if (PrimitiveCoercion.Coerce(item, element.ClrType) is { } typed)
+                    {
+                        elementJson.ToJson(writer, typed);
+                    }
+                    else
+                    {
+                        writer.WriteNullValue();
+                    }
+                }
+
+                writer.WriteEndArray();
+            }
+
+            return PrimitiveCoercion.FromWireValue(member, System.Text.Encoding.UTF8.GetString(json.WrittenSpan));
+        }
+
+        return PrimitiveCoercion.Coerce(value, member.ClrType);
     }
 
     /// <summary>

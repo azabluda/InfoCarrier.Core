@@ -79,7 +79,7 @@ class and one more arm of that switch.
 | `[StoreDefect("1.6")]` | crashes, or answers wrongly; the argument is the section of `docs/upstream-defects.md` that records it | `DEFECT 1.6` |
 | `[StoreIssue(IssueTracker.EfCore, 36400)]` | behaves in a way a tracker entry already covers | `ISSUE dotnet/efcore#36400` |
 | `[InfoCarrierDesign(10)]` | nothing: this provider differs on purpose, by a recorded decision | `DESIGN ADR-010` |
-| `[InfoCarrierDefect(52)]` | nothing: the failure is ours and is not fixed yet | `INFOCARRIER DEFECT #52` |
+| `[InfoCarrierDefect(n)]` | nothing: the failure is ours and is not fixed yet | `INFOCARRIER DEFECT #n` |
 
 **A crash or a wrong answer is never `[StoreLimit]`.** A store that means "no" says so. A
 `NullReferenceException` is a `[StoreDefect]` even when the store would refuse the same query on a
@@ -320,7 +320,9 @@ exception crosses the wire as `InfoCarrierServerException`.
 2026-09-15, to confirm every suspected defect).
 
 - **#52, the property-bag insert.** It was labelled `DESIGN` naming the limitations page, which
-  described the page and not the failure; an issue already tracked it.
+  described the page and not the failure; an issue already tracked it. **Fixed 2026-09-29**: the
+  server builds such an entity with EF's empty materializer and restores the bag's member types, and
+  EF's test runs with no override. No `[InfoCarrierDefect]` is left in the suite.
 - **#113, a context leak.** `Inlined_dbcontext_is_not_leaking` expects EF's refusal of a client
   projection that calls a `DbContext` instance method. This client answers, correctly, and a context
   that ran that query stays reachable after disposal until EF's memory cache is compacted, while a

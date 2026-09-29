@@ -461,7 +461,13 @@ Not yet implemented, in rough priority order:
   test **because EF never materializes the entity from a value buffer**; EF's SQL Server suite
   disables it outright (issue #36175). The route — construct the entity without
   `GetOrCreateMaterializer` — has to reproduce constructor binding, so it is priced in J22 and not
-  taken. The
+  taken. **Taken 2026-09-29 (#52), and the price was wrong**: EF's own `GetOrCreateEmptyMaterializer`
+  does the constructor binding and fills no member, so nothing had to be reproduced. The insert then
+  met a second layer that J22 could not see, because the first threw earlier: a bag is a dictionary of
+  `object`, so a `List<string>` member crossed as a `List<object>` and EF's snapshot threw
+  `InvalidCastException`; the server now restores member types from the model. And plain EF turned
+  out to hit the materializer defect itself, through any query of such an entity. **The lesson is
+  R65's again: the price was set without trying the cheapest route EF itself offers.** The
   `Query.Associations.ComplexProperties` family is **not** adoptable on Tier A (A77): EF's InMemory
   provider does not translate a complex property access at all, which is why EF ships no InMemory
   complex-type query test. Complex-type *queries* need Tier B.
