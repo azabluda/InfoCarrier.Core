@@ -99,8 +99,13 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 Two racing attempts cannot both commit: the second insert of the marker fails on its key and rolls
 back the rest of that save.
 
+This relies on `SaveChanges` being one unit, which it is on a relational database and on MongoDB.
+On Cosmos DB, EF Core 10 writes each document separately, and a marker cannot tell you which changes
+landed.
+
 When the answer is lost, keys the database generated never reach the client: reload the rows, or
-generate keys on the client. Delete old markers yourself.
+generate keys on the client. Keep the marker's id where it survives a restart of your application,
+such as local storage, until you have looked for it. Delete old markers yourself.
 
 For `ExecuteUpdate`, `ExecuteDelete` and anything else inside a transaction, save the marker inside
 the transaction too. If the commit fails, look for the marker rather than calling `Commit` again.

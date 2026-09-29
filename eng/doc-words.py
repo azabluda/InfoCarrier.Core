@@ -76,7 +76,10 @@ BUDGET = {
     # made false. Padding was cut first and paid for half of it -- the page already has a section
     # telling a reader to authenticate the transport, so the paragraph repeating that went.
     "website/docs/security.md": 840,
-    "website/docs/guide/errors.md": 750,
+    # 810 on 2026-09-29, for two limits of the marker-row pattern the page shows since #185: on
+    # Cosmos DB, EF Core 10 writes each document separately, so a marker cannot say which changes
+    # landed; and a marker's id lost with the application cannot be looked for.
+    "website/docs/guide/errors.md": 810,
 
     # PROVISIONAL, 2026-08-31. Raised from 700 for the reason the tier exists: the page names
     # every scenario in the spec suite that does not behave as a normal provider does, so its
