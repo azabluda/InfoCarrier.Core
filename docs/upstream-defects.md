@@ -34,14 +34,24 @@ do, because the entity reaches the server as values. The server's own stack was 
 `exception.Data["InfoCarrier.ServerStackTrace"]` (R65) and names every frame down to
 `ServerSaveChangesExecutor.Materialize`.
 
-**What it blocks here.** Inserting an entity whose complex property, or complex collection, has a
-`Dictionary<string, object>` CLR type and holds a primitive collection. This is the **single entry
-under "Not supported"** on [`website/docs/limitations.md`](../website/docs/limitations.md). Two
-spec tests, both parameterizations of
-`ComplexTypesTrackingInfoCarrierTest.Can_track_entity_with_complex_property_bag_collections(state: Added)`,
-red until 2026-09-15 and overridden since to assert this exception, as `[InfoCarrierDefect(52)]`:
-for a user it is this provider's failure, whoever's line causes it. The route around it has to avoid `GetOrCreateMaterializer` and reproduce constructor
-binding, which was priced in M9 and declined.
+**That heading is half wrong, measured 2026-09-29: plain EF reaches it too, through any query of
+such an entity.** EF's query shaper builds the entity through the same method, so
+`server.Set<Crew>().SingleAsync()` on plain EF Core with SQLite throws this exception.
+EF's suites never query this model, which is why no EF test fails.
+
+**What it blocks here, since 2026-09-29: reading such an entity, exactly as it blocks plain EF.**
+`Sqlite/PropertyBagComplexTypeTest.Reading_such_an_entity_fails_where_EF_Core_10_fails` asserts the
+two fail alike, and goes red when EF fixes the branch. **Inserting is no longer blocked (#52)**: the
+server builds the entity with EF's empty materializer (`GetOrCreateEmptyMaterializer`), which does
+EF's constructor binding and fills no member, and restores the bag's member types, which the wire
+loses because a bag is a dictionary of `object`. EF's `Can_track_entity_with_complex_property_bag_collections`
+runs with no override.
+
+Until then this said the defect blocked "inserting an entity whose complex property, or complex
+collection, has a `Dictionary<string, object>` CLR type and holds a primitive collection", that it was
+"the single entry under 'Not supported'" on the limitations page, and that "the route around it has
+to avoid `GetOrCreateMaterializer` and reproduce constructor binding, which was priced in M9 and
+declined". The empty materializer is that route, and nobody had tried it.
 
 **`dotnet/efcore#36175` does not track this, and the corroboration this repository claimed for it
 does not exist either.** That issue is *"Support notification change tracking for complex types"* —
@@ -59,8 +69,8 @@ and it passes there.
 materializes the entity from a value buffer. No EF suite reaches the branch, no EF issue describes
 it, and the one number attached to it describes a different feature under a different fixture.
 
-**To report:** a model with `ComplexCollection` over `List<Dictionary<string, object>>` whose
-declared members include one primitive collection, plus a materialization from a value buffer. The
+**To report:** a model with a property-bag complex property whose declared members include one
+primitive collection, and a plain EF query of it; nothing of this provider is needed any more. The
 fix is one branch applying the guard its own method already applies.
 
 ### 1.2 `EnumerableClassKey.Equals(object)` casts to the wrong type

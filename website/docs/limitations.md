@@ -21,66 +21,6 @@ here.
 
 ## Not supported
 
-### Inserting an entity whose complex property is a property bag
-
-Affects you if you map a complex property, or a complex collection, whose CLR type is
-`Dictionary<string, object>`. EF Core calls this a property bag: the shape is declared in the model
-rather than in the CLR type.
-
-```csharp
-public class Product
-{
-    public int Id { get; set; }
-    public string Sku { get; set; } = "";
-
-    // A property bag: no CLR properties, the members come from the model below.
-    public Dictionary<string, object> Spec { get; set; } = new();
-}
-
-modelBuilder.Entity<Product>()
-    .ComplexProperty(e => e.Spec, "Spec", b =>
-    {
-        b.Property<string>("Material");
-        b.Property<double>("WeightKg");
-    });
-```
-
-The insert throws:
-
-```csharp
-context.Products.Add(new Product
-{
-    Sku = "BOLT-M6",
-    Spec = { ["Material"] = "steel", ["WeightKg"] = 0.012 },
-});
-
-await context.SaveChangesAsync();   // throws
-```
-
-The same applies to the collection form, `List<Dictionary<string, object>>` mapped with
-`ComplexCollection`.
-
-Querying and change tracking work. Inserting throws. EF's suite does not cover updating or deleting
-for this shape, so treat the whole write path as unsupported rather than assuming update works.
-
-The workaround is to declare the complex type as an ordinary class:
-
-```csharp
-public class ProductSpec
-{
-    public string Material { get; set; } = "";
-    public double WeightKg { get; set; }
-}
-
-modelBuilder.Entity<Product>().ComplexProperty(e => e.Spec);
-```
-
-Nested complex types and complex collections are fine, as long as the type is a class rather than a
-dictionary.
-
-The cause is a defect in EF Core's own materializer, reached because this provider rebuilds entities
-on the server from the values sent over the wire.
-
 ### Suppressing a concurrency exception in an interceptor on the client
 
 Affects you if an `ISaveChangesInterceptor` registered on the client returns

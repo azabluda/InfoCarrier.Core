@@ -124,6 +124,40 @@ The other half, `guide/errors.md` showing the marker pattern instead of saying t
 remedy, corrects what the shipped release does, so it starts on `release/10.2` and is merged up. It
 has no checkbox here, because the plan on that branch predates this phase.
 
+## Phase F — an entity with a property-bag complex type is inserted (#52)
+
+Taken up by the owner on 2026-09-29, replacing the handoff's "only if EF fixes it or a user reports
+it". J22 had priced the route around EF's materializer defect as reproducing constructor binding.
+
+- [x] **F1. The server inserts an entity whose complex type is a property bag holding a list.** Two
+      layers, the second hidden by the first.
+
+      1. **EF's defect** (`docs/upstream-defects.md` 1.1): the full materializer fills a bag's
+         primitive-collection member through `Expression.Property` on the `Item[string]` indexer.
+         `ServerSaveChangesExecutor.Materialize` now builds such an entity with EF's own
+         `GetOrCreateEmptyMaterializer`, which binds the constructor and fills no member, then writes
+         the values the full materializer would have. Only where the constructor takes no property
+         value, and only for an entity with a property-bag complex type.
+      2. **Ours**: a bag is a dictionary of `object`, so the wire walked it as one and a
+         `List<string>` member arrived as a `List<object>`; EF's snapshot then threw
+         `InvalidCastException`. The server restores each bag member's type from the model, through
+         complex collections and nested complex values, rebuilding a list through its JSON form with
+         EF's own reader/writer service.
+
+      **Plain EF cannot read such an entity either**: its query shaper takes the same branch. So the
+      read stays failing, as in plain EF, and a test asserts the two fail alike.
+
+      Two promises in `Sqlite/PropertyBagComplexTypeTest`: the insert, checked with SQL against the
+      columns the model names, and the read failing where EF Core 10 fails. EF's
+      `Can_track_entity_with_complex_property_bag_collections` runs with no override, and no
+      `[InfoCarrierDefect]` is left in the suite. With `src/` reverted to `main`, exactly the insert
+      and EF's two `Added` cases fail. Normal run, `eng/measure.sh property-bag lost-commit`:
+      **FAILING 0, TOTAL 29968**, FIXED none, BROKEN none, REASONS unchanged; the spec project
+      **Passed: 29500, Skipped: 234, Total: 29734** and Tier D **Passed: 234, Total: 234**.
+      `trim-ratchet.sh` OK at 106 <= 106. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0,
+      Total: 28**. `CI=true` Release build after deleting the product's `obj` and `bin`: 0 errors,
+      the 5 known Razor warnings.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
