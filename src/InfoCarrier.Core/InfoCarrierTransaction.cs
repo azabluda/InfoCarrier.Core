@@ -79,13 +79,18 @@ public class InfoCarrierTransaction(
             return;
         }
 
-        _finished = true;
-        _onFinished();
-
+        // FINISHED ONLY ONCE THE SERVER ANSWERED, as EF's `RelationalTransaction` clears its state
+        // only after the store did. Until 2026-09-29 this was set before the round trip, so a
+        // commit the transport lost left the transaction finished anyway: a second `Commit` then
+        // reported success without reaching the server, and the dispose sent no rollback, which
+        // left a commit that never arrived holding the server's transaction open.
         if (_owned)
         {
             await _client.CommitTransactionAsync(ServerTransactionId, cancellationToken).ConfigureAwait(false);
         }
+
+        _finished = true;
+        _onFinished();
     }
 
     /// <inheritdoc />
@@ -100,13 +105,14 @@ public class InfoCarrierTransaction(
             return;
         }
 
-        _finished = true;
-        _onFinished();
-
+        // Only once the server answered, for the reason `CommitAsync` gives.
         if (_owned)
         {
             await _client.RollbackTransactionAsync(ServerTransactionId, cancellationToken).ConfigureAwait(false);
         }
+
+        _finished = true;
+        _onFinished();
     }
 
     /// <inheritdoc />

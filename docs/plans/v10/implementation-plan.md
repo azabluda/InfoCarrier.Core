@@ -90,6 +90,39 @@ letter is the first that no earlier phase used.
       0, Total: 28**. `CI=true` Release build after deleting the product's `obj` and `bin`: 0
       errors, the 5 known Razor warnings.
 
+## Phase E — what 10.3 does about a write whose outcome is unknown (#48)
+
+#48 asked for a request id the server records, so that a retried unit of work cannot write twice.
+Its design reached three approved sections on 2026-09-28 and 29, and was then deferred to Backlog
+by the owner: an application can already do this itself with EF Core's own documented pattern, a
+marker row saved with the changes and looked for after a failure ("Connection Resiliency", option
+4), and plain EF leaves the same problem to the application. The design is saved on the issue.
+What 10.3 does instead is the part an application cannot do itself.
+
+- [x] **E1. A commit or a rollback the transport loses is not treated as done.** Found while
+      designing #48: `InfoCarrierTransaction` marked itself finished before the round trip. A second
+      `Commit` after a lost request then reported success without reaching the server, and the
+      dispose sent no rollback, so a commit that never arrived left the server holding the
+      transaction, its connection and its locks. It now finishes only once the server answered, as
+      EF's `RelationalTransaction` clears its state only after the store did. No test could see it:
+      every transport in the suite delivers everything, and EF tests a failed commit only in its
+      SQL Server suite.
+
+      Four promises in `InMemory/LostTransactionEndTest`, whose transport loses one request or one
+      answer on purpose: a lost commit is sent again by the next `Commit`; a commit whose answer was
+      lost makes the next `Commit` throw rather than report success; a lost commit or a lost
+      rollback is rolled back on the server by the dispose. With `src/` reverted to `main`, exactly
+      these four fail. Normal run, `eng/measure.sh lost-commit context-capture-2`: **FAILING 0,
+      TOTAL 29966**, FIXED none, BROKEN none, REASONS unchanged; the spec project **Passed: 29498,
+      Skipped: 234, Total: 29732** and Tier D **Passed: 234, Total: 234**. `trim-ratchet.sh` OK at
+      106 <= 106. `InfoCarrier.Core.TransportTests` **Passed: 28, Failed: 0, Total: 28**. `CI=true`
+      Release build after deleting the product's `obj` and `bin`: 0 errors, the 5 known Razor
+      warnings.
+
+The other half, `guide/errors.md` showing the marker pattern instead of saying that an update has no
+remedy, corrects what the shipped release does, so it starts on `release/10.2` and is merged up. It
+has no checkbox here, because the plan on that branch predates this phase.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
