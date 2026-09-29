@@ -93,11 +93,12 @@ letter is the first that no earlier phase used.
 ## Phase E — what 10.3 does about a write whose outcome is unknown (#48)
 
 #48 asked for a request id the server records, so that a retried unit of work cannot write twice.
-Its design reached three approved sections on 2026-09-28 and 29, and was then deferred to Backlog
-by the owner: an application can already do this itself with EF Core's own documented pattern, a
-marker row saved with the changes and looked for after a failure ("Connection Resiliency", option
-4), and plain EF leaves the same problem to the application. The design is saved on the issue.
-What 10.3 does instead is the part an application cannot do itself.
+Its design reached two approved sections and a drafted third on 2026-09-28 and 29, and the owner
+then set it aside: an application can already do this itself with EF Core's own documented pattern,
+a marker row saved with the changes and looked for after a failure ("Connection Resiliency", option
+4), and plain EF leaves the same problem to the application. The design is saved on the issue,
+which the owner closed on 2026-09-29 once the errors page showed the pattern (#185). What 10.3 does
+instead is the part an application cannot do itself.
 
 - [x] **E1. A commit or a rollback the transport loses is not treated as done.** Found while
       designing #48: `InfoCarrierTransaction` marked itself finished before the round trip. A second

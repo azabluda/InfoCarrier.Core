@@ -141,6 +141,13 @@ duplicates the insert. There is no request id, no idempotency key, and no "did m
 commit?" query. The page now states the hazard; the mechanism does not exist. **The reader called
 this the one gap that can corrupt a customer's data, and that reading is correct.**
 
+> **CLOSED 2026-09-29 without a mechanism, and the finding's second half was too pessimistic.**
+> A marker row saved in the same `SaveChanges` answers "did my last unit of work commit?", because
+> the server runs that `SaveChanges` as one unit and looking for the row is a read. It is EF Core's
+> own "Connection Resiliency" option 4, and the page now shows it (#185). Designing the request id
+> found the part an application could not work around: a second `Commit` reported success without
+> reaching the server, fixed for 10.3 (#184). #48 is closed.
+
 **The abandoned transaction.** Known internally (`roadmap.md` M8, deprioritized 2026-08-16) and now
 stated for consumers. A client that vanishes between `BeginTransaction` and the commit pins a
 `DbContext`, its connection and its locks until the process exits. There is no timeout and no
