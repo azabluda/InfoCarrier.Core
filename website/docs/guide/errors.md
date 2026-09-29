@@ -62,20 +62,48 @@ data is unknown, not wrong.
 
 Retrying a read is safe. **Retrying anything that writes is not**, because the failure does not
 tell you whether the server committed: the request may have died on the way out, or the answer on
-the way back. Nothing in the envelope carries a request id, so there is no way to ask afterwards.
+the way back. That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` look like
+queries and are writes, and so is a transaction's `Commit`.
 
-That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` are written on an
-`IQueryable` and read like queries, and they are writes.
+### Knowing whether a write committed
 
-For an insert, the remedy is a key you supply rather than a store-generated one, with a unique
-constraint on the server's database that enforces it. Without the constraint a supplied key is not
-idempotent and the retry inserts twice.
+Save a marker row with your changes, and look for it after a transport failure. The server
+runs one `SaveChanges` as one unit, so the marker commits exactly when your changes do, and looking
+for it is a read. EF Core documents the same pattern:
+[manually track the transaction](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#option-4---manually-track-the-transaction).
+`SaveMarker` is one entity with a `Guid` key, mapped in `ShopContext` on both halves.
 
-**An update has no such remedy here.** A retried `balance = balance - 100` debits twice, and nothing
-in the protocol can tell you whether the first one landed. Make the operation one whose repetition
-is harmless, such as setting a value rather than adjusting one, or carry your own applied-once
-marker in the row and check it on the server. Reading back before you retry is not equivalent: the
-first write can still commit between your read and your retry.
+```csharp
+var marker = new SaveMarker { Id = Guid.NewGuid() };
+context.SaveMarkers.Add(marker);
+context.Orders.Add(order);
+
+try
+{
+    await context.SaveChangesAsync();
+}
+catch (Exception ex) when (ex is InfoCarrierTransportException
+                           || ex.InnerException is InfoCarrierTransportException)
+{
+    if (await context.SaveMarkers.AsNoTracking().AnyAsync(m => m.Id == marker.Id))
+    {
+        context.ChangeTracker.AcceptAllChanges();   // it committed; only the answer was lost
+    }
+    else
+    {
+        await context.SaveChangesAsync();           // it did not; send it again
+    }
+}
+```
+
+Two racing attempts cannot both commit: the second insert of the marker fails on its key and rolls
+back the rest of that save.
+
+When the answer is lost, keys the database generated never reach the client: reload the rows, or
+generate keys on the client. Delete old markers yourself.
+
+For `ExecuteUpdate`, `ExecuteDelete` and anything else inside a transaction, save the marker inside
+the transaction too. If the commit fails, look for the marker rather than calling `Commit` again.
 
 If a transaction was open when the connection dropped, do not retry into it. The server holds it on
 the instance that began it, and a retry landing anywhere else cannot join it. See
@@ -111,7 +139,7 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 | `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
 | `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
 | `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
-| `InfoCarrierTransportException` | The request did not complete | Retry a read. Do not retry a write: see [A failure of the journey](#a-failure-of-the-journey) |
+| `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](#knowing-whether-a-write-committed) |
 
 Catch the type, not the message: message text is not a supported contract on any EF Core provider,
 and a couple of messages here are worded differently from other providers'. See
