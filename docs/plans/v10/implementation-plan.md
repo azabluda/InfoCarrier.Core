@@ -158,6 +158,29 @@ it". J22 had priced the route around EF's materializer defect as reproducing con
       Total: 28**. `CI=true` Release build after deleting the product's `obj` and `bin`: 0 errors,
       the 5 known Razor warnings.
 
+## Phase Q, resumed — cancellation over a real socket (#55)
+
+The owner reopened the real-socket question for 10.3.0 on 2026-09-30. The earlier decision remains
+in the archive; this step tests the missing integration without a sleep or a slow database query.
+
+- [x] **Q3. Cancelling a query over a real socket stops server execution.**
+      `ServerCancellationOverSocketTest` uses the existing Northwind host with Kestrel bound to a
+      dynamically assigned loopback port and HTTP/1.1. An ordinary query succeeds first. A command
+      interceptor then signals entry and waits on the real server-side cancellation token. Only
+      after that signal does the client cancel. The test checks both command cancellation and exit
+      from the real request pipeline before cleanup releases the interceptor. The endpoint,
+      envelope dispatch, query executor and Entity Framework command path are not replaced.
+
+      Deadlines prevent hangs; they do not order events. This proves cancellation reaches server
+      execution at the command boundary, not that every database driver interrupts a running native
+      command. No product behavior, shared fixture or package dependency changes.
+
+      With the query executor changed temporarily to pass `CancellationToken.None`, the test failed
+      after reaching the command: it timed out waiting for server-side cancellation. Restored, it
+      passed in 2 seconds. `InfoCarrier.Core.TransportTests` **Passed: 29, Failed: 0, Total: 29**.
+      `eng/measure.sh cancellation-real-socket`: **FAILING 0, TOTAL 29968**. `CI=true` Release build:
+      **0 warnings, 0 errors**.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

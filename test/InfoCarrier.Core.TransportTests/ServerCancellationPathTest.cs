@@ -80,18 +80,16 @@ public sealed class CommandPathRecorder : DbCommandInterceptor
 ///         it is about is not evidence, however end-to-end it looks.
 ///     </para>
 ///     <para>
-///         <b>Nothing here cancels anything, and that is deliberate.</b> Cancelling mid-flight
-///         needs the server to be slow, which means either a sleep or a race, and this repository
-///         treats a flaky test as a stop-everything defect. The reading taken instead is the one
-///         that distinguishes the two implementations without any timing at all: the old server
+///         <b>This test checks the command path without cancelling.</b> The reading taken is the
+///         one that distinguishes the two implementations without timing dependencies: the old server
 ///         enumerated the query synchronously, so EF called <c>ReaderExecuting</c> and no token
 ///         reached the command; the current one enumerates asynchronously, so EF calls
 ///         <c>ReaderExecutingAsync</c> and hands the command a token that can be cancelled.
 ///     </para>
 ///     <para>
-///         What it does not cover is Kestrel: <c>WebApplicationFactory</c> runs the pipeline in
-///         memory, with no socket and no port, so whether a real web server reports a lost client
-///         promptly for a POST is a separate question (`archive/implementation-plan-post-10.0.md`, Q2).
+///         This factory uses the in-memory host, with no socket or port.
+///         <see cref="ServerCancellationOverSocketTest" /> separately uses Kestrel and explicit
+///         command-entry synchronization to prove that client cancellation reaches server execution.
 ///     </para>
 /// </remarks>
 public class ServerCancellationPathTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
