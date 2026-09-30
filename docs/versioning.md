@@ -273,9 +273,9 @@ One question, asked before the work rather than after it.
 
 | The change | Branch | Reaches `main` by |
 |---|---|---|
-| A fix for the version people are running | `release/10.1` | merging up |
+| A fix for the version people are running | `release/10.2` | merging up |
 | Anything for the next minor | `main` | it is already there |
-| A correction to what the SHIPPED docs say | `release/10.1` | merging up |
+| A correction to what the SHIPPED docs say | `release/10.2` | merging up |
 | Documentation for an unreleased feature | `main` | it is already there |
 
 **Fixes originate on the release branch and are merged up**, the direction Symfony and Linux use,
