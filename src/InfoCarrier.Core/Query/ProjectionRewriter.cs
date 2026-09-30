@@ -363,7 +363,26 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             return moved;
         }
 
-        if (TryMoveBelowReassembly(call) is { } below)
+        Expression? below = TryMoveBelowReassembly(call);
+        // Unlike Take over a tuple projection, Single lets EF place LIMIT after a reference join.
+        // Rebuild its one tuple after the server executes the terminal.
+        if (ReferenceEquals(node, _root)
+            && (below ?? call) is MethodCallExpression rootCall
+            && rootCall.Method.DeclaringType == typeof(Queryable)
+            && rootCall.Method.Name == nameof(Queryable.Single)
+            && rootCall.Arguments.Count == 1
+            && rootCall.Arguments[0] is MethodCallExpression singleReassembly
+            && _reassemblies.Contains(singleReassembly)
+            && StripQuotes(singleReassembly.Arguments[1]) is LambdaExpression { Parameters: [var singleRow] } singleRebuild)
+        {
+            Forget(singleReassembly);
+            MethodCallExpression single = Expression.Call(
+                rootCall.Method.GetGenericMethodDefinition().MakeGenericMethod(singleRow.Type),
+                singleReassembly.Arguments[0]);
+            return Expression.Invoke(singleRebuild, single);
+        }
+
+        if (below is not null)
         {
             return below;
         }
@@ -944,8 +963,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         twice.
     ///     </para>
     ///     <para>
-    ///         <b>Only inside a lambda.</b> At the root of the query the operator already bounds the
-    ///         rows the server sends (<c>QuerySplitter.WithRowLimitForTerminalOperator</c>).
+    ///         <b>Only inside a lambda.</b> A root Single moves below reassembly in
+    ///         <c>VisitMethodCall</c>; root terminals left in the residual bound the server rows
+    ///         through <c>QuerySplitter.WithRowLimitForTerminalOperator</c>.
     ///     </para>
     /// </remarks>
     private InvocationExpression OneRowRebuilt(
