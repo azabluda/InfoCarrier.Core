@@ -1,0 +1,34 @@
+# Only commands whose later arguments cannot introduce repository writes belong here.
+
+prefix_rule(
+    pattern = ["dotnet", "--info"],
+    decision = "allow",
+    justification = "Reading the installed .NET SDK information is safe.",
+    match = ["dotnet --info"],
+    not_match = ["dotnet --list-sdks"],
+)
+
+prefix_rule(
+    pattern = ["git", ["status", "blame", "check-ignore"]],
+    decision = "allow",
+    justification = "These Git commands inspect repository state without changing it.",
+    match = [
+        "git status --short",
+        "git blame CLAUDE.md",
+        "git check-ignore subrepos/efcore",
+    ],
+    not_match = [
+        "git commit -m change",
+        "git diff --output=review.txt",
+        "git show --output=review.txt HEAD",
+        "git log --output=review.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "branch", ["--list", "--show-current"]],
+    decision = "allow",
+    justification = "These Git branch forms only inspect local branch state.",
+    match = ["git branch --list", "git branch --show-current"],
+    not_match = ["git branch -D topic"],
+)

@@ -1,0 +1,45 @@
+{
+  "description": "Repository navigation and file-hygiene hooks.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$(git rev-parse --show-toplevel)/.codex/hooks/cs-search-reminder.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"$root = git rev-parse --show-toplevel; python (Join-Path $root '.codex/hooks/cs-search-reminder.py'); exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Checking the C# navigation rule"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$(git rev-parse --show-toplevel)/.codex/hooks/file-hygiene.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"$root = git rev-parse --show-toplevel; python (Join-Path $root '.codex/hooks/file-hygiene.py'); exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Protecting reference subrepositories"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$(git rev-parse --show-toplevel)/.codex/hooks/file-hygiene.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"$root = git rev-parse --show-toplevel; python (Join-Path $root '.codex/hooks/file-hygiene.py'); exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Checking file hygiene"
+          }
+        ]
+      }
+    ]
+  }
+}
