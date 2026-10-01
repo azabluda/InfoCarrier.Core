@@ -85,6 +85,32 @@ red first, the fix in the product, and the slow run again.
       promises with no broken tests. The selected slow-run class reports **Passed: 25, Failed: 0**.
       Trim warnings stay at **106**. The design is recorded in docs/projection-split.md section 3.4.
 
+- [x] **H37. A compiled FromSqlRaw query preserves EF's constant arguments.**
+      `FromSqlRaw_queryable_composed_compiled_with_parameter` returned the same answer and read
+      count as plain Entity Framework Core, but the server bound a parameter where EF emitted a
+      literal. Server execution performs a second, ordinary parameter extraction after the client
+      has already made the compiled query's constantization decision.
+
+      The entity-root factory protects only constant argument arrays until EF's invocation-removal
+      visitor starts preprocessing. Earlier server visitors and parameter extraction retain that
+      protection. EF then receives its genuine raw SQL root and formats literals through its own
+      type mapping. Ordinary argument expressions remain bound. No wire contract or permission
+      changes, and no specification deviation reason.
+
+      Provider-owned differential tests cover synchronous and asynchronous execution, quoted values,
+      all three server collection modes, ordinary bound arguments, and two constants on one model.
+      The original four compiled cases failed before the change. The review exposed an early
+      collection-mode visitor; eight additional cases failed before the lifecycle correction.
+      Focused run: **Passed: 14, Failed: 0, Total: 14**. On 2026-10-01,
+      `eng/measure.sh h37-product h37-red-own` changed **FAILING 4 to 0**, with the four original
+      compiled cases fixed, no broken tests, and unchanged reasons. Expanded collection-mode coverage
+      makes the final **TOTAL 29986**. The selected live class reports **Passed: 149, Failed: 0,
+      Total: 149**. The related ad-hoc entity `SqlQueryRaw_queryable_composed_compiled_with_parameter`
+      also passes through the same entity-root correction. Its live cases and the Firebird tier
+      report **Passed: 111, Failed: 0, Skipped: 1, Total: 112**.
+      Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

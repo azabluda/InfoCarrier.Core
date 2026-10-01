@@ -260,9 +260,9 @@ public class ServerQueryExecutor(
         {
             RequireArbitrarySql();
 
-            // The arguments are rebuilt as an expression and handed to EF, which binds them as
-            // DbParameters. They are never spliced into the text: a value in a string has lost
-            // its type, and the round trip is the only reason this node carries a tree at all.
+            // Rebuild the argument expression, preserving parameters and compiled-query constants.
+            // EF binds parameters or formats literals through the store's type mapping. This
+            // pipeline never interpolates values into SQL text itself.
             return _relationalQueryRoots.CreateEntityRoot(
                 entityType,
                 fromSql.Sql,
