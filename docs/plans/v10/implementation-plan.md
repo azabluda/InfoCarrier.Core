@@ -54,6 +54,23 @@ red first, the fix in the product, and the slow run again.
       Release build after deleting the product's `obj` and `bin`: 0 errors, once a nullability error
       in the new promise was fixed (`Blog.Title` is `string?`, so the local list declares it too).
 
+- [x] **H35. A root Single places its limit after an optional reference join.**
+      Query_filter_with_pk_fk_optimization returned the same answer and read count as plain Entity
+      Framework Core, but its LIMIT 2 ran before the join. The provider-owned ServerSqlTest promise
+      reproduced that subquery and failed before the product change.
+
+      ProjectionRewriter now sends Single over the server tuple and rebuilds its one result on the
+      client. Entity Framework Core puts LIMIT 2 after the join. A second promise checks the empty
+      and duplicate-result exceptions. The specification override and its design reason are gone.
+      The decision is recorded in docs/projection-split.md section 3.4.
+
+      On 2026-10-01, the measured rewrite changed **FAILING 1 to 0, TOTAL 29969**, with one fixed
+      promise, no broken tests, and unchanged reasons. The final normal run reports **FAILING 0,
+      TOTAL 29970**. The selected slow-run class reports **Passed: 23, Failed: 0, Total: 23**.
+      The wider SQLite slow run has 29 failing cases, one fewer than its preceding capture.
+      Trim warnings stay at 106; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

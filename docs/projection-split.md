@@ -285,6 +285,13 @@ and one whose fused lambda reads a slot that holds a sequence. The second is §6
 can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
 provider translates. `QuerySplitter` judges what stays exactly as before.
 
+**Amendment 2026-10-01: a root Single runs on the server tuple.** When the final projection needs
+client reassembly, the server executes Single over the tuple query and the client rebuilds its one
+result. This lets Entity Framework Core place LIMIT 2 after an optional reference join, as it does
+without this provider. The server fault mapper restores InvalidOperationException and its message
+for an empty result or a second row. A root terminal that remains in the residual still uses the
+row bound sent by QuerySplitter and executes on the client.
+
 The general case of §7, an arbitrary operator over any client-typed element, is still deferred.
 
 ### 3.5 Frontier and fallback
