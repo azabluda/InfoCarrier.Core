@@ -112,7 +112,7 @@ public class QuerySplitterTest : IDisposable
         // minimal-column payload are the same mechanism (§3.2).
         SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }));
 
-        Assert.Equal(typeof(ValueTuple<string>), Assert.Single(split.ServerQueries).ElementType);
+        Assert.Equal(typeof(string), Assert.Single(split.ServerQueries).ElementType);
         Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
     }
 
