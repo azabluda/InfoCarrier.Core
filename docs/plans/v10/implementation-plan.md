@@ -71,6 +71,20 @@ red first, the fix in the product, and the slow run again.
       Trim warnings stay at 106; transport tests report **Passed: 29, Failed: 0, Total: 29**.
       The nonincremental CI Release build reports five known Razor warnings and zero errors.
 
+- [x] **H36. A root SingleOrDefault directly after a projection limits after its reference join.**
+      `Using_explicit_interface_implementation_as_navigation_works` returned the same answer and
+      read count as plain Entity Framework Core, but its LIMIT 2 ran before the join. A new
+      provider-owned SQL promise reproduced that shape and failed before the product change.
+
+      ProjectionRewriter now uses a reference tuple when a root SingleOrDefault directly follows a
+      reassembled Select with no predicate. It runs the terminal on the server tuple and rebuilds a
+      present result on the client. A second
+      promise checks empty, present, and duplicate results. No specification override was needed.
+
+      On 2026-10-01, the measured rewrite changed **FAILING 2 to 0, TOTAL 29972**, fixing both new
+      promises with no broken tests. The selected slow-run class reports **Passed: 25, Failed: 0**.
+      Trim warnings stay at **106**. The design is recorded in docs/projection-split.md section 3.4.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

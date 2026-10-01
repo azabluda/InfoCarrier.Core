@@ -213,9 +213,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private IReadOnlySet<(Type, string)> _read = new HashSet<(Type, string)>();
 
     /// <summary>
-    ///     The projections inside a lambda that a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
-    ///     reads one row of. Their tuple is the reference-typed family, so that no row reads as
-    ///     <see langword="null" />. See <see cref="TryMoveBelowReassembly" />.
+    ///     The projections read once by <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a
+    ///     lambda, or by a root <c>SingleOrDefault</c> directly over a Select. Their tuple is the
+    ///     reference-typed family, so that no row reads as <see langword="null" />.
+    ///     See <see cref="TryMoveBelowReassembly" />.
     /// </summary>
     private IReadOnlySet<Expression> _singleResultSources = new HashSet<Expression>();
 
@@ -364,17 +365,26 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         Expression? below = TryMoveBelowReassembly(call);
-        // Unlike Take over a tuple projection, Single lets EF place LIMIT after a reference join.
-        // Rebuild its one tuple after the server executes the terminal.
+        // Unlike Take over a tuple projection, these terminals let EF place LIMIT after a reference join.
+        // Rebuild the one tuple after the server executes the terminal.
         if (ReferenceEquals(node, _root)
             && (below ?? call) is MethodCallExpression rootCall
             && rootCall.Method.DeclaringType == typeof(Queryable)
-            && rootCall.Method.Name == nameof(Queryable.Single)
+            && (rootCall.Method.Name == nameof(Queryable.Single)
+                || rootCall.Method.Name == nameof(Queryable.SingleOrDefault))
             && rootCall.Arguments.Count == 1
+            && (rootCall.Method.Name == nameof(Queryable.Single) || node.Arguments.Count == 1)
             && rootCall.Arguments[0] is MethodCallExpression singleReassembly
             && _reassemblies.Contains(singleReassembly)
-            && StripQuotes(singleReassembly.Arguments[1]) is LambdaExpression { Parameters: [var singleRow] } singleRebuild)
+            && StripQuotes(singleReassembly.Arguments[1]) is LambdaExpression { Parameters: [var singleRow] } singleRebuild
+            && (rootCall.Method.Name == nameof(Queryable.Single) || !singleRow.Type.IsValueType))
         {
+            if (rootCall.Method.Name == nameof(Queryable.SingleOrDefault))
+            {
+                return OneRowRebuilt(
+                    rootCall, singleReassembly, singleRebuild, rootCall.Method.GetGenericArguments()[0]);
+            }
+
             Forget(singleReassembly);
             MethodCallExpression single = Expression.Call(
                 rootCall.Method.GetGenericMethodDefinition().MakeGenericMethod(singleRow.Type),
@@ -940,8 +950,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a projection on the server's
-    ///     tuple, and rebuilds the one row it returns on the client, or <see langword="null" />.
+    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> on the server's tuple.
+    ///     Rebuilds its one row on the client, or returns <see langword="null" />.
+    ///     Used inside a projection and for a root <c>SingleOrDefault</c> directly over a Select.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -963,8 +974,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         twice.
     ///     </para>
     ///     <para>
-    ///         <b>Only inside a lambda.</b> A root Single moves below reassembly in
-    ///         <c>VisitMethodCall</c>; root terminals left in the residual bound the server rows
+    ///         A root Single, or SingleOrDefault directly over Select, moves below reassembly
+    ///         in <c>VisitMethodCall</c>. Root terminals left in the residual bound server rows
     ///         through <c>QuerySplitter.WithRowLimitForTerminalOperator</c>.
     ///     </para>
     /// </remarks>
@@ -1090,18 +1101,18 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     Finds the projections inside a lambda that a <c>FirstOrDefault</c> or
-    ///     <c>SingleOrDefault</c> without a predicate reads one row of. See
-    ///     <see cref="OneRowRebuilt" />.
+    ///     Finds projections read once by a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
+    ///     inside a lambda, or by a root <c>SingleOrDefault</c> directly over a Select.
+    ///     See <see cref="OneRowRebuilt" />.
     /// </summary>
-    private sealed class SingleResultSourceFinder : ExpressionVisitor
+    private sealed class SingleResultSourceFinder(Expression root) : ExpressionVisitor
     {
         private readonly HashSet<Expression> _found = new(ReferenceEqualityComparer.Instance);
         private int _depth;
 
         public static IReadOnlySet<Expression> Find(Expression query)
         {
-            var finder = new SingleResultSourceFinder();
+            var finder = new SingleResultSourceFinder(query);
             finder.Visit(query);
             return finder._found;
         }
@@ -1121,7 +1132,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (_depth > 0
+            bool rootSingleOrDefault = ReferenceEquals(node, root)
+                && node.Method.Name == nameof(Queryable.SingleOrDefault)
+                && node.Arguments.Count == 1;
+            if ((_depth > 0 || rootSingleOrDefault)
                 && node.Method.Name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
                 && (node.Method.DeclaringType == typeof(Queryable) || node.Method.DeclaringType == typeof(Enumerable))
                 && node.Arguments is [MethodCallExpression source]
