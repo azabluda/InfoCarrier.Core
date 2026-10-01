@@ -10,7 +10,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.14.4" />
+    <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="5.0.0" />
     <!--
       A RANGE, NOT A POINT, AND IT IS THE ONE NUMBER CONSUMERS INHERIT. NuGet reads a bare
       `Version="10.0.0"` in a nuspec as ">= 10.0.0" with no ceiling, so the package would resolve
