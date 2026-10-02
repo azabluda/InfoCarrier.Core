@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -35,7 +36,8 @@ public class SqliteSmokeTest
     ///     </para>
     /// </remarks>
     private static SqliteInfoCarrierBackendTestStore CreateStore(
-        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null,
+        ParameterTranslationMode? collectionMode = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -47,6 +49,15 @@ public class SqliteSmokeTest
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
                 OnAddServices = services => onAddServices?.Invoke(services) ?? services,
+                OnAddOptions = builder =>
+                {
+                    if (collectionMode is { } mode)
+                    {
+                        new SqliteDbContextOptionsBuilder(builder).UseParameterizedCollectionMode(mode);
+                    }
+
+                    return builder;
+                },
             });
 
     /// <remarks>
@@ -71,9 +82,10 @@ public class SqliteSmokeTest
             .Options);
 
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(
-        Func<IServiceCollection, IServiceCollection>? onAddServices = null)
+        Func<IServiceCollection, IServiceCollection>? onAddServices = null,
+        ParameterTranslationMode? collectionMode = null)
     {
-        SqliteInfoCarrierBackendTestStore store = CreateStore(onAddServices);
+        SqliteInfoCarrierBackendTestStore store = CreateStore(onAddServices, collectionMode);
         await store.InitializeAsync(
             store.ServiceProvider,
             store.CreateDbContext,
@@ -224,16 +236,94 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
 
-        // `{0}` becomes a `DbParameter` on the server, which is the only shape in which an
-        // argument keeps its type across the wire. A quote in the value is the assertion that it
-        // was bound and not spliced: interpolated into the text it would be a syntax error, and
-        // matching zero rows through a parameter is the correct answer.
+        // An ordinary query keeps `{0}` bound as a DbParameter on the server. A quote in the
+        // value guards against interpolating it into SQL text. Compiled constants have their
+        // own promise below: EF formats those literals, including their quote escaping.
         Assert.Equal(
             1,
             await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "alpha").CountAsync());
         Assert.Equal(
             0,
             await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync());
+    }
+
+    /// <summary>A compiled raw SQL query preserves its constant arguments as EF does.</summary>
+    [ConditionalTheory]
+    [InlineData(false, "alpha", 1, ParameterTranslationMode.MultipleParameters)]
+    [InlineData(true, "alpha", 1, ParameterTranslationMode.MultipleParameters)]
+    [InlineData(false, "al'pha", 0, ParameterTranslationMode.MultipleParameters)]
+    [InlineData(true, "al'pha", 0, ParameterTranslationMode.MultipleParameters)]
+    [InlineData(false, "alpha", 1, ParameterTranslationMode.Constant)]
+    [InlineData(true, "alpha", 1, ParameterTranslationMode.Constant)]
+    [InlineData(false, "al'pha", 0, ParameterTranslationMode.Constant)]
+    [InlineData(true, "al'pha", 0, ParameterTranslationMode.Constant)]
+    [InlineData(false, "alpha", 1, ParameterTranslationMode.Parameter)]
+    [InlineData(true, "alpha", 1, ParameterTranslationMode.Parameter)]
+    [InlineData(false, "al'pha", 0, ParameterTranslationMode.Parameter)]
+    [InlineData(true, "al'pha", 0, ParameterTranslationMode.Parameter)]
+    public async Task A_compiled_FromSqlRaw_preserves_constant_arguments(
+        bool async, string title, int expected, ParameterTranslationMode collectionMode)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution(), collectionMode);
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+        using DbContext server = store.CreateDbContext();
+
+        // Compile separately for each provider: EF compiled delegates belong to one model.
+        Task<int> Execute(DbContext context, string queryTitle)
+        {
+            const string Sql = "SELECT * FROM \"Blogs\" WHERE \"Title\" = {0}";
+            return async
+                ? EF.CompileAsyncQuery((DbContext c) => c.Set<Blog>()
+                    .FromSqlRaw(Sql, queryTitle).Where(b => b.Id > 0).Count())(context)
+                : Task.FromResult(EF.CompileQuery((DbContext c) => c.Set<Blog>()
+                    .FromSqlRaw(Sql, queryTitle).Where(b => b.Id > 0).Count())(context));
+        }
+
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(server, title));
+        string[] direct = [.. store.ServerSql.Statements];
+        Assert.Contains(
+            $" = '{title.Replace("'", "''", StringComparison.Ordinal)}'",
+            Assert.Single(direct),
+            StringComparison.Ordinal);
+
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(client, title));
+        store.AssertServerSql(direct);
+
+        // A second constant on the same model must not reuse the first constant's server plan.
+        store.ServerSql.Clear();
+        Assert.Equal(0, await Execute(server, "missing"));
+        string[] second = [.. store.ServerSql.Statements];
+        store.ServerSql.Clear();
+        Assert.Equal(0, await Execute(client, "missing"));
+        store.AssertServerSql(second);
+    }
+
+    /// <summary>An ordinary raw SQL query keeps the arguments EF extracted as parameters bound.</summary>
+    [ConditionalTheory]
+    [InlineData("alpha", 1)]
+    [InlineData("al'pha", 0)]
+    public async Task An_ordinary_FromSqlRaw_argument_stays_bound(string title, int expected)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
+            services => services.AddInfoCarrierArbitrarySqlExecution());
+        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+        using DbContext server = store.CreateDbContext();
+
+        Task<int> Execute(DbContext context)
+            => context.Set<Blog>().FromSqlRaw("SELECT * FROM \"Blogs\" WHERE \"Title\" = {0}", title)
+                .Where(b => b.Id > 0).CountAsync();
+
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(server));
+        string[] direct = [.. store.ServerSql.Statements];
+        Assert.Contains(" = @", Assert.Single(direct), StringComparison.Ordinal);
+
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(client));
+        store.AssertServerSql(direct);
     }
 
     // unshippable for a different reason -- its `Object` was a constant holding the live client
