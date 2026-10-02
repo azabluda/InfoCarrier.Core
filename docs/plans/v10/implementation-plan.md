@@ -111,6 +111,28 @@ red first, the fix in the product, and the slow run again.
       Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
       The nonincremental CI Release build reports five known Razor warnings and zero errors.
 
+- [x] **H38. A value-converted private subtype keeps EF's SQL cast.**
+      `Comparison_with_value_converted_subclass` returned the same answer and read count, but
+      widening the constant's private `IPAddress.ReadOnlyIPAddress` type to its public base turned
+      EF's conversion into an identity conversion. The server omitted `CAST(... AS TEXT)`.
+
+      The expression translator preserves only a built-in constant upcast affected by that widening,
+      with a conversion through `object` inside the original conversion. EF deliberately preserves
+      object conversions during parameter extraction and emits its original SQL cast. No inaccessible
+      type name, new wire field, public signature, permission, or provider-specific SQL is introduced.
+      Public constants and user-defined conversions keep their existing paths.
+
+      A provider-owned address model reproduces the difference in both execution modes. Public-base
+      constants are controls against introducing extra casts. The failing full baseline reports
+      **FAILING 2, TOTAL 29990**, exactly the two private-subtype cases. Focused candidate:
+      **Passed: 4, Failed: 0, Total: 4**. The targeted live run, including all three inheritance
+      variants, reports **Passed: 10, Failed: 0, Total: 10**. On 2026-10-01,
+      `eng/measure.sh h38-product h38-red-own` changed **FAILING 2 to 0, TOTAL 29990**, with exactly
+      the two private-subtype cases fixed, no broken tests, and unchanged reasons. The selected live
+      class reports **Passed: 1173, Failed: 0, Skipped: 4, Total: 1177**.
+      Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
