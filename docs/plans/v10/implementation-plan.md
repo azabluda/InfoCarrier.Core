@@ -150,6 +150,23 @@ red first, the fix in the product, and the slow run again.
       Total: 29**. The nonincremental CI Release build reports five known Razor warnings and
       zero errors. Independent review found no blocking defect.
 
+- [x] **H40. Ordering over an unresolved client-constructor property is refused.**
+      `Member_binding_after_ctor_arguments_fails_with_client_eval` read every customer and ordered
+      the rows locally, whereas plain EF refused before executing a statement. A scalar ordering
+      key had hidden the unresolved client-type getter from the existing client-code guard.
+
+      A provider-owned regression failed before the product change in synchronous and asynchronous
+      execution. Anonymous-projection controls retain server ordering, including a null value.
+      The full baseline reports **FAILING 2, TOTAL 29996**, exactly the two constructor cases.
+      The initial broad guard changed an existing cast-refusal diagnostic. Independent review
+      identified the excessive scope; the final guard checks only ordering keys and preserves
+      that diagnostic. On 2026-10-02, `eng/measure.sh h40-final h40-red-own` reports **FAILING 2 to 0,
+      TOTAL 29996**, exactly the two constructor cases fixed, none broken, and no remaining failure
+      reasons. Focused tests pass 5 cases; live comparison passes all 377 selected-class, own-test,
+      and cast-diagnostic cases. Transport tests pass 29 cases. The trim ratchet passes at 106 <=
+      106. Nonincremental `CI=true` Release build reports five known Razor warnings and zero errors.
+      Independent review confirms the ordering restriction resolves its finding.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
