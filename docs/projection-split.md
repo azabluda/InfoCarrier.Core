@@ -293,6 +293,15 @@ and one whose fused lambda reads a slot that holds a sequence. The second is §6
 can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
 provider translates. `QuerySplitter` judges what stays exactly as before.
 
+**Amendment 2026-10-06 — constructor ordering parity requires explicit type registration.**
+This replaces the 2026-10-01 client refusal guard for unresolved constructor-property ordering.
+A shared type with public members, admitted on both ends, lets the existing transport deliver the
+constructor and getter to the server. The actual provider then decides whether it can translate
+the ordering; the client does not infer a refusal from relational-store identity. Without that
+registration, the observed query sorts its materialized constructor projection locally after one
+statement without ORDER BY. Own tests pin this configuration edge case outside the owner's parity
+goal. Anonymous ordering remains a server-side control, and existing client-filtering guards remain.
+
 **Amendment 2026-10-01: a root Single runs on the server tuple.** When the final projection needs
 client reassembly, the server executes Single over the tuple query and the client rebuilds its one
 result. This lets Entity Framework Core place LIMIT 2 after an optional reference join, as it does

@@ -150,6 +150,21 @@ red first, the fix in the product, and the slow run again.
       Total: 29**. The nonincremental CI Release build reports five known Razor warnings and
       zero errors. Independent review found no blocking defect.
 
+- [x] **H40. Register the custom constructor projection before requiring backend parity.**
+      The owner reconsidered the refusal guard on 2026-10-06. The original
+      `Member_binding_after_ctor_arguments_fails_with_client_eval` lacked registration for its
+      `CustomerListItem` result type. With that type available and admitted on both ends, the
+      existing server path reaches the actual provider's translation refusal. The harness now
+      declares the type explicitly rather than adding a relational-only client guard.
+
+      Own tests distinguish registered backend refusal from unregistered local ordering. The
+      registered result has a recorded server translation stack and executes no SQL; the
+      unregistered result is sorted correctly on the client after one statement with no ORDER BY.
+      The latter is a configuration edge case outside the owner's parity goal. Anonymous ordering
+      remains a direct-server control. No upstream source or deserialization security is changed.
+      The focused original-method and own-test run passes eight cases. Broader verification is
+      recorded by the rebuilt branch's measurements and commit message.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
