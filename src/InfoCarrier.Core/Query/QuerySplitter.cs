@@ -1714,9 +1714,12 @@ public sealed class QuerySplitter
                     // argument is a property path, so walking it finds nothing to refuse.
                     || declaring == typeof(EntityFrameworkQueryableExtensions)))
             {
+                bool clientOrderingMembers = _serverStoreIsRelational
+                    && node.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                        or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending);
                 foreach (Expression argument in RowDecidingArguments(node))
                 {
-                    if (ClientCodeFinder.Find(argument, allowlist) is { } reason)
+                    if (ClientCodeFinder.Find(argument, allowlist, clientMemberReads: clientOrderingMembers) is { } reason)
                     {
                         _found = (node, reason.Details);
                         break;
@@ -2249,7 +2252,7 @@ public sealed class QuerySplitter
             };
     }
 
-    private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false)
+    private sealed class ClientCodeFinder(TypeAllowlist allowlist, bool methodsOnly = false, bool clientMemberReads = false)
         : ExpressionVisitor
     {
         private ClientCodeReason? _found;
@@ -2262,12 +2265,28 @@ public sealed class QuerySplitter
         ///     is the type boundary this milestone is about, and refusing it in the composed-over
         ///     position cost 235 tests once.
         /// </param>
+        /// <param name="clientMemberReads">Also refuses unresolved client-type member reads in relational ordering keys.</param>
         public static ClientCodeReason? Find(
-            Expression expression, TypeAllowlist allowlist, bool methodsOnly = false)
+            Expression expression, TypeAllowlist allowlist, bool methodsOnly = false, bool clientMemberReads = false)
         {
-            var finder = new ClientCodeFinder(allowlist, methodsOnly);
+            var finder = new ClientCodeFinder(allowlist, methodsOnly, clientMemberReads);
             finder.Visit(expression);
             return finder._found;
+        }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            // Construction-backed member reads that EF can fold have already disappeared.
+            // An unresolved getter on a client type is still client code, even when its result
+            // is a scalar: sorting it here fetched every row where EF refused the ordering.
+            if (_found is null && clientMemberReads
+                && node.Member.DeclaringType is { } declaring && !allowlist.IsAllowed(declaring))
+            {
+                _found = new ClientCodeReason(null);
+                return node;
+            }
+
+            return _found is null ? base.VisitMember(node) : node;
         }
 
         /// <summary>

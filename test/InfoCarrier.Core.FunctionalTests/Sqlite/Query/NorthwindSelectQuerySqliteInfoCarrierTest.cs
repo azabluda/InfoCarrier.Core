@@ -277,6 +277,12 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
 
     // EF's NorthwindSelectQuerySqliteTest asserts exactly this failure for exactly this test.
     [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 299, 300,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Member_binding_after_ctor_arguments_fails_with_client_eval(bool async)
+        => AssertTranslationFailed(() => base.Member_binding_after_ctor_arguments_fails_with_client_eval(async));
+
+    [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 155, 164,
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.SqlNotAsserted)]

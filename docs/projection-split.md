@@ -293,6 +293,14 @@ and one whose fused lambda reads a slot that holds a sequence. The second is §6
 can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
 provider translates. `QuerySplitter` judges what stays exactly as before.
 
+**Amendment 2026-10-01 — an ordering key cannot read an unresolved client-constructor property.**
+A scalar key type alone is not evidence that the ordering can translate. After member folding and
+projection fusion, `new ClientDto(row.City).City` still names the client type's getter when its
+constructor does not expose member bindings. If an ordering remains in the residual with such a
+read, the relational client refuses it before executing a statement, as EF does. Anonymous and
+member-initializer reads that fold to server values remain valid; projection reassembly itself is
+not refused. The check is limited to ordering keys, preserving existing predicate diagnostics.
+
 **Amendment 2026-10-01: a root Single runs on the server tuple.** When the final projection needs
 client reassembly, the server executes Single over the tuple query and the client rebuilds its one
 result. This lets Entity Framework Core place LIMIT 2 after an optional reference join, as it does
