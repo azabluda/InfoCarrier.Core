@@ -292,6 +292,14 @@ without this provider. The server fault mapper restores InvalidOperationExceptio
 for an empty result or a second row. A root terminal that remains in the residual still uses the
 row bound sent by QuerySplitter and executes on the client.
 
+**Amendment 2026-10-01: root SingleOrDefault directly over a reassembled Select uses the server
+tuple too.** The call has no predicate. The projection carries a reference tuple, so no row
+remains null rather than becoming a default value tuple. The server runs SingleOrDefault after
+an optional reference join, and the client rebuilds a row only when one exists. This preserves
+the SQL limit position and the server's duplicate-result message. A predicate overload or a
+Where between Select and SingleOrDefault remains on its prior path. Found by
+`Using_explicit_interface_implementation_as_navigation_works` in the slow run.
+
 The general case of §7, an arbitrary operator over any client-typed element, is still deferred.
 
 ### 3.5 Frontier and fallback

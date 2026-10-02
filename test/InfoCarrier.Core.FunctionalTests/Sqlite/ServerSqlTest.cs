@@ -182,6 +182,49 @@ LIMIT 2
         Assert.Equal("Sequence contains more than one element.", duplicate.Message);
     }
 
+    /// <summary>A root SingleOrDefault limits rows after the optional reference join.</summary>
+    [ConditionalFact]
+    public Task A_root_SingleOrDefault_over_a_client_projection_limits_after_the_optional_reference_join()
+        => AssertServerRuns(
+            client => client.OptionalSeats
+                .Where(s => s.Id == 1)
+                .Select(s => new { s.Id, LongSubject = NotTranslatable(s.Ticket!.Subject) })
+                .SingleOrDefaultAsync(),
+            """
+SELECT "o"."Id", "t"."Subject"
+FROM "OptionalSeats" AS "o"
+LEFT JOIN "Tickets" AS "t" ON "o"."TicketId" = "t"."Id"
+WHERE "o"."Id" = 1
+LIMIT 2
+""");
+
+    /// <summary>A root SingleOrDefault returns null for no row and rejects duplicate rows.</summary>
+    [ConditionalFact]
+    public async Task A_root_SingleOrDefault_over_a_client_projection_preserves_cardinality()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore();
+        await SeedAsync(store);
+        await using ServerSqlContext client = CreateClient(store);
+
+        var empty = await client.OptionalSeats
+            .Where(s => s.Id == 99)
+            .Select(s => new { s.Id, Ticket = s.Ticket == null ? null : new { s.Ticket.Id } })
+            .SingleOrDefaultAsync();
+        Assert.Null(empty);
+
+        var present = await client.OptionalSeats
+            .Where(s => s.Id == 1)
+            .Select(s => new { s.Id, LongSubject = NotTranslatable(s.Ticket!.Subject) })
+            .SingleOrDefaultAsync();
+        Assert.NotNull(present);
+        Assert.Equal(1, present.Id);
+        Assert.True(present.LongSubject);
+
+        InvalidOperationException duplicate = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.OptionalSeats.Select(s => new { s.Id }).SingleOrDefaultAsync());
+        Assert.Equal("Sequence contains more than one element.", duplicate.Message);
+    }
+
     /// <summary>Paging is the store's work: the client never receives the pages it skipped.</summary>
     [ConditionalFact]
     public Task Paging_sends_the_limit_and_the_offset_to_the_server()
