@@ -34,7 +34,8 @@ namespace InfoCarrier.Core.Query;
 ///     <para>
 ///         So the projection is rewritten rather than cut. The body's maximal server-evaluable
 ///         subexpressions travel as a tuple, and the client rebuilds its own types from the tuple
-///         slots. The server does the work it was always going to do, and only the values the
+///         slots, or directly from one scalar at a root Select. The server does the work it was
+///         always going to do, and only the values the
 ///         projection needs are on the wire — which is also wire-protocol W1.
 ///     </para>
 /// </remarks>
@@ -426,7 +427,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         (Expression tuple, ParameterExpression row, Expression clientBody, bool carriesACollection) = Carry(
-            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node));
+            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node),
+            ReferenceEquals(node, _root) && IsPlainSelect(node));
         if (selector.Parameters.Any(p => ReferencesParameter(clientBody, p)))
         {
             // A row value the server could not carry — a parameter of a type it does not know.
@@ -475,18 +477,20 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     The tuple the server computes for <paramref name="body" />, the row parameter that reads
+    ///     The carrier the server computes for <paramref name="body" />, the row parameter that reads
     ///     it, and the body rebuilt from that row on the client.
     /// </summary>
     /// <param name="body">A body the server cannot run as written.</param>
     /// <param name="analysis">The analysis of the lambda <paramref name="body" /> is from.</param>
     /// <param name="rowParameters">The rows a value may read to be carried in the tuple.</param>
     /// <param name="nullable">Whether the tuple is the reference-typed family.</param>
+    /// <param name="scalar">Whether a root projection may carry its one scalar without a tuple.</param>
     private (Expression Tuple, ParameterExpression Row, Expression ClientBody, bool CarriesACollection) Carry(
         Expression body,
         BoundaryAnalysis analysis,
         IReadOnlyCollection<ParameterExpression> rowParameters,
-        bool nullable = false)
+        bool nullable = false,
+        bool scalar = false)
     {
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
@@ -498,6 +502,13 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         IReadOnlySet<Expression> consumed = Consumed(body);
+        bool carriesACollection = fragments.Any(f => CarriesACollection(f, consumed));
+        Expression[] values = [.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))];
+        // A root sequence keeps one row even when its scalar is null. Nested projections and
+        // single-result sources retain tuples, whose null identifies an absent row instead.
+        // Avoiding Item1 also lets EF retain a pruned inheritance UNION without an outer SELECT.
+        bool directScalar = scalar && !nullable && !carriesACollection
+            && values.Length == 1 && IsScalar(values[0].Type);
 
         // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
         //
@@ -511,22 +522,23 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // So the carrier holds nothing instead, and the reassembly below reads none of it. What the
         // server is asked for is the row count, which is what EF asks for. Until 2026-09-27 this
         // read "the carrier holds one constant instead", a tuple of `1`: see RowPresence.
-        Expression tuple = fragments.Count > 0
-            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
+        Expression tuple = directScalar ? values[0] : values.Length > 0
+            ? TupleCarrier.New(values, nullable)
             : RowPresence();
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
+            slots[fragments[i]] = Requeryable(
+                ReadBack(directScalar ? row : TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
         }
 
         return (
             tuple,
             row,
             new SlotSubstitutingVisitor(slots).Visit(body)!,
-            fragments.Any(f => CarriesACollection(f, consumed)));
+            carriesACollection);
     }
 
     /// <summary>

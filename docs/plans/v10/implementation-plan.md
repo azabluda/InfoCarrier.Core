@@ -133,6 +133,23 @@ red first, the fix in the product, and the slow run again.
       Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
       The nonincremental CI Release build reports five known Razor warnings and zero errors.
 
+- [x] **H39. A root one-column projection preserves EF's inheritance union.**
+      `Selecting_only_base_properties_on_derived_type` returned the same rows but wrapped EF's
+      pruned table-per-concrete-type union in an outer SELECT for the tuple's `Item1` alias.
+      The root plain Select now carries one scalar directly and rebuilds from that value.
+      Nested, single-result, entity, collection and multi-slot projections keep their tuples.
+      A null scalar remains a present row, not an absent result.
+
+      The provider-owned inheritance regression failed in both execution modes before the change.
+      The first full candidate fixed both cases and exposed one structural unit assertion expecting
+      a tuple rather than a string. Its minimal-payload contract is unchanged; the assertion now
+      checks the direct string carrier. The selected live class reports **Passed: 96, Failed: 0,
+      Skipped: 4, Total: 100**. On 2026-10-01, `eng/measure.sh h39-final h39-red-own` changed
+      **FAILING 2 to 0, TOTAL 29992**, fixing both new cases with no broken tests and unchanged
+      reasons. Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0,
+      Total: 29**. The nonincremental CI Release build reports five known Razor warnings and
+      zero errors. Independent review found no blocking defect.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

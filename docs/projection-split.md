@@ -151,6 +151,14 @@ caller's own construction. Until then this read "The stand-in `1` remains for a 
 at all, `new OrderDto()`, where EF projects nothing and a tuple has to hold something"; a carrier
 that is not a tuple does not have to.
 
+**Amendment 2026-10-01 — one scalar at a root Select needs no tuple.** When the root projection
+has exactly one scalar fragment and carries no collection, that scalar is the server row and the
+client rebuilds directly from it. A null scalar still represents a present sequence element.
+This avoids the `Item1` alias that makes EF wrap a pruned table-per-concrete-type union in an
+unnecessary outer SELECT. Nested projections, single-result sources, entities, collections and
+multiple fragments keep their tuple carriers; in particular, a null reference tuple can still
+distinguish an absent result from a present result containing a null value.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:
