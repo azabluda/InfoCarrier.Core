@@ -167,6 +167,28 @@ red first, the fix in the product, and the slow run again.
       106. Nonincremental `CI=true` Release build reports five known Razor warnings and zero errors.
       Independent review confirms the ordering restriction resolves its finding.
 
+- [x] **H41. A final multi-column shadow projection preserves the inheritance union.**
+      `TPCGearsOfWarQueryInfoCarrierTest.Project_shadow_properties` returns the correct values,
+      but tuple member aliases introduce an outer SELECT that plain EF does not need. A new
+      provider-owned two-column regression reproduces the statement difference in synchronous and
+      asynchronous execution, with a nullable regular column and a nullable shadow column.
+
+      EF's relational projection binder uses index-based binding when a constructor has no member
+      metadata. The proposed change removes that metadata only from flat final tuples holding
+      row-dependent scalar member reads or `EF.Property` calls. Internal projections, absent-row
+      reference tuples, collections, closed values, and other expression shapes retain the existing
+      construction. Full baseline reports **FAILING 2, TOTAL 29998**, exactly the two new cases.
+      A focused control found that a captured parameter also has a member-read shape; requiring a
+      reference to a row parameter preserves that parameter's existing SQL binding. Review also
+      found that the argument-count check alone accepts exactly eight values with a nested Rest
+      tuple; checking every constructed argument's scalar type restores the intended flatness.
+      On 2026-10-02, `eng/measure.sh h41-scoped h41-red-own` reports **FAILING 2 to 0, TOTAL 29998**,
+      exactly the two new cases fixed, none broken, and unchanged reasons. Final-code live comparison
+      passes **1280 cases, with 4 skips, total 1284**, covering the complete concrete-inheritance
+      query class, own regressions, and parameter-handling controls. Transport tests pass 29 cases;
+      trim passes at 106 <= 106. Nonincremental `CI=true` Release build reports five known Razor
+      warnings and zero errors. Independent review approves the corrected guard.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
