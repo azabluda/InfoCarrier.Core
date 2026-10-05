@@ -189,6 +189,30 @@ red first, the fix in the product, and the slow run again.
       trim passes at 106 <= 106. Nonincremental `CI=true` Release build reports five known Razor
       warnings and zero errors. Independent review approves the corrected guard.
 
+- [x] **H42. JSON entity collection indexes require a translatable index.**
+      The two `Json_collection_index_in_projection_using_untranslatable_client_method` methods
+      return answers through InfoCarrier, whereas plain SQLite EF refuses the index method before
+      executing a statement. Provider-owned regressions reproduce both a root collection index
+      and a nested collection index, synchronously and asynchronously. Four refusal cases fail
+      before a product change; four row-computed, translatable index controls pass and match SQL.
+
+      The proposed guard checks index arguments for client methods only when the indexed element
+      belongs to a JSON-mapped owned entity collection. Ordinary client projection methods and
+      translatable JSON indexes remain valid. Full baseline reports **FAILING 4, TOTAL 30006**,
+      exactly the four new refusal cases. Review found that mapped instance functions needed
+      receiver normalization first, and repeated owned CLR types needed their actual ownership
+      path. Three added controls failed with the first guard, then passed with both corrections.
+      The trim gate also found an added IL2072 warning from `FindEntityType(Type)`; enumerating
+      existing non-shared root metadata removes the new reflection requirement without changing
+      navigation-path resolution. On 2026-10-06, all 15 own and adopted focused cases pass.
+      Final review approves both corrections and the trim-safe root lookup. Final-code live
+      comparison passes **450 cases, with 7 skips, total 457**; trim passes at 106 <= 106.
+      Final full measurement reports **FAILING 0, TOTAL 30009**, fixing exactly the four
+      refusal regressions with no broken cases. The three review controls were added after the
+      baseline. Transport passes all 29 cases; the nonincremental Release gate has five known
+      framework warnings and no errors. This fixes two recorded slow-red methods, attributes
+      none, and leaves three known methods (four cases), pending a fresh full slow-run census.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

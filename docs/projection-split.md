@@ -168,6 +168,16 @@ other expression shapes, collections, absent-row reference tuples, and internal 
 member metadata. In particular, captured values retain the binding mode that projects them as SQL
 parameters; merely recognizing their member-read shape would incorrectly omit those parameters.
 
+**Amendment 2026-10-02 — selecting a JSON entity requires a translatable collection index.**
+A client method inside the index of a JSON-mapped owned collection cannot be moved into final
+projection reassembly: plain relational EF refuses that entity selection before executing SQL.
+The splitter checks the collection-navigation index after mapped function receiver normalization,
+before projection rewriting, and uses the existing method-specific translation diagnostic.
+Navigation identity follows the actual ownership path, so another occurrence of the same CLR type
+cannot classify a table-owned collection as JSON-mapped. Root and nested JSON collections follow
+the same rule. Ordinary client projection calls, translatable indexes, non-JSON collections, and
+nonrelational stores retain their existing paths.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:

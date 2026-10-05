@@ -239,6 +239,10 @@ public sealed class QuerySplitter
         // `ServerContextExpression`. Before the boundary, because the boundary is what refuses the
         // constant this replaces.
         query = new InstanceDbFunctionReceiverVisitor(_model).Visit(query)!;
+        if (ServerStoreIsRelational)
+        {
+            new JsonEntityIndexValidator(_model, _allowlist).Visit(query);
+        }
 
         // STRIPPED FROM THE TREE AND CARRIED ON THE REQUEST INSTEAD (R149). Everything above is
         // why it cannot stay in the tree; none of it says the server should not be told. The
@@ -728,6 +732,46 @@ public sealed class QuerySplitter
             onNonEntity
                 ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.IncludeOnNonEntity(invalid.ToString())
                 : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.InvalidIncludeExpression(invalid));
+    }
+
+    private sealed class JsonEntityIndexValidator(IModel model, TypeAllowlist allowlist) : ExpressionVisitor
+    {
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            // Selecting one JSON entity requires a SQL-translatable index, even in a final
+            // projection. Materializing the whole collection and indexing locally would answer
+            // a query the relational provider refuses. Ordinary client projection calls remain
+            // valid, as do non-JSON collections and indexes the server can translate.
+            if (node.Method.Name == "get_Item" && node.Arguments.Count == 1
+                && node.Object is MemberExpression { Expression: { } owner } collection
+                && EntityFor(owner)?.FindNavigation(collection.Member.Name) is { IsCollection: true } navigation
+                && navigation.TargetEntityType.IsMappedToJson()
+                && ClientCodeFinder.Find(node.Arguments[0], allowlist, methodsOnly: true) is { } reason)
+            {
+                string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(node);
+                throw new InvalidOperationException(reason.Details is null
+                    ? Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailed(printed)
+                    : Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings.TranslationFailedWithDetails(printed, reason.Details));
+            }
+
+            return base.VisitMethodCall(node);
+        }
+
+        // Owned CLR types can have several mappings. Follow the actual navigation path instead
+        // of allowing an unrelated JSON occurrence to classify a table-owned collection.
+        private IEntityType? EntityFor(Expression expression)
+            => expression switch
+            {
+                ParameterExpression parameter => model.GetEntityTypes()
+                    .FirstOrDefault(entity => entity.ClrType == parameter.Type && !entity.HasSharedClrType),
+                MemberExpression { Expression: { } parent } member
+                    => EntityFor(parent)?.FindNavigation(member.Member.Name)?.TargetEntityType,
+                MethodCallExpression { Method.Name: "get_Item", Object: { } collection, Arguments.Count: 1 }
+                    => EntityFor(collection),
+                UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.TypeAs } conversion
+                    => EntityFor(conversion.Operand),
+                _ => null,
+            };
     }
 
     /// <summary>

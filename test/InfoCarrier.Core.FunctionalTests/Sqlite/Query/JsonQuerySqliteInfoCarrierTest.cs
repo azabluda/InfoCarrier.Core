@@ -2,6 +2,7 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
@@ -54,6 +55,30 @@ public class JsonQuerySqliteInfoCarrierTest(
     JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture fixture)
     : JsonQueryRelationalTestBase<JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture>(fixture)
 {
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs", 382, 392,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Json_collection_index_in_projection_using_untranslatable_client_method(bool async)
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => base.Json_collection_index_in_projection_using_untranslatable_client_method(async));
+        Assert.Contains(CoreStrings.QueryUnableToTranslateMethod(
+            $"Microsoft.EntityFrameworkCore.Query.JsonQueryTestBase<{typeof(JsonQuerySqliteInfoCarrierFixture).FullName}>",
+            "MyMethod"), exception.Message);
+    }
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs", 394, 404,
+        Justification = Upstream.GaveNoReason)]
+    public override async Task Json_collection_index_in_projection_using_untranslatable_client_method2(bool async)
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => base.Json_collection_index_in_projection_using_untranslatable_client_method2(async));
+        Assert.Contains(CoreStrings.QueryUnableToTranslateMethod(
+            $"Microsoft.EntityFrameworkCore.Query.JsonQueryTestBase<{typeof(JsonQuerySqliteInfoCarrierFixture).FullName}>",
+            "MyMethod"), exception.Message);
+    }
+
     /// <summary>
     ///     The seventeen overrides below are EF's own, from <c>JsonQuerySqliteTest</c>.
     /// </summary>
