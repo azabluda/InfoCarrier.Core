@@ -1,8 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -16,10 +18,18 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         members, two of which assert that the provider <em>refuses</em> a query.
 ///     </para>
 ///     <para>
-///         Deliberately <b>no overrides</b>. Whether this provider refuses those two is the
-///         question the class is here to answer, and an override written before the run would be
-///         the assumption rather than the measurement.
+///         The client-projection UNION override adopts SQLite's refusal after H43 reproduced
+///         and fixed the client-side answer. The other relational refusal tests stay inherited.
 ///     </para>
 /// </remarks>
 public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindSetOperationsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindSetOperationsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+{
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSetOperationsQuerySqliteTest.cs", 20, 24,
+        Justification = "Client evaluation in projection. Issue #16243.")]
+    public override async Task Client_eval_Union_FirstOrDefault(bool async)
+        => Assert.Equal(
+            RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_eval_Union_FirstOrDefault(async))).Message);
+}

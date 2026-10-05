@@ -193,6 +193,14 @@ The rewrite is **recursive**: a nested projection inside a fragment
 (`Select(c => new { Orders = c.Orders.Select(o => new { o.OrderID }) })`) is rewritten by the
 same rule, and reassembled by the same rule on the client.
 
+**Amendment 2026-10-06 — UNION over a client method follows the backing store's rule.**
+InMemory permits a client-method projection followed by UNION and FirstOrDefault; relational EF
+refuses UNION after client evaluation. The guard follows sequence sources to actual client-method
+reassemblies and checks both UNION operands. It refuses before either input is fetched, with the
+relational provider's exact diagnostic. Constructed scalar projections do not count as client
+methods, and valid UNION inputs remain on the existing server path. Cardinality and row limiting
+over a client projection keep their existing behavior.
+
 ### 3.3a A composite join KEY is rewritten too (2026-09-16)
 
 §3.3 is about the lambda that becomes the element. A join's **key** selector is not that lambda, and

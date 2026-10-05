@@ -213,6 +213,30 @@ red first, the fix in the product, and the slow run again.
       framework warnings and no errors. This fixes two recorded slow-red methods, attributes
       none, and leaves three known methods (four cases), pending a fresh full slow-run census.
 
+- [x] **H43. Relational UNION cannot consume a client-method projection.**
+      `Client_eval_Union_FirstOrDefault` must follow SQLite's refusal before reading rows,
+      not apply the in-memory provider's client set-operation rule. Provider-owned synchronous
+      and asynchronous cases check both operands, the exact relational diagnostic, and zero
+      statements. Constructed scalar projections remain valid and must execute UNION in one
+      server statement; tuple member aliases are not part of that control's contract.
+      First reproduce the four refusal cases, measure the unchanged product, then add a
+      relational-only guard using actual client-method reassembly sources. Adopt the SQLite
+      override at lines 20–24, run the class live, and verify the full suite, Release build,
+      trim, transport, and review before committing. No attribution is planned.
+
+      On 2026-10-06, the unchanged-product baseline reports **FAILING 4, TOTAL 30015**,
+      exactly the four own refusal cases. The first candidate fixes those four but breaks
+      `QuerySplitterTest.A_client_method_nothing_reads_is_allowed`: that split-level test used
+      the default relational setting while expecting InMemory's UNION rule. Its corrected
+      assertion covers both settings and executes the nonrelational residual against real rows.
+      Product behavior did not change in that correction. Focused cases pass **9, failed 0,
+      total 9**; live comparison passes **188, failed 0, total 188**; transport passes 29;
+      trim passes at 106 <= 106; nonincremental Release builds have five known framework
+      warnings and no errors. Review approves the guard, corrected test, and documentation.
+      Final full measurement reports **FAILING 0, TOTAL 30015**, fixing exactly the four
+      refusal regressions with no broken cases. This fixes one recorded slow-red method
+      (two cases), attributes none, and leaves two known methods before a fresh full census.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

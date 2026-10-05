@@ -1722,7 +1722,7 @@ public sealed class QuerySplitter
 
         /// <summary>
         ///     The reassemblies that compute a value with client code — the projections a later
-        ///     operator may not apply a lambda to.
+        ///     operator may not apply a row-deciding lambda to or consume in a relational UNION.
         /// </summary>
         private static IReadOnlySet<Expression> ClientProjectedSources(
             IReadOnlySet<Expression> reassemblies, TypeAllowlist allowlist)
@@ -2045,8 +2045,8 @@ public sealed class QuerySplitter
         }
 
         /// <summary>
-        ///     Refuses an operator that applies a row-deciding lambda to a sequence some earlier
-        ///     projection computed with client code.
+        ///     Refuses an operator that applies a row-deciding lambda to a client-method
+        ///     projection, or consumes that projection in a relational UNION.
         /// </summary>
         /// <remarks>
         ///     <para>
@@ -2056,14 +2056,14 @@ public sealed class QuerySplitter
         ///         <b>18 broken</b>. The eighteen say what the real line is:
         ///     </para>
         ///     <list type="bullet">
-        ///         <item><c>Select(c =&gt; Client(c)).Union(…)</c> then <c>FirstOrDefault</c> — <b>allowed</b></item>
+        ///         <item><c>Select(c =&gt; Client(c)).Union(…)</c> then <c>FirstOrDefault</c> — <b>allowed by InMemory</b>, refused by relational stores (H43)</item>
         ///         <item><c>Select(o =&gt; Client(o)).Count()</c> — <b>allowed</b></item>
         ///         <item><c>… select Client(l1_inner)).Count() &gt; 7</c> inside a <c>Where</c> — <b>allowed</b></item>
         ///         <item><c>Join(root, Orders.Select(o =&gt; Client(o)), c =&gt; c.CustomerID, o =&gt; o.CustomerID, …)</c> — <b>refused</b></item>
         ///         <item><c>(… select Client(l1)).Take(2).LeftJoin(root, x =&gt; x.Id, …)</c> — <b>refused</b></item>
         ///     </list>
         ///     <para>
-        ///         `Union`, `Count` and `FirstOrDefault` take **no lambda over the projected
+        ///         `Count` and `FirstOrDefault` take **no lambda over the projected
         ///         element**; the two refusals apply a **join key** to it. So the line is not
         ///         whether something composes over the projection but whether it *reads* it, and
         ///         "reads it" is already this class's own <see cref="RowDecidingArguments" />
@@ -2087,9 +2087,17 @@ public sealed class QuerySplitter
                 return;
             }
 
-            // No row-deciding lambda means nothing reads the projected value: cardinality
-            // (`Count`), set operations (`Union`) and row limiting all fall here, and EF allows
-            // every one of them over a client projection.
+            // InMemory can combine client-projected rows. Relational EF cannot put a client
+            // method into either UNION input; fetching both inputs would silently answer a
+            // query it refuses. Merely constructing a scalar projection is not client code.
+            if (_serverStoreIsRelational && node.Method.Name == nameof(Queryable.Union)
+                && SourceArguments(node).Any(ReachesClientProjection))
+            {
+                throw new InvalidOperationException(RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation);
+            }
+
+            // Cardinality (`Count`) and row limiting take no row-deciding lambda and remain
+            // valid over a client projection. UNION follows the store-specific rule above.
             if (!RowDecidingArguments(node).Any(a => StripQuotes(a) is LambdaExpression))
             {
                 return;

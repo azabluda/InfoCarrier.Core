@@ -4,6 +4,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
@@ -541,17 +542,23 @@ public class QuerySplitterTest : IDisposable
     }
 
     /// <summary>
-    ///     And the same projection is allowed under operators that read only cardinality or
-    ///     position — which is what `Count_on_projection_with_client_eval` and
-    ///     `Client_eval_Union_FirstOrDefault` assert, and what C59's blunter rule broke.
+    ///     Cardinality and row limiting remain valid. UNION follows the backing store's rule:
+    ///     InMemory allows client methods in its inputs, while relational EF refuses them.
     /// </summary>
     [Fact]
     public void A_client_method_nothing_reads_is_allowed()
     {
         Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a))).ServerQueries);
         Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a)).Take(2)).ServerQueries);
-        Assert.NotEmpty(
-            Split(_context.Authors.Select(a => Rename(a)).Union(_context.Authors)).ServerQueries);
+        var union = _context.Authors.Select(a => Rename(a)).Union(_context.Authors);
+        Assert.Equal(RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation,
+            Assert.Throws<InvalidOperationException>(() => Split(union)).Message);
+
+        var nonrelational = new QuerySplitter(_context.Model) { ServerStoreIsRelational = false };
+        var split = nonrelational.Split(union.Expression);
+        Assert.NotEmpty(split.ServerQueries);
+        var result = Assert.IsAssignableFrom<IEnumerable<Author>>(Run(split));
+        Assert.Equal(new[] { "Austen", "Woolf" }, result.Select(author => author.Name));
     }
 
     private static Author Rename(Author author)
