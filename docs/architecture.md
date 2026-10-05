@@ -84,6 +84,15 @@ On receiving entity-typed results:
 Reference identity is preserved per-message (see expression-serialization §2.3), so circular
 nav refs and identity maps hold.
 
+### 4.1 Shared-row change replay (amendment 2026-10-06, H44)
+
+Relational changes to owned references also carry their tracked same-table ownership chain.
+EF groups shared-table modification commands by the common principal entry, not by equal key
+values alone. Omitting an unchanged owner gave separate owned branches two UPDATEs for one row.
+The client sends only the required owner chain, deduplicated with the other change entries;
+unrelated siblings and owners in another table do not travel. JSON documents keep their existing
+owner/document expansion, and nonrelational stores keep their separate document rules.
+
 ## 5. Test strategy (ADR-004 — LOCKED)
 
 Mirror EF Core's official suite by inheriting `Microsoft.EntityFrameworkCore.Specification.Tests`

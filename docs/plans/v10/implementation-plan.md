@@ -237,6 +237,29 @@ red first, the fix in the product, and the slow run again.
       refusal regressions with no broken cases. This fixes one recorded slow-red method
       (two cases), attributes none, and leaves two known methods before a fresh full census.
 
+- [x] **H44. Changes to separate owned branches write their shared row once.**
+      `Save_changed_owned_one_to_one` sends two UPDATEs where plain SQLite EF sends one.
+      A provider-owned two-branch model reproduces the difference for edits and replacements,
+      synchronously and asynchronously: all four cases fail before a product change.
+      EF's `SharedTableEntryMap.GetMainEntry` follows tracked principals, so omitting the
+      unchanged common owner gives the branches separate modification commands.
+      Send only each changed entry's same-table ownership chain, not all owned siblings.
+      Verify the own cases, the graph-update class live, the full suite, Release build,
+      trim, transport, and review. No attribution is planned.
+
+      On 2026-10-06, the first full candidate passes **FAILING 0, TOTAL 30023**, with no
+      broken cases or changed failure reasons against the committed H43 measurement. The own
+      red evidence is the focused four-case run, not a fabricated full-suite red snapshot.
+      The final own matrix has ten passing cases: shared-row edits and replacements, separate
+      table controls, and leaf-only changes through unchanged intermediate owners. It checks
+      SaveChanges counts, stored values, and untouched owner values. Live comparison passes
+      **1777, failed 0, skipped 6, total 1783**; transport passes 29; trim passes at 106 <= 106;
+      the nonincremental Release build has five known framework warnings and no errors.
+      Review approves the bounded expansion, leaf-only controls, and architecture amendment.
+      Final full measurement with both added controls reports **FAILING 0, TOTAL 30025**,
+      with no broken cases or changed failure reasons. This fixes one recorded slow-red method,
+      attributes none, and leaves one known method before a fresh full slow-run census.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

@@ -365,8 +365,9 @@ public class InfoCarrierDatabase(
         // Restricted to JSON-mapped types on purpose. Every owned type has an owner, and widening
         // this to all of them would put table-splitting dependents' owners on the wire for no
         // reason — `SaveChanges` payload changes are the ones this provider has paid most for
-        // (C37, C42). "For no reason" was wrong for one case, a row-mate with a concurrency token,
-        // and that case has its own clause below since 2026-09-15.
+        // (C37, C42). "For no reason" was wrong for a row-mate with a concurrency token
+        // (2026-09-15) and an owner needed to combine shared-row branches (H44). Each case
+        // has its own bounded clause below.
         // …and, once the owner is going, the rest of its JSON document (C95).
         //
         // C87 sent the owner and stopped there, which was enough for an *edit* and wrong for an
@@ -387,6 +388,20 @@ public class InfoCarrierDatabase(
         // at all on a model with no `ToJson()`.
         foreach (IUpdateEntry entry in entries)
         {
+            // SharedTableEntryMap groups commands by the tracked principal, not by equal key
+            // values. Without the unchanged owner, two owned branches of one row became two
+            // UPDATEs. Send only the same-table ownership chain, not the whole graph.
+            if (_serverStoreIsRelational)
+            {
+                foreach (IUpdateEntry owner in SharedRowOwners(entry))
+                {
+                    if (!sent.Contains(owner) && seen.Add(owner))
+                    {
+                        yield return owner;
+                    }
+                }
+            }
+
             foreach (IUpdateEntry owner in JsonColumnOwners(entry))
             {
                 if (!sent.Contains(owner) && seen.Add(owner))
@@ -455,6 +470,18 @@ public class InfoCarrierDatabase(
         foreach (IUpdateEntry entry in entries)
         {
             yield return entry;
+        }
+    }
+
+    private IEnumerable<IUpdateEntry> SharedRowOwners(IUpdateEntry entry)
+    {
+        var current = entry as InternalEntityEntry;
+        while (current?.EntityType.FindOwnership() is { } ownership
+            && SharesRow(current.EntityType, ownership.PrincipalEntityType)
+            && current.StateManager.FindPrincipal(current, ownership) is { } owner)
+        {
+            yield return owner;
+            current = owner;
         }
     }
 
