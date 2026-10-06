@@ -260,6 +260,33 @@ red first, the fix in the product, and the slow run again.
       with no broken cases or changed failure reasons. This fixes one recorded slow-red method,
       attributes none, and leaves one known method before a fresh full slow-run census.
 
+- [x] **H45. An ad hoc raw query does not inherit the mapped type's query filter.**
+      `Ad_hoc_query_for_shared_type_entity_type_works` adds a mapped filter where plain EF
+      reads the raw view directly. A populated provider-owned keyless model exposes missing
+      rows: four ad hoc cases fail, while four mapped FromSql controls pass, covering sync,
+      async, and composition. Preserve EF's ad hoc root identity in an optional wire field
+      and rebuild that root through the existing ad hoc mapper, even when its CLR type is
+      also mapped. Keep both SQL execution grants and type admission unchanged. Measure the
+      full red baseline and candidate, run live shared-type and raw-query controls, and check
+      Release, trim, transport, package validation, and review. Then run a fresh full slow
+      census for SQLite and Firebird before claiming the complete queue is resolved.
+
+      On 2026-10-06, the full baseline reports **FAILING 4, TOTAL 30033**, exactly the four
+      populated ad hoc cases. The first candidate fixes all four with no broken cases.
+      Review found the sibling constant-query-root path also needed the marker. Its own
+      ad hoc serialization case fails before that correction; the mapped control passes.
+      Both paths corrected, all ten focused cases pass. Final full measurement reports
+      **FAILING 0, TOTAL 30035**, fixing the same four populated regressions with no broken
+      cases; the four collection-equality failures disappear from the reason summary.
+      Broad live comparison passes **1532, failed 0, total 1532**; final-code focused live
+      comparison passes **11, failed 0, total 11**. Final transport passes 29;
+      trim passes at 106 <= 106; package validation passes; the final nonincremental Release
+      build has five known framework warnings and no errors. Review approves both paths.
+      This fixes one recorded slow-red method and attributes none. The fresh SQLite census
+      reports **passed 27571, failed 2, skipped 167, total 27740**; both failures name
+      `Select_distinct_Select_with_client_bindings`. Firebird reports **passed 109, failed 0,
+      skipped 1, total 110**. One newly observed method remains, to investigate next.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
