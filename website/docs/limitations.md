@@ -71,8 +71,8 @@ EF Core provider.
 
 ### Queries this provider answers that other providers do not
 
-One scenario in EF's suite expects the provider to reject the query, and this provider answers it.
-Composing LINQ over a collection stored through a value converter:
+A local projection can answer a query that another EF Core provider refuses. For example, composing
+LINQ over a collection stored through a value converter:
 
 ```csharp
 modelBuilder.Entity<Dashboard>()
@@ -95,6 +95,14 @@ and the query reaches the server, which rejects it as every other provider does.
 
 A test suite you port will expect the exception, and LINQ that relies on the answer will not run
 unchanged elsewhere.
+
+Private or client-only helpers can produce the same difference. Examples include choosing a JSON
+collection element with a private index helper and applying UNION to a private helper's projection.
+InfoCarrier can compute these locally where plain SQLite EF refuses them.
+
+For backend parity, use public shared helpers and register their types on both ends. The server's
+provider then decides whether the query is supported. Registration never admits private methods.
+See [Helpers of your own](guide/querying.md#helpers-of-your-own).
 
 ## Consequences of the client having no database
 

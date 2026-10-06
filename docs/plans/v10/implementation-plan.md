@@ -289,6 +289,16 @@ red first, the fix in the product, and the slow run again.
       Both complete comparison runs have no failures. This fixes one newly observed slow-red
       method, attributes none, and leaves zero slow-red methods in the fresh census.
 
+### Helper documentation, 2026-10-06
+
+- [x] **H48. Explain shared-helper registration and local-only differences to consumers.**
+      The querying guide replaces its blanket refusal claim with the actual backend boundary,
+      shows registration on both ends, and distinguishes public shared helpers from private or
+      client-only helpers. The limitations page names the JSON-index and UNION examples without
+      promising backend parity for them. Registration still never admits private methods.
+      The querying word budget moves to 1200 for these required facts. These pages remain unpublished
+      until the owner explicitly deploys the documentation from a release branch.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
