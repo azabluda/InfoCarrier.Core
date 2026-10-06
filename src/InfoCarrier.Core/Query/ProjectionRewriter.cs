@@ -508,8 +508,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // A root sequence keeps one row even when its scalar is null. Nested projections and
         // single-result sources retain tuples, whose null identifies an absent row instead.
         // Avoiding Item1 also lets EF retain a pruned inheritance UNION without an outer SELECT.
+        // A scalar row parameter must keep a nonidentity projection: Select(x => x) skips
+        // EF's projection translation and loses its DISTINCT subquery boundary (H46).
         bool directScalar = scalar && !nullable && !carriesACollection
-            && values.Length == 1 && IsScalar(values[0].Type);
+            && values.Length == 1 && IsScalar(values[0].Type) && values[0] is not ParameterExpression;
 
         // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
         //
