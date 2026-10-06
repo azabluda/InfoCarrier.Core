@@ -19,7 +19,7 @@
 
 @if (_error is { } error)
 {
-    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
+    <FluentMessageBar Intent="MessageBarIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
 }
 
 <div class="master-detail">
@@ -91,14 +91,14 @@
                     {
                         <div class="kv">
                             <span class="kv-key">product @line.ProductId &nbsp;&middot;&nbsp; @line.UnitPrice.ToString("0.00")</span>
-                            <FluentNumberField Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
+                            <FluentNumberInput Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
                                                ValueChanged="@(value => SetQuantity(line, value))"
                                                TValue="int" Immediate="true" />
                         </div>
                     }
 
                     <div class="actions">
-                        <FluentButton Appearance="Appearance.Accent" Disabled="@(_pending == 0)" OnClick="SaveAsync">
+                        <FluentButton Appearance="ButtonAppearance.Primary" Disabled="@(_pending == 0)" OnClick="SaveAsync">
                             Save @_pending change@(_pending == 1 ? "" : "s")
                         </FluentButton>
                         <span class="toolbar-note">
@@ -201,9 +201,10 @@
     private static IQueryable<Order> Sorted(
         IQueryable<Order> query, GridItemsProviderRequest<OrderRow> request)
     {
-        bool ascending = request.SortByAscending;
+        DataGridSortColumn<OrderRow>? sort = request.SortColumns.FirstOrDefault();
+        bool ascending = sort?.Ascending ?? true;
 
-        return request.SortByColumn?.Title switch
+        return sort?.Column.Title switch
         {
             "Customer" => Then(By(query, o => o.Customer!.CompanyName, ascending)),
             "Placed" => Then(By(query, o => o.OrderDate, ascending)),

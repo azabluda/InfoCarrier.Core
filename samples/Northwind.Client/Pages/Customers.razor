@@ -16,7 +16,7 @@
 
 @if (_error is { } error)
 {
-    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
+    <FluentMessageBar Intent="MessageBarIntent.Error" AllowDismiss="false">@error</FluentMessageBar>
 }
 
 <div class="grid-wrap">
@@ -35,8 +35,9 @@
             <PropertyColumn Property="@(r => r.Company)" Title="Company" Sortable="true"
                             Filtered="@(!string.IsNullOrWhiteSpace(_company))">
                 <ColumnOptions>
-                    <FluentSearch @bind-Value="_company" @bind-Value:after="FilterChangedAsync"
-                                  Label="Company contains" Placeholder="all" AutoComplete="off" Immediate="true" />
+                    <FluentTextInput @bind-Value="_company" @bind-Value:after="FilterChangedAsync"
+                                     Label="Company contains" Placeholder="all" AutoComplete="off" Immediate="true"
+                                     TextInputType="TextInputType.Search" InputMode="TextInputMode.Search" />
                 </ColumnOptions>
             </PropertyColumn>
 
@@ -45,8 +46,9 @@
             <PropertyColumn Property="@(r => r.Country)" Title="Country" Sortable="true"
                             Filtered="@(!string.IsNullOrWhiteSpace(_country))">
                 <ColumnOptions>
-                    <FluentSearch @bind-Value="_country" @bind-Value:after="FilterChangedAsync"
-                                  Label="Country contains" Placeholder="all" AutoComplete="off" Immediate="true" />
+                    <FluentTextInput @bind-Value="_country" @bind-Value:after="FilterChangedAsync"
+                                     Label="Country contains" Placeholder="all" AutoComplete="off" Immediate="true"
+                                     TextInputType="TextInputType.Search" InputMode="TextInputMode.Search" />
                 </ColumnOptions>
             </PropertyColumn>
         </ChildContent>
@@ -174,9 +176,10 @@
     private static IQueryable<Customer> Sorted(
         IQueryable<Customer> query, GridItemsProviderRequest<CustomerRow> request)
     {
-        bool ascending = request.SortByAscending;
+        DataGridSortColumn<CustomerRow>? sort = request.SortColumns.FirstOrDefault();
+        bool ascending = sort?.Ascending ?? true;
 
-        return request.SortByColumn?.Title switch
+        return sort?.Column.Title switch
         {
             // Id last as a tie-break, so a page boundary cannot show the same row twice: the seed
             // has repeated cities and countries, and an unstable order makes paging look broken.
