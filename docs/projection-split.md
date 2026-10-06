@@ -159,6 +159,13 @@ unnecessary outer SELECT. Nested projections, single-result sources, entities, c
 multiple fragments keep their tuple carriers; in particular, a null reference tuple can still
 distinguish an absent result from a present result containing a null value.
 
+**Amendment 2026-10-06 — a scalar row keeps a nonidentity projection.** The direct-scalar rule
+above excludes a fragment that is the scalar row parameter itself. Turning a client projection
+over that row into `Select(x => x)` makes EF skip projection translation; after DISTINCT this
+removes the subquery boundary the caller's nonidentity projection creates. Retaining the tuple
+keeps that boundary without changing the values or the client's computation. Ordinary scalar
+column fragments keep the direct carrier, including the inheritance-union correction above.
+
 **Amendment 2026-10-02 — final flat scalar column tuples need no member aliases.** A final
 root Select carrying multiple scalar member reads or `EF.Property` calls can omit its tuple's
 `NewExpression.Members` when every value reads a row parameter and the tuple does not nest.

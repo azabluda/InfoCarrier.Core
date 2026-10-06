@@ -264,6 +264,31 @@ red first, the fix in the product, and the slow run again.
       `Select_distinct_Select_with_client_bindings`. Firebird reports **passed 109, failed 0,
       skipped 1, total 110**. One newly observed method remains, to investigate next.
 
+- [x] **H46. Preserve the DISTINCT boundary before a client projection.**
+      The fresh H45 census finds sync and async `Select_distinct_Select_with_client_bindings`:
+      identical rows, but the carrier removes the outer SELECT over the distinct subquery.
+      A provider-owned computed-year model reproduces both failures; non-DISTINCT controls
+      pass. EF's relational TranslateSelect pushes a distinct source into a subquery unless
+      the selector is an identity. H39's direct scalar carrier turns the client projection
+      into exactly that identity. Preserve a nonidentity carrier when its fragment is the
+      scalar row parameter; keep direct scalar column carriers elsewhere. Measure red baseline and candidate, verify
+      focused and full live comparisons, Release, trim, transport, and review. No attribution
+      is planned. A fresh complete SQLite and Firebird census must establish the final queue.
+
+      On 2026-10-06, the four-case focused run reports **failed 2, passed 2, total 4**;
+      the full red baseline reports **FAILING 2, TOTAL 30039**, exactly the own DISTINCT cases.
+      Two added ordered-DISTINCT controls pass before the change. With the single guard
+      correction, all six focused cases pass, and live comparison passes **8, failed 0,
+      total 8**, including the selected upstream method's two cases. Review approves the
+      bounded nonidentity carrier without adding a source-operator scan. Transport passes 29;
+      trim passes at 106 <= 106; the nonincremental Release build has five known framework
+      warnings and no errors. The full candidate reports **FAILING 0, TOTAL 30041**, fixing
+      exactly the two baseline DISTINCT cases, with no broken cases and unchanged reasons.
+      The final full SQLite live census reports **passed 27581, failed 0, skipped 167,
+      total 27748**. Firebird reports **passed 109, failed 0, skipped 1, total 110**.
+      Both complete comparison runs have no failures. This fixes one newly observed slow-red
+      method, attributes none, and leaves zero slow-red methods in the fresh census.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
