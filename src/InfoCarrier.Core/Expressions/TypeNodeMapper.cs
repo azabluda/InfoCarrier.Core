@@ -30,7 +30,9 @@ public class TypeNodeMapper(IModel? model = null)
     ///         private nested subclass — and EF's funcletizer types the constant by the value it
     ///         holds. No allowlist can admit that name and no transport could resolve it, so the
     ///         comparison went client-side and answered <b>0 rows instead of 1, silently</b> (B23).
-    ///         What the caller wrote, and all the other side needs, is <c>IPAddress</c>.
+    ///         The other side needs the public <c>IPAddress</c> name. A conversion from the private
+    ///         subtype must also retain its type distinction: <c>ExpressionToNodeTranslator</c>
+    ///         preserves that conversion through <c>object</c> without sending the private name.
     ///     </para>
     ///     <para>
     ///         <b>Two exclusions, and both were paid for.</b> A type whose first public base is

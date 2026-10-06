@@ -2040,9 +2040,10 @@ public sealed class QuerySplitter
                 return;
             }
 
-            // No row-deciding lambda means nothing reads the projected value: cardinality
-            // (`Count`), set operations (`Union`) and row limiting all fall here, and EF allows
-            // every one of them over a client projection.
+            // No row-deciding lambda means this guard does not inspect a projected value:
+            // cardinality, UNION and row limiting retain their projection path. The earlier
+            // claim that EF allows all of them was corrected on 2026-10-06: registered public
+            // helpers reach the actual backend, which decides translation or refusal.
             if (!RowDecidingArguments(node).Any(a => StripQuotes(a) is LambdaExpression))
             {
                 return;

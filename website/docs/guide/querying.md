@@ -59,10 +59,29 @@ because a local function will not compile inside a query.
 
 ### The query cannot be translated
 
-Where EF Core itself would refuse a query, this provider refuses it too, with the same
-`InvalidOperationException`. Catch the type and never match on the message: message text is not a
-supported contract on any EF Core provider, and a couple of messages here are worded differently
-from other providers'. See [Limitations](../limitations.md).
+An expression sent to the server follows its provider's translation rules, including refusal.
+Client-only projections can differ, as [Helpers of your own](#helpers-of-your-own) explains.
+Catch the exception type rather than matching message text, which is not a supported contract.
+See [Limitations](../limitations.md).
+
+### Helpers of your own
+
+For backend behavior parity, put your helper on a shared type, make the method public, and register
+the type on both ends:
+
+```csharp
+services.AddInfoCarrierAllowedTypes(typeof(Formatting));                       // server
+optionsBuilder.UseInfoCarrier(client, o => o.AllowTypes(typeof(Formatting)));  // client
+```
+
+The helper must exist on the server too. Registration lets the expression reach that server;
+its provider decides whether to translate it, evaluate a final projection, or refuse it.
+Registration does not make a method translatable or admit private methods. Register only trusted
+types, as [Security](../security.md) describes.
+
+A private or genuinely client-only helper can remain in the local projection. Such a query may
+answer where plain EF Core refuses it. Missing registration can also leave work on the client.
+Do not rely on those answers when porting queries to another provider.
 
 ### Rules that come from the server's store
 

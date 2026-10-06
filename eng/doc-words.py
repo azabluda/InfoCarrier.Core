@@ -176,7 +176,7 @@ BUDGET = {
     # caller's own `HasDbFunction` mappings cross while a store's own family has to be named on
     # both halves. The first of those is a behaviour change from 10.0, so a reader who does not
     # find it here finds it as an exception. Read for padding first; the page is dense already.
-    "website/docs/guide/querying.md": 1080,
+    "website/docs/guide/querying.md": 1200,
 
     # 640 on 2026-09-09. The page teaches transactions and therefore owns the warning that a
     # server holds one open until the client ends it. #54 gave that warning a resolution, so the

@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using InfoCarrier.Core.Expressions;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.Query;
 
@@ -34,7 +35,8 @@ namespace InfoCarrier.Core.Query;
 ///     <para>
 ///         So the projection is rewritten rather than cut. The body's maximal server-evaluable
 ///         subexpressions travel as a tuple, and the client rebuilds its own types from the tuple
-///         slots. The server does the work it was always going to do, and only the values the
+///         slots, or directly from one scalar at a root Select. The server does the work it was
+///         always going to do, and only the values the
 ///         projection needs are on the wire — which is also wire-protocol W1.
 ///     </para>
 /// </remarks>
@@ -213,9 +215,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     private IReadOnlySet<(Type, string)> _read = new HashSet<(Type, string)>();
 
     /// <summary>
-    ///     The projections inside a lambda that a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
-    ///     reads one row of. Their tuple is the reference-typed family, so that no row reads as
-    ///     <see langword="null" />. See <see cref="TryMoveBelowReassembly" />.
+    ///     The projections read once by <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a
+    ///     lambda, or by a root <c>SingleOrDefault</c> directly over a Select. Their tuple is the
+    ///     reference-typed family, so that no row reads as <see langword="null" />.
+    ///     See <see cref="TryMoveBelowReassembly" />.
     /// </summary>
     private IReadOnlySet<Expression> _singleResultSources = new HashSet<Expression>();
 
@@ -364,17 +367,26 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         Expression? below = TryMoveBelowReassembly(call);
-        // Unlike Take over a tuple projection, Single lets EF place LIMIT after a reference join.
-        // Rebuild its one tuple after the server executes the terminal.
+        // Unlike Take over a tuple projection, these terminals let EF place LIMIT after a reference join.
+        // Rebuild the one tuple after the server executes the terminal.
         if (ReferenceEquals(node, _root)
             && (below ?? call) is MethodCallExpression rootCall
             && rootCall.Method.DeclaringType == typeof(Queryable)
-            && rootCall.Method.Name == nameof(Queryable.Single)
+            && (rootCall.Method.Name == nameof(Queryable.Single)
+                || rootCall.Method.Name == nameof(Queryable.SingleOrDefault))
             && rootCall.Arguments.Count == 1
+            && (rootCall.Method.Name == nameof(Queryable.Single) || node.Arguments.Count == 1)
             && rootCall.Arguments[0] is MethodCallExpression singleReassembly
             && _reassemblies.Contains(singleReassembly)
-            && StripQuotes(singleReassembly.Arguments[1]) is LambdaExpression { Parameters: [var singleRow] } singleRebuild)
+            && StripQuotes(singleReassembly.Arguments[1]) is LambdaExpression { Parameters: [var singleRow] } singleRebuild
+            && (rootCall.Method.Name == nameof(Queryable.Single) || !singleRow.Type.IsValueType))
         {
+            if (rootCall.Method.Name == nameof(Queryable.SingleOrDefault))
+            {
+                return OneRowRebuilt(
+                    rootCall, singleReassembly, singleRebuild, rootCall.Method.GetGenericArguments()[0]);
+            }
+
             Forget(singleReassembly);
             MethodCallExpression single = Expression.Call(
                 rootCall.Method.GetGenericMethodDefinition().MakeGenericMethod(singleRow.Type),
@@ -416,7 +428,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         (Expression tuple, ParameterExpression row, Expression clientBody, bool carriesACollection) = Carry(
-            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node));
+            selector.Body, bodyAnalysis, [.. selector.Parameters, .. enclosing], _singleResultSources.Contains(node),
+            ReferenceEquals(node, _root) && IsPlainSelect(node));
         if (selector.Parameters.Any(p => ReferencesParameter(clientBody, p)))
         {
             // A row value the server could not carry — a parameter of a type it does not know.
@@ -465,18 +478,20 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     The tuple the server computes for <paramref name="body" />, the row parameter that reads
+    ///     The carrier the server computes for <paramref name="body" />, the row parameter that reads
     ///     it, and the body rebuilt from that row on the client.
     /// </summary>
     /// <param name="body">A body the server cannot run as written.</param>
     /// <param name="analysis">The analysis of the lambda <paramref name="body" /> is from.</param>
     /// <param name="rowParameters">The rows a value may read to be carried in the tuple.</param>
     /// <param name="nullable">Whether the tuple is the reference-typed family.</param>
+    /// <param name="scalar">Whether a root projection may avoid scalar carrier member aliases.</param>
     private (Expression Tuple, ParameterExpression Row, Expression ClientBody, bool CarriesACollection) Carry(
         Expression body,
         BoundaryAnalysis analysis,
         IReadOnlyCollection<ParameterExpression> rowParameters,
-        bool nullable = false)
+        bool nullable = false,
+        bool scalar = false)
     {
         List<Expression> fragments = [];
         var guards = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
@@ -488,6 +503,15 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         IReadOnlySet<Expression> consumed = Consumed(body);
+        bool carriesACollection = fragments.Any(f => CarriesACollection(f, consumed));
+        Expression[] values = [.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))];
+        // A root sequence keeps one row even when its scalar is null. Nested projections and
+        // single-result sources retain tuples, whose null identifies an absent row instead.
+        // Avoiding Item1 also lets EF retain a pruned inheritance UNION without an outer SELECT.
+        // A scalar row parameter must keep a nonidentity projection: Select(x => x) skips
+        // EF's projection translation and loses its DISTINCT subquery boundary (H46).
+        bool directScalar = scalar && !nullable && !carriesACollection
+            && values.Length == 1 && IsScalar(values[0].Type) && values[0] is not ParameterExpression;
 
         // A BODY THAT READS NOTHING FROM THE ROW STILL NEEDS ONE ROW PER ROW, AND NO COLUMN.
         //
@@ -501,22 +525,39 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // So the carrier holds nothing instead, and the reassembly below reads none of it. What the
         // server is asked for is the row count, which is what EF asks for. Until 2026-09-27 this
         // read "the carrier holds one constant instead", a tuple of `1`: see RowPresence.
-        Expression tuple = fragments.Count > 0
-            ? TupleCarrier.New([.. fragments.Select(f => Guarded(Materialized(f, consumed), f, guards))], nullable)
+        Expression tuple = directScalar ? values[0] : values.Length > 0
+            ? TupleCarrier.New(values, nullable)
             : RowPresence();
+        // A final flat column tuple has no later server-side slot reads to bind. Omitting its
+        // member names lets EF bind columns by index and retain a pruned inheritance UNION.
+        // Closed values and other expression shapes keep member binding, including its SQL
+        // projection of constants. Internal tuples keep names for navigation expansion slot reads.
+        if (scalar && !nullable && !carriesACollection && values.Length > 1
+            && tuple is NewExpression construction && construction.Arguments.Count == values.Length
+            && construction.Arguments.All(argument => IsScalar(argument.Type))
+            && values.All(value => IsScalar(value.Type)
+                && rowParameters.Any(parameter => ReferencesParameter(value, parameter))
+                && (value is MemberExpression
+                    || value is MethodCallExpression { Method.DeclaringType: var declaringType, Method.Name: nameof(EF.Property) }
+                        && declaringType == typeof(EF))))
+        {
+            tuple = Expression.New(construction.Constructor!, construction.Arguments);
+        }
+
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(ReadBack(TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
+            slots[fragments[i]] = Requeryable(
+                ReadBack(directScalar ? row : TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
         }
 
         return (
             tuple,
             row,
             new SlotSubstitutingVisitor(slots).Visit(body)!,
-            fragments.Any(f => CarriesACollection(f, consumed)));
+            carriesACollection);
     }
 
     /// <summary>
@@ -940,8 +981,9 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> inside a projection on the server's
-    ///     tuple, and rebuilds the one row it returns on the client, or <see langword="null" />.
+    ///     Runs a <c>FirstOrDefault</c> or <c>SingleOrDefault</c> on the server's tuple.
+    ///     Rebuilds its one row on the client, or returns <see langword="null" />.
+    ///     Used inside a projection and for a root <c>SingleOrDefault</c> directly over a Select.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -963,8 +1005,8 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     ///         twice.
     ///     </para>
     ///     <para>
-    ///         <b>Only inside a lambda.</b> A root Single moves below reassembly in
-    ///         <c>VisitMethodCall</c>; root terminals left in the residual bound the server rows
+    ///         A root Single, or SingleOrDefault directly over Select, moves below reassembly
+    ///         in <c>VisitMethodCall</c>. Root terminals left in the residual bound server rows
     ///         through <c>QuerySplitter.WithRowLimitForTerminalOperator</c>.
     ///     </para>
     /// </remarks>
@@ -1090,18 +1132,18 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     }
 
     /// <summary>
-    ///     Finds the projections inside a lambda that a <c>FirstOrDefault</c> or
-    ///     <c>SingleOrDefault</c> without a predicate reads one row of. See
-    ///     <see cref="OneRowRebuilt" />.
+    ///     Finds projections read once by a <c>FirstOrDefault</c> or <c>SingleOrDefault</c>
+    ///     inside a lambda, or by a root <c>SingleOrDefault</c> directly over a Select.
+    ///     See <see cref="OneRowRebuilt" />.
     /// </summary>
-    private sealed class SingleResultSourceFinder : ExpressionVisitor
+    private sealed class SingleResultSourceFinder(Expression root) : ExpressionVisitor
     {
         private readonly HashSet<Expression> _found = new(ReferenceEqualityComparer.Instance);
         private int _depth;
 
         public static IReadOnlySet<Expression> Find(Expression query)
         {
-            var finder = new SingleResultSourceFinder();
+            var finder = new SingleResultSourceFinder(query);
             finder.Visit(query);
             return finder._found;
         }
@@ -1121,7 +1163,10 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (_depth > 0
+            bool rootSingleOrDefault = ReferenceEquals(node, root)
+                && node.Method.Name == nameof(Queryable.SingleOrDefault)
+                && node.Arguments.Count == 1;
+            if ((_depth > 0 || rootSingleOrDefault)
                 && node.Method.Name is nameof(Queryable.FirstOrDefault) or nameof(Queryable.SingleOrDefault)
                 && (node.Method.DeclaringType == typeof(Queryable) || node.Method.DeclaringType == typeof(Enumerable))
                 && node.Arguments is [MethodCallExpression source]

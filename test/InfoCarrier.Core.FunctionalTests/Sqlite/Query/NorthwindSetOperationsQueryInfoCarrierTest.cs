@@ -16,10 +16,21 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         members, two of which assert that the provider <em>refuses</em> a query.
 ///     </para>
 ///     <para>
-///         Deliberately <b>no overrides</b>. Whether this provider refuses those two is the
-///         question the class is here to answer, and an override written before the run would be
-///         the assumption rather than the measurement.
+///         The private client-projection helper remains local, outside the owner's shared public
+///         helper parity goal. Its measured answer is attributed, while own tests pin that behavior
+///         and registered public equivalents exercise the actual backend's decision.
 ///     </para>
 /// </remarks>
 public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
-    : NorthwindSetOperationsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture);
+    : NorthwindSetOperationsQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
+{
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSetOperationsQuerySqliteTest.cs", 20, 24,
+        Justification = "Client evaluation in projection. Issue #16243.")]
+    [InfoCarrierDesign(8,
+        Justification = "The upstream helper is private and cannot be admitted on the server. Public shared helpers require registration on both ends.",
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = "The private projection and UNION run locally over materialized rows; own tests pin this behavior.")]
+    public override Task Client_eval_Union_FirstOrDefault(bool async)
+        => base.Client_eval_Union_FirstOrDefault(async);
+}

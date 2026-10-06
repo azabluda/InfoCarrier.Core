@@ -2,6 +2,11 @@
 
 using System.Linq.Expressions;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore.Internal;
+
+// Internal EF Core API usage. EF's IsAdHoc identifies independent raw-query result models
+// so the wire does not replace them with mapped entities that have different query filters.
+#pragma warning disable EF1001
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -172,6 +177,8 @@ public class ExpressionToNodeTranslator(
                     Type = type,
                     Sql = capturedSql,
                     Arguments = Translate(capturedArgument),
+                    IsAdHoc = queryable.Expression is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression entityRoot
+                        && entityRoot.EntityType.IsAdHoc(),
                 };
                 return node;
             }
@@ -259,6 +266,8 @@ public class ExpressionToNodeTranslator(
                     Type = rootType,
                     Sql = sql,
                     Arguments = arguments,
+                    IsAdHoc = root is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression entityRoot
+                        && entityRoot.EntityType.IsAdHoc(),
                 };
                 return node;
             }
@@ -418,6 +427,26 @@ public class ExpressionToNodeTranslator(
     protected override Expression VisitUnary(UnaryExpression node)
     {
         ExpressionNode operand = Translate(node.Operand);
+
+        // A private runtime subtype is carried as its public base (B23). In an upcast of a
+        // constant, that would turn EF's conversion into an identity conversion and remove its
+        // SQL CAST. Preserve the type distinction with a round trip through object instead.
+        // EF's funcletizer deliberately preserves object conversions; its SQL translator then
+        // emits the same cast to the mapped base. No private type name crosses the wire.
+        if (node is { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked, Method: null }
+            && node.Operand is ConstantExpression
+            && node.Operand.Type != node.Type
+            && node.Type.IsClass
+            && TypeNodeMapper.Nameable(node.Operand.Type) == node.Type)
+        {
+            operand = new UnaryNode
+            {
+                Operator = nameof(ExpressionType.Convert),
+                Operand = operand,
+                Type = _typeMapper.ToTypeNode(typeof(object)),
+            };
+        }
+
         _result = new UnaryNode
         {
             Operator = node.NodeType.ToString(),

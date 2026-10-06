@@ -29,6 +29,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
     : NorthwindSelectQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
+    public static Type ConstructorProjectionType => typeof(CustomerListItem);
+
     // -------------------------------------------------------------------------------------
     // BACKING-STORE LIMITATION — SQLite has no APPLY, and a correlated collection projection
     // needs one. EF Core's own Northwind*QuerySqliteTest overrides each of these the same way,
@@ -276,6 +278,12 @@ public class NorthwindSelectQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrier
     // from NorthwindSelectQueryRelationalTestBase, which asserts exactly this failure.
 
     // EF's NorthwindSelectQuerySqliteTest asserts exactly this failure for exactly this test.
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 299, 300,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Member_binding_after_ctor_arguments_fails_with_client_eval(bool async)
+        => AssertTranslationFailed(() => base.Member_binding_after_ctor_arguments_fails_with_client_eval(async));
+
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSelectQuerySqliteTest.cs", 155, 164,
         Justification = Upstream.GaveNoReason,

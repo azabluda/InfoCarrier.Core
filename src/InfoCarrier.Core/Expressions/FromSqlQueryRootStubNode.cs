@@ -1,5 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Text.Json.Serialization;
+
 namespace InfoCarrier.Core.Expressions;
 
 /// <summary>
@@ -42,15 +44,25 @@ public sealed record FromSqlQueryRootStubNode : QueryRootStubNode
     public required string Sql { get; init; }
 
     /// <summary>
-    ///     The arguments EF collected for the SQL - <c>Expression.Constant(object?[])</c> on EF's
-    ///     side, and translated here like any other constant.
+    ///     Whether EF created an ad hoc result type for Database.SqlQuery rather than using
+    ///     the mapped entity type. A mapped CLR type can also have an independent ad hoc root.
+    /// </summary>
+    /// <remarks>
+    ///     Missing or false retains mapped-root resolution. False is omitted from JSON so
+    ///     ordinary FromSql roots retain their existing payload shape.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsAdHoc { get; init; }
+
+    /// <summary>
+    ///     The arguments EF collected for the SQL, preserving whether it extracted a parameter
+    ///     or kept the array constant for a compiled query.
     /// </summary>
     /// <remarks>
     ///     Carried as a node rather than as a value list so the values keep their types across the
-    ///     wire: the server hands them back to EF, which binds them as <c>DbParameter</c>s. They
-    ///     are never spliced into <see cref="Sql" /> - not because injection is the threat here (a
-    ///     client that can send this node already writes whatever SQL it likes) but because a
-    ///     value put into text has lost its type.
+    ///     wire. The server hands the expression back to EF, which binds parameters or formats
+    ///     constants through the store's type mapping. This node does not interpolate values into
+    ///     <see cref="Sql" /> itself.
     /// </remarks>
     public required ExpressionNode Arguments { get; init; }
 }
