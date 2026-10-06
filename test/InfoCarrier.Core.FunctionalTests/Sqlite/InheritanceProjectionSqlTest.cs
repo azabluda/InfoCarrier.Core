@@ -6,7 +6,7 @@ using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
-/// <summary>A single-value client projection does not wrap an inheritance union in a subquery.</summary>
+/// <summary>Final scalar projections do not wrap an inheritance union in a subquery.</summary>
 public class InheritanceProjectionSqlTest
 {
     [ConditionalTheory]
@@ -53,6 +53,61 @@ public class InheritanceProjectionSqlTest
         store.AssertServerSql(direct);
     }
 
+    [ConditionalTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_two_column_shadow_projection_keeps_EFs_union(bool async)
+    {
+        await using SqliteInfoCarrierBackendTestStore store = new(
+            Guid.NewGuid().ToString(),
+            shared: false,
+            new SharedTestStoreProperties
+            {
+                ContextType = typeof(InheritanceContext),
+                OnModelCreating = (_, _) => { },
+            });
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext, seed: async context =>
+        {
+            Animal[] animals =
+            [
+                new Eagle { Id = 1, Name = "alpha" },
+                new Eagle { Id = 2, Name = null },
+                new Kiwi { Id = 3, Name = "beta" },
+            ];
+            context.AddRange(animals);
+            context.Entry(animals[0]).Property("Habitat").CurrentValue = "mountain";
+            context.Entry(animals[2]).Property("Habitat").CurrentValue = "forest";
+            await context.SaveChangesAsync();
+        });
+
+        using DbContext server = store.CreateDbContext();
+        await using InheritanceContext client = new(new DbContextOptionsBuilder<InheritanceContext>()
+            .UseInfoCarrier(store).Options);
+
+        async Task<(string? Name, string? Habitat)[]> Execute(DbContext context)
+        {
+            var query = context.Set<Bird>().Select(bird => new
+            {
+                bird.Name,
+                Habitat = EF.Property<string?>(bird, "Habitat"),
+            });
+            var rows = async ? await query.ToArrayAsync() : query.ToArray();
+            return [.. rows.OrderBy(row => row.Name, StringComparer.Ordinal)
+                .Select(row => (row.Name, row.Habitat))];
+        }
+
+        (string? Name, string? Habitat)[] expected = [(null, null), ("alpha", "mountain"), ("beta", "forest")];
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(server));
+        string[] direct = [.. store.ServerSql.Statements];
+        Assert.Contains("UNION ALL", Assert.Single(direct), StringComparison.Ordinal);
+        Assert.DoesNotContain("FROM (", Assert.Single(direct), StringComparison.Ordinal);
+
+        store.ServerSql.Clear();
+        Assert.Equal(expected, await Execute(client));
+        store.AssertServerSql(direct);
+    }
+
     public abstract class Animal
     {
         public int Id { get; set; }
@@ -69,6 +124,7 @@ public class InheritanceProjectionSqlTest
         {
             modelBuilder.Entity<Animal>().UseTpcMappingStrategy();
             modelBuilder.Entity<Animal>().Property(animal => animal.Id).ValueGeneratedNever();
+            modelBuilder.Entity<Animal>().Property<string?>("Habitat");
             modelBuilder.Entity<Bird>();
             modelBuilder.Entity<Eagle>();
             modelBuilder.Entity<Kiwi>();

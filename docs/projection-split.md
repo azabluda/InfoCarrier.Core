@@ -159,6 +159,15 @@ unnecessary outer SELECT. Nested projections, single-result sources, entities, c
 multiple fragments keep their tuple carriers; in particular, a null reference tuple can still
 distinguish an absent result from a present result containing a null value.
 
+**Amendment 2026-10-02 — final flat scalar column tuples need no member aliases.** A final
+root Select carrying multiple scalar member reads or `EF.Property` calls can omit its tuple's
+`NewExpression.Members` when every value reads a row parameter and the tuple does not nest.
+EF then binds the projection by index, preserving a pruned inheritance UNION without an outer
+SELECT. The tuple type, slot order, values, and client reassembly remain unchanged. Closed values,
+other expression shapes, collections, absent-row reference tuples, and internal projections keep
+member metadata. In particular, captured values retain the binding mode that projects them as SQL
+parameters; merely recognizing their member-read shape would incorrectly omit those parameters.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:

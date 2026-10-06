@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using InfoCarrier.Core.Expressions;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.Query;
 
@@ -484,7 +485,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
     /// <param name="analysis">The analysis of the lambda <paramref name="body" /> is from.</param>
     /// <param name="rowParameters">The rows a value may read to be carried in the tuple.</param>
     /// <param name="nullable">Whether the tuple is the reference-typed family.</param>
-    /// <param name="scalar">Whether a root projection may carry its one scalar without a tuple.</param>
+    /// <param name="scalar">Whether a root projection may avoid scalar carrier member aliases.</param>
     private (Expression Tuple, ParameterExpression Row, Expression ClientBody, bool CarriesACollection) Carry(
         Expression body,
         BoundaryAnalysis analysis,
@@ -525,6 +526,22 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         Expression tuple = directScalar ? values[0] : values.Length > 0
             ? TupleCarrier.New(values, nullable)
             : RowPresence();
+        // A final flat column tuple has no later server-side slot reads to bind. Omitting its
+        // member names lets EF bind columns by index and retain a pruned inheritance UNION.
+        // Closed values and other expression shapes keep member binding, including its SQL
+        // projection of constants. Internal tuples keep names for navigation expansion slot reads.
+        if (scalar && !nullable && !carriesACollection && values.Length > 1
+            && tuple is NewExpression construction && construction.Arguments.Count == values.Length
+            && construction.Arguments.All(argument => IsScalar(argument.Type))
+            && values.All(value => IsScalar(value.Type)
+                && rowParameters.Any(parameter => ReferencesParameter(value, parameter))
+                && (value is MemberExpression
+                    || value is MethodCallExpression { Method.DeclaringType: var declaringType, Method.Name: nameof(EF.Property) }
+                        && declaringType == typeof(EF))))
+        {
+            tuple = Expression.New(construction.Constructor!, construction.Arguments);
+        }
+
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
         var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
