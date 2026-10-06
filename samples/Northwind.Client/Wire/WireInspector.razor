@@ -13,7 +13,7 @@
     <div class="wire-head-row">
         <span class="wire-title">📡 Wire</span>
         <span class="wire-count">@Log.Sequence round trip@(Log.Sequence == 1 ? "" : "s")</span>
-        <FluentButton Appearance="Appearance.Stealth" OnClick="@(() => Log.Clear())" Title="Clear the panel">
+        <FluentButton Appearance="ButtonAppearance.Subtle" OnClick="@(() => Log.Clear())" Title="Clear the panel">
             Clear
         </FluentButton>
     </div>

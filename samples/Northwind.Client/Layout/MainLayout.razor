@@ -1,5 +1,6 @@
 @* Licensed under the MIT license. See license.txt file in the project root for license information. *@
 @inherits LayoutComponentBase
+@inject IThemeService ThemeService
 
 @*
     The shell is a CSS grid rather than nested FluentStacks. Three regions that must hold their
@@ -11,8 +12,6 @@
     breadcrumb's leading mark is the exception, and not an icon set either: it is the product's own
     shipped artwork, one file serving the tab icon too.
 *@
-
-<FluentDesignTheme Mode="DesignThemeModes.System" StorageName="infocarrier-theme" />
 
 <div class="app-shell">
     <header class="app-header">
@@ -47,3 +46,15 @@
         <WireInspector />
     </aside>
 </div>
+
+<FluentProviders />
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ThemeService.SetThemeAsync(ThemeMode.System);
+        }
+    }
+}
