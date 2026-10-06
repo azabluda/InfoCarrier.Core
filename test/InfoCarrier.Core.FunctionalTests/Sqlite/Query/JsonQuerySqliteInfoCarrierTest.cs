@@ -54,6 +54,26 @@ public class JsonQuerySqliteInfoCarrierTest(
     JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture fixture)
     : JsonQueryRelationalTestBase<JsonQuerySqliteInfoCarrierTest.JsonQuerySqliteInfoCarrierFixture>(fixture)
 {
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs", 382, 392,
+        Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(8,
+        Justification = "The upstream helper is private and cannot be admitted on the server. Public shared helpers require registration on both ends.",
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = "The private index executes locally after the JSON collection is materialized; own tests pin this behavior.")]
+    public override Task Json_collection_index_in_projection_using_untranslatable_client_method(bool async)
+        => base.Json_collection_index_in_projection_using_untranslatable_client_method(async);
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/JsonQuerySqliteTest.cs", 394, 404,
+        Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(8,
+        Justification = "The upstream helper is private and cannot be admitted on the server. Public shared helpers require registration on both ends.",
+        Deviation = DeviationKind.AnswerNotRefusal,
+        DeviationNote = "The private index executes locally after the nested JSON collection is materialized; own tests pin this behavior.")]
+    public override Task Json_collection_index_in_projection_using_untranslatable_client_method2(bool async)
+        => base.Json_collection_index_in_projection_using_untranslatable_client_method2(async);
+
     /// <summary>
     ///     The seventeen overrides below are EF's own, from <c>JsonQuerySqliteTest</c>.
     /// </summary>

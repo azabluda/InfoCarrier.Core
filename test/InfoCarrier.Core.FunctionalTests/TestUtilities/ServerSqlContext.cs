@@ -43,6 +43,16 @@ public class Seat
     public string? Label { get; set; }
 }
 
+/// <summary>A row with an optional reference to a ticket.</summary>
+public class OptionalSeat
+{
+    public int Id { get; set; }
+
+    public int? TicketId { get; set; }
+
+    public Ticket? Ticket { get; set; }
+}
+
 /// <summary>A complex type in the owner's columns, carrying the concurrency token.</summary>
 public class Venue
 {
@@ -80,6 +90,8 @@ public class ServerSqlContext(DbContextOptions<ServerSqlContext> options) : DbCo
 
     public DbSet<Seat> Seats => Set<Seat>();
 
+    public DbSet<OptionalSeat> OptionalSeats => Set<OptionalSeat>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,5 +105,10 @@ public class ServerSqlContext(DbContextOptions<ServerSqlContext> options) : DbCo
         });
 
         modelBuilder.Entity<Seat>(b => b.Property(s => s.Id).ValueGeneratedNever());
+        modelBuilder.Entity<OptionalSeat>(b =>
+        {
+            b.Property(s => s.Id).ValueGeneratedNever();
+            b.HasOne(s => s.Ticket).WithMany().HasForeignKey(s => s.TicketId);
+        });
     }
 }

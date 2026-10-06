@@ -333,9 +333,9 @@ public sealed class QuerySplitter
 
         IReadOnlyList<Expression> augmented = AugmentWithNavigations(analysis.Shippable, residualBody);
 
-        // A `First()` ABOVE A CLIENT-SIDE PROJECTION HAS TO TELL THE SERVER SO (2026-09-16). The
-        // operator itself cannot ship — it consumes the rows the client reassembles — so without
-        // this the server sent every matching row and the client kept one:
+        // A `First()` ABOVE A CLIENT-SIDE PROJECTION HAS TO TELL THE SERVER SO (2026-09-16). When
+        // a terminal cannot ship because it consumes client-reassembled rows, this bound prevents
+        // the server from sending every matching row while the client keeps one:
         // `Select(b => new { b.Id, b.Title }).First()` ran `SELECT … WHERE …` here and
         // `SELECT … WHERE … LIMIT 1` on EF's own client, measured against
         // `EnumTranslationsSqliteTest.HasFlag` and by running the same query both ways. On a large
@@ -344,8 +344,8 @@ public sealed class QuerySplitter
         // Sound because of what may be on the client at all: `RejectClientEvaluation` has just
         // established that the only client-side work is the reassembly of a rewritten projection,
         // which is row for row, so no filtering stands between the rows the limit bounds and the row
-        // the operator returns. The operator still runs on the client over the rows that arrive, so
-        // an empty result and a second row raise EF's own exceptions, with EF's own wording.
+        // the operator returns. Such a terminal still runs on the client over the rows that arrive,
+        // so an empty result and a second row raise EF's own exceptions, with EF's own wording.
         (residualBody, augmented) = WithRowLimitForTerminalOperator(residualBody, parameters, augmented);
 
         // Only here, never on the pass-through return above: a query the server runs whole has
@@ -2040,9 +2040,10 @@ public sealed class QuerySplitter
                 return;
             }
 
-            // No row-deciding lambda means nothing reads the projected value: cardinality
-            // (`Count`), set operations (`Union`) and row limiting all fall here, and EF allows
-            // every one of them over a client projection.
+            // No row-deciding lambda means this guard does not inspect a projected value:
+            // cardinality, UNION and row limiting retain their projection path. The earlier
+            // claim that EF allows all of them was corrected on 2026-10-06: registered public
+            // helpers reach the actual backend, which decides translation or refusal.
             if (!RowDecidingArguments(node).Any(a => StripQuotes(a) is LambdaExpression))
             {
                 return;

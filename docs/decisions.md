@@ -260,6 +260,16 @@ substance: EF's own `ICompiledQueryCache` already caches what the client's `Comp
 so what repeats per request is serialization and translation, and that returns the same answer every
 time.
 
+### Amendment 2026-10-06 — helper parity requires shared public members and explicit registration
+
+The owner requires backend behavior parity for public helpers present and explicitly admitted on
+both ends. The existing expression transport sends these helpers to the actual provider, which
+decides translation or refusal. A missing registration, or a genuinely client-only helper such as
+a private method, is outside that parity goal. Own tests pin the observed local behavior instead
+of imposing the inherited EF store's refusal. This replaces H40/H42/H43's parity-only client
+refusal rules, not the general client-filtering guard. All eight constraints above remain binding;
+in particular, registration never grants access to private methods.
+
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 
 **Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and
@@ -736,6 +746,16 @@ this ADR and carry `[InfoCarrierDesign("ADR-010")]`: a test EF's InMemory provid
 evaluating in .NET, which is refused here as EF's relational providers refuse it; and a test a
 relational provider refuses to translate, which is answered here because the part it cannot
 translate is a projection this client reassembles, or runs after one on the rows it returned.
+
+### Amendment 2026-10-06 — backend parity is scoped to transportable shared helpers
+
+The 2026-09-15 phrase "anything else is refused" does not impose one store's translation rules
+on every client-only projection. The owner's explicit public-and-registered helper boundary in
+ADR-008 now governs parity. Existing refusal of client filtering remains binding. Own tests record
+unregistered constructor ordering, private JSON indexing, and set operations over private projection
+helpers as observed local behavior, not promises to match a backend that cannot receive those
+helpers. Registered public equivalents follow the existing server path and the actual provider's
+decision. No new server expression vocabulary or security exception is introduced.
 
 ## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
 

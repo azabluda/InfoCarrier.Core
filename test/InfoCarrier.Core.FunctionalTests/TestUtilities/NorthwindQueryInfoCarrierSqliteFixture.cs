@@ -51,7 +51,8 @@ public class NorthwindQueryInfoCarrierSqliteFixture<TModelCustomizer>
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
             arbitrarySqlExecution: true,
-            allowedTypes: [.. AdHocProjectionTypes, .. GroupByKeyTypes]);
+            allowedTypes: [.. AdHocProjectionTypes, .. GroupByKeyTypes,
+                Sqlite.Query.NorthwindSelectQuerySqliteInfoCarrierTest.ConstructorProjectionType]);
 
     /// <summary>
     ///     The two grouping keys <c>NorthwindGroupByQueryTestBase</c> declares, closed over this

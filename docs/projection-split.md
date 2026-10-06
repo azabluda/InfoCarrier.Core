@@ -151,6 +151,30 @@ caller's own construction. Until then this read "The stand-in `1` remains for a 
 at all, `new OrderDto()`, where EF projects nothing and a tuple has to hold something"; a carrier
 that is not a tuple does not have to.
 
+**Amendment 2026-10-01 — one scalar at a root Select needs no tuple.** When the root projection
+has exactly one scalar fragment and carries no collection, that scalar is the server row and the
+client rebuilds directly from it. A null scalar still represents a present sequence element.
+This avoids the `Item1` alias that makes EF wrap a pruned table-per-concrete-type union in an
+unnecessary outer SELECT. Nested projections, single-result sources, entities, collections and
+multiple fragments keep their tuple carriers; in particular, a null reference tuple can still
+distinguish an absent result from a present result containing a null value.
+
+**Amendment 2026-10-06 — a scalar row keeps a nonidentity projection.** The direct-scalar rule
+above excludes a fragment that is the scalar row parameter itself. Turning a client projection
+over that row into `Select(x => x)` makes EF skip projection translation; after DISTINCT this
+removes the subquery boundary the caller's nonidentity projection creates. Retaining the tuple
+keeps that boundary without changing the values or the client's computation. Ordinary scalar
+column fragments keep the direct carrier, including the inheritance-union correction above.
+
+**Amendment 2026-10-02 — final flat scalar column tuples need no member aliases.** A final
+root Select carrying multiple scalar member reads or `EF.Property` calls can omit its tuple's
+`NewExpression.Members` when every value reads a row parameter and the tuple does not nest.
+EF then binds the projection by index, preserving a pruned inheritance UNION without an outer
+SELECT. The tuple type, slot order, values, and client reassembly remain unchanged. Closed values,
+other expression shapes, collections, absent-row reference tuples, and internal projections keep
+member metadata. In particular, captured values retain the binding mode that projects them as SQL
+parameters; merely recognizing their member-read shape would incorrectly omit those parameters.
+
 ### 3.3 Which operators are rewritten
 
 Rewriting applies to operators whose lambda *becomes* the element:
@@ -284,6 +308,30 @@ of a cross join where EF reads two. `ProjectionRewriter.TryMoveBelowReassembly` 
 and one whose fused lambda reads a slot that holds a sequence. The second is §6a's lesson: a slot
 can hold a `GroupJoin`'s grouping, and navigating out of a projected tuple back into it is what no
 provider translates. `QuerySplitter` judges what stays exactly as before.
+
+**Amendment 2026-10-06 — constructor ordering parity requires explicit type registration.**
+This replaces the 2026-10-01 client refusal guard for unresolved constructor-property ordering.
+A shared type with public members, admitted on both ends, lets the existing transport deliver the
+constructor and getter to the server. The actual provider then decides whether it can translate
+the ordering; the client does not infer a refusal from relational-store identity. Without that
+registration, the observed query sorts its materialized constructor projection locally after one
+statement without ORDER BY. Own tests pin this configuration edge case outside the owner's parity
+goal. Anonymous ordering remains a server-side control, and existing client-filtering guards remain.
+
+**Amendment 2026-10-01: a root Single runs on the server tuple.** When the final projection needs
+client reassembly, the server executes Single over the tuple query and the client rebuilds its one
+result. This lets Entity Framework Core place LIMIT 2 after an optional reference join, as it does
+without this provider. The server fault mapper restores InvalidOperationException and its message
+for an empty result or a second row. A root terminal that remains in the residual still uses the
+row bound sent by QuerySplitter and executes on the client.
+
+**Amendment 2026-10-01: root SingleOrDefault directly over a reassembled Select uses the server
+tuple too.** The call has no predicate. The projection carries a reference tuple, so no row
+remains null rather than becoming a default value tuple. The server runs SingleOrDefault after
+an optional reference join, and the client rebuilds a row only when one exists. This preserves
+the SQL limit position and the server's duplicate-result message. A predicate overload or a
+Where between Select and SingleOrDefault remains on its prior path. Found by
+`Using_explicit_interface_implementation_as_navigation_works` in the slow run.
 
 The general case of §7, an arbitrary operator over any client-typed element, is still deferred.
 

@@ -54,6 +54,251 @@ red first, the fix in the product, and the slow run again.
       Release build after deleting the product's `obj` and `bin`: 0 errors, once a nullability error
       in the new promise was fixed (`Blog.Title` is `string?`, so the local list declares it too).
 
+- [x] **H35. A root Single places its limit after an optional reference join.**
+      Query_filter_with_pk_fk_optimization returned the same answer and read count as plain Entity
+      Framework Core, but its LIMIT 2 ran before the join. The provider-owned ServerSqlTest promise
+      reproduced that subquery and failed before the product change.
+
+      ProjectionRewriter now sends Single over the server tuple and rebuilds its one result on the
+      client. Entity Framework Core puts LIMIT 2 after the join. A second promise checks the empty
+      and duplicate-result exceptions. The specification override and its design reason are gone.
+      The decision is recorded in docs/projection-split.md section 3.4.
+
+      On 2026-10-01, the measured rewrite changed **FAILING 1 to 0, TOTAL 29969**, with one fixed
+      promise, no broken tests, and unchanged reasons. The final normal run reports **FAILING 0,
+      TOTAL 29970**. The selected slow-run class reports **Passed: 23, Failed: 0, Total: 23**.
+      The wider SQLite slow run has 29 failing cases, one fewer than its preceding capture.
+      Trim warnings stay at 106; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
+- [x] **H36. A root SingleOrDefault directly after a projection limits after its reference join.**
+      `Using_explicit_interface_implementation_as_navigation_works` returned the same answer and
+      read count as plain Entity Framework Core, but its LIMIT 2 ran before the join. A new
+      provider-owned SQL promise reproduced that shape and failed before the product change.
+
+      ProjectionRewriter now uses a reference tuple when a root SingleOrDefault directly follows a
+      reassembled Select with no predicate. It runs the terminal on the server tuple and rebuilds a
+      present result on the client. A second
+      promise checks empty, present, and duplicate results. No specification override was needed.
+
+      On 2026-10-01, the measured rewrite changed **FAILING 2 to 0, TOTAL 29972**, fixing both new
+      promises with no broken tests. The selected slow-run class reports **Passed: 25, Failed: 0**.
+      Trim warnings stay at **106**. The design is recorded in docs/projection-split.md section 3.4.
+
+- [x] **H37. A compiled FromSqlRaw query preserves EF's constant arguments.**
+      `FromSqlRaw_queryable_composed_compiled_with_parameter` returned the same answer and read
+      count as plain Entity Framework Core, but the server bound a parameter where EF emitted a
+      literal. Server execution performs a second, ordinary parameter extraction after the client
+      has already made the compiled query's constantization decision.
+
+      The entity-root factory protects only constant argument arrays until EF's invocation-removal
+      visitor starts preprocessing. Earlier server visitors and parameter extraction retain that
+      protection. EF then receives its genuine raw SQL root and formats literals through its own
+      type mapping. Ordinary argument expressions remain bound. No wire contract or permission
+      changes, and no specification deviation reason.
+
+      Provider-owned differential tests cover synchronous and asynchronous execution, quoted values,
+      all three server collection modes, ordinary bound arguments, and two constants on one model.
+      The original four compiled cases failed before the change. The review exposed an early
+      collection-mode visitor; eight additional cases failed before the lifecycle correction.
+      Focused run: **Passed: 14, Failed: 0, Total: 14**. On 2026-10-01,
+      `eng/measure.sh h37-product h37-red-own` changed **FAILING 4 to 0**, with the four original
+      compiled cases fixed, no broken tests, and unchanged reasons. Expanded collection-mode coverage
+      makes the final **TOTAL 29986**. The selected live class reports **Passed: 149, Failed: 0,
+      Total: 149**. The related ad-hoc entity `SqlQueryRaw_queryable_composed_compiled_with_parameter`
+      also passes through the same entity-root correction. Its live cases and the Firebird tier
+      report **Passed: 111, Failed: 0, Skipped: 1, Total: 112**.
+      Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
+- [x] **H38. A value-converted private subtype keeps EF's SQL cast.**
+      `Comparison_with_value_converted_subclass` returned the same answer and read count, but
+      widening the constant's private `IPAddress.ReadOnlyIPAddress` type to its public base turned
+      EF's conversion into an identity conversion. The server omitted `CAST(... AS TEXT)`.
+
+      The expression translator preserves only a built-in constant upcast affected by that widening,
+      with a conversion through `object` inside the original conversion. EF deliberately preserves
+      object conversions during parameter extraction and emits its original SQL cast. No inaccessible
+      type name, new wire field, public signature, permission, or provider-specific SQL is introduced.
+      Public constants and user-defined conversions keep their existing paths.
+
+      A provider-owned address model reproduces the difference in both execution modes. Public-base
+      constants are controls against introducing extra casts. The failing full baseline reports
+      **FAILING 2, TOTAL 29990**, exactly the two private-subtype cases. Focused candidate:
+      **Passed: 4, Failed: 0, Total: 4**. The targeted live run, including all three inheritance
+      variants, reports **Passed: 10, Failed: 0, Total: 10**. On 2026-10-01,
+      `eng/measure.sh h38-product h38-red-own` changed **FAILING 2 to 0, TOTAL 29990**, with exactly
+      the two private-subtype cases fixed, no broken tests, and unchanged reasons. The selected live
+      class reports **Passed: 1173, Failed: 0, Skipped: 4, Total: 1177**.
+      Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0, Total: 29**.
+      The nonincremental CI Release build reports five known Razor warnings and zero errors.
+
+- [x] **H39. A root one-column projection preserves EF's inheritance union.**
+      `Selecting_only_base_properties_on_derived_type` returned the same rows but wrapped EF's
+      pruned table-per-concrete-type union in an outer SELECT for the tuple's `Item1` alias.
+      The root plain Select now carries one scalar directly and rebuilds from that value.
+      Nested, single-result, entity, collection and multi-slot projections keep their tuples.
+      A null scalar remains a present row, not an absent result.
+
+      The provider-owned inheritance regression failed in both execution modes before the change.
+      The first full candidate fixed both cases and exposed one structural unit assertion expecting
+      a tuple rather than a string. Its minimal-payload contract is unchanged; the assertion now
+      checks the direct string carrier. The selected live class reports **Passed: 96, Failed: 0,
+      Skipped: 4, Total: 100**. On 2026-10-01, `eng/measure.sh h39-final h39-red-own` changed
+      **FAILING 2 to 0, TOTAL 29992**, fixing both new cases with no broken tests and unchanged
+      reasons. Trim warnings remain **106**; transport tests report **Passed: 29, Failed: 0,
+      Total: 29**. The nonincremental CI Release build reports five known Razor warnings and
+      zero errors. Independent review found no blocking defect.
+
+- [x] **H40. Register the custom constructor projection before requiring backend parity.**
+      The owner reconsidered the refusal guard on 2026-10-06. The original
+      `Member_binding_after_ctor_arguments_fails_with_client_eval` lacked registration for its
+      `CustomerListItem` result type. With that type available and admitted on both ends, the
+      existing server path reaches the actual provider's translation refusal. The harness now
+      declares the type explicitly rather than adding a relational-only client guard.
+
+      Own tests distinguish registered backend refusal from unregistered local ordering. The
+      registered result has a recorded server translation stack and executes no SQL; the
+      unregistered result is sorted correctly on the client after one statement with no ORDER BY.
+      The latter is a configuration edge case outside the owner's parity goal. Anonymous ordering
+      remains a direct-server control. No upstream source or deserialization security is changed.
+      The focused original-method and own-test run passes eight cases. Broader verification is
+      recorded by the rebuilt branch's measurements and commit message.
+
+- [x] **H41. A final multi-column shadow projection preserves the inheritance union.**
+      `TPCGearsOfWarQueryInfoCarrierTest.Project_shadow_properties` returns the correct values,
+      but tuple member aliases introduce an outer SELECT that plain EF does not need. A new
+      provider-owned two-column regression reproduces the statement difference in synchronous and
+      asynchronous execution, with a nullable regular column and a nullable shadow column.
+
+      EF's relational projection binder uses index-based binding when a constructor has no member
+      metadata. The proposed change removes that metadata only from flat final tuples holding
+      row-dependent scalar member reads or `EF.Property` calls. Internal projections, absent-row
+      reference tuples, collections, closed values, and other expression shapes retain the existing
+      construction. Full baseline reports **FAILING 2, TOTAL 29998**, exactly the two new cases.
+      A focused control found that a captured parameter also has a member-read shape; requiring a
+      reference to a row parameter preserves that parameter's existing SQL binding. Review also
+      found that the argument-count check alone accepts exactly eight values with a nested Rest
+      tuple; checking every constructed argument's scalar type restores the intended flatness.
+      On 2026-10-02, `eng/measure.sh h41-scoped h41-red-own` reports **FAILING 2 to 0, TOTAL 29998**,
+      exactly the two new cases fixed, none broken, and unchanged reasons. Final-code live comparison
+      passes **1280 cases, with 4 skips, total 1284**, covering the complete concrete-inheritance
+      query class, own regressions, and parameter-handling controls. Transport tests pass 29 cases;
+      trim passes at 106 <= 106. Nonincremental `CI=true` Release build reports five known Razor
+      warnings and zero errors. Independent review approves the corrected guard.
+
+- [x] **H42. Separate registered JSON index parity from private-helper behavior.**
+      Rebuilt on 2026-10-06 after the owner's configuration clarification. Public shared index
+      helpers registered on both ends reach the backend's translation refusal, with a recorded
+      server stack and no SQL. Private helpers remain local; own tests pin correct root and nested
+      results and the statement count. Row-computed and mapped-function indexes retain direct
+      provider controls. The JSON-specific early refusal guard is not replayed.
+
+      The two inherited upstream helpers are private. Their unchanged bodies retain upstream
+      refusal references plus ADR-008 `AnswerNotRefusal` reasons. This attributes two recorded
+      methods, fixes none, and leaves three known unresolved methods before the final census.
+      Verification is recorded by the rebuilt measurement and commit message.
+
+- [x] **H43. Separate shared public UNION parity from private local projections.**
+      Rebuilt on 2026-10-06. Registered public helpers reach the actual backend: SQLite refuses
+      before executing SQL. InMemory instead produces its own operand-dependent failures, preserved
+      through the wire with a recorded server stack rather than a client-side relational diagnostic.
+      Private unregistered helpers retain local execution, pinned by own operand and sync/async
+      cases with two SELECT statements and no server UNION. Valid constructed scalar inputs retain
+      a server UNION in one statement.
+      The relational-only client-method UNION guard is not replayed, and existing filtering and
+      collection-identity guards remain unchanged.
+
+      The upstream helper is private. Its unchanged inherited body retains SQLite's refusal
+      reference and an ADR-008 `AnswerNotRefusal` reason. This attributes one recorded method,
+      fixes none, and leaves two known unresolved methods before the final census. Verification
+      is recorded by the rebuilt measurements and commit message.
+
+- [x] **H44. Changes to separate owned branches write their shared row once.**
+      `Save_changed_owned_one_to_one` sends two UPDATEs where plain SQLite EF sends one.
+      A provider-owned two-branch model reproduces the difference for edits and replacements,
+      synchronously and asynchronously: all four cases fail before a product change.
+      EF's `SharedTableEntryMap.GetMainEntry` follows tracked principals, so omitting the
+      unchanged common owner gives the branches separate modification commands.
+      Send only each changed entry's same-table ownership chain, not all owned siblings.
+      Verify the own cases, the graph-update class live, the full suite, Release build,
+      trim, transport, and review. No attribution is planned.
+
+      On 2026-10-06, the first full candidate passes **FAILING 0, TOTAL 30023**, with no
+      broken cases or changed failure reasons against the committed H43 measurement. The own
+      red evidence is the focused four-case run, not a fabricated full-suite red snapshot.
+      The final own matrix has ten passing cases: shared-row edits and replacements, separate
+      table controls, and leaf-only changes through unchanged intermediate owners. It checks
+      SaveChanges counts, stored values, and untouched owner values. Live comparison passes
+      **1777, failed 0, skipped 6, total 1783**; transport passes 29; trim passes at 106 <= 106;
+      the nonincremental Release build has five known framework warnings and no errors.
+      Review approves the bounded expansion, leaf-only controls, and architecture amendment.
+      Final full measurement with both added controls reports **FAILING 0, TOTAL 30025**,
+      with no broken cases or changed failure reasons. This fixes one recorded slow-red method,
+      attributes none, and leaves one known method before a fresh full slow-run census.
+
+- [x] **H45. An ad hoc raw query does not inherit the mapped type's query filter.**
+      `Ad_hoc_query_for_shared_type_entity_type_works` adds a mapped filter where plain EF
+      reads the raw view directly. A populated provider-owned keyless model exposes missing
+      rows: four ad hoc cases fail, while four mapped FromSql controls pass, covering sync,
+      async, and composition. Preserve EF's ad hoc root identity in an optional wire field
+      and rebuild that root through the existing ad hoc mapper, even when its CLR type is
+      also mapped. Keep both SQL execution grants and type admission unchanged. Measure the
+      full red baseline and candidate, run live shared-type and raw-query controls, and check
+      Release, trim, transport, package validation, and review. Then run a fresh full slow
+      census for SQLite and Firebird before claiming the complete queue is resolved.
+
+      On 2026-10-06, the full baseline reports **FAILING 4, TOTAL 30033**, exactly the four
+      populated ad hoc cases. The first candidate fixes all four with no broken cases.
+      Review found the sibling constant-query-root path also needed the marker. Its own
+      ad hoc serialization case fails before that correction; the mapped control passes.
+      Both paths corrected, all ten focused cases pass. Final full measurement reports
+      **FAILING 0, TOTAL 30035**, fixing the same four populated regressions with no broken
+      cases; the four collection-equality failures disappear from the reason summary.
+      Broad live comparison passes **1532, failed 0, total 1532**; final-code focused live
+      comparison passes **11, failed 0, total 11**. Final transport passes 29;
+      trim passes at 106 <= 106; package validation passes; the final nonincremental Release
+      build has five known framework warnings and no errors. Review approves both paths.
+      This fixes one recorded slow-red method and attributes none. The fresh SQLite census
+      reports **passed 27571, failed 2, skipped 167, total 27740**; both failures name
+      `Select_distinct_Select_with_client_bindings`. Firebird reports **passed 109, failed 0,
+      skipped 1, total 110**. One newly observed method remains, to investigate next.
+
+- [x] **H46. Preserve the DISTINCT boundary before a client projection.**
+      The fresh H45 census finds sync and async `Select_distinct_Select_with_client_bindings`:
+      identical rows, but the carrier removes the outer SELECT over the distinct subquery.
+      A provider-owned computed-year model reproduces both failures; non-DISTINCT controls
+      pass. EF's relational TranslateSelect pushes a distinct source into a subquery unless
+      the selector is an identity. H39's direct scalar carrier turns the client projection
+      into exactly that identity. Preserve a nonidentity carrier when its fragment is the
+      scalar row parameter; keep direct scalar column carriers elsewhere. Measure red baseline and candidate, verify
+      focused and full live comparisons, Release, trim, transport, and review. No attribution
+      is planned. A fresh complete SQLite and Firebird census must establish the final queue.
+
+      On 2026-10-06, the four-case focused run reports **failed 2, passed 2, total 4**;
+      the full red baseline reports **FAILING 2, TOTAL 30039**, exactly the own DISTINCT cases.
+      Two added ordered-DISTINCT controls pass before the change. With the single guard
+      correction, all six focused cases pass, and live comparison passes **8, failed 0,
+      total 8**, including the selected upstream method's two cases. Review approves the
+      bounded nonidentity carrier without adding a source-operator scan. Transport passes 29;
+      trim passes at 106 <= 106; the nonincremental Release build has five known framework
+      warnings and no errors. The full candidate reports **FAILING 0, TOTAL 30041**, fixing
+      exactly the two baseline DISTINCT cases, with no broken cases and unchanged reasons.
+      The final full SQLite live census reports **passed 27581, failed 0, skipped 167,
+      total 27748**. Firebird reports **passed 109, failed 0, skipped 1, total 110**.
+      Both complete comparison runs have no failures. This fixes one newly observed slow-red
+      method, attributes none, and leaves zero slow-red methods in the fresh census.
+
+### Helper documentation, 2026-10-06
+
+- [x] **H48. Explain shared-helper registration and local-only differences to consumers.**
+      The querying guide replaces its blanket refusal claim with the actual backend boundary,
+      shows registration on both ends, and distinguishes public shared helpers from private or
+      client-only helpers. The limitations page names the JSON-index and UNION examples without
+      promising backend parity for them. Registration still never admits private methods.
+      The querying word budget moves to 1200 for these required facts. These pages remain unpublished
+      until the owner explicitly deploys the documentation from a release branch.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

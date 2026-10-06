@@ -4,7 +4,7 @@
       MinVer derives the version from the git tag (see Directory.Build.props). Build-time only:
       Directory.Build.props references it with PrivateAssets="all", so it appears in no nuspec.
     -->
-    <PackageVersion Include="MinVer" Version="7.0.0" />
+    <PackageVersion Include="MinVer" Version="8.0.0" />
 
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" />
@@ -102,11 +102,11 @@
     -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.11" />
 
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="System.Text.Json" Version="10.0.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
 
     <!--
       TEST-ONLY, and it buys determinism rather than convenience. `FakeTimeProvider.Advance` fires
@@ -136,6 +136,6 @@
       that would have caught the 10.1.1 defect months earlier.
     -->
     <PackageVersion Include="Mongo2Go" Version="5.0.0" />
-    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.3" />
+    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.4" />
   </ItemGroup>
 </Project>
