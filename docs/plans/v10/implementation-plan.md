@@ -199,6 +199,21 @@ red first, the fix in the product, and the slow run again.
       methods, fixes none, and leaves three known unresolved methods before the final census.
       Verification is recorded by the rebuilt measurement and commit message.
 
+- [x] **H43. Separate shared public UNION parity from private local projections.**
+      Rebuilt on 2026-10-06. Registered public helpers reach the actual backend: SQLite refuses
+      before executing SQL. InMemory instead produces its own operand-dependent failures, preserved
+      through the wire with a recorded server stack rather than a client-side relational diagnostic.
+      Private unregistered helpers retain local execution, pinned by own operand and sync/async
+      cases with two SELECT statements and no server UNION. Valid constructed scalar inputs retain
+      a server UNION in one statement.
+      The relational-only client-method UNION guard is not replayed, and existing filtering and
+      collection-identity guards remain unchanged.
+
+      The upstream helper is private. Its unchanged inherited body retains SQLite's refusal
+      reference and an ADR-008 `AnswerNotRefusal` reason. This attributes one recorded method,
+      fixes none, and leaves two known unresolved methods before the final census. Verification
+      is recorded by the rebuilt measurements and commit message.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
