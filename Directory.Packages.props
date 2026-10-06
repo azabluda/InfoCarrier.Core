@@ -134,6 +134,6 @@
       that would have caught the 10.1.1 defect months earlier.
     -->
     <PackageVersion Include="Mongo2Go" Version="5.0.0" />
-    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.3" />
+    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.4" />
   </ItemGroup>
 </Project>
