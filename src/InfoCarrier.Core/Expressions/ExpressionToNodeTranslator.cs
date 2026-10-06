@@ -2,6 +2,11 @@
 
 using System.Linq.Expressions;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore.Internal;
+
+// Internal EF Core API usage. EF's IsAdHoc identifies independent raw-query result models
+// so the wire does not replace them with mapped entities that have different query filters.
+#pragma warning disable EF1001
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -172,6 +177,8 @@ public class ExpressionToNodeTranslator(
                     Type = type,
                     Sql = capturedSql,
                     Arguments = Translate(capturedArgument),
+                    IsAdHoc = queryable.Expression is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression entityRoot
+                        && entityRoot.EntityType.IsAdHoc(),
                 };
                 return node;
             }
@@ -259,6 +266,8 @@ public class ExpressionToNodeTranslator(
                     Type = rootType,
                     Sql = sql,
                     Arguments = arguments,
+                    IsAdHoc = root is Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression entityRoot
+                        && entityRoot.EntityType.IsAdHoc(),
                 };
                 return node;
             }

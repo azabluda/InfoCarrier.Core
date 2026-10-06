@@ -1448,6 +1448,17 @@ one axis rather than four: `NorthwindSqlQueryTestBase`, `SqlQueryTestBase` and `
 are all item 2, and `FromSqlSprocQueryTestBase` needs stored procedures, which SQLite has not and
 for which EF ships no SQLite class.
 
+#### D8 amendment 2026-10-06 — preserve the independent ad hoc result model (H45)
+
+`Database.SqlQuery<T>` creates an ad hoc entity type even when the ordinary model maps `T`.
+Resolving that root only by its CLR type wrongly replaced it with the mapped entity and applied
+the mapped query filter. `FromSqlQueryRootStubNode.IsAdHoc` now preserves EF's runtime identity;
+the server rebuilds a marked root through its existing `IAdHocMapper`. Normal `FromSql` roots
+still resolve through the mapped model. A missing marker retains the previous resolution rules,
+and false is omitted from JSON. Both raw-SQL grants and type admission remain unchanged.
+The corrected behavior requires both updated halves; this does not introduce a version-skew
+policy or change protocol version 1. The owner deferred that policy to issue #50 in 11.0.0.
+
 ### D9 — a concurrency conflict is decided on the server, and a client-side suppression cannot complete the save (2026-09-27)
 
 **The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/limitations.md`,

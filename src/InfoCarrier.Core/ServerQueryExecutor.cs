@@ -223,12 +223,14 @@ public class ServerQueryExecutor(
             : _context.Model.FindEntityType(elementType);
         entityType ??= _context.Model.FindEntityType(elementType);
 
-        // `Database.SqlQuery<T>` INTO A TYPE THE MODEL DOES NOT MAP (#56), which is the entity-typed
-        // half of the scalar case answered above. EF does not put such a type in the model: it
+        // `Database.SqlQuery<T>` uses an independent result model even when T is mapped (H45,
+        // 2026-10-06). This formerly recognized only types absent from the server model (#56),
+        // which replaced an ad hoc root with the mapped type and wrongly applied its filters.
+        // EF does not put the result type in the ordinary model: it
         // builds an AD-HOC entity type for it, on demand, through `IAdHocMapper` — the same service
         // `RelationalDatabaseFacadeExtensions.SqlQuery` uses on the client. So the model lookup
-        // above is correct and still finds nothing, and this is the one root whose entity type has
-        // to be MADE rather than found.
+        // above can find an unrelated mapped type, and the ad hoc marker preserves that distinction.
+        // Missing types retain the earlier fallback for payloads without the marker.
         //
         // WHY THIS IS NOT A WIDENING. It sits behind a conjunction of two gates that are already
         // the ones this file states elsewhere. First, `elementType` reached this method at all only
@@ -239,7 +241,7 @@ public class ServerQueryExecutor(
         // unless this server granted execution. Neither gate is relaxed and no new one is invented;
         // what changes is that a payload passing BOTH is now answered instead of being told the
         // type is missing from a model it was never going to be in.
-        if (entityType is null && stub is FromSqlQueryRootStubNode)
+        if (stub is FromSqlQueryRootStubNode rawRoot && (rawRoot.IsAdHoc || entityType is null))
         {
             RequireArbitrarySql();
 

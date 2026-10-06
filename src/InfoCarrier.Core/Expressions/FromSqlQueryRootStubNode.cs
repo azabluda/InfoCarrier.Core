@@ -1,5 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Text.Json.Serialization;
+
 namespace InfoCarrier.Core.Expressions;
 
 /// <summary>
@@ -40,6 +42,17 @@ public sealed record FromSqlQueryRootStubNode : QueryRootStubNode
     ///     The caller's SQL text, verbatim.
     /// </summary>
     public required string Sql { get; init; }
+
+    /// <summary>
+    ///     Whether EF created an ad hoc result type for Database.SqlQuery rather than using
+    ///     the mapped entity type. A mapped CLR type can also have an independent ad hoc root.
+    /// </summary>
+    /// <remarks>
+    ///     Missing or false retains mapped-root resolution. False is omitted from JSON so
+    ///     ordinary FromSql roots retain their existing payload shape.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsAdHoc { get; init; }
 
     /// <summary>
     ///     The arguments EF collected for the SQL, preserving whether it extracted a parameter
