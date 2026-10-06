@@ -187,6 +187,18 @@ red first, the fix in the product, and the slow run again.
       trim passes at 106 <= 106. Nonincremental `CI=true` Release build reports five known Razor
       warnings and zero errors. Independent review approves the corrected guard.
 
+- [x] **H42. Separate registered JSON index parity from private-helper behavior.**
+      Rebuilt on 2026-10-06 after the owner's configuration clarification. Public shared index
+      helpers registered on both ends reach the backend's translation refusal, with a recorded
+      server stack and no SQL. Private helpers remain local; own tests pin correct root and nested
+      results and the statement count. Row-computed and mapped-function indexes retain direct
+      provider controls. The JSON-specific early refusal guard is not replayed.
+
+      The two inherited upstream helpers are private. Their unchanged bodies retain upstream
+      refusal references plus ADR-008 `AnswerNotRefusal` reasons. This attributes two recorded
+      methods, fixes none, and leaves three known unresolved methods before the final census.
+      Verification is recorded by the rebuilt measurement and commit message.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
