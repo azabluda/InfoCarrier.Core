@@ -3,7 +3,7 @@
 /*
  * Layout and page chrome only. Fluent UI styles the controls; this file arranges the three regions
  * of the shell and gives the pages the card/toolbar structure that CRUD screens are expected to
- * have. Colours are taken from Fluent's design tokens (--neutral-*, --accent-*) rather than
+ * have. Colours are taken from Fluent's design tokens rather than
  * hard-coded, so light and dark both work and the accent stays consistent with the controls.
  */
 
@@ -14,14 +14,14 @@ body {
 
     /*
      * Scrollbars, and every other piece of browser-painted chrome, follow the OS theme. The page
-     * already does, through Fluent's DesignThemeModes.System, but a scrollbar is drawn by the
+     * already does, through Fluent's ThemeMode.System, but a scrollbar is drawn by the
      * browser rather than by CSS -- so without this one declaration a dark page keeps light
      * scrollbars. Declaring both keywords keeps the light theme exactly as it was.
      */
     color-scheme: light dark;
     font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-    background: var(--neutral-layer-2);
-    color: var(--neutral-foreground-rest);
+    background: var(--colorNeutralBackground2);
+    color: var(--colorNeutralForeground1);
 }
 
 /* ---------------------------------------------------------------- shell */
@@ -42,8 +42,8 @@ body {
     align-items: center;
     gap: 0.6rem;
     padding: 0 1.25rem;
-    background: var(--neutral-layer-1);
-    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 
 /*
@@ -80,8 +80,8 @@ body {
     font-size: 0.75rem;
     padding: 0.2rem 0.6rem;
     border-radius: 999px;
-    background: var(--neutral-layer-3);
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground3);
+    border: 1px solid var(--colorNeutralStroke2);
     opacity: 0.85;
 }
 
@@ -90,8 +90,8 @@ body {
 .app-nav {
     grid-area: nav;
     padding: 0.75rem 0.5rem;
-    background: var(--neutral-layer-1);
-    border-right: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border-right: 1px solid var(--colorNeutralStroke2);
     overflow-y: auto;
 }
 
@@ -106,12 +106,12 @@ body {
 }
 
 .nav-item:hover {
-    background: var(--neutral-fill-secondary-hover, rgba(128, 128, 128, 0.12));
+    background: var(--colorSubtleBackgroundHover, rgba(128, 128, 128, 0.12));
 }
 
 .nav-item.active {
-    background: var(--neutral-fill-secondary-rest, rgba(128, 128, 128, 0.08));
-    border-left-color: var(--accent-fill-rest);
+    background: var(--colorSubtleBackgroundSelected, rgba(128, 128, 128, 0.08));
+    border-left-color: var(--colorBrandBackground);
 }
 
 .nav-label {
@@ -162,14 +162,14 @@ code {
     font-size: 0.85em;
     padding: 0.05em 0.3em;
     border-radius: 4px;
-    background: var(--neutral-layer-3);
+    background: var(--colorNeutralBackground3);
 }
 
 /* ---------------------------------------------------------------- cards */
 
 .card {
-    background: var(--neutral-layer-1);
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke2);
     border-radius: 8px;
     padding: 1rem 1.15rem;
     margin-top: 1rem;
@@ -203,35 +203,29 @@ code {
 }
 
 /*
- * The toolbar. `align-items: end` puts every control on one baseline: a labelled field is taller
- * than a bare button, so a row aligned to the top leaves the button floating above the inputs.
- * The `.field` wrapper below is the other half of the fix.
+ * The label occupies its own row. The controls below it are centred together, so the dropdown,
+ * checkbox and button align independently of FluentField's label layout.
  */
 .toolbar {
     display: flex;
-    gap: 0.85rem;
-    align-items: end;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.4rem;
     padding: 0.9rem 1rem;
-    background: var(--neutral-layer-1);
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke2);
     border-radius: 8px;
     margin: 1rem 0 0;
 }
 
-/*
- * One flex item per control. Fluent renders a field's Label as a SIBLING of the input rather than
- * wrapping it, so without this each label became its own column in the toolbar row and sat beside
- * its input instead of above it -- visible as controls that do not line up.
- */
-.field {
+.toolbar-controls {
     display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.85rem;
 }
 
-.field-inline {
-    padding-bottom: 0.45rem;
+.toolbar-controls > .toolbar-note {
+    padding-bottom: 0;
 }
 
 .toolbar-spacer {
@@ -248,8 +242,8 @@ code {
 
 .grid-wrap {
     margin-top: 1rem;
-    background: var(--neutral-layer-1);
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke2);
     border-radius: 8px;
     padding: 0.25rem 0.5rem 0.5rem;
 }
@@ -257,8 +251,28 @@ code {
 .grid-foot {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 1rem;
     padding: 0.4rem 0.5rem 0.2rem;
+}
+
+/* Keep the item count clear of the first button, and wrap rather than squeeze the controls. */
+.grid-foot .fluent-paginator {
+    gap: 0.5rem 1rem;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.grid-foot .fluent-paginator .paginator-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.grid-foot .fluent-paginator .summary,
+.grid-foot .fluent-paginator .pagination-text {
+    white-space: nowrap;
 }
 
 /*
@@ -289,8 +303,8 @@ code {
 
 /* The selected row. Fluent's own hover styling stays; this only marks the current one. */
 .master-detail .row-selected {
-    background: var(--neutral-fill-secondary-rest, rgba(128, 128, 128, 0.1));
-    box-shadow: inset 3px 0 0 0 var(--accent-fill-rest);
+    background: var(--colorSubtleBackgroundSelected, rgba(128, 128, 128, 0.1));
+    box-shadow: inset 3px 0 0 0 var(--colorBrandBackground);
 }
 
 /*
@@ -308,12 +322,12 @@ code {
     font-size: 0.76rem;
     cursor: pointer;
     color: inherit;
-    background: var(--neutral-layer-3);
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground3);
+    border: 1px solid var(--colorNeutralStroke2);
 }
 
 .filter-chip:hover {
-    background: var(--neutral-fill-secondary-hover, rgba(128, 128, 128, 0.12));
+    background: var(--colorSubtleBackgroundHover, rgba(128, 128, 128, 0.12));
 }
 
 .filter-chip-x {
@@ -337,7 +351,7 @@ code {
     align-items: center;
     gap: 1rem;
     padding: 0.45rem 0;
-    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 
 .kv:last-child {
@@ -385,13 +399,13 @@ code {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: var(--neutral-layer-1);
-    border-left: 1px solid var(--neutral-stroke-divider-rest);
+    background: var(--colorNeutralBackground1);
+    border-left: 1px solid var(--colorNeutralStroke2);
 }
 
 .wire-head {
     padding: 0.85rem 1rem 0.7rem;
-    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 
 .wire-head-row {
@@ -436,10 +450,10 @@ code {
 }
 
 .wire-entry {
-    border: 1px solid var(--neutral-stroke-divider-rest);
+    border: 1px solid var(--colorNeutralStroke2);
     border-radius: 6px;
     margin-bottom: 0.4rem;
-    background: var(--neutral-layer-2);
+    background: var(--colorNeutralBackground2);
     overflow: hidden;
 }
 
@@ -471,17 +485,17 @@ code {
     padding: 0.1rem 0.45rem;
     border-radius: 999px;
     font-size: 0.7rem;
-    background: var(--neutral-layer-3);
+    background: var(--colorNeutralBackground3);
 }
 
 .wire-op-tag.op-save {
-    background: var(--accent-fill-rest);
-    color: var(--foreground-on-accent-rest, #fff);
+    background: var(--colorBrandBackground);
+    color: var(--colorNeutralForegroundOnBrand, #fff);
 }
 
 .wire-op-tag.op-tx {
-    background: var(--neutral-foreground-rest);
-    color: var(--neutral-layer-1);
+    background: var(--colorNeutralForeground1);
+    color: var(--colorNeutralBackground1);
 }
 
 .wire-ms {
@@ -531,7 +545,7 @@ code {
     margin: 0;
     padding: 0.5rem 0.6rem;
     border-radius: 4px;
-    background: var(--neutral-layer-3);
+    background: var(--colorNeutralBackground3);
     white-space: pre;
 }
 

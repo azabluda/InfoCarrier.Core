@@ -133,6 +133,11 @@
             _error = null;
             return GridItemsProviderResult.From(rows, total);
         }
+        catch (OperationCanceledException) when (request.CancellationToken.IsCancellationRequested)
+        {
+            // Sorting, filtering or paging superseded this request. It is not a query failure.
+            return GridItemsProviderResult.From<CustomerRow>([], 0);
+        }
         catch (Exception exception)
         {
             // A transport or server failure must be visible, not swallowed (spec §6). No stack
