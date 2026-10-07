@@ -1,11 +1,19 @@
 # Projection split — design spec (milestone M2)
 
-Status: **design approved 2026-08-01**, implementation not started.
+Status: implemented; anonymous data representation amended 2026-10-07.
 Authority for requirements §3. Recorded as [ADR-010](decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01).
 
 Companion docs: [`result-wire-format.md`](result-wire-format.md) (how rows travel),
 [`expression-serialization.md`](expression-serialization.md) (how trees travel),
 [`research-findings.md`](research-findings.md) §8 (superseded in part — see §2.3).
+
+The [2026-10-07 amendment](decisions.md#amendment-2026-10-07-bounded-anonymous-data-descriptors)
+supersedes this document's earlier anonymous-to-tuple representation. Anonymous data whose component
+types are admitted now crosses as bounded descriptors, so ordinary grouping, distinct, joins, member
+access and nested projections reach the backend without tuple aliases. The server generates its own
+immutable classes; the client reconstructs its original classes from returned descriptors. Custom
+application behavior still uses projection splitting. The historical measurements and tuple design
+below explain the retained fallback, not a requirement to rewrite every anonymous object.
 
 ---
 

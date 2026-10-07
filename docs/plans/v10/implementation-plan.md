@@ -464,6 +464,20 @@ in the archive; this step tests the missing integration without a sleep or a slo
       `eng/measure.sh cancellation-real-socket`: **FAILING 0, TOTAL 29968**. `CI=true` Release build:
       **0 warnings, 0 errors**.
 
+## Phase G ? bounded anonymous-shape reconstruction ([#209](https://github.com/azabluda/InfoCarrier.Core/issues/209))
+
+- [x] **G1. Preserve anonymous data through backend translation and restore original client types.**
+      The owner selected the bounded generated-shape protocol on 2026-10-07 after the
+      [investigation](anonymous-shape-investigation.md). The
+      [implementation and validation report](anonymous-shape-implementation.md) records bounds,
+      security review, owned promises, removed attribution, and final gate results.
+      Protocol major 2 refuses old peers. Application types still require explicit registration;
+      custom behavior still belongs on the client. Regular measurement reports FAILING 0, TOTAL 30081;
+      final owned checks pass 226 and transport passes 29. Complete SQLite comparison reports
+      Passed 27603, Failed 0, Skipped 167, Total 27770; Firebird reports Passed 109, Failed 0,
+      Skipped 1, Total 110. The report distinguishes the later Unicode-only correction and records
+      the documented trim increase 106 to 107. No release work is included.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

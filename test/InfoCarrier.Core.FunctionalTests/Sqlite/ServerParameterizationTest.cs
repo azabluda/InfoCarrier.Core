@@ -2343,6 +2343,45 @@ public partial class ServerParameterizationTest
     private Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run)
         => AssertSameStatementFor(context => run(context.Set<Blog>()), collectionMode: null);
 
+    [ConditionalFact]
+    public Task A_nine_member_anonymous_join_key_runs_as_one_database_join()
+        => AssertSameStatementFor(async blogs =>
+        {
+            int[] rows = await blogs.Join(blogs,
+                b => new { A = b.Id, B = b.Id, C = b.Id, D = b.Id, E = b.Id, F = b.Id, G = b.Id, H = b.Id, I = b.Id },
+                b => new { A = b.Id, B = b.Id, C = b.Id, D = b.Id, E = b.Id, F = b.Id, G = b.Id, H = b.Id, I = b.Id },
+                (left, right) => left.Id).OrderBy(id => id).ToArrayAsync();
+            Assert.Equal([1, 2, 3], rows);
+        });
+
+    [ConditionalFact]
+    public Task Anonymous_shapes_restore_nested_lists_and_empty_objects()
+        => AssertSameStatementFor(async blogs =>
+        {
+            var row = await blogs.OrderBy(b => b.Id).Select(b => new
+            {
+                b.Id,
+                Empty = new { },
+                Nested = new { b.Title },
+                Items = b.Posts.OrderBy(p => p.Id).Select(p => new { p.Id }).ToList(),
+            }).FirstAsync();
+            Assert.Equal(1, row.Id);
+            Assert.Equal("alpha", row.Nested.Title);
+            Assert.Empty(row.Items);
+            Assert.Equal("{ }", row.Empty.ToString());
+        });
+
+    [ConditionalTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Missing_anonymous_terminal_rows_remain_null(bool async)
+        => AssertSameStatementFor(async blogs =>
+        {
+            var query = blogs.Where(b => b.Id == -1).Select(b => new { b.Id, Nested = new { b.Title } });
+            var row = async ? await query.FirstOrDefaultAsync() : query.FirstOrDefault();
+            Assert.Null(row);
+        });
+
     /// <summary>
     ///     Runs <paramref name="run" /> against the client context and again against the server
     ///     context, and asserts the store saw one statement, not two — for a query that needs the

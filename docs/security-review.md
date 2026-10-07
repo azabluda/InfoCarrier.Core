@@ -12,6 +12,27 @@ Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63
 
 ## 1. The path, in order
 
+### Addendum 2026-10-07: bounded anonymous data
+
+Protocol major 2 adds a server-owned immutable data generator. Descriptor names do not resolve
+client assemblies or grant arbitrary compiler-generated types. Raw anonymous and emitted CLR names
+are refused, even inside generic containers. Every property component resolves through the existing
+allowlist on every execution, including cache hits after registrations change. The reflection
+invocation conjunction in §2 remains unchanged.
+
+Generation is limited to 32 members, 128 characters per identifier, 64 distinct shapes per exchange,
+type nesting depth 16, and 4096 type-generation attempts per process. The process cache is synchronized,
+never evicts and regenerates, and refuses further generation at capacity. This bounds emitted code
+despite provider caches retaining types; it does not promise collectible assemblies actually unload.
+Valid but adversarial callers can exhaust that finite capacity. Request-size, authentication,
+rate limits and process lifecycle remain deployment controls, not a claim of unbounded availability.
+
+Data fields are readonly. Public members are limited to getters, the ordered data constructor,
+structural equality/hash methods, and formatting. Names never enter source code. Private static
+comparer slots contain the framework's EqualityComparer<T>.Default, installed by trusted factory
+code before publication; no payload chooses a comparer method.
+Existing model/application registrations still determine which component behavior is reachable.
+
 Every arrow is a place a hostile payload gets a say.
 
 | # | Stage | Control |

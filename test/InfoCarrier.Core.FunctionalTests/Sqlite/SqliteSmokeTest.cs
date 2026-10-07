@@ -905,13 +905,9 @@ public class SqliteSmokeTest
     [ConditionalFact]
     public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member()
     {
-        // R64. `LeftJoin` was missing from `ProjectionShape`'s operator list, so a left join's
-        // result selector was never entered and every owned type it projected came back with no
-        // entity type. That has two consequences and this test pins the loud one: the tracking
-        // downgrade `ServerQueryExecutor.TrackingBehaviorFor` makes for an ownerless owned type
-        // never fires, and the server refuses the query outright -- "a tracking query is
-        // attempting to project an owned entity without a corresponding owner". Measured red
-        // before the fix and green after.
+        // R64 originally tested a tuple carrier's automatic tracking downgrade. Since
+        // 2026-10-07 the anonymous data descriptor reaches EF as the original projection does:
+        // tracking an owned value without its owner is refused, and AsNoTracking is required.
         //
         // The quiet consequence is the worse one and this model does not reproduce it: with four
         // owned types sharing one CLR type, as `OwnedQueryTestBase` has, the mapper falls back to
@@ -935,9 +931,11 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext client = CreateClient(store);
 
-        var rows = await client.Blogs
-            .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address })
-            .ToListAsync();
+        var query = client.Blogs
+            .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address });
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+        Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
+        var rows = await query.AsNoTracking().ToListAsync();
 
         var row = Assert.Single(rows);
         LocatedAddress address = Assert.IsType<LocatedAddress>(row.Address);

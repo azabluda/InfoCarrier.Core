@@ -32,7 +32,9 @@ public class RewriteVerifierTest : IDisposable
     ///     in this milestone is trying to remove.
     /// </summary>
     private IQueryable<string?> ThroughACarrier()
-        => _context.Authors.Select(a => new { N = a.Name }).Select(x => x.N);
+        => _context.Authors.Select(a => new ClientCarrier(a.Name)).Select(x => x.N);
+
+    private sealed record ClientCarrier(string? N);
 
     [Fact]
     public void A_rewrite_that_moves_operators_to_the_server_is_kept()
@@ -62,7 +64,7 @@ public class RewriteVerifierTest : IDisposable
     public void A_rewrite_that_moves_nothing_is_discarded()
     {
         // Swapping one client-only carrier for another is a different tree and the same split:
-        // still two operators on the client, still an anonymous type in the middle.
+        // still two operators on the client, still an unregistered application type.
         RewriteVerdict verdict = _verifier.Verify(
             ThroughACarrier().Expression,
             _context.Authors

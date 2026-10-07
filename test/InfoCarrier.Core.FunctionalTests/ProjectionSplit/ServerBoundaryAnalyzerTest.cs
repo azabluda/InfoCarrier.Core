@@ -51,13 +51,13 @@ public class ServerBoundaryAnalyzerTest : IDisposable
     }
 
     [Fact]
-    public void An_anonymous_projection_stops_at_the_source()
+    public void An_anonymous_projection_ships_with_its_shape()
     {
         BoundaryAnalysis analysis = Analyze(_context.Authors.Select(a => new { a.Name }));
 
-        Assert.False(analysis.IsWhollyServerExecutable);
+        Assert.True(analysis.IsWhollyServerExecutable);
         Expression shipped = Assert.Single(analysis.Shippable);
-        Assert.Equal(typeof(IQueryable<Author>), shipped.Type);
+        Assert.Equal("Name", Assert.Single(shipped.Type.GetGenericArguments()[0].GetProperties()).Name);
         Assert.Empty(analysis.OpenFragments);
     }
 
@@ -77,7 +77,7 @@ public class ServerBoundaryAnalyzerTest : IDisposable
         // The Where is server-ok and sits below the boundary, so it must travel with the source
         // rather than be dragged onto the client.
         BoundaryAnalysis analysis = Analyze(
-            _context.Authors.Where(a => a.Id > 3).Select(a => new { a.Name }));
+            _context.Authors.Where(a => a.Id > 3).Select(a => new BookSummary { AuthorName = a.Name }));
 
         Expression shipped = Assert.Single(analysis.Shippable);
         var call = Assert.IsAssignableFrom<MethodCallExpression>(shipped);
@@ -88,14 +88,14 @@ public class ServerBoundaryAnalyzerTest : IDisposable
     public void Filtering_after_a_client_projection_stays_on_the_client()
     {
         BoundaryAnalysis analysis = Analyze(
-            _context.Authors.Select(a => new { a.Name }).Where(x => x.Name == "a"));
+            _context.Authors.Select(a => new BookSummary { AuthorName = a.Name }).Where(x => x.AuthorName == "a"));
 
         Expression shipped = Assert.Single(analysis.Shippable);
         Assert.Equal(typeof(IQueryable<Author>), shipped.Type);
     }
 
     [Fact]
-    public void A_join_with_an_anonymous_result_ships_both_sources()
+    public void A_join_with_an_anonymous_result_ships_whole()
     {
         BoundaryAnalysis analysis = Analyze(
             _context.Authors.Join(
@@ -104,9 +104,8 @@ public class ServerBoundaryAnalyzerTest : IDisposable
                 b => b.AuthorId,
                 (a, b) => new { a.Name, b.Title }));
 
-        Assert.Equal(2, analysis.Shippable.Count);
-        Assert.Contains(analysis.Shippable, e => e.Type == typeof(IQueryable<Author>));
-        Assert.Contains(analysis.Shippable, e => e.Type == typeof(IQueryable<Book>));
+        Assert.True(analysis.IsWhollyServerExecutable);
+        Assert.Equal(nameof(Queryable.Join), Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(analysis.Shippable)).Method.Name);
     }
 
     [Fact]

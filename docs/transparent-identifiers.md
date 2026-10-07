@@ -1,6 +1,12 @@
 # Transparent identifiers — design spec
 
 Status: **X2 and X3 implemented; X1 tried and reverted.** Measured 111 → 101.
+
+Amended 2026-10-07: [bounded anonymous descriptors](decisions.md#amendment-2026-10-07-bounded-anonymous-data-descriptors)
+carry admitted anonymous identifiers directly. The tuple re-carry below remains a fallback for other
+client-only types. The server still receives only admitted components, but it now has a fixed data
+generator rather than needing the caller's assembly. These historical tuple restrictions do not
+constrain a descriptor that the backend can translate natively.
 Extends [`projection-split.md`](projection-split.md) §6a. Recorded as [ADR-011](decisions.md#adr-011-transparent-identifiers-are-re-carried-not-reassembled-locked-2026-08-02).
 
 Measured 2026-08-02: **36 of 111 remaining failures** are this problem, across both test tiers.

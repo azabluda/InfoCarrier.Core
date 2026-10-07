@@ -18,6 +18,12 @@ namespace InfoCarrier.Core.Expressions;
 public class TypeNodeMapper(IModel? model = null)
 {
     private readonly IModel? _model = model;
+    private readonly Dictionary<string, Type> _originalShapes = new(StringComparer.Ordinal);
+
+    internal bool TryOriginalShape(TypeNode node, out Type? type)
+        => _originalShapes.TryGetValue(node.CacheIdentity(), out type);
+
+    internal void ResetShapes() => _originalShapes.Clear();
 
     /// <summary>
     ///     The nearest type the wire can <em>name</em> for a value of <paramref name="type" />:
@@ -128,6 +134,36 @@ public class TypeNodeMapper(IModel? model = null)
     /// </summary>
     public virtual TypeNode ToTypeNode(Type type)
     {
+        if (AnonymousShapeTypes.TryDescriptor(type, out TypeNode? emitted))
+        {
+            return emitted!;
+        }
+
+        if (AnonymousShapeTypes.IsOriginal(type))
+        {
+            System.Reflection.PropertyInfo[] properties = type.GetProperties();
+            var shape = new TypeNode
+            {
+                Name = AnonymousShapeTypes.Identity(type),
+                ShapeMembers = properties.Select(p => p.Name).ToArray(),
+                GenericArguments = properties.Select(p => ToTypeNode(p.PropertyType)).ToArray(),
+            };
+            AnonymousShapeTypes.Validate(shape);
+            string key = shape.CacheIdentity();
+            if (!_originalShapes.ContainsKey(key) && _originalShapes.Count >= AnonymousShapeTypes.MaximumShapes)
+            {
+                throw new InvalidOperationException("The exchange anonymous-shape budget is exhausted.");
+            }
+
+            _originalShapes[key] = type;
+            return shape;
+        }
+
+        if (type.IsArray && ContainsShape(type.GetElementType()!))
+        {
+            return new TypeNode { Name = "InfoCarrier.ShapeArray.v1", ArrayElement = ToTypeNode(type.GetElementType()!), ArrayRank = type.GetArrayRank() };
+        }
+
         TypeNode result = type.IsGenericType && !type.IsGenericTypeDefinition
             ? new TypeNode
             {
@@ -146,4 +182,9 @@ public class TypeNodeMapper(IModel? model = null)
 
     private string? LookupEntityTypeName(Type type)
         => _model?.FindEntityType(type)?.Name;
+
+    private static bool ContainsShape(Type type)
+        => AnonymousShapeTypes.IsOriginal(type) || AnonymousShapeTypes.IsGenerated(type)
+            || (type.IsGenericType && type.GetGenericArguments().Any(ContainsShape))
+            || (type.IsArray && ContainsShape(type.GetElementType()!));
 }

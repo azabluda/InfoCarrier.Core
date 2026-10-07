@@ -34,7 +34,8 @@ public class EnvelopeProtocolTest
 
     [Theory]
     [InlineData(0)]
-    [InlineData(2)]
+    [InlineData(1)]
+    [InlineData(3)]
     [InlineData(99)]
     [InlineData(-1)]
     public async Task An_unsupported_protocol_version_is_refused_by_number(int version)
@@ -93,7 +94,7 @@ public class EnvelopeProtocolTest
     public async Task A_version_mismatch_escapes_rather_than_becoming_a_fault()
         => await Assert.ThrowsAsync<NotSupportedException>(
             () => Server(new ThrowingServer()).DispatchAsync(
-                Envelope(InfoCarrierOperation.BeginTransaction, version: 2)));
+                Envelope(InfoCarrierOperation.BeginTransaction, version: InfoCarrierEnvelope.CurrentProtocolVersion + 1)));
 
     /// <summary>
     ///     A server-side failure comes back with its type, message and inner chain intact — which

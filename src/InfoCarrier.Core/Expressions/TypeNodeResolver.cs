@@ -27,6 +27,9 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly IModel? _model = model;
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
+    internal TypeNodeMapper? ShapeMapper { get; set; }
+    private readonly HashSet<string> _shapes = new(StringComparer.Ordinal);
+    internal void ResetShapes() => _shapes.Clear();
 
     // The list actually consulted: the DI-scoped one until an execution declares more, then a
     // widened copy of it. WIDENED RATHER THAN CONSULTED BESIDE, so the allowlist's own generic
@@ -70,7 +73,19 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     /// </summary>
     public virtual Type Resolve(TypeNode node)
     {
-        string cacheKey = node.ToString();
+        ValidateShapes(node, 0);
+        if (HasShape(node))
+        {
+            Type shaped = ResolveCore(node);
+            if (!_effective.IsAllowed(shaped))
+            {
+                throw new InvalidOperationException(BuildRejection(shaped));
+            }
+
+            return shaped;
+        }
+
+        string cacheKey = node.CacheIdentity();
 
         // THE CACHE MEMOIZES THE RESOLUTION AND NEVER THE PERMISSION, and the two were one lookup
         // until `UseExecutionAllowedTypes` existed. A name resolved while one execution's declared
@@ -90,7 +105,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
 
         // Enforced after resolution, not instead of it: the name has to be resolved to know
         // what it denotes, but nothing is constructed from it until it clears the allowlist.
-        if (!_effective.IsAllowed(resolved))
+        if (ContainsAnonymous(resolved) || !_effective.IsAllowed(resolved))
         {
             throw new InvalidOperationException(BuildRejection(resolved));
         }
@@ -120,11 +135,29 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
 
     private Type ResolveCore(TypeNode node)
     {
+        if (node.ShapeMembers is not null)
+        {
+            Type[] components = node.GenericArguments.Select(Resolve).ToArray();
+            if (ShapeMapper?.TryOriginalShape(node, out Type? original) == true)
+            {
+                return original!;
+            }
+
+            return AnonymousShapeTypes.Resolve(node, components);
+        }
+
+        if (node.ArrayElement is not null)
+        {
+            Type element = Resolve(node.ArrayElement);
+            return node.ArrayRank == 1 ? element.MakeArrayType() : element.MakeArrayType(node.ArrayRank);
+        }
+
         // Generic reconstruction.
         if (node.GenericArguments.Count > 0)
         {
             Type definition = ResolveByName(node.Name)
                 ?? throw new InvalidOperationException($"Cannot resolve generic type definition '{node.Name}'.");
+            RejectRawAnonymous(definition);
             Type[] arguments = node.GenericArguments.Select(ResolveCore).ToArray();
             return definition.MakeGenericType(arguments);
         }
@@ -133,6 +166,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         Type? resolved = ResolveByName(node.Name);
         if (resolved is not null)
         {
+            RejectRawAnonymous(resolved);
             return resolved;
         }
 
@@ -170,5 +204,70 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         }
 
         return null;
+    }
+
+    private static bool HasShape(TypeNode node)
+        => node.ShapeMembers is not null || node.ArrayElement is not null || node.GenericArguments.Any(HasShape);
+
+    private static bool ContainsAnonymous(Type type)
+        => AnonymousShapeTypes.IsOriginal(type) || AnonymousShapeTypes.IsGenerated(type)
+            || (type.IsArray && ContainsAnonymous(type.GetElementType()!))
+            || (type.IsGenericType && type.GetGenericArguments().Any(ContainsAnonymous));
+
+    private static void RejectRawAnonymous(Type type)
+    {
+        if (ContainsAnonymous(type))
+        {
+            throw new InvalidOperationException("Anonymous data requires a bounded shape descriptor, not a CLR name.");
+        }
+    }
+
+    private void ValidateShapes(TypeNode node, int depth)
+    {
+        if (node is null || string.IsNullOrEmpty(node.Name) || node.GenericArguments is null)
+        {
+            throw new InvalidOperationException("A type descriptor requires a name and component list.");
+        }
+
+        if (depth > AnonymousShapeTypes.MaximumDepth)
+        {
+            throw new InvalidOperationException("The type descriptor depth budget is exhausted.");
+        }
+
+        if (node.ShapeMembers is not null)
+        {
+            AnonymousShapeTypes.Validate(node);
+        }
+        else if (node.Name.StartsWith(AnonymousShapeTypes.Prefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("An anonymous-shape identity requires member metadata.");
+        }
+
+        if (node.ArrayElement is not null)
+        {
+            if (node.Name != "InfoCarrier.ShapeArray.v1" || node.ArrayRank is < 1 or > 32
+                || node.GenericArguments.Count != 0 || node.EntityTypeName is not null)
+            {
+                throw new InvalidOperationException("Invalid anonymous-shape array descriptor.");
+            }
+
+            ValidateShapes(node.ArrayElement, depth + 1);
+        }
+
+        foreach (TypeNode component in node.GenericArguments)
+        {
+            ValidateShapes(component, depth + 1);
+        }
+
+        if (node.ShapeMembers is not null)
+        {
+            string identity = node.CacheIdentity();
+            if (!_shapes.Contains(identity) && _shapes.Count >= AnonymousShapeTypes.MaximumShapes)
+            {
+                throw new InvalidOperationException("The exchange anonymous-shape budget is exhausted.");
+            }
+
+            _shapes.Add(identity);
+        }
     }
 }

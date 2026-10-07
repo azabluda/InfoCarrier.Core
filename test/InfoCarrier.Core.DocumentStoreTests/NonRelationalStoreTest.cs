@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace InfoCarrier.Core.DocumentStoreTests;
@@ -53,33 +54,38 @@ public class NonRelationalStoreTest(DocumentStoreFixture fixture) : IClassFixtur
     }
 
     /// <summary>
-    ///     The refusal the switch exists to lift, against a store that genuinely answers it.
+    ///     Anonymous collection carriers follow the document store's actual tracking rules.
     /// </summary>
     /// <remarks>
-    ///     <b>By default the client refuses a <c>Distinct</c> over a projection carrying a
-    ///     collection</b>, because every relational provider does: the identifying columns do not
-    ///     survive it. A document store has no such problem. This asserts the two directions
-    ///     differ, which is the switch's entire premise and the thing InMemory could not show.
+    ///     Before 2026-10-07 this was a tuple reassembly guarded by the non-relational switch.
+    ///     A bounded anonymous descriptor reaches MongoDB directly with either client setup.
+    ///     Its owned collection requires no tracking when the owner is absent from the result.
+    ///     MongoDB also refuses materializing this DISTINCT projection without its document key.
+    ///     Compare both refusals with a direct backend context instead of inventing support.
     /// </remarks>
-    [Fact]
-    public async Task Distinct_over_a_collection_projection_is_refused_by_default_and_allowed_when_told()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Anonymous_collection_distinct_follows_backend_tracking_rules(bool nonRelational)
     {
-        await using (ShopClientContext relational = fixture.CreateClient())
-        {
-            await Assert.ThrowsAnyAsync<Exception>(
-                () => relational.Customers
-                    .Select(c => new { c.Name, c.Lines })
-                    .Distinct()
-                    .ToListAsync());
-        }
-
-        await using ShopClientContext document = fixture.CreateNonRelationalClient();
-        var rows = await document.Customers
+        await using ShopClientContext document = nonRelational
+            ? fixture.CreateNonRelationalClient() : fixture.CreateClient();
+        var query = document.Customers
             .Select(c => new { c.Name, c.Lines })
-            .Distinct()
-            .ToListAsync();
-
-        Assert.Equal(3, rows.Count);
+            .Distinct();
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+        Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
+        using IServiceScope scope = fixture.ServerProvider.CreateScope();
+        await using ShopServerContext backend = scope.ServiceProvider.GetRequiredService<ShopServerContext>();
+        var direct = backend.Customers.Select(c => new { c.Name, c.Lines }).Distinct();
+        InvalidOperationException expectedTracking = await Assert.ThrowsAsync<InvalidOperationException>(() => direct.ToListAsync());
+        Assert.Equal(expectedTracking.Message, refusal.Message);
+        InvalidOperationException expectedMaterialization = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => direct.AsNoTracking().ToListAsync());
+        InvalidOperationException actualMaterialization = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => query.AsNoTracking().ToListAsync());
+        Assert.Equal(expectedMaterialization.Message, actualMaterialization.Message);
+        Assert.Contains("Document element is missing", actualMaterialization.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

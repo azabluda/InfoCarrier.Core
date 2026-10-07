@@ -35,7 +35,13 @@ public class DynamicValueMapper(
 {
     private readonly IModel? _model = model;
     private readonly TypeNodeMapper _typeMapper = typeMapper;
-    private readonly TypeNodeResolver _typeResolver = typeResolver;
+    private readonly TypeNodeResolver _typeResolver = BindShapes(typeResolver, typeMapper);
+
+    private static TypeNodeResolver BindShapes(TypeNodeResolver resolver, TypeNodeMapper mapper)
+    {
+        resolver.ShapeMapper = mapper;
+        return resolver;
+    }
     // The application's mappers first, then the model's own opinion (M9 J9). Built here rather
     // than registered, because that is what makes it symmetric: each half derives it from the
     // model it was given, and the two models agree about converters by construction (A49), so
@@ -112,6 +118,8 @@ public class DynamicValueMapper(
         _toIds.Clear();
         _fromIds.Clear();
         _nextId = 0;
+        _typeMapper.ResetShapes();
+        _typeResolver.ResetShapes();
     }
 
     /// <summary>
@@ -912,11 +920,13 @@ public class DynamicValueMapper(
 
     private object? RehydrateObject(DynamicValueNode node, Type type)
     {
+        StringComparer names = AnonymousShapeTypes.IsOriginal(type) || AnonymousShapeTypes.IsGenerated(type)
+            ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
         // Distinct: the forward path emits properties and fields, and a name could in
         // principle be claimed by both.
         Dictionary<string, DynamicPropertyValue> byName = node.Properties
-            .DistinctBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            .DistinctBy(p => p.Name, names)
+            .ToDictionary(p => p.Name, names);
 
         // Ctor-param matching: parameterless ctor wins, else match ctor params to properties
         // by name (OrdinalIgnoreCase) + assignable type (aqua §2.3).
@@ -925,7 +935,7 @@ public class DynamicValueMapper(
             .FirstOrDefault(c => c.GetParameters().All(p => byName.ContainsKey(p.Name!)));
 
         object? instance;
-        HashSet<string> ctorBound = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ctorBound = new(names);
         if (ctor is { } parameterized && parameterized.GetParameters().Length > 0)
         {
             // The only ordering that cannot register first: the arguments have to be read

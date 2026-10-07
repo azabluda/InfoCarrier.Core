@@ -502,6 +502,21 @@ public sealed class TypeAllowlist
 
     private bool Evaluate(Type type)
     {
+        // Dated ADR-010/011 amendment: immutable anonymous data has a bounded descriptor.
+        // This admits no application method on the server; only factory-owned emitted types
+        // resolve there. Each component still needs its own existing permission.
+        if (AnonymousShapeTypes.IsGenerated(type))
+        {
+            return true;
+        }
+
+        if (AnonymousShapeTypes.IsOriginal(type))
+        {
+            Type[] components = type.IsGenericType ? type.GetGenericArguments() : [];
+            return components.Length <= AnonymousShapeTypes.MaximumMembers
+                && components.All(IsAllowed);
+        }
+
         // Structural forms delegate to their components, so `List<Customer>[]` is allowed
         // exactly when `Customer` is.
         if (type.IsArray)

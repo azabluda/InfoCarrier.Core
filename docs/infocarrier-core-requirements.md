@@ -84,7 +84,12 @@ When the client receives query results from the server for entity types:
 4. Wire up navigation properties (reference and collection) based on foreign key relationships.
 5. Mark included navigations as loaded.
 
-For queries that project to non-entity types (anonymous types, DTOs, value tuples), the server returns the necessary entity data (or raw column values) and the client applies the projection locally after materialization.
+For queries that project to non-entity types, the client reconstructs its own result types after
+materialization. Amended 2026-10-07: anonymous immutable data can be described through the bounded
+protocol in ADR-010/011. The server creates its own equivalent data classes to preserve backend
+translation; returned descriptors restore the original client classes. Custom client-only behavior
+and other ad-hoc types retain projection splitting. No client assembly or executable method body
+crosses the wire.
 
 ### 2.6 Server-Side Query Binding
 

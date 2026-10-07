@@ -320,5 +320,19 @@
 #
 # `total` rises with ours, 1150 -> 1151: EFCore is unchanged at 864.
 
-ours=106
-total=1151
+# 2026-10-07, 106 -> 107 (#209 step G1: bounded anonymous data descriptors).
+#
+# TypeNodeMapper.ToTypeNode reads the original compiler-generated type's public properties
+# to retain their names and constructor order. Its new IL2070 cannot be proved for an arbitrary
+# runtime Type; this is the same metadata-preservation requirement as the existing value walk.
+# It is deliberately reported, not suppressed. Application/client metadata must remain available
+# under trimming; Native AOT remains unsupported. The emitter's IL2055 is suppressed only for
+# definitions it creates itself at runtime with unconstrained generic parameters. That code
+# has no trim-time member requirements. Component admission uses the compiler type's generic
+# arguments and adds no reflection scan to the allowlist.
+#
+# Measured with SDK 10.0.401: ours 107, total 1140. Other assemblies differ from the older total;
+# the ratchet gates ours, not external diagnostics.
+
+ours=107
+total=1140
