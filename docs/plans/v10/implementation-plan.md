@@ -464,7 +464,7 @@ in the archive; this step tests the missing integration without a sleep or a slo
       `eng/measure.sh cancellation-real-socket`: **FAILING 0, TOTAL 29968**. `CI=true` Release build:
       **0 warnings, 0 errors**.
 
-## Phase G ? bounded anonymous-shape reconstruction ([#209](https://github.com/azabluda/InfoCarrier.Core/issues/209))
+## Phase G: bounded anonymous-shape reconstruction ([#209](https://github.com/azabluda/InfoCarrier.Core/issues/209))
 
 - [x] **G1. Preserve anonymous data through backend translation and restore original client types.**
       The owner selected the bounded generated-shape protocol on 2026-10-07 after the
@@ -477,6 +477,17 @@ in the archive; this step tests the missing integration without a sleep or a slo
       Passed 27603, Failed 0, Skipped 167, Total 27770; Firebird reports Passed 109, Failed 0,
       Skipped 1, Total 110. The report distinguishes the later Unicode-only correction and records
       the documented trim increase 106 to 107. No release work is included.
+
+- [x] **G2. Close raw-name type-depth bypass and measure process-capacity exhaustion.**
+      Continue on the same branch at the owner's request. Validate CLR names before lookup and
+      runtime type construction, preserving valid generic arrays and exact whole-type registrations.
+      Pin raw, structured, mixed and malformed-name cases. Exhaust the real factory in an isolated
+      child test host and document consequences for another caller without poisoning the suite.
+      Shared capacity remains an availability risk; host quotas/isolation are a separate design.
+      Run regular, transport, complete slow comparisons, strict Release, trim and documentation gates.
+      All gates pass; the [report](anonymous-shape-implementation.md#follow-up-validation) records
+      complete results. The shared-cap attack took 1.305 seconds locally and remains a documented
+      cross-caller availability risk, not protection delivered by this depth fix.
 
 ## Branches that outlive their pull request
 

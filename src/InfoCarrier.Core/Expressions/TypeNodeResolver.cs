@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Reflection.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Expressions;
@@ -29,6 +30,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
     internal TypeNodeMapper? ShapeMapper { get; set; }
     private readonly HashSet<string> _shapes = new(StringComparer.Ordinal);
+    private static readonly TypeNameParseOptions NameParseOptions = new() { MaxNodes = 1024 };
     internal void ResetShapes() => _shapes.Clear();
 
     // The list actually consulted: the DI-scoped one until an execution declares more, then a
@@ -242,6 +244,32 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         {
             throw new InvalidOperationException("An anonymous-shape identity requires member metadata.");
         }
+        else if (node.ArrayElement is null)
+        {
+            // FullName can contain constructed generic types, especially inside ordinary arrays.
+            // Parse without loading assemblies or constructing runtime types. Raw names and
+            // structured arguments must consume the same depth budget before either lookup path.
+            if (node.Name.Length > 16384)
+            {
+                throw new InvalidOperationException("The type-name length budget is exhausted.");
+            }
+
+            TypeName name;
+            try
+            {
+                name = TypeName.Parse(node.Name, NameParseOptions);
+            }
+            catch (Exception error) when (error is ArgumentException or InvalidOperationException)
+            {
+                throw new InvalidOperationException("Invalid or excessively complex CLR type name.", error);
+            }
+
+            ValidateNameDepth(name, depth);
+            if (node.GenericArguments.Count > 0 && !name.IsSimple)
+            {
+                throw new InvalidOperationException("Structured generic arguments require a simple generic definition name.");
+            }
+        }
 
         if (node.ArrayElement is not null)
         {
@@ -268,6 +296,26 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
             }
 
             _shapes.Add(identity);
+        }
+    }
+
+    private static void ValidateNameDepth(TypeName name, int depth)
+    {
+        if (depth > AnonymousShapeTypes.MaximumDepth)
+        {
+            throw new InvalidOperationException("The type descriptor depth budget is exhausted.");
+        }
+
+        if (name.IsArray || name.IsPointer || name.IsByRef)
+        {
+            ValidateNameDepth(name.GetElementType(), depth + 1);
+        }
+        else if (name.IsConstructedGenericType)
+        {
+            foreach (TypeName argument in name.GetGenericArguments())
+            {
+                ValidateNameDepth(argument, depth + 1);
+            }
         }
     }
 }

@@ -54,10 +54,11 @@ identity, raw-name admission, private-component access, and mutable metadata ris
 
 The exchange rejects its sixty-fifth distinct descriptor on every attempt until reset. A locked
 process cache counts generation attempts before emission, including failures. Successful identical
-descriptors reuse one type under concurrent resolution. The process's 4096-attempt ceiling is verified
-by source inspection; the shared test process is deliberately not exhausted and poisoned by a test.
-Its finite capacity can still be exhausted by authorized adversarial callers. There is no availability
-claim beyond the documented bounds, and provider caches can retain emitted types indefinitely.
+descriptors reuse one type under concurrent resolution. An isolated child test host exhausts the
+actual 4096-attempt ceiling without poisoning the regular suite's factory. Separate resolvers share
+that ceiling: a new legitimate descriptor is then refused, while cached descriptors remain usable.
+Its finite capacity can be exhausted by any caller that can send accepted descriptors. There is no
+availability claim beyond the documented bounds, and provider caches can retain emitted types indefinitely.
 
 Owned coverage adds what inherited Entity Framework tests cannot establish: separate wire pipelines
 restore the original client types; raw original and generated CLR names fail even in mixed generic
@@ -126,3 +127,73 @@ Local evidence is under artifacts/: `measure/bounded-anonymous-shapes-verified.*
 Independent read-only review found no remaining blockers after the identity, raw-name,
 budget, snapshot, private-component, trim, and Unicode corrections. Owner review should assess the
 protocol-major upgrade and finite process capacity before merging. No release or merge is requested.
+
+## Security follow-up: type-name depth and shared capacity
+
+The owner approved this follow-up on the current branch after discussing hostile client payloads.
+The original descriptor-only depth check accepted a raw `List<List<...>>` CLR name at depth 128.
+Four owned cases failed before the fix: depths 17 and 128, mixed descriptor/name nesting, and an
+array above the depth boundary. Validation now parses raw CLR names without creating runtime types,
+then checks combined raw-name/descriptor depth before any resolver lookup or generic construction.
+The framework's [TypeName parser](https://learn.microsoft.com/en-us/dotnet/api/system.reflection.metadata.typename.parse?view=net-10.0)
+has a 1,024-node ceiling and raw names have a 16,384-character ceiling.
+Valid depth-16 generic types, generic array FullName output, and depth-16 arrays remain supported.
+Additional tests cover assembly-qualified arguments with an unavailable assembly, malformed names,
+wide names, and constructed names incorrectly paired with structured arguments.
+
+The isolated capacity test uses the real factory through public resolution, not a reduced test budget
+or reflection that resets production state. It emits 4,096 one-member integer shapes using fresh
+resolvers, demonstrates repeated refusal for a different caller's new shape, and verifies reuse of
+the earlier legitimate shape. Its initial local measurement took 1.305 seconds with a 220,418,048-byte
+working-set increase. The measurement excludes transport, queries, and retained-memory collection.
+No test asserts a machine-specific time or memory number.
+
+This is a fast, persistent cross-caller denial of new-shape service, not only a theoretical cache
+ceiling. Arbitrary valid identity tokens consume the shared budget. Authentication and request rate
+limits do not prevent cumulative exhaustion by an admitted malicious caller. The cap bounds emission
+but does not isolate callers. Trusted quotas, lifecycle isolation, and broader expression-resource
+budgets require separate host design; this patch does not claim those protections. Owner review of
+that remaining risk is required before treating the protocol as safe for untrusted client availability.
+Descriptor limits do not constrain a complex string passed to an admitted runtime `Type.GetType`
+expression call. Existing reflection-pivot tests check invocation admission, not execution resources.
+
+Recommended next design: a host-owned resource policy with trusted caller/tenant identity, generation
+admission quotas, and recyclable workers for hard memory/time boundaries. A client-provided identity
+must not select its own quota. Raising the process cap changes attack cost, not the failure mode;
+cache eviction cannot promise release while provider caches retain types. Broader budgets should cover
+expression nodes, generic construction, constants, and runtime type-resolution calls. Cooperative
+cancellation alone does not stop every admitted framework operation. This is separate architecture
+work, not protection claimed by the current patch.
+
+Independent review found no blocking defect in the depth fix or process-isolated capacity test. One
+minor follow-up is clearer captured-output diagnostics when the child test host exceeds its deadline.
+
+### Follow-up validation
+
+All following runs completed on 2026-10-07 and include the final Unicode change and the security
+follow-up. `eng/measure.sh type-budget-hardening bounded-anonymous-shapes-verified` reports **FAILING 0,
+TOTAL 30089**, FIXED none, BROKEN none, REASONS unchanged. The seven new security cases run in the
+regular project, including the isolated process-cap test. No additional attribution is removed by
+resource validation; it changes rejection bounds rather than translation.
+
+| Run | Passed | Failed | Skipped | Total |
+|---|---:|---:|---:|---:|
+| Complete regular functional project | 29620 | 0 | 234 | 29854 |
+| Complete regular document-store project | 235 | 0 | 0 | 235 |
+| Release HTTP transport | 29 | 0 | 0 | 29 |
+| Complete SQLite live comparison | 27603 | 0 | 167 | 27770 |
+| Complete Firebird live comparison | 109 | 0 | 1 | 110 |
+
+Both complete live comparisons pass without a reason-without-difference failure. The strict Release
+solution rebuild passes with zero errors and the five existing generated Razor warnings. The final
+functional-test build also uses strict warning rules and passes. Trim publish reports **OURS 107,
+TOTAL 1140; OK (107 <= 107)**. Both shipping packages pass compatibility validation. No captured SQL
+baselines, package publication, release, or merge are included. Documentation links, prose budgets,
+whitespace, and changed-file hygiene pass.
+
+Local evidence remains ignored under artifacts/: `measure/type-budget-hardening.*`,
+`type-budget-focused.log`, `type-budget-release.log`, `type-budget-test-release.log`,
+`type-budget-transport.log`, `type-budget-trim.log`, `type-budget-pack.log`,
+`type-budget-slow-sqlite.log`, and `type-budget-slow-firebird.log`. The focused log preserves the
+initial capacity measurement and a subsequent corrected parser-message assertion; the complete
+regular gate is the final behavioral result.

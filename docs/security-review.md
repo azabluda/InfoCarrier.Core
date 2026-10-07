@@ -27,6 +27,33 @@ despite provider caches retaining types; it does not promise collectible assembl
 Valid but adversarial callers can exhaust that finite capacity. Request-size, authentication,
 rate limits and process lifecycle remain deployment controls, not a claim of unbounded availability.
 
+The depth check includes constructed generic and array syntax inside raw CLR names, combined with
+the surrounding structured descriptor depth. Before `Type.GetType`, `Assembly.GetType`, or
+`MakeGenericType`, the framework's metadata-only `TypeName` parser limits each raw name to 16,384
+characters and 1,024 parser nodes. Ordinary generic arrays remain supported. This closes the earlier
+raw-name bypass; the final allowlist still follows ordinary generic type construction, preserving
+exact model/application whole-type registrations. It does not bound all expression evaluation work.
+
+An isolated owned test exhausts the actual 4,096-attempt cache through separate resolvers. Another
+resolver then cannot generate a new legitimate shape, while an existing cached shape still resolves.
+The local measurement took 1.305 seconds and increased the process working set by 220,418,048 bytes.
+Those figures exclude network/database costs and are neither portable performance limits nor a
+measurement of retained memory after collection. The rejection persists for the process lifetime.
+The client-controlled opaque identity prevents the per-exchange cap from protecting shared capacity.
+Any caller whose accepted descriptors reach this path can consume it; authentication alone is not
+protection against an authenticated malicious caller. A process restart restores capacity but also
+restores the attack opportunity. Rate limits delay cumulative exhaustion rather than prevent it.
+
+This follow-up fixes the depth bypass and documents the demonstrated availability risk. It does
+not introduce trusted caller quotas or isolate generation in disposable worker processes. Those
+controls need a separate host policy and lifecycle design before claiming availability under hostile
+payloads. Do not interpret the finite generation cap as caller isolation or complete denial-of-service
+protection. The existing runtime type and expression evaluation surfaces remain relevant too.
+In particular, an admitted `Type.GetType(string)` call can still receive a complex name as an
+ordinary string argument during expression evaluation. Descriptor parsing does not validate those
+runtime arguments. The existing hardening test permits that method and blocks the later reflection
+invocation pivot; it does not establish a resource budget for the method itself.
+
 Data fields are readonly. Public members are limited to getters, the ordered data constructor,
 structural equality/hash methods, and formatting. Names never enter source code. Private static
 comparer slots contain the framework's EqualityComparer<T>.Default, installed by trusted factory
