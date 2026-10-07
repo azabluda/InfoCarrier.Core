@@ -329,6 +329,14 @@ red first, the fix in the product, and the slow run again.
       all passed. The Firebird live comparison required an unrestricted native-filesystem retry.
       Review also corrected an obsolete client-refusal comment without changing production code.
 
+      Owner review added an explicit requirement to retain owned configuration-boundary tests.
+      `ServerParameterizationTest.Configuration.cs` now pins the client setter diagnostic without
+      helper registration and the backend selector diagnostic with registration. It also pins the
+      earlier cast refusal without target registration and the backend filter refusal with it.
+      Existing `SqliteSmokeTest` raw-SQL grant tests and the registered/unregistered converted-list
+      tests already cover the other boundaries; those remain unchanged. The owned pins complement
+      the restored inherited tests rather than restoring their obsolete overrides.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its
