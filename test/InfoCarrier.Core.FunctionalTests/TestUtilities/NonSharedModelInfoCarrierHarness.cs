@@ -48,11 +48,13 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     Whether the server sends the log events it raises back to the client (R172). Same opt-in as
 ///     a shared fixture's, and threaded the same way.
 /// </param>
+/// <param name="allowedTypes">Types the fixture explicitly registers on both client and server.</param>
 public sealed class NonSharedModelInfoCarrierHarness(
     InfoCarrierTier backend,
     bool relationalClientStore = false,
     bool arbitrarySqlExecution = false,
-    bool serverLogForwarding = false)
+    bool serverLogForwarding = false,
+    Type[]? allowedTypes = null)
 {
     private SharedTestStoreProperties _pending;
     private ITestStoreFactory? _testStoreFactory;
@@ -92,6 +94,7 @@ public sealed class NonSharedModelInfoCarrierHarness(
 
             ArbitrarySqlExecution = arbitrarySqlExecution,
             ServerLogForwarding = serverLogForwarding,
+            AllowedTypes = allowedTypes,
         };
 
     /// <summary>

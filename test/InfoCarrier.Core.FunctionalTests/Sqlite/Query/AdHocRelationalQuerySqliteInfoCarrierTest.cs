@@ -127,7 +127,9 @@ public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixtur
 public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocAdvancedMappingsQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        SqliteInfoCarrierTier.Instance,
+        allowedTypes: [typeof(Context18087.IDummyEntity)]);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -135,16 +137,14 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 
     /// <inheritdoc />
     /// <remarks>
-    ///     The base's body. Its first two blocks pass unchanged; the third is refused with EF's
-    ///     own <c>TranslationFailed</c>, naming the <c>Cast</c> where EF names the filter behind
-    ///     it. Measured 2026-09-15.
+    ///     With the cast target registered on both halves, the backend refuses the full query.
+    ///     Only the parameter name in its diagnostic differs from plain EF: Value instead of id.
     /// </remarks>
     [InfoCarrierDesign(
         6,
-        Justification = "EF removes the redundant cast in its own pipeline, which runs on the server, and then names the "
-            + "filter it cannot translate. The client does not run that pipeline, so it refuses at the Cast it cannot send.",
-        Deviation = DeviationKind.RefusedEarlier | DeviationKind.QueryWrittenOut,
-        DeviationNote = "Only the third block's expected message differs; the base asserts all three in one method.")]
+        Justification = "The backend refuses the same cast and filter, but the wire parameter is named Value instead of id.",
+        Deviation = DeviationKind.QueryWrittenOut | DeviationKind.Other,
+        DeviationNote = "The base asserts the exact message in its third block; only the diagnostic parameter name differs.")]
     public override async Task Casts_are_removed_from_expression_tree_when_redundant()
     {
         var contextFactory = await InitializeAsync<Context18087>(seed: c => c.SeedAsync());
@@ -171,13 +171,14 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
             var queryBase = (IQueryable)context.MockEntities;
             var id = 1;
 
-            string message = Assert
-                .Throws<InvalidOperationException>(() => queryBase.Cast<Context18087.IDummyEntity>().FirstOrDefault(x => x.Id == id))
-                .Message;
+            var refusal = Assert.Throws<InvalidOperationException>(
+                () => queryBase.Cast<Context18087.IDummyEntity>().FirstOrDefault(x => x.Id == id));
 
             Assert.Equal(
-                CoreStrings.TranslationFailed("DbSet<MockEntity>()    .Cast<IDummyEntity>()"),
-                message.Replace("\r", string.Empty).Replace("\n", string.Empty));
+                CoreStrings.TranslationFailed("DbSet<MockEntity>()    .Cast<IDummyEntity>()    .Where(e => e.Id == @Value)"),
+                refusal.Message.Replace("\r", string.Empty).Replace("\n", string.Empty));
+            string serverStack = Assert.IsType<string>(refusal.Data[InfoCarrierFaultMapper.ServerStackTraceKey]);
+            Assert.Contains("Microsoft.EntityFrameworkCore.Query", serverStack, StringComparison.Ordinal);
         }
     }
 

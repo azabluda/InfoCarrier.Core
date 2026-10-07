@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -22,12 +21,10 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         a single <c>FromSql</c> theory and nothing else. 16 tests become 18.
 ///     </para>
 ///     <para>
-///         <b>Sixteen of the eighteen assert the detector; the <c>FromSql</c> theory asserts the
-///         refusal instead (R75).</b> R62 predicted "2 tests, both red, zero new green" and R73
-///         measured both green — but they were green because <c>FromSql</c> was silently
-///         discarded. Now the query is refused while it is still being compiled, which is
-///         <em>earlier</em> than the detector's check, so the concurrency message the base expects
-///         is never the one that arrives. Both statements are true and only one is observable.
+///         The fixture grants raw SQL on both halves, so the inherited <c>FromSql</c> theory
+///         reaches the concurrency detector and asserts EF's own refusal. Until 2026-10-07 it
+///         asserted the missing grant instead. Enabling the grant removed that diagnostic
+///         difference without changing the provider.
 ///     </para>
 ///     <para>
 ///         The relational base reaches its store through
@@ -41,44 +38,6 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
     : ConcurrencyDetectorEnabledRelationalTestBase<
         ConcurrencyDetectorEnabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture>(fixture)
 {
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <para>
-    ///         <b>The refusal arrives before the detector does.</b> The base enters a critical
-    ///         section on another thread and asserts that the call raises
-    ///         <c>CoreStrings.ConcurrentMethodInvocation</c>; on this provider the query is refused
-    ///         (R75) while it is still being compiled, which is <em>earlier</em> than the
-    ///         detector's check. Both statements are true and only one is observable. The other
-    ///         sixteen tests in this class still assert the detector.
-    ///     </para>
-    ///     <para>
-    ///         <c>ConcurrencyDetectorEnabledTestBase.ConcurrencyDetectorTest</c> catches the
-    ///         <see cref="InvalidOperationException" /> <em>itself</em> and compares its message,
-    ///         so what escapes <c>base</c> is xUnit's <c>EqualException</c>, with the refusal's text
-    ///         as the actual value. That is what is asserted. xUnit shortens both strings in its
-    ///         message, so the assertion is on the start of the refusal.
-    ///     </para>
-    ///     <para>
-    ///         <b>Until 2026-09-15 this skipped</b>, and read <i>"EF's own <c>Task.CompletedTask</c>
-    ///         form is taken instead"</i>. No EF suite skips this test, so the skip had nothing
-    ///         upstream to cite. The disabled sibling below still pins the refusal by node name.
-    ///     </para>
-    /// </remarks>
-    [InfoCarrierDesign(
-        Decisions.SecurityReview,
-        Decisions.RawSqlGrant,
-        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not. The refusal comes "
-            + "while the query is compiled, before the concurrency detector is reached.",
-        Deviation = DeviationKind.Other,
-        DeviationNote = "Plain EF reaches the concurrency detector. This client refuses the raw SQL first, and the "
-            + "override asserts the refusal.")]
-    public override async Task FromSql(bool async)
-    {
-        var failure = await Assert.ThrowsAsync<Xunit.Sdk.EqualException>(() => base.FromSql(async));
-
-        Assert.Contains("No part of the query can be executed on t", failure.Message, StringComparison.Ordinal);
-    }
-
     public class ConcurrencyDetectorInfoCarrierFixture : ConcurrencyDetectorFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
@@ -89,7 +48,8 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
                 SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                arbitrarySqlExecution: true);
     }
 }
 
@@ -100,30 +60,15 @@ public class ConcurrencyDetectorEnabledInfoCarrierTest(
 /// <remarks>
 ///     The fixture keeps the <c>EnableThreadSafetyChecks(false)</c> that replaces rather than
 ///     extends the base options, which is EF's own arrangement in every provider's version of this
-///     class. With the checks off the base simply runs the query and asserts nothing, which is why
-///     its <c>FromSql</c> theory <b>used to pass by accident</b>: the query root was discarded and
-///     the resulting table scan raised nothing. R75 refuses it, and the refusal is pinned instead.
+///     class. The fixture grants raw SQL on both halves, so the inherited <c>FromSql</c> theory
+///     runs the query with the detector disabled. Until 2026-10-07 its override asserted the
+///     missing grant; the configured fixture now runs EF's unchanged test.
 /// </remarks>
 public class ConcurrencyDetectorDisabledInfoCarrierTest(
     ConcurrencyDetectorDisabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture fixture)
     : ConcurrencyDetectorDisabledRelationalTestBase<
         ConcurrencyDetectorDisabledInfoCarrierTest.ConcurrencyDetectorInfoCarrierFixture>(fixture)
 {
-    /// <inheritdoc />
-    /// <remarks>
-    ///     With the checks off the base simply runs the query and asserts nothing, so this test
-    ///     <b>used to pass by accident</b>: the <c>FromSqlRaw</c> was silently discarded and the
-    ///     resulting table scan raised nothing. R75 refuses it, and the refusal is what is pinned.
-    /// </remarks>
-    [InfoCarrierDesign(
-        Decisions.SecurityReview,
-        Decisions.RawSqlGrant,
-        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.",
-        Deviation = DeviationKind.Other,
-        DeviationNote = "Plain EF runs the raw SQL. This client refuses it before any statement, and the override asserts the refusal.")]
-    public override Task FromSql(bool async)
-        => FromSqlAssertions.NotSupportedAsync(() => base.FromSql(async));
-
     public class ConcurrencyDetectorInfoCarrierFixture : ConcurrencyDetectorFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
@@ -134,7 +79,8 @@ public class ConcurrencyDetectorDisabledInfoCarrierTest(
                 SqliteInfoCarrierTier.Instance,
                 ContextType,
                 (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-                configureConventions: ConfigureConventions);
+                configureConventions: ConfigureConventions,
+                arbitrarySqlExecution: true);
 
         /// <inheritdoc />
         public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)

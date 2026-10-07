@@ -299,6 +299,44 @@ red first, the fix in the product, and the slow run again.
       The querying word budget moves to 1200 for these required facts. These pages remain unpublished
       until the owner explicitly deploys the documentation from a release branch.
 
+### Fixture configuration review, 2026-10-07
+
+- [x] **H49. Remove attribution only where correct fixture configuration removes the difference.**
+      The owner authorized this follow-up after H48. The concurrency-detector fixtures and the
+      nonshared miscellaneous-query harness now grant raw SQL on both halves. Their inherited
+      `FromSql` and namespace-collision tests run unchanged. The Northwind bulk-update fixture
+      explicitly registers the public `TestExtensions` helper on both halves, so the backend
+      refuses the invalid setter with Entity Framework Core's own diagnostic. These four design
+      reasons and their overrides are removed after observing the unconfigured tests fail and
+      the configured tests pass the live comparison.
+
+      The nonshared harness also accepts explicit allowed types. The advanced-mapping fixture
+      registers `Context18087.IDummyEntity`, which moves the cast refusal to the backend. Its
+      reason remains because the diagnostic names `@Value` where direct EF names `@id`; it no
+      longer claims an earlier refusal. The test checks the carried backend stack. The converted
+      collection's existing `Layout` registration still leaves a tuple-versus-anonymous diagnostic
+      difference, so that reason remains too.
+
+      The remaining reasons were reviewed for configuration remedies. Private helpers, queryable
+      result validation, buffering, client model services, command-cache and schema ownership,
+      absent client connections, nonvirtual transaction helpers, tier compliance, and interceptor
+      object identity do not become equivalent through additional type registration. Existing
+      shared-public-helper and private-helper regression coverage is retained. No production
+      behavior, allowlist inference, upstream reference clone, or release workflow changes.
+
+      Validation on 2026-10-07: the full measured suite, the focused live comparisons, the Release
+      warnings-as-errors build, transport tests, trimming ratchet, document links, and file hygiene
+      all passed. The Firebird live comparison required an unrestricted native-filesystem retry.
+      Review also corrected an obsolete client-refusal comment without changing production code.
+
+      Owner review added an explicit requirement to retain owned configuration-boundary tests.
+      `ServerParameterizationTest.Configuration.cs` now pins the client setter diagnostic without
+      helper registration and the backend selector diagnostic with registration. It also pins the
+      earlier cast refusal without target registration and the backend filter refusal with it.
+      Existing `SqliteSmokeTest` raw-SQL grant tests and the registered/unregistered converted-list
+      tests already cover the other boundaries; those remain unchanged. The owned pins complement
+      the restored inherited tests rather than restoring their obsolete overrides.
+
 ## Phase D — a client projection that holds a captured object is refused, as EF refuses it (#113)
 
 The first issue phase after 10.2.0, taken up on 2026-09-28 in the owner's order for 10.3.0. Its

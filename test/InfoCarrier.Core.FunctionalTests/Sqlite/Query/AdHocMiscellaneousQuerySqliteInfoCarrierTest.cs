@@ -44,7 +44,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///     <para>
 ///         <b>Until 2026-09-15 this paragraph called <c>Multiple_different_entity_type_from_different_namespaces</c>
 ///         a red left on purpose</b>, a witness to R71's discarded <c>FromSql</c> root. R75 made that
-///         a refusal, the override below pins it, and the class has no red.
+///         a refusal. Since 2026-10-07 the harness grants raw SQL on both halves, and the
+///         inherited test runs without an override or a different outcome from plain EF.
 ///     </para>
 ///     <para>
 ///         EF's <c>AdHocMiscellaneousQuerySqliteTest</c> also overrides <c>Average_with_cast</c>
@@ -56,7 +57,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocMiscellaneousQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        SqliteInfoCarrierTier.Instance, arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     protected override ITestStoreFactory TestStoreFactory
@@ -101,26 +103,6 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
 
         return optionsBuilder;
     }
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <b>EF issue #23981 is about entity types in different namespaces; the
-    ///     <c>FromSqlRaw</c> is only how the base reaches them.</b> This provider refuses
-    ///     <c>FromSql</c> (R75), so the scenario cannot be reached here at all, and the refusal is
-    ///     what is pinned. Until R75 this failed with a <c>NullReferenceException</c> out of this
-    ///     provider's own materializer — the discarded query root surfacing three layers from its
-    ///     cause, which is why it read as an unrelated defect.
-    /// </remarks>
-    [InfoCarrierDesign(
-        Decisions.SecurityReview,
-        Decisions.RawSqlGrant,
-        Justification = "Raw SQL is refused unless the server grants it, and this fixture does not.",
-        Deviation = DeviationKind.Other,
-        DeviationNote = "Plain EF runs the raw SQL. This client refuses it before any statement, and the override asserts the refusal.")]
-    public override Task Multiple_different_entity_type_from_different_namespaces(bool async)
-        => FromSqlAssertions.NotSupportedAsync(
-            () => base.Multiple_different_entity_type_from_different_namespaces(async));
-
     /// <inheritdoc />
     /// <remarks>EF's own <c>AdHocMiscellaneousQuerySqliteTest</c>'s, verbatim.</remarks>
     protected override Task Seed2951(Context2951 context)
