@@ -1163,24 +1163,27 @@ public sealed class QuerySplitter
     ///         a member chain is reported, because EF reports one.
     ///     </para>
     ///     <para>
-    ///         <b>THIS DOES NOT MAKE <c>Update_with_invalid_lambda_in_set_property_throws</c>
-    ///         PASS, AND THE REASON IS A BOUND VARIABLE'S NAME.</b> The spec base compares against
+    ///         Until 2026-10-07 this remark said the invalid-selector specification stayed red
+    ///         because of a bound variable's name. That described a fixture with an unregistered
+    ///         public helper, so the query reached this client refusal. The spec base compares against
     ///         <c>RelationalStrings.InvalidPropertyInSetProperty</c> built over
     ///         <c>(OrderDetail o) =&gt; o.MaybeScalar(e =&gt; e.OrderID)</c>, while the caller wrote
     ///         <c>e =&gt; e.MaybeScalar(e =&gt; e.OrderID)</c>. The <c>o</c> is EF's:
     ///         <c>NavigationExpandingExpressionVisitor.CreateNavigationExpansionExpression</c>
     ///         renames the query's parameter to
     ///         <c>entityType.ShortName()[0].ToString().ToLowerInvariant()</c>, and it renames the
-    ///         whole query. This provider refuses <em>before</em> any of EF's pipeline runs
-    ///         (ADR-006), so it has the caller's own names and nothing else.
+    ///         whole query. A refusal here precedes that pipeline (ADR-006), so it has the caller's
+    ///         own names. Registering the shared public helper on both halves lets the full query
+    ///         reach the backend instead, which refuses it with EF's own diagnostic. The specification
+    ///         now passes unchanged, without a design reason.
     ///     </para>
     ///     <para>
     ///         Renaming just this selector would satisfy the assertion and make the message
     ///         disagree with itself — the query printed beside it still says
     ///         <c>od =&gt; od.OrderID &lt; 10250</c>, because that half is the caller's too. A
     ///         message that names one lambda's parameter EF's way and the next one the caller's
-    ///         way is worse than one that is consistently the caller's, so the two tests stay red
-    ///         and this stays as it is.
+    ///         way is worse than one that is consistently the caller's. This guard therefore keeps
+    ///         the caller's names for queries that cannot travel; registration does not rename them.
     ///     </para>
     /// </remarks>
     private static string? InvalidSetPropertySelector(MethodCallExpression call)
