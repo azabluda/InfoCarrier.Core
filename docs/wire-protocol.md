@@ -24,6 +24,20 @@ Every message — request and response — carries an envelope with:
 Versioning policy: additive changes bump minor; breaking changes bump major; a server
 rejects an unsupported major with a well-known error payload.
 
+### Protocol major 2: bounded anonymous shapes (2026-10-07)
+
+`InfoCarrierEnvelope.CurrentProtocolVersion` is 2. Both peers must use this major; version 1 is
+refused rather than accepted with silently discarded shape metadata. TypeNode can describe anonymous
+data with a reserved `InfoCarrier.AnonymousShape.v1/` identity token, ordered `shapeMembers`, and
+property-type `genericArguments`. Arrays containing shapes use `arrayElement` and `arrayRank`.
+The shape vocabulary's version is separate from the envelope major.
+
+The identity token distinguishes original type definitions; it is not an assembly load instruction.
+The server validates names, count, depth, and component permissions before generating fixed data
+classes. Responses retain descriptors and the client restores its original types. There is no
+server-to-client generated code or client assembly transfer. Named application types still require
+matching explicit registration. See the [ADR amendment](decisions.md#amendment-2026-10-07-bounded-anonymous-data-descriptors).
+
 ## 2. Operations (from requirements §2.4)
 
 ### 2.1 Query

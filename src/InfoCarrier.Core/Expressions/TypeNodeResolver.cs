@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Reflection.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Expressions;
@@ -27,6 +28,48 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly IModel? _model = model;
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
+    private readonly Dictionary<Type, TypeNode> _responseShapes = [];
+    private readonly Dictionary<string, AnonymousShapeCatalog.Entry> _catalogEntries = new(StringComparer.Ordinal);
+    private TypeNodeMapper? _shapeMapper;
+    internal TypeNodeMapper? ShapeMapper
+    {
+        get => _shapeMapper;
+        set
+        {
+            _shapeMapper = value;
+            foreach ((Type type, TypeNode node) in _responseShapes)
+            {
+                value?.BindResponseShape(type, node);
+            }
+        }
+    }
+    private AnonymousShapeCatalog? _shapeCatalog;
+    internal void RequireServerShapeCatalog() => _shapeCatalog ??= AnonymousShapeCatalog.Empty;
+
+    /// <summary>
+    ///     Uses an immutable catalog constructed by trusted server configuration. Attaching a
+    ///     catalog disables client exchange-local original-type restoration on this resolver.
+    ///     Component permissions are still checked separately on every resolution.
+    /// </summary>
+    public virtual void UseAnonymousShapeCatalog(AnonymousShapeCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        if (catalog.Model is not null && !ReferenceEquals(catalog.Model, _model))
+        {
+            throw new InvalidOperationException("The anonymous-shape catalog belongs to another server model.");
+        }
+
+        _shapeCatalog = catalog;
+        _catalogEntries.Clear();
+    }
+    private readonly HashSet<string> _shapes = new(StringComparer.Ordinal);
+    private static readonly TypeNameParseOptions NameParseOptions = new() { MaxNodes = 1024 };
+    internal void ResetShapes()
+    {
+        _shapes.Clear();
+        _responseShapes.Clear();
+        _catalogEntries.Clear();
+    }
 
     // The list actually consulted: the DI-scoped one until an execution declares more, then a
     // widened copy of it. WIDENED RATHER THAN CONSULTED BESIDE, so the allowlist's own generic
@@ -71,7 +114,19 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     public virtual Type Resolve(TypeNode node)
     {
         TypeNodeComplexity.Validate(node);
-        string cacheKey = node.ToString();
+        ValidateShapes(node, 0);
+        if (HasShape(node))
+        {
+            Type shaped = ResolveCore(node);
+            if (!_effective.IsAllowed(shaped))
+            {
+                throw new InvalidOperationException(BuildRejection(shaped));
+            }
+
+            return shaped;
+        }
+
+        string cacheKey = node.CacheIdentity();
 
         // THE CACHE MEMOIZES THE RESOLUTION AND NEVER THE PERMISSION, and the two were one lookup
         // until `UseExecutionAllowedTypes` existed. A name resolved while one execution's declared
@@ -89,10 +144,9 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         // generic test base. The constructed type below still has to clear it, and an argument
         // that is not part of an allowed whole is still denied there.
 
-        // Complexity is bounded before resolution, but permission still needs the resolved Type.
-        // MakeGenericType creates type metadata before this check; it invokes no constructor.
-        // Object construction remains behind the allowlist.
-        if (!_effective.IsAllowed(resolved))
+        // Enforced after resolution, not instead of it: the name has to be resolved to know
+        // what it denotes, but nothing is constructed from it until it clears the allowlist.
+        if (ContainsAnonymous(resolved) || !_effective.IsAllowed(resolved))
         {
             throw new InvalidOperationException(BuildRejection(resolved));
         }
@@ -122,11 +176,48 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
 
     private Type ResolveCore(TypeNode node)
     {
+        if (node.ShapeMembers is not null)
+        {
+            string key = node.CacheIdentity();
+            AnonymousShapeCatalog.Entry? entry = null;
+            if (_shapeCatalog is not null && !_catalogEntries.TryGetValue(key, out entry))
+            {
+                entry = _shapeCatalog.Require(node);
+                // ValidateShapes already bounded all anonymous identities for this exchange.
+                _catalogEntries.Add(key, entry);
+            }
+            Type[] components = node.GenericArguments.Select(Resolve).ToArray();
+            if (_shapeCatalog is null && ShapeMapper?.TryOriginalShape(node, out Type? original) == true)
+            {
+                return original!;
+            }
+
+            Type generated = entry is not null ? AnonymousShapeCatalog.Resolve(entry, components)
+                : throw new InvalidOperationException("Anonymous-shape generation requires a trusted server catalog.");
+            if (_responseShapes.TryGetValue(generated, out TypeNode? previous)
+                && previous.CacheIdentity() != node.CacheIdentity())
+            {
+                throw new InvalidOperationException("Different anonymous type identities for the same registered structure cannot share one exchange.");
+            }
+
+            TypeNode saved = AnonymousShapeTypes.Snapshot(node);
+            _responseShapes[generated] = saved;
+            ShapeMapper?.BindResponseShape(generated, saved);
+            return generated;
+        }
+
+        if (node.ArrayElement is not null)
+        {
+            Type element = Resolve(node.ArrayElement);
+            return node.ArrayRank == 1 ? element.MakeArrayType() : element.MakeArrayType(node.ArrayRank);
+        }
+
         // Generic reconstruction.
         if (node.GenericArguments.Count > 0)
         {
             Type definition = ResolveByName(node.Name)
                 ?? throw new InvalidOperationException($"Cannot resolve generic type definition '{node.Name}'.");
+            RejectRawAnonymous(definition);
             Type[] arguments = node.GenericArguments.Select(ResolveCore).ToArray();
             return definition.MakeGenericType(arguments);
         }
@@ -135,6 +226,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         Type? resolved = ResolveByName(node.Name);
         if (resolved is not null)
         {
+            RejectRawAnonymous(resolved);
             return resolved;
         }
 
@@ -172,5 +264,116 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         }
 
         return null;
+    }
+
+    private static bool HasShape(TypeNode node)
+        => node.ShapeMembers is not null || node.ArrayElement is not null || node.GenericArguments.Any(HasShape);
+
+    private static bool ContainsAnonymous(Type type)
+        => AnonymousShapeTypes.IsOriginal(type) || AnonymousShapeTypes.IsGenerated(type)
+            || (type.IsArray && ContainsAnonymous(type.GetElementType()!))
+            || (type.IsGenericType && type.GetGenericArguments().Any(ContainsAnonymous));
+
+    private static void RejectRawAnonymous(Type type)
+    {
+        if (ContainsAnonymous(type))
+        {
+            throw new InvalidOperationException("Anonymous data requires a bounded shape descriptor, not a CLR name.");
+        }
+    }
+
+    private void ValidateShapes(TypeNode node, int depth)
+    {
+        if (node is null || string.IsNullOrEmpty(node.Name) || node.GenericArguments is null)
+        {
+            throw new InvalidOperationException("A type descriptor requires a name and component list.");
+        }
+
+        if (depth > AnonymousShapeTypes.MaximumDepth)
+        {
+            throw new InvalidOperationException("The type descriptor depth budget is exhausted.");
+        }
+
+        if (node.ShapeMembers is not null)
+        {
+            AnonymousShapeTypes.Validate(node);
+        }
+        else if (node.Name.StartsWith(AnonymousShapeTypes.Prefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("An anonymous-shape identity requires member metadata.");
+        }
+        else if (node.ArrayElement is null)
+        {
+            // FullName can contain constructed generic types, especially inside ordinary arrays.
+            // Parse without loading assemblies or constructing runtime types. Raw names and
+            // structured arguments must consume the same depth budget before either lookup path.
+            if (node.Name.Length > 16384)
+            {
+                throw new InvalidOperationException("The type-name length budget is exhausted.");
+            }
+
+            TypeName name;
+            try
+            {
+                name = TypeName.Parse(node.Name, NameParseOptions);
+            }
+            catch (Exception error) when (error is ArgumentException or InvalidOperationException)
+            {
+                throw new InvalidOperationException("Invalid or excessively complex CLR type name.", error);
+            }
+
+            ValidateNameDepth(name, depth);
+            if (node.GenericArguments.Count > 0 && !name.IsSimple)
+            {
+                throw new InvalidOperationException("Structured generic arguments require a simple generic definition name.");
+            }
+        }
+
+        if (node.ArrayElement is not null)
+        {
+            if (node.Name != "InfoCarrier.ShapeArray.v1" || node.ArrayRank is < 1 or > 32
+                || node.GenericArguments.Count != 0 || node.EntityTypeName is not null)
+            {
+                throw new InvalidOperationException("Invalid anonymous-shape array descriptor.");
+            }
+
+            ValidateShapes(node.ArrayElement, depth + 1);
+        }
+
+        foreach (TypeNode component in node.GenericArguments)
+        {
+            ValidateShapes(component, depth + 1);
+        }
+
+        if (node.ShapeMembers is not null)
+        {
+            string identity = node.CacheIdentity();
+            if (!_shapes.Contains(identity) && _shapes.Count >= AnonymousShapeTypes.MaximumShapes)
+            {
+                throw new InvalidOperationException("The exchange anonymous-shape budget is exhausted.");
+            }
+
+            _shapes.Add(identity);
+        }
+    }
+
+    private static void ValidateNameDepth(TypeName name, int depth)
+    {
+        if (depth > AnonymousShapeTypes.MaximumDepth)
+        {
+            throw new InvalidOperationException("The type descriptor depth budget is exhausted.");
+        }
+
+        if (name.IsArray || name.IsPointer || name.IsByRef)
+        {
+            ValidateNameDepth(name.GetElementType(), depth + 1);
+        }
+        else if (name.IsConstructedGenericType)
+        {
+            foreach (TypeName argument in name.GetGenericArguments())
+            {
+                ValidateNameDepth(argument, depth + 1);
+            }
+        }
     }
 }

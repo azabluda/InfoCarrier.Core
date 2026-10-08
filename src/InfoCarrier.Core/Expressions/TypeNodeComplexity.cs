@@ -44,6 +44,22 @@ internal static class TypeNodeComplexity
             throw new InvalidOperationException("The type descriptor name length budget is exhausted.");
         }
 
+        if (node.ShapeMembers is not null || node.ArrayElement is not null)
+        {
+            remainingNodes--;
+            foreach (TypeNode component in node.GenericArguments)
+            {
+                Validate(component, depth + 1, ref remainingNodes);
+            }
+
+            if (node.ArrayElement is { } element)
+            {
+                Validate(element, depth + 1, ref remainingNodes);
+            }
+
+            return;
+        }
+
         TypeName name;
         try
         {

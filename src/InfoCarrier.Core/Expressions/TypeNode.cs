@@ -30,9 +30,45 @@ public sealed record TypeNode
     /// </summary>
     public string? EntityTypeName { get; init; }
 
+    /// <summary>Ordered anonymous data properties; null for ordinary named types.</summary>
+    public IReadOnlyList<string>? ShapeMembers { get; init; }
+
+    /// <summary>Element descriptor for an array containing anonymous shapes.</summary>
+    public TypeNode? ArrayElement { get; init; }
+
+    /// <summary>Rank of an array with an element descriptor; zero otherwise.</summary>
+    public int ArrayRank { get; init; }
+
+    // Length prefixes keep punctuation in model names from merging distinct descriptors.
+    internal string CacheIdentity()
+    {
+        var text = new System.Text.StringBuilder();
+        Append(this);
+        return text.ToString();
+
+        void Value(string? value) => text.Append(value?.Length ?? -1).Append(':').Append(value);
+        void Append(TypeNode node)
+        {
+            Value(node.Name);
+            Value(node.EntityTypeName);
+            text.Append('/').Append(node.ArrayRank).Append('/').Append(node.ShapeMembers?.Count ?? -1).Append('/');
+            if (node.ShapeMembers is not null)
+            {
+                foreach (string member in node.ShapeMembers) Value(member);
+            }
+
+            text.Append('/').Append(node.GenericArguments.Count).Append('/');
+            foreach (TypeNode argument in node.GenericArguments) Append(argument);
+            text.Append(node.ArrayElement is null ? '0' : '1');
+            if (node.ArrayElement is not null) Append(node.ArrayElement);
+        }
+    }
+
     /// <inheritdoc />
     public override string ToString()
-        => GenericArguments.Count == 0
+        => ArrayElement is not null ? $"{ArrayElement}[{new string(',', ArrayRank - 1)}]"
+            : ShapeMembers is not null ? $"{Name}{{{string.Join(",", ShapeMembers)}}}<{string.Join(",", GenericArguments)}>"
+            : GenericArguments.Count == 0
             ? (EntityTypeName is null ? Name : $"{Name} [{EntityTypeName}]")
-            : $"{Name}<{string.Join(",", GenericArguments)}>";
+            : $"{Name}<{string.Join(",", GenericArguments)}>{(EntityTypeName is null ? string.Empty : $" [{EntityTypeName}]")}";
 }

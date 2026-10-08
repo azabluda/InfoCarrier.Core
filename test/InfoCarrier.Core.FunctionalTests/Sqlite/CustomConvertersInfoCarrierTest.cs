@@ -82,43 +82,9 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
             CoreStrings.TranslationFailed("")[47..],
             Assert.Throws<InvalidOperationException>(() => base.Value_conversion_on_enum_collection_contains()).Message);
 
-    /// <inheritdoc />
-    /// <remarks>
-    ///     <para>
-    ///         <b>The server's EF refuses it, as EF does, since 2026-09-22.</b> Until then the server
-    ///         read the whole <c>Layouts</c> column and the client ran the inner <c>Select</c>, which
-    ///         answered a query every EF provider refuses. The lambda over an element names
-    ///         <c>Layout</c>, which the model does not imply, so the fixture registers it.
-    ///         <c>ServerParameterizationTest</c> compares the two refusals directly, and pins what an
-    ///         unregistered element type does.
-    ///     </para>
-    ///     <para>
-    ///         The message names the tuple that carries the anonymous type, where EF names the
-    ///         anonymous type.
-    ///     </para>
-    /// </remarks>
-    [InfoCarrierDesign(
-        10,
-        Justification = "The anonymous type in the inner Select crosses the wire as a ValueTuple, so the server's EF "
-            + "refuses the lambda it received and prints the tuple.",
-        Deviation = DeviationKind.QueryWrittenOut | DeviationKind.Other,
-        DeviationNote = "The same refusal of the same lambda, printed with the tuple. The base asserts the message inside "
-            + "its own Assert.Throws, so its query is written out.")]
-    public override void Composition_over_collection_of_complex_mapped_as_scalar()
-    {
-        using DbContext context = CreateContext();
-
-        Assert.Equal(
-            CoreStrings.TranslationFailed("l => new ValueTuple<int, int>(    Item1 = l.Height,     Item2 = l.Width)"),
-            Assert.Throws<InvalidOperationException>(
-                    () => context.Set<Dashboard>().AsNoTracking().Select(d => new
-                    {
-                        d.Id,
-                        d.Name,
-                        Layouts = d.Layouts.Select(l => new { H = l.Height, W = l.Width }).ToList()
-                    }).ToList())
-                .Message.Replace("\r", string.Empty).Replace("\n", string.Empty));
-    }
+    // Since 2026-10-07, bounded anonymous shapes preserve the inherited converted-list
+    // refusal diagnostic. The former tuple-specific override and attribution are removed.
+    // Layout still requires explicit fixture registration; owned tests retain both boundaries.
 
     // REVERSED BY R72, and the reason the earlier measurement disproved it is now known.
     // `Value_conversion_on_enum_collection_contains` -- EF's other behavioural SQLite override --

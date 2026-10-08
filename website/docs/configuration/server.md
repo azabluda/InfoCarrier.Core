@@ -87,6 +87,49 @@ command text runs every statement in it, and such a query does not go through `O
 your query filters are not in it. What limits the caller is the rights of the database account your
 connection string uses.
 
+## Registering anonymous projections
+
+Register anonymous data structures on the server using prototype objects:
+
+```csharp
+builder.Services.AddInfoCarrierAnonymousShapes(
+    new { Name = "", Age = 0 },
+    new { Country = "", City = "" },
+    new { CustomerId = 0, Year = 0 });
+
+// Named records use the existing type permission registration.
+builder.Services.AddInfoCarrierAllowedTypes(typeof(CustomerSummary));
+```
+
+Prototype values are ignored. Names, property order, and property types must match the client's
+structure. The server and client can declare their anonymous objects in different assemblies.
+Repeated calls compose. These registrations also cover grouping keys, join keys, and nested anonymous
+data, not just final projections.
+
+Nested anonymous objects are registered recursively. Arrays and generic collections can contain
+them, including lists of lists. Each anonymous type has at most 32 properties; complete type
+descriptors have at most 1,024 nodes and nesting depth 16. Each exchange admits at most 64 anonymous
+identities. Rank-one non-vector arrays containing anonymous elements are unsupported.
+
+The provider builds the immutable catalog using the registered server `DbContext` model.
+`MapInfoCarrier()` constructs it during endpoint setup; an in-process server constructs it when
+created. Registered structures reuse fixed generated types across exchanges. Keep registrations in
+trusted startup code. Advanced hosts can build `AnonymousShapeCatalog.Create(model, types)` directly
+and supply one complete catalog per model instance. Use either prototypes or an explicit catalog;
+mixing these registration methods depends on call order.
+
+An unregistered shape reaching server execution is rejected. There is no automatic client-evaluation
+fallback. Existing client projection reassembly still applies where the query planner chooses it.
+Different original anonymous identities for the same registered structure cannot share one exchange;
+the server rejects this case to preserve equality behavior and unambiguous response restoration.
+
+Shape registration does not grant permission to its component types. Register custom components
+and named records on both client and server using the existing type permission APIs.
+Records do not require anonymous-shape registration.
+See [Security](../security.md) and the
+[catalog contract](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/plans/v10/anonymous-shape-catalog.md)
+for startup configuration and the limits.
+
 ## Sending the server's log to the client
 
 EF writes its warnings about a query or a save on the server, so a client never sees them.

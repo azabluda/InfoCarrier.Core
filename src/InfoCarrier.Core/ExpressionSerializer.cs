@@ -133,7 +133,18 @@ public class ExpressionSerializer(
     /// </remarks>
     /// <param name="context">The server's context.</param>
     public virtual void UseServerContext(Microsoft.EntityFrameworkCore.DbContext context)
-        => _serverContext = context;
+    {
+        _serverContext = context;
+        _typeResolver.RequireServerShapeCatalog();
+    }
+
+    /// <summary>
+    ///     Attaches a fully constructed catalog from trusted server configuration. This is
+    ///     separate from component-type permission registration and client response restoration.
+    /// </summary>
+    /// <param name="catalog">The immutable catalog for this pipeline's server model.</param>
+    public virtual void UseAnonymousShapeCatalog(AnonymousShapeCatalog catalog)
+        => _typeResolver.UseAnonymousShapeCatalog(catalog);
 
     /// <summary>
     ///     Builds a model-aware serializer pipeline for the given EF model. Used by the server,
@@ -166,9 +177,26 @@ public class ExpressionSerializer(
         Microsoft.EntityFrameworkCore.Metadata.IModel model,
         IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers = null,
         IEnumerable<Type>? allowedTypes = null)
+        => CreateForModel(model, valueMappers, allowedTypes, null);
+
+    /// <summary>
+    ///     Creates a server serializer with a trusted catalog. An absent catalog refuses
+    ///     anonymous-shape descriptors; ordinary model types retain their existing permissions.
+    /// </summary>
+    /// <param name="model">The actual server model.</param>
+    /// <param name="valueMappers">Server value mappers.</param>
+    /// <param name="allowedTypes">Additional permitted component and application types.</param>
+    /// <param name="anonymousShapes">A complete catalog constructed before serving requests.</param>
+    /// <returns>The server serializer.</returns>
+    public static ExpressionSerializer CreateForModel(
+        Microsoft.EntityFrameworkCore.Metadata.IModel model,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers,
+        IEnumerable<Type>? allowedTypes,
+        AnonymousShapeCatalog? anonymousShapes)
     {
         var typeMapper = new TypeNodeMapper(model);
         var typeResolver = new TypeNodeResolver(model, TypeAllowlist.ForModel(model, allowedTypes));
+        typeResolver.UseAnonymousShapeCatalog(anonymousShapes ?? AnonymousShapeCatalog.Empty);
         var valueMapper = new DynamicValueMapper(model, typeMapper, typeResolver, valueMappers);
         var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
         return new ExpressionSerializer(forward, typeResolver, valueMapper);

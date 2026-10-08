@@ -12,6 +12,69 @@ Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63
 
 ## 1. The path, in order
 
+### Addendum 2026-10-08: bounded anonymous data and trusted catalogs
+
+Protocol major 2 adds a server-owned immutable data generator. A server reconstructs only closed
+shapes in an immutable `AnonymousShapeCatalog` built from trusted application types before serving
+requests. Descriptor names do not resolve
+client assemblies or grant arbitrary compiler-generated types. Raw anonymous and emitted CLR names
+are refused, even inside generic containers. Every property component resolves through the existing
+allowlist on every execution, including cache hits after registrations change. The reflection
+invocation conjunction in §2 remains unchanged.
+
+Generation is limited to 32 members, 128 characters per identifier, 64 distinct shapes per exchange,
+type nesting depth 16, and 4096 type-generation attempts per process. Catalog construction validates
+the complete trusted graph and checks remaining capacity under the factory lock before generation.
+All registered replacements are constructed before the catalog is published. Invalid or oversized
+configuration returns no partially usable catalog. The process cache is synchronized,
+never evicts and regenerates, and refuses further trusted generation at capacity. This bounds emitted code
+despite provider caches retaining types; it does not promise collectible assemblies actually unload.
+Requests cannot emit types, add catalog entries, or consume that generation budget. Local membership
+matches the structural descriptor, including member order, nesting, arrays and model names;
+original compiler tokens are preserved per exchange for response restoration, not catalog membership.
+resolution also requires the registered actual runtime component identities. A globally cached type
+or a server mapper's original-type binding does not grant membership in another catalog.
+
+The depth check includes constructed generic and array syntax inside raw CLR names, combined with
+the surrounding structured descriptor depth. Before `Type.GetType`, `Assembly.GetType`, or
+`MakeGenericType`, the framework's metadata-only `TypeName` parser limits names and model names to
+16,384 characters and the complete descriptor graph to 1,024 nodes. Ordinary generic arrays remain supported. This closes the earlier
+raw-name bypass; the final allowlist still follows ordinary generic type construction, preserving
+exact model/application whole-type registrations. It does not bound all expression evaluation work.
+
+The earlier draft permitted valid descriptors to exhaust the shared cache across independent
+exchanges. The owner selected a trusted catalog on 2026-10-08 to remove that request admission path
+([issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212)). The isolated owned test now
+sends 8,192 identity aliases for an approved structure and 8,192 unknown structures through independent
+production resolvers. Aliases reuse the fixed type, unknown structures are refused, approved callers
+remain usable, and trusted configuration can still add another legitimate shape afterward.
+It also uses the actual 4,096-slot limit to check oversized-catalog refusal before emission and
+concurrent catalog reuse. No production counter is reset and no smaller test limit is substituted.
+
+This compatibility change requires server registration of complete, closed anonymous projections.
+Registration is not an additional `AllowTypes` grant: current component permissions remain required
+on every execution, including cached reuse after revocation. Model-bound catalogs cannot be attached
+to another model instance. Server prototypes match client structures across assemblies and builds.
+Conflicting original identities for one generated structure within an exchange are refused, avoiding
+changed equality and ambiguous response reconstruction. Client restoration remains exchange-local
+and cannot register new server shapes. See the
+[catalog contract and validation report](plans/v10/anonymous-shape-catalog.md).
+
+The catalog prevents client-driven emission exhaustion, not every denial of service through allowed
+expressions. Request-size, authentication, rate limits and process lifecycle remain deployment controls.
+This change does not introduce workers or a general execution resource budget. Existing runtime type
+and expression evaluation surfaces remain relevant.
+In particular, an admitted `Type.GetType(string)` call can still receive a complex name as an
+ordinary string argument during expression evaluation. Descriptor parsing does not validate those
+runtime arguments. The existing hardening test permits that method and blocks the later reflection
+invocation pivot; it does not establish a resource budget for the method itself.
+
+Data fields are readonly. Public members are limited to getters, the ordered data constructor,
+structural equality/hash methods, and formatting. Names never enter source code. Private static
+comparer slots contain the framework's EqualityComparer<T>.Default, installed by trusted factory
+code before publication; no payload chooses a comparer method.
+Existing model/application registrations still determine which component behavior is reachable.
+
 Every arrow is a place a hostile payload gets a say.
 
 | # | Stage | Control |

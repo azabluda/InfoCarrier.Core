@@ -795,6 +795,65 @@ wrote is still a boundary. Only compiler-generated identifiers are re-carried. S
 a type property and not a translatability property, so the guards reduce risk without removing
 it — which is why each phase is measured separately and reverted if it does not pay.
 
+### Amendment 2026-10-07 — bounded anonymous data descriptors
+
+The owner selected the bounded generated-shape protocol after the
+[measured investigation](plans/v10/anonymous-shape-investigation.md), superseding the anonymous-data
+representation clauses of ADR-010 and ADR-011. Boundaries remain client-computed. Custom behavior,
+unregistered application types, private helpers, and unsafe reflection signatures remain governed by
+the existing registration and client-evaluation rules.
+
+Reasons reviewed: the server still lacks client assemblies, but can generate immutable data classes
+from validated descriptors without loading those assemblies. Default-deny resolution still holds:
+only the fixed server factory's classes are admitted, and every component must clear the existing
+allowlist. Names, property order/types, and constructor/member mappings are necessary; a Boolean
+anonymous marker cannot reconstruct them. Tuple replacement loses diagnostic names and a nine-member
+join's server execution, as the investigation demonstrated. Avoiding a compiler dependency and
+reflection invocation admission remains binding. No captured statement baseline is committed.
+
+Protocol major 2 carries ordered anonymous members and opaque original-definition tokens in TypeNode.
+The server emits fixed getters, a data constructor, structural equality/hash methods and formatting.
+It never executes client code from metadata. The original client types are remembered per exchange
+and reconstructed by the existing value mapper; generated runtime identity is not original identity.
+Both arbitrary CLR names for anonymous classes and raw names of generated classes are refused,
+including inside mixed generic descriptors. Old peers refuse the incompatible envelope version.
+
+Bounds are 32 members, 128 characters per name, 64 shapes per exchange, type depth 16, and 4096 type-generation
+attempts per server process. Types are reused under a locked cache and generation refuses at the
+process ceiling. The hard ceiling bounds emitted code even if provider caches retain types; collectible
+assemblies alone are not an unloading guarantee. Deployments must still bound request bytes and callers.
+
+The tuple and custom projection machinery remains for types without descriptors or client-only
+operations. Anonymous data that clears the boundary follows the backend's actual translation and
+refusal behavior. This supersedes the earlier claim that every caller-written anonymous type is a
+boundary, not the obligation to reconstruct results and preserve entity identity on the client.
+
+### Amendment 2026-10-08 — trusted structural catalogs
+
+The owner selected trusted server registration for
+[issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212), then approved anonymous
+prototype syntax. Only trusted catalog construction can emit fixed replacements, before requests
+execute. Requests match registered structures and cannot spend generation capacity. Member names,
+order, nested structures, component descriptors, model names, and actual runtime component identities
+remain binding. Compiler identity tokens are excluded from structural membership, so client and
+server declarations need not share an assembly or build. Component permissions remain independent.
+
+`AddInfoCarrierAnonymousShapes(params object[] shapes)` snapshots prototype types and composes
+repeated calls. Values are ignored. Named records retain `AddInfoCarrierAllowedTypes`. The catalog
+uses the registered server context's model and is constructed during endpoint setup or in-process
+server creation. Advanced hosts may construct complete model-bound catalogs explicitly.
+
+Responses retain each original request identity within an exchange. Different original identities
+for one registered generated structure in the same exchange are refused: silently merging them can
+change equality and make response reconstruction ambiguous. Across exchanges they reuse one fixed
+server type. Catalog entries are immutable; successful membership lookup caches are exchange-scoped
+and bounded by the existing 64-identity limit. Permission checks are never cached. Unregistered
+server shapes are rejected; this does not add an automatic client-evaluation fallback.
+
+The [structural registration plan](plans/v10/anonymous-shape-structural-registration.md) records
+implementation and evidence. This supersedes request-controlled generation and exact-template
+catalog membership in the earlier draft while retaining the protocol and recursive limits.
+
 ## ADR-012 — A value-mapper seam for CLR types the wire cannot walk — LOCKED (2026-08-09)
 
 **Context.** The wire's default handling of a non-primitive, non-entity value is a reflective

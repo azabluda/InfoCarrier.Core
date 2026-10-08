@@ -112,7 +112,8 @@ public class QuerySplitterTest : IDisposable
         // minimal-column payload are the same mechanism (§3.2).
         SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }));
 
-        Assert.Equal(typeof(string), Assert.Single(split.ServerQueries).ElementType);
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(typeof(string), Assert.Single(Assert.Single(split.ServerQueries).ElementType.GetProperties()).PropertyType);
         Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
     }
 
@@ -163,7 +164,8 @@ public class QuerySplitterTest : IDisposable
         SplitQuery split = Split(
             _context.Authors.Select(a => new { a.Name, Count = a.Books.Count }));
 
-        Assert.Equal(typeof(ValueTuple<string, int>), Assert.Single(split.ServerQueries).ElementType);
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(["Name", "Count"], Assert.Single(split.ServerQueries).ElementType.GetProperties().Select(p => p.Name));
         Assert.Equal([1, 0], Rows(Run(split), "Count"));
     }
 
@@ -223,7 +225,8 @@ public class QuerySplitterTest : IDisposable
                 (a, b) => new { a.Name, b.Title }));
 
         ServerQuery server = Assert.Single(split.ServerQueries);
-        Assert.Equal(typeof(ValueTuple<string, string>), server.ElementType);
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(["Name", "Title"], server.ElementType.GetProperties().Select(p => p.Name));
         Assert.Equal(["Austen"], Rows(Run(split), "Name"));
         Assert.Equal(["Emma"], Rows(Run(split), "Title"));
     }
@@ -301,9 +304,9 @@ public class QuerySplitterTest : IDisposable
 
         // Nested, because the inner projection was rewritten first: only the Title travels, not
         // whole Book rows (wire-protocol W1), and the materialization wraps that.
-        Assert.Equal(
-            typeof(ValueTuple<List<ValueTuple<string>>>),
-            Assert.Single(split.ServerQueries).ElementType);
+        Assert.True(split.IsPassThrough);
+        Assert.Equal("Title", Assert.Single(Assert.Single(split.ServerQueries).ElementType
+            .GetGenericArguments()[0].GetProperties()).Name);
 
         List<object?> rows = [.. ((IEnumerable)Run(split)!).Cast<object?>()];
         Assert.Equal(2, rows.Count);
@@ -384,7 +387,8 @@ public class QuerySplitterTest : IDisposable
                 .Select(a => new { a, books = a.Books.Where(b => b.Id < 5) })
                 .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault()!.Title }));
 
-        Assert.Equal(typeof(ValueTuple<string, string>), Assert.Single(split.ServerQueries).ElementType);
+        Assert.True(split.IsPassThrough);
+        Assert.Equal(["Name", "Title"], Assert.Single(split.ServerQueries).ElementType.GetProperties().Select(p => p.Name));
     }
 
     /// <summary>
