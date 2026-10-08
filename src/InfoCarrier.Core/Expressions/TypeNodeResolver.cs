@@ -70,6 +70,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     /// </summary>
     public virtual Type Resolve(TypeNode node)
     {
+        TypeNodeComplexity.Validate(node);
         string cacheKey = node.ToString();
 
         // THE CACHE MEMOIZES THE RESOLUTION AND NEVER THE PERMISSION, and the two were one lookup
@@ -88,8 +89,9 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         // generic test base. The constructed type below still has to clear it, and an argument
         // that is not part of an allowed whole is still denied there.
 
-        // Enforced after resolution, not instead of it: the name has to be resolved to know
-        // what it denotes, but nothing is constructed from it until it clears the allowlist.
+        // Complexity is bounded before resolution, but permission still needs the resolved Type.
+        // MakeGenericType creates type metadata before this check; it invokes no constructor.
+        // Object construction remains behind the allowlist.
         if (!_effective.IsAllowed(resolved))
         {
             throw new InvalidOperationException(BuildRejection(resolved));
