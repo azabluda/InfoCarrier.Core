@@ -126,6 +126,7 @@ baseline. Both shipping packages passed Release compatibility validation without
 | Complete regular functional project | 29644 | 0 | 234 | 29878 |
 | Complete regular document-store project | 235 | 0 | 0 | 235 |
 | Final Release owned protocol/catalog/capacity and descriptor checks | 48 | 0 | 0 | 48 |
+| Integrated Release shape and deserialization protection checks | 78 | 0 | 0 | 78 |
 | HTTP transport | 30 | 0 | 0 | 30 |
 | Complete SQLite live comparison | 27603 | 0 | 167 | 27770 |
 | Complete Firebird live comparison | 109 | 0 | 1 | 110 |
@@ -152,6 +153,11 @@ The manifest now starts from the concrete backend store's actual assembly and is
 through `Lazy<Type[]>`. It never derives registration from received expressions or response bytes.
 
 The corrected final Release rebuild also passed with zero errors and the same five Razor warnings.
+Integration of [pull request #213](https://github.com/azabluda/InfoCarrier.Core/pull/213) preserved
+the verified resolver, complexity helper, and ordinary budget tests byte-for-byte. The merge changes
+only documentation relative to the catalog implementation commit. The integrated Release run passed
+all 78 focused shape and deserialization protection tests; the complete measurement's tested source
+is unchanged.
 One attempted rebuild while the SQLite slow process held Release files failed with Windows copy
 locks. It was rerun after that process exited; this was an execution scheduling error, not a test
 or source failure.

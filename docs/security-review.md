@@ -1,4 +1,4 @@
-﻿# Security review — the deserialization path
+# Security review — the deserialization path
 
 Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63` (plan item C48).
 
@@ -81,7 +81,7 @@ Every arrow is a place a hostile payload gets a say.
 | 3 | payload → request DTO | source-generated `JsonSerializerContext`, no reflection fallback |
 | 4 | `SerializedQuery` → `ExpressionNode` | payload bound again; `ExpressionJsonContext` `MaxDepth = 256` |
 | 5 | `$kind` → node type | closed set of 16 `[JsonDerivedType]`s; unregistered discriminator fails the parse |
-| 6 | `TypeNode` → CLR type | `TypeAllowlist` |
+| 6 | `TypeNode` → CLR type | descriptor complexity preflight (§5b), then `TypeAllowlist` |
 | 7 | `MethodNode` → `MethodInfo` | `ResolveMethod` + `Admit`: public, or two named markers |
 | 8 | `Operator` → `ExpressionType` | per-node-kind allowlist of the pure subset |
 | 9 | `DynamicValueNode` → object | `TypeNodeResolver` again, then constructor invocation |
@@ -605,6 +605,38 @@ added to it. The `T` is still subject to ADR-008 constraint 2 like every other n
 type on the client's model, and making it work server-side would mean the server constructing an
 entity type on a client's say-so. That is a genuine widening, it is unbuilt, and it gets its own
 reading before it is taken.
+
+## 5b. Amendment 2026-10-08 — ordinary type-descriptor complexity ([#211](https://github.com/azabluda/InfoCarrier.Core/issues/211))
+
+`TypeNodeResolver.Resolve` validates the complete descriptor before building its cache key or
+calling `Type.GetType`, `Assembly.GetType`, or `MakeGenericType`. The same preflight applies to
+cache hits. It imposes these fixed limits:
+
+- 16 structural edges from the root to a leaf, counting structured generic arguments and raw-name
+  generic arguments, arrays, pointers, and by-reference modifiers together.
+- 1024 cumulative `System.Reflection.Metadata.TypeName` parser nodes across the descriptor,
+  including generic definitions and declaring-type names. Each individual parse also has this cap.
+- 16,384 UTF-16 characters per CLR name or entity-model name.
+
+The metadata parser does not resolve runtime types or load assemblies. Null nodes or argument
+lists, empty names, parser failures, and raw constructed names combined with structured arguments
+are refused. A descriptor exceeding a budget is rejected before any component reaches runtime
+lookup, including when an earlier component names an unavailable assembly or type.
+
+These limits bound descriptor parsing, traversal, and construction requests. They do not establish
+a process-wide type-count or memory quota. `MakeGenericType` still creates bounded runtime type
+metadata before the whole-type permission check; it invokes no instance constructor or static
+initializer. Exact model and application registrations still admit complete generic types without
+requiring each argument to be independently admitted. Registration does not exempt a descriptor
+from the complexity limits, and cached resolution does not preserve revoked permission.
+
+`TypeResolutionBudgetTest` pins raw, structured, and mixed nesting, breadth across separate raw
+names, element modifiers, malformed input, lookup ordering, boundary acceptance, and registration
+revocation. This is independent of anonymous-object reconstruction
+([#209](https://github.com/azabluda/InfoCarrier.Core/issues/209)) and generated-type capacity
+([#212](https://github.com/azabluda/InfoCarrier.Core/issues/212)). Runtime expression calls to
+`Type.GetType(string)`, expensive queries, regular expressions, and host quotas remain outside
+[issue #211](https://github.com/azabluda/InfoCarrier.Core/issues/211).
 
 ## 6. Cancellation (W6) — half landed, and the half that touches this path is the open one
 
