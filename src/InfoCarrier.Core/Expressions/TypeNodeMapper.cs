@@ -19,11 +19,19 @@ public class TypeNodeMapper(IModel? model = null)
 {
     private readonly IModel? _model = model;
     private readonly Dictionary<string, Type> _originalShapes = new(StringComparer.Ordinal);
+    private readonly Dictionary<Type, TypeNode> _responseShapes = [];
 
     internal bool TryOriginalShape(TypeNode node, out Type? type)
         => _originalShapes.TryGetValue(node.CacheIdentity(), out type);
 
-    internal void ResetShapes() => _originalShapes.Clear();
+    internal void ResetShapes()
+    {
+        _originalShapes.Clear();
+        _responseShapes.Clear();
+    }
+
+    internal void BindResponseShape(Type type, TypeNode node)
+        => _responseShapes[type] = AnonymousShapeTypes.Snapshot(node);
 
     /// <summary>
     ///     The nearest type the wire can <em>name</em> for a value of <paramref name="type" />:
@@ -134,6 +142,11 @@ public class TypeNodeMapper(IModel? model = null)
     /// </summary>
     public virtual TypeNode ToTypeNode(Type type)
     {
+        if (_responseShapes.TryGetValue(type, out TypeNode? response))
+        {
+            return AnonymousShapeTypes.Snapshot(response);
+        }
+
         if (AnonymousShapeTypes.TryDescriptor(type, out TypeNode? emitted))
         {
             return emitted!;

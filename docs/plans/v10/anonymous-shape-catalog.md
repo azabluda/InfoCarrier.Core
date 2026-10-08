@@ -1,13 +1,11 @@
 # Trusted anonymous-shape catalog implementation plan
 
 > Execute inline in the existing checkout with `superpowers:executing-plans`.
-> Preserve the existing uncommitted capacity investigation in
-> `anonymous-shape-implementation.md`.
 
 **Goal:** Prevent client descriptors from consuming shared anonymous-shape emission capacity.
 
 **Architecture:** Only a finite, immutable catalog built from trusted, closed anonymous
-types can request emission. Requests perform exact descriptor and runtime-component matching
+types can request emission. Requests perform structural descriptor and runtime-component matching
 against already constructed catalog entries. Component permissions remain a separate,
 per-execution check. Client response restoration retains its exchange-local original bindings.
 
@@ -27,7 +25,7 @@ Ordinary descriptor complexity remains the separate, merged
 - Configuration supplies actual closed anonymous `Type` objects, never received descriptors.
 - A dedicated model-aware mapper derives full descriptors from those trusted types.
 - Nested anonymous objects, arrays, and generic containers are closed recursively.
-- Catalog membership compares token, member names and order, every component descriptor,
+- Catalog membership compares member names and order, every structural component descriptor,
   array information, model names, and actual runtime component identities.
 - A catalog is immutable after construction. Registrations do not grant component permissions.
 - Validate the complete trusted graph and capacity requirements before emission. Reserve all
@@ -64,7 +62,7 @@ Files: new `src/InfoCarrier.Core/Expressions/AnonymousShapeCatalog.cs`, existing
 `AnonymousShapeTypes.cs`, `TypeNodeResolver.cs`, and owned projection-split tests.
 
 - [x] Write failing owned tests for unregistered shape refusal, cross-catalog cache refusal,
-  and thousands of forged identities across independent production resolvers.
+  and thousands of unregistered structures across independent production resolvers.
 - [x] Run the focused tests and record their expected failures before production changes.
 - [x] Add `AnonymousShapeCatalog.Create(IModel? model, IEnumerable<Type> shapes)` and
   immutable internal descriptor/component/type entries. Reject open or non-anonymous roots.
@@ -92,7 +90,7 @@ Files: `ExpressionSerializer.cs`, `InProcessInfoCarrierServer.cs`,
 ### C3: Integration and delivery
 
 - [x] Integrate merged ordinary-descriptor protection while preserving its whole-type allowlist
-  semantics and the original uncommitted investigation notes.
+  semantics. The owner subsequently deleted the uncommitted investigation notes.
 - [x] Run regular specification measurement, transport tests, SQLite and Firebird slow tests,
   strict non-incremental Release build, trim ratchet, and Release package validation.
 - [x] Document configuration, compatibility, and residual limits in the report and security review.
@@ -100,7 +98,10 @@ Files: `ExpressionSerializer.cs`, `InProcessInfoCarrierServer.cs`,
   and update the existing pull request with issue traceability and measured validation.
 - [x] Stop when completed work awaits continuous integration.
 
-## Evidence
+## Evidence before structural registration
+
+The figures below record the exact-template catalog draft. The structural follow-up supersedes its
+identity admission rule; its verification is recorded separately.
 
 The initial missing-registration test failed because the old resolver emitted an unregistered
 shape. It passed after separating trusted catalog construction from request lookup.
@@ -164,47 +165,59 @@ or source failure.
 
 ## Application configuration
 
-Supply closed anonymous types from a trusted deployment artifact containing the actual query
-templates. Shape membership includes the compiler template identity, not just matching member names.
-A server-created anonymous literal in a different assembly is not interchangeable with the client
-template. Rebuilding the template assembly can require updating the server's catalog. Open generic
-templates and wildcards are deliberately refused.
-
-Default assembly load contexts provide portable module/build identities. Independently created
-non-default load contexts receive process-local scope tokens, so loading the same binary in separate
-processes does not reproduce their template identity. The catalog does not add cross-process
-load-context negotiation. The owned load-context tests verify isolation and runtime mismatch refusal,
-not interoperability between independently created contexts.
-
-An application with an already known model can call:
+Register server-owned anonymous prototypes using the same names, order, and component types as the
+client structures. Values are ignored, nested anonymous components are included, and repeated calls
+compose into one immutable catalog:
 
 ```csharp
-var catalog = AnonymousShapeCatalog.Create(serverModel, SharedQueryManifest.ClosedAnonymousTypes);
-services.AddInfoCarrierAnonymousShapes(catalog);
+builder.Services.AddInfoCarrierAnonymousShapes(
+    new { Name = "", Age = 0 },
+    new { Country = "", City = "" },
+    new { CustomerId = 0, Year = 0 });
+
+builder.Services.AddInfoCarrierAllowedTypes(typeof(CustomerSummary));
 ```
 
-When the application obtains its model from dependency injection, it can construct the singleton
-through the actual context and force construction before accepting requests:
+Named records use the existing permission registration on both client and server. Shape registration
+never grants component permissions. It also covers grouping keys, joins, and intermediate anonymous
+data. Nested arrays and generic containers compose within the existing recursive bounds.
 
-```csharp
-builder.Services.AddSingleton<AnonymousShapeCatalog>(provider =>
-{
-    using var scope = provider.CreateScope();
-    var context = scope.ServiceProvider.GetRequiredService<MyServerContext>();
-    return AnonymousShapeCatalog.Create(context.Model, SharedQueryManifest.ClosedAnonymousTypes);
-});
-var app = builder.Build();
-_ = app.Services.GetRequiredService<AnonymousShapeCatalog>();
-```
+Client and server anonymous declarations may come from different assemblies or builds. Structural
+membership ignores original compiler tokens recursively; responses retain the request's tokens for
+client restoration. Different original identities for the same structure in one exchange are
+rejected, because replacing both with the same runtime type could change equality behavior.
 
-`SharedQueryManifest` and `MyServerContext` represent application-owned declarations, not provider
-APIs. The manifest is fixed trusted configuration, never an append operation driven by requests.
-Use one complete catalog per actual model instance; combine trusted template sets before construction.
-For a custom server, pass the catalog to the four-argument `ExpressionSerializer.CreateForModel`
-overload or attach it with `UseAnonymousShapeCatalog`. Existing overloads remain available and refuse
-anonymous shape reconstruction without registration. Model-independent primitive shapes may use a
-null model. Catalog registration does not replace the existing client and server component-type
-registrations.
+The prototype overload snapshots actual types immediately, then builds its singleton catalog with
+the registered server `DbContext` model. `MapInfoCarrier()` resolves catalogs during endpoint setup.
+An in-process server initializes prototype registrations when created. No request invokes emission.
+Unregistered shapes reaching server execution are rejected, without automatic client evaluation.
+Existing projection reassembly remains where the client planner already chooses it.
+
+Advanced custom hosts can construct `AnonymousShapeCatalog.Create(model, trustedTypes)` and pass the
+complete catalog to the serializer's four-argument `CreateForModel` overload. Use one complete
+catalog per actual model instance. Model-independent shapes may use a null model. Actual component
+runtime identity is checked independently, including types from different assembly load contexts.
+
+### Inherited Entity Framework test shapes
+
+The test harness uses `TrustedAnonymousShapeManifest.ForAssembly(actualBackendStoreAssembly)`.
+It reads compiled method instructions with `GetILAsByteArray`, resolves metadata references with
+`Module.ResolveMember`, and follows selected specification methods with their closed generic
+arguments. It collects anonymous data types without executing queries. Types with the same
+registered structure share one replacement even when their compiler identities differ.
+
+This finite discovery is specific to selected trusted test assemblies. Application startup does
+not scan loaded assemblies, learn from received descriptors, or invoke test methods. The harness
+constructs its complete model-aware catalog before executing test requests.
+
+### Cache lifetime
+
+Generated runtime types are strongly cached, with at most 4096 generation attempts per process.
+Trusted catalogs are fixed after construction. Requests cannot append entries. Successful catalog
+lookups and response identity bindings are exchange-local and bounded by the 64 anonymous identity
+limit; reset clears them. Changing a catalog clears membership lookups. Components still require
+current permission and matching runtime identities on every resolution. Descriptor validation
+remains necessary on repeated lookups; cached membership does not bypass recursive budgets.
 
 ## Limits and attribution
 
@@ -227,3 +240,13 @@ Local evidence remains ignored under `artifacts/`: `measure/issue212-catalog-ver
 `issue212-owned-final.log`, `issue212-slow-sqlite.log`, `issue212-slow-firebird.log`,
 `issue212-release-verified.log`, `issue212-trim.log`, and the two `issue212-pack-*.log` files.
 The transport gate passed 30 tests. Independent source review found no confirmed defect.
+
+## Structural follow-up verification, 2026-10-08
+
+The owner-approved prototype API and structural admission supersede exact-template membership.
+The [structural registration report](anonymous-shape-structural-registration.md) records the final
+contract, red/green evidence, cache limits, independent review, and all verification summaries.
+The complete regular measurement has FAILING 0, TOTAL 30120, no fixed or broken cases, and unchanged
+reasons. Complete SQLite and Firebird live comparisons have zero failures. Prototype registration
+adds no further diagnostic attribution removals. Both shipping packages, strict Release, trimming,
+transport, documentation, and hygiene gates pass. No release or package publication was performed.

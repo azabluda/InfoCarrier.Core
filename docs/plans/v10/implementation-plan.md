@@ -514,8 +514,15 @@ in the archive; this step tests the missing integration without a sleep or a slo
       Requests cannot spend generation capacity, reuse another catalog's global entries,
       or register themselves through original-type mapper bindings. Component permissions
       and actual model/runtime identities remain independent requirements. Preserve the
-      original uncommitted investigation notes. Merge the separate ordinary descriptor
-      hardening from [pull request #213](https://github.com/azabluda/InfoCarrier.Core/pull/213).
+      original investigation notes until the owner deleted them. The separate ordinary descriptor
+      hardening from [pull request #213](https://github.com/azabluda/InfoCarrier.Core/pull/213) is merged.
+
+- [x] **G4. Register anonymous structures using server prototypes across client assemblies.**
+      The owner approved `AddInfoCarrierAnonymousShapes(params object[] shapes)` on 2026-10-08.
+      The [structural registration plan](anonymous-shape-structural-registration.md) records
+      structural membership, per-exchange identity restoration, startup construction, and tests.
+      Named records retain the existing type permission registration. Component permissions,
+      recursive limits, model binding, and request-independent generation remain mandatory.
 
 ## Branches that outlive their pull request
 

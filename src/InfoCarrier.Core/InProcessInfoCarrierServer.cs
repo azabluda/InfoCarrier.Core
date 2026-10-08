@@ -28,7 +28,7 @@ namespace InfoCarrier.Core;
 public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     : IInfoCarrierServer, IAsyncDisposable
 {
-    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
 
     /// <summary>
     ///     The transactions this server is holding open, by token (wire-protocol W3).

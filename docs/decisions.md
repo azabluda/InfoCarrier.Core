@@ -828,6 +828,32 @@ operations. Anonymous data that clears the boundary follows the backend's actual
 refusal behavior. This supersedes the earlier claim that every caller-written anonymous type is a
 boundary, not the obligation to reconstruct results and preserve entity identity on the client.
 
+### Amendment 2026-10-08 — trusted structural catalogs
+
+The owner selected trusted server registration for
+[issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212), then approved anonymous
+prototype syntax. Only trusted catalog construction can emit fixed replacements, before requests
+execute. Requests match registered structures and cannot spend generation capacity. Member names,
+order, nested structures, component descriptors, model names, and actual runtime component identities
+remain binding. Compiler identity tokens are excluded from structural membership, so client and
+server declarations need not share an assembly or build. Component permissions remain independent.
+
+`AddInfoCarrierAnonymousShapes(params object[] shapes)` snapshots prototype types and composes
+repeated calls. Values are ignored. Named records retain `AddInfoCarrierAllowedTypes`. The catalog
+uses the registered server context's model and is constructed during endpoint setup or in-process
+server creation. Advanced hosts may construct complete model-bound catalogs explicitly.
+
+Responses retain each original request identity within an exchange. Different original identities
+for one registered generated structure in the same exchange are refused: silently merging them can
+change equality and make response reconstruction ambiguous. Across exchanges they reuse one fixed
+server type. Catalog entries are immutable; successful membership lookup caches are exchange-scoped
+and bounded by the existing 64-identity limit. Permission checks are never cached. Unregistered
+server shapes are rejected; this does not add an automatic client-evaluation fallback.
+
+The [structural registration plan](plans/v10/anonymous-shape-structural-registration.md) records
+implementation and evidence. This supersedes request-controlled generation and exact-template
+catalog membership in the earlier draft while retaining the protocol and recursive limits.
+
 ## ADR-012 — A value-mapper seam for CLR types the wire cannot walk — LOCKED (2026-08-09)
 
 **Context.** The wire's default handling of a non-primitive, non-entity value is a reflective

@@ -31,6 +31,55 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierServiceCollectionExtensions
 {
     /// <summary>
+    ///     Registers anonymous data structures from trusted prototypes. Only property names,
+    ///     order, and types are used; prototype values are ignored. Nested shapes are included.
+    ///     Calls compose, and component-type permissions still require their existing registration.
+    ///     The catalog is built with the server context's model before accepting requests.
+    /// </summary>
+    /// <param name="services">The server application service collection.</param>
+    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
+    /// <returns>The same collection.</returns>
+    public static IServiceCollection AddInfoCarrierAnonymousShapes(
+        this IServiceCollection services, params object[] shapes)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(shapes);
+        Type[] types = shapes.Select(shape => shape?.GetType()
+            ?? throw new ArgumentException("Anonymous-shape prototypes cannot be null.", nameof(shapes))).ToArray();
+        if (types.Any(type => !AnonymousShapeTypes.IsOriginal(type) || type.ContainsGenericParameters))
+        {
+            throw new ArgumentException("Use anonymous objects as shape prototypes; register named records with AddInfoCarrierAllowedTypes.", nameof(shapes));
+        }
+
+        services.AddSingleton(new AnonymousShapeRegistration(types));
+        services.TryAddSingleton(provider =>
+        {
+            using IServiceScope scope = provider.CreateScope();
+            IModel? model = scope.ServiceProvider.GetService<Microsoft.EntityFrameworkCore.DbContext>()?.Model;
+            return AnonymousShapeCatalog.Create(model,
+                provider.GetServices<AnonymousShapeRegistration>().SelectMany(registration => registration.Types));
+        });
+        return services;
+    }
+
+    internal sealed class AnonymousShapeRegistration(Type[] types)
+    {
+        internal IReadOnlyList<Type> Types { get; } = types;
+    }
+
+    internal static IServiceProvider InitializeAnonymousShapes(IServiceProvider provider)
+    {
+        // Existing explicit catalog factories can depend on fixture initialization after server
+        // construction. Eager initialization applies only to the prototype registration overload.
+        if (provider.GetServices<AnonymousShapeRegistration>().Any())
+        {
+            _ = provider.GetServices<AnonymousShapeCatalog>().ToArray();
+        }
+
+        return provider;
+    }
+
+    /// <summary>
     ///     Registers an immutable, already generated anonymous-shape catalog for the in-process
     ///     server. Build it from trusted application types and the actual server model before
     ///     accepting requests. This registration does not grant component-type permissions.

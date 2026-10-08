@@ -56,7 +56,7 @@ public class AnonymousShapeCapacityTest(ITestOutputHelper output)
         string result = await stdout + await stderr;
         _output.WriteLine(result);
         Assert.True(child.ExitCode == 0, result);
-        Assert.Contains("CAPACITY: forged=8192; refused=8192; registered-callers=usable", result);
+        Assert.Contains("CAPACITY: aliases=8192; unknown=8192; registered-callers=usable", result);
         Assert.Contains("CATALOG: oversized=refused-before-emission; trusted-slots=4096; cached-registrations=usable", result);
     }
 
@@ -79,7 +79,11 @@ public class AnonymousShapeCapacityTest(ITestOutputHelper output)
             // Each resolver represents a different exchange. No exchange exceeds its own cap.
             var attacker = new TypeNodeResolver();
             attacker.UseAnonymousShapeCatalog(catalog);
-            Assert.Throws<InvalidOperationException>(() => attacker.Resolve(hostile));
+            Assert.Same(legitimate, attacker.Resolve(hostile));
+            var unknown = new TypeNodeResolver();
+            unknown.UseAnonymousShapeCatalog(catalog);
+            Assert.Throws<InvalidOperationException>(() => unknown.Resolve(
+                hostile with { ShapeMembers = ["Unknown" + i] }));
         }
 
         var otherCaller = new TypeNodeResolver();
@@ -125,7 +129,7 @@ public class AnonymousShapeCapacityTest(ITestOutputHelper output)
         Assert.Same(legitimate, firstCaller.Resolve(template));
         timer.Stop();
         process.Refresh();
-        _output.WriteLine("CAPACITY: forged=8192; refused=8192; registered-callers=usable");
+        _output.WriteLine("CAPACITY: aliases=8192; unknown=8192; registered-callers=usable");
         _output.WriteLine("CATALOG: oversized=refused-before-emission; trusted-slots=4096; cached-registrations=usable");
         _output.WriteLine($"Elapsed: {timer.Elapsed}; working-set increase: {process.WorkingSet64 - before} bytes.");
     }

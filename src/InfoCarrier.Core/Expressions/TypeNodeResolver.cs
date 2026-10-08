@@ -28,7 +28,21 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly IModel? _model = model;
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
-    internal TypeNodeMapper? ShapeMapper { get; set; }
+    private readonly Dictionary<Type, TypeNode> _responseShapes = [];
+    private readonly Dictionary<string, AnonymousShapeCatalog.Entry> _catalogEntries = new(StringComparer.Ordinal);
+    private TypeNodeMapper? _shapeMapper;
+    internal TypeNodeMapper? ShapeMapper
+    {
+        get => _shapeMapper;
+        set
+        {
+            _shapeMapper = value;
+            foreach ((Type type, TypeNode node) in _responseShapes)
+            {
+                value?.BindResponseShape(type, node);
+            }
+        }
+    }
     private AnonymousShapeCatalog? _shapeCatalog;
     internal void RequireServerShapeCatalog() => _shapeCatalog ??= AnonymousShapeCatalog.Empty;
 
@@ -46,10 +60,16 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         }
 
         _shapeCatalog = catalog;
+        _catalogEntries.Clear();
     }
     private readonly HashSet<string> _shapes = new(StringComparer.Ordinal);
     private static readonly TypeNameParseOptions NameParseOptions = new() { MaxNodes = 1024 };
-    internal void ResetShapes() => _shapes.Clear();
+    internal void ResetShapes()
+    {
+        _shapes.Clear();
+        _responseShapes.Clear();
+        _catalogEntries.Clear();
+    }
 
     // The list actually consulted: the DI-scoped one until an execution declares more, then a
     // widened copy of it. WIDENED RATHER THAN CONSULTED BESIDE, so the allowlist's own generic
@@ -158,15 +178,32 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     {
         if (node.ShapeMembers is not null)
         {
-            _shapeCatalog?.Require(node);
+            string key = node.CacheIdentity();
+            AnonymousShapeCatalog.Entry? entry = null;
+            if (_shapeCatalog is not null && !_catalogEntries.TryGetValue(key, out entry))
+            {
+                entry = _shapeCatalog.Require(node);
+                // ValidateShapes already bounded all anonymous identities for this exchange.
+                _catalogEntries.Add(key, entry);
+            }
             Type[] components = node.GenericArguments.Select(Resolve).ToArray();
             if (_shapeCatalog is null && ShapeMapper?.TryOriginalShape(node, out Type? original) == true)
             {
                 return original!;
             }
 
-            return _shapeCatalog?.Resolve(node, components)
-                ?? throw new InvalidOperationException("Anonymous-shape generation requires a trusted server catalog.");
+            Type generated = entry is not null ? AnonymousShapeCatalog.Resolve(entry, components)
+                : throw new InvalidOperationException("Anonymous-shape generation requires a trusted server catalog.");
+            if (_responseShapes.TryGetValue(generated, out TypeNode? previous)
+                && previous.CacheIdentity() != node.CacheIdentity())
+            {
+                throw new InvalidOperationException("Different anonymous type identities for the same registered structure cannot share one exchange.");
+            }
+
+            TypeNode saved = AnonymousShapeTypes.Snapshot(node);
+            _responseShapes[generated] = saved;
+            ShapeMapper?.BindResponseShape(generated, saved);
+            return generated;
         }
 
         if (node.ArrayElement is not null)

@@ -89,26 +89,43 @@ connection string uses.
 
 ## Registering anonymous projections
 
-Anonymous projections sent for server execution require a trusted `AnonymousShapeCatalog`.
-Build it from the closed anonymous types used by your query templates, then register the complete
-catalog before accepting requests:
+Register anonymous data structures on the server using prototype objects:
 
 ```csharp
-var catalog = AnonymousShapeCatalog.Create(serverModel, SharedQueryManifest.ClosedAnonymousTypes);
-builder.Services.AddInfoCarrierAnonymousShapes(catalog);
+builder.Services.AddInfoCarrierAnonymousShapes(
+    new { Name = "", Age = 0 },
+    new { Country = "", City = "" },
+    new { CustomerId = 0, Year = 0 });
+
+// Named records use the existing type permission registration.
+builder.Services.AddInfoCarrierAllowedTypes(typeof(CustomerSummary));
 ```
 
-`AnonymousShapeCatalog` is in `InfoCarrier.Core.Expressions`. `serverModel` is your actual server
-model; `SharedQueryManifest` represents your fixed application configuration. If your context comes
-from dependency injection, construct the catalog in a singleton factory and resolve it during startup.
+Prototype values are ignored. Names, property order, and property types must match the client's
+structure. The server and client can declare their anonymous objects in different assemblies.
+Repeated calls compose. These registrations also cover grouping keys, join keys, and nested anonymous
+data, not just final projections.
 
-The server must have the actual trusted query-template types. An anonymous literal in a different
-assembly does not have the client's template identity. Coordinate template and catalog deployments;
-rebuilding an assembly can change that identity. Open generic templates are refused. Keep
-registration in trusted startup configuration, with one complete catalog per model instance.
+Nested anonymous objects are registered recursively. Arrays and generic collections can contain
+them, including lists of lists. Each anonymous type has at most 32 properties; complete type
+descriptors have at most 1,024 nodes and nesting depth 16. Each exchange admits at most 64 anonymous
+identities. Rank-one non-vector arrays containing anonymous elements are unsupported.
 
-Without registration, the server refuses the anonymous shape. Registering a catalog does not grant
-permission to its component types; the existing client and server type registrations still apply.
+The provider builds the immutable catalog using the registered server `DbContext` model.
+`MapInfoCarrier()` constructs it during endpoint setup; an in-process server constructs it when
+created. Registered structures reuse fixed generated types across exchanges. Keep registrations in
+trusted startup code. Advanced hosts can build `AnonymousShapeCatalog.Create(model, types)` directly
+and supply one complete catalog per model instance. Use either prototypes or an explicit catalog;
+mixing these registration methods depends on call order.
+
+An unregistered shape reaching server execution is rejected. There is no automatic client-evaluation
+fallback. Existing client projection reassembly still applies where the query planner chooses it.
+Different original anonymous identities for the same registered structure cannot share one exchange;
+the server rejects this case to preserve equality behavior and unambiguous response restoration.
+
+Shape registration does not grant permission to its component types. Register custom components
+and named records on both client and server using the existing type permission APIs.
+Records do not require anonymous-shape registration.
 See [Security](../security.md) and the
 [catalog contract](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/plans/v10/anonymous-shape-catalog.md)
 for startup configuration and the limits.

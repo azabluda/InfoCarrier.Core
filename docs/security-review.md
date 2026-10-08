@@ -30,7 +30,8 @@ configuration returns no partially usable catalog. The process cache is synchron
 never evicts and regenerates, and refuses further trusted generation at capacity. This bounds emitted code
 despite provider caches retaining types; it does not promise collectible assemblies actually unload.
 Requests cannot emit types, add catalog entries, or consume that generation budget. Local membership
-matches the complete descriptor, including token, member order, nesting, arrays and model names;
+matches the structural descriptor, including member order, nesting, arrays and model names;
+original compiler tokens are preserved per exchange for response restoration, not catalog membership.
 resolution also requires the registered actual runtime component identities. A globally cached type
 or a server mapper's original-type binding does not grant membership in another catalog.
 
@@ -44,17 +45,19 @@ exact model/application whole-type registrations. It does not bound all expressi
 The earlier draft permitted valid descriptors to exhaust the shared cache across independent
 exchanges. The owner selected a trusted catalog on 2026-10-08 to remove that request admission path
 ([issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212)). The isolated owned test now
-sends 8,192 forged identities through independent production resolvers; all are refused, approved
-callers remain usable, and trusted configuration can still add another legitimate shape afterward.
+sends 8,192 identity aliases for an approved structure and 8,192 unknown structures through independent
+production resolvers. Aliases reuse the fixed type, unknown structures are refused, approved callers
+remain usable, and trusted configuration can still add another legitimate shape afterward.
 It also uses the actual 4,096-slot limit to check oversized-catalog refusal before emission and
 concurrent catalog reuse. No production counter is reset and no smaller test limit is substituted.
 
 This compatibility change requires server registration of complete, closed anonymous projections.
 Registration is not an additional `AllowTypes` grant: current component permissions remain required
 on every execution, including cached reuse after revocation. Model-bound catalogs cannot be attached
-to another model instance. Applications must coordinate the client template identities and trusted
-server configuration; a rebuilt template assembly can change an identity. Client restoration remains
-exchange-local and cannot register new server shapes. See the
+to another model instance. Server prototypes match client structures across assemblies and builds.
+Conflicting original identities for one generated structure within an exchange are refused, avoiding
+changed equality and ambiguous response reconstruction. Client restoration remains exchange-local
+and cannot register new server shapes. See the
 [catalog contract and validation report](plans/v10/anonymous-shape-catalog.md).
 
 The catalog prevents client-driven emission exhaustion, not every denial of service through allowed

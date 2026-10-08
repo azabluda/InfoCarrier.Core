@@ -36,18 +36,18 @@ public sealed class AnonymousShapeCatalog
         return AnonymousShapeTypes.BuildCatalog(model, shapes);
     }
 
-    internal void Require(TypeNode node)
+    internal Entry Require(TypeNode node)
     {
-        if (!_entries.ContainsKey(node.CacheIdentity()))
+        if (!_entries.TryGetValue(AnonymousShapeTypes.StructuralIdentity(node), out Entry? entry))
         {
             throw new InvalidOperationException("The anonymous shape is not registered in this server's trusted catalog.");
         }
+
+        return entry;
     }
 
-    internal Type Resolve(TypeNode node, Type[] components)
+    internal static Type Resolve(Entry entry, Type[] components)
     {
-        Require(node);
-        Entry entry = _entries[node.CacheIdentity()];
         if (!entry.Components.SequenceEqual(components))
         {
             throw new InvalidOperationException("The anonymous-shape catalog's runtime component identities do not match this execution.");

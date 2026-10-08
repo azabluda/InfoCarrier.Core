@@ -63,6 +63,9 @@ public static class InfoCarrierEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
+        // Fail trusted catalog construction during endpoint setup, before requests arrive.
+        _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
+
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
             IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();

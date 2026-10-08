@@ -150,7 +150,7 @@ internal static class AnonymousShapeTypes
     internal static AnonymousShapeCatalog BuildCatalog(IModel? model, IEnumerable<Type> roots)
     {
         var plans = new Dictionary<Type, TypeNode>();
-        var bindings = new Dictionary<string, Type>(StringComparer.Ordinal);
+        var bindings = new Dictionary<string, string>(StringComparer.Ordinal);
         var mapper = new TypeNodeMapper(model);
         foreach (Type root in roots)
         {
@@ -166,7 +166,8 @@ internal static class AnonymousShapeTypes
         // reach this path, and trusted startup failure never returns a partly usable catalog.
         lock (Gate)
         {
-            int missing = plans.Count(p => !TrustedTypes.ContainsKey(TrustedKey(p.Key, p.Value)));
+            int missing = plans.Select(p => TrustedKey(p.Key, p.Value)).Distinct(StringComparer.Ordinal)
+                .Count(key => !TrustedTypes.ContainsKey(key));
             if (missing > MaximumGeneratedTypes - _emissions)
             {
                 throw new InvalidOperationException("The trusted anonymous-shape catalog exceeds the remaining process generation budget.");
@@ -231,18 +232,19 @@ internal static class AnonymousShapeTypes
                 }
 
                 mapper.ResetShapes();
-                TypeNode node = mapper.ToTypeNode(type);
+                TypeNode node = Canonicalize(mapper.ToTypeNode(type));
                 Validate(node);
                 TypeNodeComplexity.Validate(node);
                 string identity = node.CacheIdentity();
-                if (bindings.TryGetValue(identity, out Type? existing) && existing != type)
+                string runtime = RuntimeIdentity(type);
+                if (bindings.TryGetValue(identity, out string? existing) && existing != runtime)
                 {
                     throw new InvalidOperationException("Trusted anonymous shapes have ambiguous runtime component bindings.");
                 }
 
-                bindings[identity] = type;
+                bindings[identity] = runtime;
                 plans.Add(type, node);
-                if (plans.Count > MaximumGeneratedTypes)
+                if (bindings.Count > MaximumGeneratedTypes)
                 {
                     throw new InvalidOperationException("The trusted anonymous-shape catalog exceeds the process generation budget.");
                 }
@@ -267,9 +269,40 @@ internal static class AnonymousShapeTypes
     }
 
     private static string TrustedKey(Type original, TypeNode node)
-        => node.CacheIdentity() + "|trusted:" + original.TypeHandle.Value;
+        => node.CacheIdentity() + "|trusted:" + RuntimeIdentity(original);
 
-    private static TypeNode Snapshot(TypeNode node)
+    // Anonymous compiler identities are exchange metadata, not server catalog membership.
+    internal static string StructuralIdentity(TypeNode node) => Canonicalize(node).CacheIdentity();
+
+    private static TypeNode Canonicalize(TypeNode node)
+    {
+        TypeNode canonical = node with
+        {
+            ShapeMembers = node.ShapeMembers?.ToArray(),
+            GenericArguments = node.GenericArguments.Select(Canonicalize).ToArray(),
+            ArrayElement = node.ArrayElement is null ? null : Canonicalize(node.ArrayElement),
+        };
+        if (canonical.ShapeMembers is not null)
+        {
+            canonical = canonical with { Name = string.Empty };
+            canonical = canonical with { Name = Prefix + Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(canonical.CacheIdentity()))) };
+        }
+
+        return canonical;
+    }
+
+    [UnconditionalSuppressMessage("Trimming", "IL2070", Justification = "Trusted closed anonymous prototypes supply their runtime data properties during catalog construction.")]
+    private static string RuntimeIdentity(Type type)
+        => IsOriginal(type)
+            ? "shape(" + string.Join(";", type.GetProperties().Select(p => p.Name.Length + ":" + p.Name + ":" + RuntimeIdentity(p.PropertyType))) + ")"
+            : type.IsArray
+                ? "array(" + type.IsSZArray + "," + type.GetArrayRank() + "," + RuntimeIdentity(type.GetElementType()!) + ")"
+                : type.IsGenericType
+                    ? "generic(" + type.GetGenericTypeDefinition().TypeHandle.Value + "," + string.Join(";", type.GetGenericArguments().Select(RuntimeIdentity)) + ")"
+                    : "type(" + type.TypeHandle.Value + ")";
+
+    internal static TypeNode Snapshot(TypeNode node)
         => node with
         {
             ShapeMembers = node.ShapeMembers?.ToArray(),
