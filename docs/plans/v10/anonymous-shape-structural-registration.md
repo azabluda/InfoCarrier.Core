@@ -68,3 +68,17 @@ exchange membership caches reset automatically and recheck permissions on every 
 No additional InfoCarrier diagnostic attributes became unnecessary through structural registration.
 The representation feature's single converted-list attribution removal remains the only justified
 removal. Regular and both slow comparisons found no further change to results, refusals, or reasons.
+
+## Sample configuration correction, 2026-10-08
+
+The console demo projects orders into `new { o.Id, o.CustomerId }`. The browser pages instead use
+client-only records with existing projection reassembly. The sample server originally lacked shape
+registration; the transport factory supplied it and masked that deployment error. Removing the
+factory registration made the existing projection test fail with the catalog refusal.
+
+The sample server now registers `new { Id = 0, CustomerId = (string?)null }` during startup.
+The transport factory supplies no extra shape registration, so the same test verifies the actual
+sample configuration across client/server assemblies. The full transport suite then passed:
+Passed: 30, Failed: 0, Total: 30. Strict non-incremental Release passed with zero errors and the same
+five generated Razor warnings. Core provider source and functional fixtures are unchanged from the
+complete regular and slow measurements above.

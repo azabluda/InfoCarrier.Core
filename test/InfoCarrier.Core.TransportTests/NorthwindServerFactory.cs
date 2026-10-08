@@ -38,8 +38,6 @@ public sealed class NorthwindServerFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Trusted closed primitive projection, registered before this host accepts requests.
-            services.AddInfoCarrierAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
             ServiceDescriptor descriptor = services.Single(
                 d => d.ServiceType == typeof(DbContextOptions<NorthwindContext>));
             services.Remove(descriptor);
