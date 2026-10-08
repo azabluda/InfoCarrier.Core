@@ -44,6 +44,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | One page, for a client-side concurrency suppression | 950 | Raised 2026-09-27. `limitations` names a second unsupported scenario: an interceptor on the client that suppresses a concurrency exception writes nothing and reports the save as done. The page has to say where the interceptor goes instead, and that costs an example |
 | One page, for the marker-row pattern | 810 | Raised 2026-09-29. `guide/errors` shows how to learn whether a write committed (#185), and then had to say where that fails: on Cosmos DB, EF Core 10 writes each document separately, and a marker's id lost with the application cannot be looked for |
 | One page, for shared helpers | 1200 | Raised 2026-10-06. `guide/querying` names the public shared helper requirement, registration on both ends, backend translation or refusal, and the different behavior of private or client-only helpers. |
+| Three pages, for trusted anonymous-shape catalogs | 540, 920 and 1460 | Raised 2026-10-08. `api-surface` 540 names the catalog API. `security` 920 explains trusted admission and the remaining execution risks. `configuration/server` 1460 explains closed template registration, coordinated builds, model binding, and missing-registration failures. |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
 The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own

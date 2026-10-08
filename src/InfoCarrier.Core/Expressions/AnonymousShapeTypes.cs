@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -22,6 +23,7 @@ internal static class AnonymousShapeTypes
     private const int MaximumGeneratedTypes = 4096;
     private static readonly object Gate = new();
     private static readonly Dictionary<string, Type> Types = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, Type> TrustedTypes = new(StringComparer.Ordinal);
     private static readonly Dictionary<Type, TypeNode> Descriptors = [];
     private static readonly HashSet<Type> Definitions = [];
     private static readonly ConditionalWeakTable<Assembly, AssemblyScope> Scopes = new();
@@ -108,8 +110,8 @@ internal static class AnonymousShapeTypes
         => value == '_' || char.IsLetter(value) || char.GetUnicodeCategory(value) == UnicodeCategory.LetterNumber;
 
     [UnconditionalSuppressMessage("Trimming", "IL2070", Justification = "The emitted data members and framework equality methods are generated and used together at runtime.")]
-    [UnconditionalSuppressMessage("Trimming", "IL2060", Justification = "EqualityComparer<T> is instantiated only for admitted shape components; Native AOT is unsupported.")]
-    internal static Type Resolve(TypeNode node, Type[] arguments)
+    [UnconditionalSuppressMessage("Trimming", "IL2060", Justification = "EqualityComparer<T> is instantiated only for trusted catalog components; Native AOT is unsupported.")]
+    private static Type GenerateTrusted(TypeNode node, Type[] arguments)
     {
         Validate(node);
         if (arguments.Any(t => t == typeof(void) || t.IsByRef || t.IsPointer || t.IsByRefLike
@@ -142,6 +144,130 @@ internal static class AnonymousShapeTypes
             return generated;
         }
     }
+
+    [UnconditionalSuppressMessage("Trimming", "IL2070", Justification = "Trusted closed anonymous types supply the same runtime projection properties already used by TypeNodeMapper.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "Trusted closed containers are reconstructed only with replacements for their anonymous data components; Native AOT is unsupported.")]
+    internal static AnonymousShapeCatalog BuildCatalog(IModel? model, IEnumerable<Type> roots)
+    {
+        var plans = new Dictionary<Type, TypeNode>();
+        var bindings = new Dictionary<string, Type>(StringComparer.Ordinal);
+        var mapper = new TypeNodeMapper(model);
+        foreach (Type root in roots)
+        {
+            if (root is null || !IsOriginal(root) || root.ContainsGenericParameters)
+            {
+                throw new InvalidOperationException("A trusted anonymous-shape catalog requires closed anonymous root types.");
+            }
+
+            Collect(root, 0);
+        }
+
+        // Reserve every missing entry before emission or catalog publication. Requests cannot
+        // reach this path, and trusted startup failure never returns a partly usable catalog.
+        lock (Gate)
+        {
+            int missing = plans.Count(p => !TrustedTypes.ContainsKey(TrustedKey(p.Key, p.Value)));
+            if (missing > MaximumGeneratedTypes - _emissions)
+            {
+                throw new InvalidOperationException("The trusted anonymous-shape catalog exceeds the remaining process generation budget.");
+            }
+
+            var entries = new Dictionary<string, AnonymousShapeCatalog.Entry>(StringComparer.Ordinal);
+            foreach (Type original in plans.Keys)
+            {
+                Replace(original);
+            }
+
+            return new AnonymousShapeCatalog(model, entries);
+
+            Type Replace(Type type)
+            {
+                if (plans.TryGetValue(type, out TypeNode? node))
+                {
+                    Type[] components = type.GetProperties().Select(p => Replace(p.PropertyType)).ToArray();
+                    string key = TrustedKey(type, node);
+                    if (!TrustedTypes.TryGetValue(key, out Type? generated))
+                    {
+                        generated = GenerateTrusted(node, components);
+                        TrustedTypes.Add(key, generated);
+                    }
+
+                    string identity = node.CacheIdentity();
+                    if (entries.TryGetValue(identity, out AnonymousShapeCatalog.Entry? existing)
+                        && (existing.Type != generated || !existing.Components.SequenceEqual(components)))
+                    {
+                        throw new InvalidOperationException("Trusted anonymous shapes have ambiguous descriptor identities.");
+                    }
+
+                    entries[identity] = new AnonymousShapeCatalog.Entry(generated, components);
+                    return generated;
+                }
+
+                if (type.IsArray)
+                {
+                    Type element = Replace(type.GetElementType()!);
+                    return type.IsSZArray ? element.MakeArrayType() : element.MakeArrayType(type.GetArrayRank());
+                }
+
+                return type.IsGenericType && !type.IsGenericTypeDefinition
+                    ? type.GetGenericTypeDefinition().MakeGenericType(type.GetGenericArguments().Select(Replace).ToArray())
+                    : type;
+            }
+        }
+
+        void Collect(Type type, int depth)
+        {
+            if (depth > MaximumDepth || type == typeof(void) || type.IsByRef || type.IsPointer
+                || type.IsByRefLike || type.IsFunctionPointer || type.ContainsGenericParameters)
+            {
+                throw new InvalidOperationException("Trusted anonymous-shape components must be bounded closed data types.");
+            }
+
+            if (IsOriginal(type))
+            {
+                if (plans.ContainsKey(type))
+                {
+                    return;
+                }
+
+                mapper.ResetShapes();
+                TypeNode node = mapper.ToTypeNode(type);
+                Validate(node);
+                TypeNodeComplexity.Validate(node);
+                string identity = node.CacheIdentity();
+                if (bindings.TryGetValue(identity, out Type? existing) && existing != type)
+                {
+                    throw new InvalidOperationException("Trusted anonymous shapes have ambiguous runtime component bindings.");
+                }
+
+                bindings[identity] = type;
+                plans.Add(type, node);
+                if (plans.Count > MaximumGeneratedTypes)
+                {
+                    throw new InvalidOperationException("The trusted anonymous-shape catalog exceeds the process generation budget.");
+                }
+
+                foreach (PropertyInfo property in type.GetProperties())
+                {
+                    Collect(property.PropertyType, depth + 1);
+                }
+            }
+            else if (type.HasElementType)
+            {
+                Collect(type.GetElementType()!, depth + 1);
+            }
+            else if (type.IsGenericType)
+            {
+                foreach (Type argument in type.GetGenericArguments())
+                {
+                    Collect(argument, depth + 1);
+                }
+            }
+        }
+    }
+
+    private static string TrustedKey(Type original, TypeNode node)
+        => node.CacheIdentity() + "|trusted:" + original.TypeHandle.Value;
 
     private static TypeNode Snapshot(TypeNode node)
         => node with

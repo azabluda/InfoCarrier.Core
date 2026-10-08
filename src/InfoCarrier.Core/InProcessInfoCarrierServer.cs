@@ -101,6 +101,13 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private IEnumerable<Type> AllowedTypes
         => _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types);
 
+    private Expressions.AnonymousShapeCatalog? AnonymousCatalogFor(Microsoft.EntityFrameworkCore.Metadata.IModel model)
+    {
+        Expressions.AnonymousShapeCatalog[] catalogs = _serviceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
+        Expressions.AnonymousShapeCatalog[] modelCatalogs = catalogs.Where(c => ReferenceEquals(c.Model, model)).ToArray();
+        return (modelCatalogs.Length > 0 ? modelCatalogs : catalogs.Where(c => c.Model is null)).SingleOrDefault();
+    }
+
     /// <summary>
     ///     Whether this server permits a payload to carry SQL it will execute
     ///     (<see cref="IInfoCarrierArbitrarySqlExecution" />, #60).
@@ -215,7 +222,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
+                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
             var executor = new ServerQueryExecutor(
                 lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
 
@@ -240,7 +248,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(lease.Context.Model, ValueMappers, AllowedTypes);
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
+                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
             var executor = new ServerSaveChangesExecutor(
                 lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper, ServerStoreIsDocument);
 

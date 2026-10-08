@@ -56,6 +56,7 @@ unchanged.
 | Type | Notes |
 |---|---|
 | `InfoCarrierPayloadLimits` | `(int? maxRequestBytes = DefaultMaxRequestBytes, int? maxResponseBytes = null)`. `Default` is the static instance; `DefaultMaxRequestBytes` is 64 MiB. `null` opts out of a limit. |
+| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | `Create(IModel? model, IEnumerable<Type> shapes)` constructs an immutable catalog from trusted closed anonymous types. Register it with `AddInfoCarrierAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
 
 ## Exceptions
 

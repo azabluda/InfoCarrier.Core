@@ -489,6 +489,17 @@ in the archive; this step tests the missing integration without a sleep or a slo
       complete results. The shared-cap attack took 1.305 seconds locally and remains a documented
       cross-caller availability risk, not protection delivered by this depth fix.
 
+- [x] **G3. Restrict generated anonymous data to trusted server catalogs.**
+      The owner chose finite server registration on 2026-10-08 for
+      [issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212).
+      The [catalog contract and validation report](anonymous-shape-catalog.md) records the
+      compatibility change, admission boundaries, configuration, and measured gates.
+      Requests cannot spend generation capacity, reuse another catalog's global entries,
+      or register themselves through original-type mapper bindings. Component permissions
+      and actual model/runtime identities remain independent requirements. Preserve the
+      original uncommitted investigation notes. Merge the separate ordinary descriptor
+      hardening from [pull request #213](https://github.com/azabluda/InfoCarrier.Core/pull/213).
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

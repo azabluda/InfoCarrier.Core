@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using InfoCarrier.Core.Expressions;
 using Northwind.Shared;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -38,6 +39,9 @@ public sealed class NorthwindServerFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Trusted closed primitive projection, registered before this host accepts requests.
+            services.AddInfoCarrierAnonymousShapes(AnonymousShapeCatalog.Create(null,
+                [new { Id = 0, CustomerId = (string?)null }.GetType()]));
             ServiceDescriptor descriptor = services.Single(
                 d => d.ServiceType == typeof(DbContextOptions<NorthwindContext>));
             services.Remove(descriptor);

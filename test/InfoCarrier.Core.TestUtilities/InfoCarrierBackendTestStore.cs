@@ -122,6 +122,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
                 ServiceLifetime.Transient,
                 _testStoreProperties.ServerOptionsLifetime ?? ServiceLifetime.Singleton);
 
+        // A finite manifest from compiled, trusted test code, fixed before any request arrives.
+        // Never register a shape observed in a received query or result descriptor.
+        services.AddSingleton(sp =>
+        {
+            using IServiceScope scope = sp.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+            return Expressions.AnonymousShapeCatalog.Create(context.Model,
+                TrustedAnonymousShapeManifest.ForAssembly(GetType().Assembly));
+        });
+
         // Only when the fixture's context is a *subclass*. A spec fixture may be
         // `SharedStoreFixtureBase<DbContext>` — `LazyLoadProxyTestBase`'s is — and then this
         // registration would re-register `DbContext` itself as scoped, overriding the transient
@@ -293,7 +303,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     Creates a server-side <see cref="DbContext" /> from the server provider.
     /// </summary>
     public virtual DbContext CreateDbContext()
-        => (DbContext)ServiceProvider!.GetRequiredService(_testStoreProperties.ContextType);
+    {
+        // Derived store connection fields are initialized before this method is called.
+        // Validate trusted catalog setup before database initialization can send any request.
+        IServiceProvider provider = ServiceProvider!;
+        provider.GetRequiredService<Expressions.AnonymousShapeCatalog>();
+        return (DbContext)provider.GetRequiredService(_testStoreProperties.ContextType);
+    }
 
     /// <summary>
     ///     Adds the backend provider services (e.g. InMemory, SqlServer) to the collection.

@@ -29,6 +29,24 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     private readonly TypeAllowlist _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
     private readonly Dictionary<string, Type> _cache = new(StringComparer.Ordinal);
     internal TypeNodeMapper? ShapeMapper { get; set; }
+    private AnonymousShapeCatalog? _shapeCatalog;
+    internal void RequireServerShapeCatalog() => _shapeCatalog ??= AnonymousShapeCatalog.Empty;
+
+    /// <summary>
+    ///     Uses an immutable catalog constructed by trusted server configuration. Attaching a
+    ///     catalog disables client exchange-local original-type restoration on this resolver.
+    ///     Component permissions are still checked separately on every resolution.
+    /// </summary>
+    public virtual void UseAnonymousShapeCatalog(AnonymousShapeCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        if (catalog.Model is not null && !ReferenceEquals(catalog.Model, _model))
+        {
+            throw new InvalidOperationException("The anonymous-shape catalog belongs to another server model.");
+        }
+
+        _shapeCatalog = catalog;
+    }
     private readonly HashSet<string> _shapes = new(StringComparer.Ordinal);
     private static readonly TypeNameParseOptions NameParseOptions = new() { MaxNodes = 1024 };
     internal void ResetShapes() => _shapes.Clear();
@@ -75,6 +93,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     /// </summary>
     public virtual Type Resolve(TypeNode node)
     {
+        TypeNodeComplexity.Validate(node);
         ValidateShapes(node, 0);
         if (HasShape(node))
         {
@@ -139,13 +158,15 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     {
         if (node.ShapeMembers is not null)
         {
+            _shapeCatalog?.Require(node);
             Type[] components = node.GenericArguments.Select(Resolve).ToArray();
-            if (ShapeMapper?.TryOriginalShape(node, out Type? original) == true)
+            if (_shapeCatalog is null && ShapeMapper?.TryOriginalShape(node, out Type? original) == true)
             {
                 return original!;
             }
 
-            return AnonymousShapeTypes.Resolve(node, components);
+            return _shapeCatalog?.Resolve(node, components)
+                ?? throw new InvalidOperationException("Anonymous-shape generation requires a trusted server catalog.");
         }
 
         if (node.ArrayElement is not null)

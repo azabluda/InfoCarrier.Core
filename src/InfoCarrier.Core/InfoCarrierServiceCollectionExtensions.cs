@@ -31,6 +31,23 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierServiceCollectionExtensions
 {
     /// <summary>
+    ///     Registers an immutable, already generated anonymous-shape catalog for the in-process
+    ///     server. Build it from trusted application types and the actual server model before
+    ///     accepting requests. This registration does not grant component-type permissions.
+    /// </summary>
+    /// <param name="services">The server application service collection.</param>
+    /// <param name="catalog">The complete trusted catalog.</param>
+    /// <returns>The same collection.</returns>
+    public static IServiceCollection AddInfoCarrierAnonymousShapes(
+        this IServiceCollection services, AnonymousShapeCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(catalog);
+        services.AddSingleton(catalog);
+        return services;
+    }
+
+    /// <summary>
     ///     Registers the InfoCarrier client provider's EF Core services. Called by
     ///     <see cref="InfoCarrierOptionsExtension.ApplyServices" />. Uses
     ///     <see cref="EntityFrameworkServicesBuilder" /> so EF's core services are registered

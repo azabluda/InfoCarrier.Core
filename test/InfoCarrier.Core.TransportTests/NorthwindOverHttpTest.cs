@@ -4,6 +4,9 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Northwind.Shared;
 using Northwind.Shared.Model;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using InfoCarrier.Core.Expressions;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -14,6 +17,19 @@ namespace InfoCarrier.Core.TransportTests;
 /// </summary>
 public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
+    [Fact]
+    public async Task An_unregistered_projection_is_refused_over_http()
+    {
+        await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
+            services => services.RemoveAll<AnonymousShapeCatalog>()));
+        using NorthwindContext context = CreateClientContext(unconfigured);
+
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync());
+
+        Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task A_client_with_no_database_reads_rows_over_http()
     {
@@ -130,10 +146,10 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             "Enumerating order.OrderDetails should have issued a further round trip.");
     }
 
-    internal static NorthwindContext CreateClientContext(NorthwindServerFactory factory)
+    internal static NorthwindContext CreateClientContext(WebApplicationFactory<Program> factory)
         => CreateClientContext(factory, out _);
 
-    internal static NorthwindContext CreateClientContext(NorthwindServerFactory factory, out RecordingHandler recorder)
+    internal static NorthwindContext CreateClientContext(WebApplicationFactory<Program> factory, out RecordingHandler recorder)
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var handler = new RecordingHandler();

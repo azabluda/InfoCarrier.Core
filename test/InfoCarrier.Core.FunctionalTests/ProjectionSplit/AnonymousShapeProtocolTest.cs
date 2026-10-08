@@ -17,7 +17,9 @@ public class AnonymousShapeProtocolTest
         var client = new DynamicValueMapper(null, mapper, new TypeNodeResolver());
         DynamicValueNode sent = client.ToDynamicValue(original, original.GetType());
         var serverMapper = new TypeNodeMapper();
-        var server = new DynamicValueMapper(null, serverMapper, new TypeNodeResolver());
+        var serverResolver = new TypeNodeResolver();
+        serverResolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original.GetType()]));
+        var server = new DynamicValueMapper(null, serverMapper, serverResolver);
         object generated = server.FromDynamicValue(sent)!;
         Assert.Equal(original.ToString(), generated.ToString());
         Assert.Equal(original, client.FromDynamicValue(server.ToDynamicValue(generated, generated.GetType())));
@@ -26,8 +28,11 @@ public class AnonymousShapeProtocolTest
     [Fact]
     public void Cached_response_descriptors_are_detached_from_mutable_request_and_response_lists()
     {
-        TypeNode node = new TypeNodeMapper().ToTypeNode(new { Snapshot = new { Id = 1 } }.GetType());
-        Type generated = new TypeNodeResolver().Resolve(node);
+        Type original = new { Snapshot = new { Id = 1 } }.GetType();
+        TypeNode node = new TypeNodeMapper().ToTypeNode(original);
+        var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original]));
+        Type generated = resolver.Resolve(node);
         ((string[])node.GenericArguments[0].ShapeMembers!)[0] = "ChangedRequest";
         var mapper = new TypeNodeMapper();
         TypeNode response = mapper.ToTypeNode(generated);
@@ -49,11 +54,19 @@ public class AnonymousShapeProtocolTest
             Assert.NotEqual(new TypeNodeMapper().ToTypeNode(original).Name,
                 new TypeNodeMapper().ToTypeNode(otherOriginal).Name);
             TypeNode node = new TypeNodeMapper().ToTypeNode(original);
-            Type first = new ComponentResolver(typeof(RegisteredCard)).Resolve(node);
-            Type second = new ComponentResolver(card).Resolve(node);
+            var firstResolver = new ComponentResolver(typeof(RegisteredCard));
+            AnonymousShapeCatalog firstCatalog = AnonymousShapeCatalog.Create(null, [original]);
+            firstResolver.UseAnonymousShapeCatalog(firstCatalog);
+            var secondResolver = new ComponentResolver(card);
+            secondResolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null,
+                [original.GetGenericTypeDefinition().MakeGenericType(card)]));
+            Type first = firstResolver.Resolve(node);
+            Type second = secondResolver.Resolve(node);
             Assert.NotEqual(first, second);
             Assert.Equal(typeof(RegisteredCard), first.GetProperty("Card")!.PropertyType);
             Assert.Equal(card, second.GetProperty("Card")!.PropertyType);
+            secondResolver.UseAnonymousShapeCatalog(firstCatalog);
+            Assert.Throws<InvalidOperationException>(() => secondResolver.Resolve(node));
         }
         finally
         {
@@ -69,38 +82,58 @@ public class AnonymousShapeProtocolTest
     }
 
     [Fact]
-    public void Cached_shapes_do_not_return_another_models_component_identity()
+    public void Cached_shapes_do_not_accept_unregistered_model_aliases()
     {
         var mapper = new TypeNodeMapper();
-        TypeNode node = mapper.ToTypeNode(new { Value = 1 }.GetType());
+        Type original = new { Value = new List<int>() }.GetType();
+        TypeNode node = mapper.ToTypeNode(original);
         TypeNode component = mapper.ToTypeNode(typeof(List<int>));
         TypeNode first = node with { GenericArguments = [component with { EntityTypeName = "FirstModel" }] };
         TypeNode second = node with { GenericArguments = [component with { EntityTypeName = "SecondModel" }] };
         var resolver = new TypeNodeResolver();
-        Type firstType = resolver.Resolve(first);
-        Type secondType = resolver.Resolve(second);
-        Assert.NotEqual(firstType, secondType);
-        Assert.Equal("FirstModel", new TypeNodeMapper().ToTypeNode(firstType).GenericArguments[0].EntityTypeName);
-        Assert.Equal("SecondModel", new TypeNodeMapper().ToTypeNode(secondType).GenericArguments[0].EntityTypeName);
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original]));
+        Type generated = resolver.Resolve(node);
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(first));
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(second));
+        Assert.Same(generated, resolver.Resolve(node));
     }
 
     [Fact]
     public async Task Concurrent_resolvers_reuse_one_generated_type_for_the_same_descriptor()
     {
-        TypeNode node = new TypeNodeMapper().ToTypeNode(new { Concurrent = 1 }.GetType());
+        Type original = new { Concurrent = 1 }.GetType();
+        TypeNode node = new TypeNodeMapper().ToTypeNode(original);
+        AnonymousShapeCatalog catalog = AnonymousShapeCatalog.Create(null, [original]);
         Type[] types = await Task.WhenAll(Enumerable.Range(0, 16)
-            .Select(_ => Task.Run(() => new TypeNodeResolver().Resolve(node))));
+            .Select(_ => Task.Run(() =>
+            {
+                var resolver = new TypeNodeResolver();
+                resolver.UseAnonymousShapeCatalog(catalog);
+                return resolver.Resolve(node);
+            })));
         Assert.All(types, type => Assert.Same(types[0], type));
     }
 
     [Fact]
     public void Nested_query_syntax_carriers_keep_the_compilers_reserved_member_name()
     {
-        TypeNode node = new TypeNodeMapper().ToTypeNode(new { Outer = 1 }.GetType())
-            with { ShapeMembers = ["<>h__TransparentIdentifier0"] };
-        Type generated = new TypeNodeResolver().Resolve(node);
-        object value = Activator.CreateInstance(generated, 7)!;
-        Assert.Equal(7, generated.GetProperty("<>h__TransparentIdentifier0")!.GetValue(value));
+        var query = from outer in new[] { 7 }
+                    from inner in new[] { 8 }
+                    from last in new[] { 9 }
+                    where last > 0
+                    select new { outer, inner, last };
+        Assert.Equal(7, query.Single().outer);
+        Type carrier = typeof(AnonymousShapeProtocolTest).Assembly.GetTypes().Single(t =>
+            t.Name.StartsWith("<>f__AnonymousType", StringComparison.Ordinal)
+            && t.GetProperties().Select(p => p.Name).SequenceEqual(["<>h__TransparentIdentifier0", "last"]));
+        Type nested = typeof(AnonymousShapeProtocolTest).Assembly.GetTypes().Single(t =>
+            t.Name.StartsWith("<>f__AnonymousType", StringComparison.Ordinal)
+            && t.GetProperties().Select(p => p.Name).SequenceEqual(["outer", "inner"])).MakeGenericType(typeof(int), typeof(int));
+        Type original = carrier.MakeGenericType(nested, typeof(int));
+        var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original]));
+        Type generated = resolver.Resolve(new TypeNodeMapper().ToTypeNode(original));
+        Assert.NotNull(generated.GetProperty("<>h__TransparentIdentifier0"));
     }
 
     [Fact]
@@ -112,9 +145,12 @@ public class AnonymousShapeProtocolTest
             Name = type.GetGenericTypeDefinition().FullName!,
             GenericArguments = [new TypeNode { Name = typeof(int).FullName! }],
         };
-        Assert.Throws<InvalidOperationException>(() => new TypeNodeResolver().Resolve(raw));
-        TypeNode shape = new TypeNodeMapper().ToTypeNode(new { Safe = 1 }.GetType());
-        Assert.Throws<InvalidOperationException>(() => new TypeNodeResolver().Resolve(new TypeNode
+        Type safe = new { Safe = 1 }.GetType();
+        var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [safe]));
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(raw));
+        TypeNode shape = new TypeNodeMapper().ToTypeNode(safe);
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(new TypeNode
         {
             Name = typeof(Tuple<,>).FullName!, GenericArguments = [shape, raw],
         }));
@@ -124,12 +160,16 @@ public class AnonymousShapeProtocolTest
     public void Recursive_shape_components_do_not_grant_reflection_invocation_types()
     {
         var mapper = new TypeNodeMapper();
-        TypeNode shape = mapper.ToTypeNode(new { X = 1 }.GetType());
+        Type definition = new { X = 1 }.GetType().GetGenericTypeDefinition();
         foreach (Type forbidden in new[] { typeof(System.Reflection.Binder), typeof(System.Reflection.MethodInfo),
             typeof(Activator), typeof(System.Reflection.Assembly), typeof(AppDomain) })
         {
-            var hostile = shape with { GenericArguments = [mapper.ToTypeNode(typeof(List<>).MakeGenericType(forbidden))] };
-            Assert.Throws<InvalidOperationException>(() => new TypeNodeResolver().Resolve(hostile));
+            Type registered = definition.MakeGenericType(typeof(List<>).MakeGenericType(forbidden));
+            TypeNode hostile = mapper.ToTypeNode(registered);
+            var resolver = new TypeNodeResolver();
+            resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [registered]));
+            InvalidOperationException refusal = Assert.Throws<InvalidOperationException>(() => resolver.Resolve(hostile));
+            Assert.Contains("allowlist", refusal.Message);
         }
     }
 
@@ -166,8 +206,10 @@ public class AnonymousShapeProtocolTest
     public void Shape_permission_is_rechecked_after_execution_registration_changes()
     {
         var mapper = new TypeNodeMapper();
-        TypeNode node = mapper.ToTypeNode(new { Card = new RegisteredCard(1) }.GetType());
+        Type original = new { Card = new RegisteredCard(1) }.GetType();
+        TypeNode node = mapper.ToTypeNode(original);
         var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original, new { Safe = 1 }.GetType()]));
         resolver.UseExecutionAllowedTypes([typeof(RegisteredCard)]);
         Type generated = resolver.Resolve(node);
         Assert.Same(generated, resolver.Resolve(node));
@@ -200,7 +242,9 @@ public class AnonymousShapeProtocolTest
     public void Generated_equality_hash_and_formatting_support_private_enum_components()
     {
         var original = new { Code = PrivateCode.Second };
-        Type generated = new TypeNodeResolver().Resolve(new TypeNodeMapper().ToTypeNode(original.GetType()));
+        var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original.GetType()]));
+        Type generated = resolver.Resolve(new TypeNodeMapper().ToTypeNode(original.GetType()));
         object first = Activator.CreateInstance(generated, PrivateCode.Second)!;
         object second = Activator.CreateInstance(generated, PrivateCode.Second)!;
         Assert.Equal(first, second);
@@ -213,7 +257,9 @@ public class AnonymousShapeProtocolTest
     {
         var mapper = new TypeNodeMapper();
         var resolver = new TypeNodeResolver(null, TypeAllowlist.ForModel(null, [typeof(PrivateCard)]));
-        Type generated = resolver.Resolve(mapper.ToTypeNode(new { Card = new PrivateCard(1) }.GetType()));
+        Type original = new { Card = new PrivateCard(1) }.GetType();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original]));
+        Type generated = resolver.Resolve(mapper.ToTypeNode(original));
         object first = Activator.CreateInstance(generated, new PrivateCard(1))!;
         object second = Activator.CreateInstance(generated, new PrivateCard(1))!;
         Assert.Equal(first, second);
@@ -223,17 +269,29 @@ public class AnonymousShapeProtocolTest
     [Fact]
     public void Exchange_shape_budget_counts_distinct_descriptors_and_resets_between_exchanges()
     {
-        var mapper = new TypeNodeMapper();
-        TypeNode node = mapper.ToTypeNode(new { Budget = 1 }.GetType());
+        Type definition = new { Budget = 1 }.GetType().GetGenericTypeDefinition();
+        Type[] components = [typeof(int), typeof(string), typeof(bool), typeof(long), typeof(double)];
+        Type[] originals = Enumerable.Range(0, 65).Select(i =>
+        {
+            Type component = components[i / 13];
+            for (int depth = 0; depth < i % 13; depth++)
+            {
+                component = typeof(List<>).MakeGenericType(component);
+            }
+
+            return definition.MakeGenericType(component);
+        }).ToArray();
+        TypeNode[] nodes = originals.Select(t => new TypeNodeMapper().ToTypeNode(t)).ToArray();
         var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, originals));
         var values = new DynamicValueMapper(null, new TypeNodeMapper(), resolver);
         for (int i = 0; i < 64; i++)
         {
-            TypeNode next = node with { Name = "InfoCarrier.AnonymousShape.v1/" + i.ToString("X64") };
+            TypeNode next = nodes[i];
             Assert.Same(resolver.Resolve(next), resolver.Resolve(next));
         }
 
-        TypeNode overflow = node with { Name = "InfoCarrier.AnonymousShape.v1/" + 64.ToString("X64") };
+        TypeNode overflow = nodes[64];
         Assert.Throws<InvalidOperationException>(() => resolver.Resolve(overflow));
         Assert.Throws<InvalidOperationException>(() => resolver.Resolve(overflow));
         values.ResetReferenceScope();
@@ -244,16 +302,18 @@ public class AnonymousShapeProtocolTest
     public void Identity_tokens_and_ordered_member_types_prevent_shape_collisions()
     {
         var mapper = new TypeNodeMapper();
-        TypeNode node = mapper.ToTypeNode(new { A = 1, B = "two" }.GetType());
+        Type original = new { A = 1, B = "two" }.GetType();
+        Type reorderedOriginal = new { B = "two", A = 1 }.GetType();
+        TypeNode node = mapper.ToTypeNode(original);
         var resolver = new TypeNodeResolver();
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original, reorderedOriginal]));
         Type first = resolver.Resolve(node);
-        Type second = resolver.Resolve(node with { Name = "InfoCarrier.AnonymousShape.v1/" + new string('F', 64) });
-        Type reordered = resolver.Resolve(node with { ShapeMembers = ["B", "A"],
-            GenericArguments = node.GenericArguments.Reverse().ToArray() });
-        Assert.NotEqual(first, second);
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(node with
+            { Name = "InfoCarrier.AnonymousShape.v1/" + new string('F', 64) }));
+        Type reordered = resolver.Resolve(mapper.ToTypeNode(reorderedOriginal));
         Assert.NotEqual(first, reordered);
         object a = Activator.CreateInstance(first, 1, "two")!;
-        object b = Activator.CreateInstance(second, 1, "two")!;
+        object b = Activator.CreateInstance(reordered, "two", 1)!;
         Assert.False(a.Equals(b));
     }
 
@@ -266,7 +326,9 @@ public class AnonymousShapeProtocolTest
         var original = new[] { new { Id = 1 }, new { Id = 2 } };
         DynamicValueNode sent = client.ToDynamicValue(original, original.GetType());
         var serverMapper = new TypeNodeMapper();
-        var server = new DynamicValueMapper(null, serverMapper, new TypeNodeResolver());
+        var serverResolver = new TypeNodeResolver();
+        serverResolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original[0].GetType()]));
+        var server = new DynamicValueMapper(null, serverMapper, serverResolver);
         object rebuilt = server.FromDynamicValue(sent)!;
         Assert.NotEqual(original.GetType(), rebuilt.GetType());
         Assert.Equal(original, client.FromDynamicValue(server.ToDynamicValue(rebuilt, rebuilt.GetType())));
@@ -278,6 +340,7 @@ public class AnonymousShapeProtocolTest
         var mapper = new TypeNodeMapper();
         var resolver = new TypeNodeResolver();
         var original = new { X = 1, x = 2, Empty = new { } };
+        resolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original.GetType()]));
         Type generated = resolver.Resolve(mapper.ToTypeNode(original.GetType()));
         Type empty = generated.GetProperty("Empty")!.PropertyType;
         object a = Activator.CreateInstance(generated, 1, 2, Activator.CreateInstance(empty))!;
@@ -305,6 +368,7 @@ public class AnonymousShapeProtocolTest
         var serverResolver = new TypeNodeResolver();
         var serverValues = new DynamicValueMapper(null, serverMapper, serverResolver);
         var original = new { Name = "one", Nested = new { Id = 3 }, Missing = (string?)null };
+        serverResolver.UseAnonymousShapeCatalog(AnonymousShapeCatalog.Create(null, [original.GetType()]));
         Expression<Func<object>> query = () => new { Name = "one", Nested = new { Id = 3 }, Missing = (string?)null };
         ExpressionNode sent = new ExpressionToNodeTranslator(mapper, values).Translate(query);
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(sent, ExpressionJsonContext.Default.ExpressionNode);

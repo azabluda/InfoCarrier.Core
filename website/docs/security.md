@@ -32,6 +32,16 @@ to need it is your provider's `EF.Functions` family. Read §2 of the review befo
 else: the boundary holds as a conjunction, and `Binder`, `MethodInfo` and `Activator` each break it
 on their own, none of them looking dangerous alone.
 
+Anonymous projections require a finite trusted server catalog. The server matches complete
+descriptors and actual component types against replacements constructed during trusted configuration.
+Unknown requests cannot emit new types or use another catalog's cached entries. Component permissions
+are checked again on every execution. See
+[server configuration](configuration/server.md#registering-anonymous-projections).
+
+This prevents client-driven exhaustion of generated-shape capacity. The 4,096-attempt process limit
+still applies to trusted configuration. It does not limit every permitted method's execution cost;
+for example, descriptor limits do not inspect strings passed to runtime `Type.GetType` calls.
+
 ## What is yours
 
 !!! danger "Authentication and authorization are out of scope"

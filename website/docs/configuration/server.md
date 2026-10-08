@@ -87,6 +87,32 @@ command text runs every statement in it, and such a query does not go through `O
 your query filters are not in it. What limits the caller is the rights of the database account your
 connection string uses.
 
+## Registering anonymous projections
+
+Anonymous projections sent for server execution require a trusted `AnonymousShapeCatalog`.
+Build it from the closed anonymous types used by your query templates, then register the complete
+catalog before accepting requests:
+
+```csharp
+var catalog = AnonymousShapeCatalog.Create(serverModel, SharedQueryManifest.ClosedAnonymousTypes);
+builder.Services.AddInfoCarrierAnonymousShapes(catalog);
+```
+
+`AnonymousShapeCatalog` is in `InfoCarrier.Core.Expressions`. `serverModel` is your actual server
+model; `SharedQueryManifest` represents your fixed application configuration. If your context comes
+from dependency injection, construct the catalog in a singleton factory and resolve it during startup.
+
+The server must have the actual trusted query-template types. An anonymous literal in a different
+assembly does not have the client's template identity. Coordinate template and catalog deployments;
+rebuilding an assembly can change that identity. Open generic templates are refused. Keep
+registration in trusted startup configuration, with one complete catalog per model instance.
+
+Without registration, the server refuses the anonymous shape. Registering a catalog does not grant
+permission to its component types; the existing client and server type registrations still apply.
+See [Security](../security.md) and the
+[catalog contract](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/plans/v10/anonymous-shape-catalog.md)
+for startup configuration and the limits.
+
 ## Sending the server's log to the client
 
 EF writes its warnings about a query or a save on the server, so a client never sees them.

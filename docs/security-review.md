@@ -12,43 +12,55 @@ Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63
 
 ## 1. The path, in order
 
-### Addendum 2026-10-07: bounded anonymous data
+### Addendum 2026-10-08: bounded anonymous data and trusted catalogs
 
-Protocol major 2 adds a server-owned immutable data generator. Descriptor names do not resolve
+Protocol major 2 adds a server-owned immutable data generator. A server reconstructs only closed
+shapes in an immutable `AnonymousShapeCatalog` built from trusted application types before serving
+requests. Descriptor names do not resolve
 client assemblies or grant arbitrary compiler-generated types. Raw anonymous and emitted CLR names
 are refused, even inside generic containers. Every property component resolves through the existing
 allowlist on every execution, including cache hits after registrations change. The reflection
 invocation conjunction in §2 remains unchanged.
 
 Generation is limited to 32 members, 128 characters per identifier, 64 distinct shapes per exchange,
-type nesting depth 16, and 4096 type-generation attempts per process. The process cache is synchronized,
-never evicts and regenerates, and refuses further generation at capacity. This bounds emitted code
+type nesting depth 16, and 4096 type-generation attempts per process. Catalog construction validates
+the complete trusted graph and checks remaining capacity under the factory lock before generation.
+All registered replacements are constructed before the catalog is published. Invalid or oversized
+configuration returns no partially usable catalog. The process cache is synchronized,
+never evicts and regenerates, and refuses further trusted generation at capacity. This bounds emitted code
 despite provider caches retaining types; it does not promise collectible assemblies actually unload.
-Valid but adversarial callers can exhaust that finite capacity. Request-size, authentication,
-rate limits and process lifecycle remain deployment controls, not a claim of unbounded availability.
+Requests cannot emit types, add catalog entries, or consume that generation budget. Local membership
+matches the complete descriptor, including token, member order, nesting, arrays and model names;
+resolution also requires the registered actual runtime component identities. A globally cached type
+or a server mapper's original-type binding does not grant membership in another catalog.
 
 The depth check includes constructed generic and array syntax inside raw CLR names, combined with
 the surrounding structured descriptor depth. Before `Type.GetType`, `Assembly.GetType`, or
-`MakeGenericType`, the framework's metadata-only `TypeName` parser limits each raw name to 16,384
-characters and 1,024 parser nodes. Ordinary generic arrays remain supported. This closes the earlier
+`MakeGenericType`, the framework's metadata-only `TypeName` parser limits names and model names to
+16,384 characters and the complete descriptor graph to 1,024 nodes. Ordinary generic arrays remain supported. This closes the earlier
 raw-name bypass; the final allowlist still follows ordinary generic type construction, preserving
 exact model/application whole-type registrations. It does not bound all expression evaluation work.
 
-An isolated owned test exhausts the actual 4,096-attempt cache through separate resolvers. Another
-resolver then cannot generate a new legitimate shape, while an existing cached shape still resolves.
-The local measurement took 1.305 seconds and increased the process working set by 220,418,048 bytes.
-Those figures exclude network/database costs and are neither portable performance limits nor a
-measurement of retained memory after collection. The rejection persists for the process lifetime.
-The client-controlled opaque identity prevents the per-exchange cap from protecting shared capacity.
-Any caller whose accepted descriptors reach this path can consume it; authentication alone is not
-protection against an authenticated malicious caller. A process restart restores capacity but also
-restores the attack opportunity. Rate limits delay cumulative exhaustion rather than prevent it.
+The earlier draft permitted valid descriptors to exhaust the shared cache across independent
+exchanges. The owner selected a trusted catalog on 2026-10-08 to remove that request admission path
+([issue #212](https://github.com/azabluda/InfoCarrier.Core/issues/212)). The isolated owned test now
+sends 8,192 forged identities through independent production resolvers; all are refused, approved
+callers remain usable, and trusted configuration can still add another legitimate shape afterward.
+It also uses the actual 4,096-slot limit to check oversized-catalog refusal before emission and
+concurrent catalog reuse. No production counter is reset and no smaller test limit is substituted.
 
-This follow-up fixes the depth bypass and documents the demonstrated availability risk. It does
-not introduce trusted caller quotas or isolate generation in disposable worker processes. Those
-controls need a separate host policy and lifecycle design before claiming availability under hostile
-payloads. Do not interpret the finite generation cap as caller isolation or complete denial-of-service
-protection. The existing runtime type and expression evaluation surfaces remain relevant too.
+This compatibility change requires server registration of complete, closed anonymous projections.
+Registration is not an additional `AllowTypes` grant: current component permissions remain required
+on every execution, including cached reuse after revocation. Model-bound catalogs cannot be attached
+to another model instance. Applications must coordinate the client template identities and trusted
+server configuration; a rebuilt template assembly can change an identity. Client restoration remains
+exchange-local and cannot register new server shapes. See the
+[catalog contract and validation report](plans/v10/anonymous-shape-catalog.md).
+
+The catalog prevents client-driven emission exhaustion, not every denial of service through allowed
+expressions. Request-size, authentication, rate limits and process lifecycle remain deployment controls.
+This change does not introduce workers or a general execution resource budget. Existing runtime type
+and expression evaluation surfaces remain relevant.
 In particular, an admitted `Type.GetType(string)` call can still receive a complex name as an
 ordinary string argument during expression evaluation. Descriptor parsing does not validate those
 runtime arguments. The existing hardening test permits that method and blocks the later reflection

@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.DocumentStoreTests.TestUtilities;
+using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -115,6 +116,13 @@ public class DocumentStoreFixture : IAsyncLifetime
         services.AddDbContext<ShopServerContext>(
             o => o.UseMongoDB(_server.ConnectionString, "shop"));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopServerContext>());
+        services.AddSingleton(provider =>
+        {
+            using IServiceScope scope = provider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ShopServerContext>();
+            return AnonymousShapeCatalog.Create(context.Model,
+                TrustedAnonymousShapeManifest.ForAssembly(typeof(DocumentStoreFixture).Assembly));
+        });
 
         if (ServerDeclaresDocumentStore)
         {
@@ -122,6 +130,7 @@ public class DocumentStoreFixture : IAsyncLifetime
         }
 
         _serverProvider = services.BuildServiceProvider();
+        _ = _serverProvider.GetRequiredService<AnonymousShapeCatalog>();
 
         using (IServiceScope scope = _serverProvider.CreateScope())
         {
