@@ -1,4 +1,4 @@
-﻿# Implementation plan — the rest of the slow run's triage (#182)
+# Implementation plan — the rest of the slow run's triage (#182)
 
 Milestone-level scope lives in [`roadmap.md`](roadmap.md). Do not put scope here.
 
@@ -15,6 +15,23 @@ it lands in is decided on the issue, not here.
 | M8 — productization (Phases H–N) | [`archive/implementation-plan-m8-phases-h-n.md`](archive/implementation-plan-m8-phases-h-n.md) |
 | M9 — provider neutrality (Phase J) | [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md) |
 | Post-10.0, issue-driven (Phases Q, R, V, S, T, U, Y, Z, X and H) | [`archive/implementation-plan-post-10.0.md`](archive/implementation-plan-post-10.0.md) |
+
+## Phase I — ordinary type-descriptor complexity ([#211](https://github.com/azabluda/InfoCarrier.Core/issues/211))
+
+- [x] **I1. Bound descriptor complexity before runtime type construction.** Independent delivery
+      for [issue #211](https://github.com/azabluda/InfoCarrier.Core/issues/211), based on merged main.
+      Preflight the entire descriptor before cache-key traversal and runtime lookup, with combined
+      depth 16, cumulative parser nodes 1024, and names up to 16,384 UTF-16 characters. Preserve
+      whole-type registration and cache permission checks. Owned adversarial tests cover raw and
+      structured nesting, total breadth, malformed input, element modifiers, and boundary behavior.
+      No anonymous-type generation or wire-version changes belong to this step.
+
+      Validated 2026-10-08: regular measurement **FAILING 0, TOTAL 30079**, no fixed or broken tests,
+      unchanged reasons. Slow SQLite **Passed: 27599, Failed: 0, Total: 27766**; slow Firebird
+      **Passed: 109, Failed: 0, Total: 110**. Transport **Passed: 29, Failed: 0, Total: 29**.
+      Nonincremental strict Release build: zero errors, five known Razor warnings. Clean trim gate:
+      106 <= 106. Focused descriptor/security tests **Passed: 50, Failed: 0, Total: 50**; the pre-fix
+      run failed 13 of 14 cases. Independent review found no blocking issue.
 
 ## Phase H, continued — the reds the slow run still shows (#182)
 
