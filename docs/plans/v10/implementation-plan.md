@@ -524,6 +524,32 @@ in the archive; this step tests the missing integration without a sleep or a slo
       Named records retain the existing type permission registration. Component permissions,
       recursive limits, model binding, and request-independent generation remain mandatory.
 
+## Phase LOG: safe server failure diagnostics ([#214](https://github.com/azabluda/InfoCarrier.Core/issues/214))
+
+The owner approved the audited issue and requested implementation in this session on 2026-10-08.
+
+- [x] **LOG1. Add safe request diagnostics and observe transaction cleanup.** Initial implementation
+      committed in the logging pull request. Superseded by the owner's simplification below.
+- [x] **LOG2. Replace shared diagnostics with injected class loggers.** Approved on 2026-10-09.
+      Remove ambient context, exception markers, counters, suppression, caller hashing, and custom
+      registration. Keep safe boundary messages, existing contracts, independent resource cleanup,
+      and pending-cleanup shutdown coordination. Preserve server SQL logging. The
+      [logging policy](server-failure-diagnostics.md) records ownership, severity, and the explicitly
+      narrowed scope. Run transport, specification, strict Release, trim, package, and document gates.
+      Update the existing pull request and stop while checks run.
+- [x] **LOG3. Surface logger configuration failures.** The owner rejected silent logger acquisition
+      fallbacks on 2026-10-09. Require adapter logging services and propagate resolution/creation
+      failures. Preserve explicit legacy constructors and protect fault delivery/resource cleanup
+      from logging emission failures. Reverse both acquisition regressions, run the required gates,
+      and update the existing pull request.
+
+- [x] **LOG4. Add bounded reasons and exception type diagnostics.** Approved on 2026-10-10 after
+      the owner tested the missing-registration sample failure. Identify that refusal with a
+      fixed reason and explanation without changing its exception or wire fault. Other mapped
+      faults report an unclassified reason and runtime exception type, without exception contents.
+      Test diagnostic output, privacy, and preserved contracts. Preserve the owner's temporary
+      sample failures uncommitted, verify normal samples separately, and update the existing pull request.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

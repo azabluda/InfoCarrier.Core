@@ -30,6 +30,17 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 {
     private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
 
+    private readonly ILogger<InProcessInfoCarrierServer> _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance;
+
+    /// <summary>Creates a server with its host-owned class logger.</summary>
+    /// <param name="serviceProvider">The server service provider.</param>
+    /// <param name="logger">The logger, retained through server shutdown.</param>
+    public InProcessInfoCarrierServer(IServiceProvider serviceProvider, ILogger<InProcessInfoCarrierServer> logger)
+        : this(serviceProvider)
+    {
+        _logger = logger;
+    }
+
     /// <summary>
     ///     The transactions this server is holding open, by token (wire-protocol W3).
     /// </summary>
@@ -74,6 +85,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private ITimer? _sweepTimer;
 
     private readonly object _lifecycle = new();
+    private readonly HashSet<Task> _backgroundCleanups = [];
 
     private bool _disposed;
 
@@ -193,15 +205,16 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     How long a transaction may go untouched before this server rolls it back
     ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
     /// </summary>
-    private IInfoCarrierServerTransactionTimeout? TransactionTimeout
-        => _serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
+    private IInfoCarrierServerTransactionTimeout? TransactionTimeout { get; }
+        = serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
 
     /// <summary>
     ///     The clock the idle timeout is measured against.
     /// </summary>
     /// <remarks>
     ///     <b>From the root provider, defaulting to the real one</b>, which is the same shape as
-    ///     every other optional service here and is what lets a test drive eviction without
+    ///     other optional services here. Captured during construction so timer callbacks never
+    ///     resolve from a disposed root during shutdown. It lets a test drive eviction without
     ///     sleeping. <c>FakeTimeProvider.Advance</c> fires a <c>CreateTimer</c> callback synchronously on
     ///     the calling thread, so a test asserts immediately after advancing.
     ///     <para>
@@ -211,8 +224,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///         inline.
     ///     </para>
     /// </remarks>
-    private TimeProvider Clock
-        => _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+    private TimeProvider Clock { get; }
+        = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
@@ -657,74 +670,46 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
         foreach (KeyValuePair<string, OpenTransaction> entry in _transactions)
         {
-            if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
-                || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
+            lock (_lifecycle)
             {
-                continue;
+                if (_disposed) { return; }
+                if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
+                    || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
+                {
+                    continue;
+                }
+
+                Log(LogLevel.Warning, 35020, "InfoCarrier removed an idle transaction; rollback and disposal will now be attempted.");
+                Task cleanup = DiscardAsync(evicted);
+                _backgroundCleanups.Add(cleanup);
+                _ = cleanup.ContinueWith(completed =>
+                {
+                    _ = completed.Exception;
+                    lock (_lifecycle) { _backgroundCleanups.Remove(completed); }
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
-
-            LogEviction(evicted, entry.Key, timeout.IdleTimeout);
-            _ = DiscardAsync(evicted);
         }
     }
 
-    /// <summary>
-    ///     Rolls an evicted transaction back and releases everything it pinned.
-    /// </summary>
-    /// <remarks>
-    ///     Every failure is swallowed deliberately: this runs unobserved, the caller that would
-    ///     have cared is gone by definition, and a store that refuses the rollback of a connection
-    ///     that is about to be disposed has nothing left to tell anyone.
-    /// </remarks>
-    private static async Task DiscardAsync(OpenTransaction evicted)
+    /// <summary>Attempts each resource cleanup stage, even when an earlier stage fails.</summary>
+    private async Task DiscardAsync(OpenTransaction evicted)
     {
-        try
-        {
-            await evicted.Transaction.RollbackAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // Intentionally ignored; see the remarks.
-        }
+        try { await evicted.Transaction.RollbackAsync().ConfigureAwait(false); }
+        catch (Exception) { Log(LogLevel.Error, 35021, "InfoCarrier transaction cleanup failed to roll back the transaction."); }
 
-        try
-        {
-            await evicted.Transaction.DisposeAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            await evicted.Scope.DisposeAsync().ConfigureAwait(false);
-        }
+        try { await evicted.Transaction.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception) { Log(LogLevel.Error, 35022, "InfoCarrier transaction cleanup failed to dispose the transaction."); }
+
+        try { await evicted.Scope.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception) { Log(LogLevel.Error, 35023, "InfoCarrier transaction cleanup failed to dispose its service scope."); }
     }
 
-    /// <summary>
-    ///     Says on the server's own log that a transaction was evicted.
-    /// </summary>
-    /// <remarks>
-    ///     <b>The client is told nothing new</b>, by decision: a later request naming the token
-    ///     gets the same message it gets for a transaction that was committed or rolled back,
-    ///     because that is what happened to it. The distinction lives here, and
-    ///     <c>AddInfoCarrierServerLogForwarding</c> carries it to the client where a deployment has
-    ///     granted that as well. <b>The token is logged and nothing else</b>: it is a random
-    ///     <c>Guid</c> this server minted, so it names no user and no row.
-    ///     <para>
-    ///         <b>The logger comes from the EVICTED TRANSACTION'S OWN SCOPE, not from the root
-    ///         provider</b>, and that is not a stylistic choice. <c>ILoggerFactory</c> can be registered
-    ///         scoped, and resolving a scoped service from the root is the defect
-    ///         <c>BuildServiceProvider(validateScopes: true)</c> exists to catch. It caught this one.
-    ///         The scope is alive here by construction: <c>DiscardAsync</c> disposes it after this
-    ///         returns.
-    ///     </para>
-    /// </remarks>
-    private static void LogEviction(OpenTransaction evicted, string token, TimeSpan idleTimeout)
-        => evicted.Scope.ServiceProvider.GetService<ILoggerFactory>()
-            ?.CreateLogger<InProcessInfoCarrierServer>()
-            .LogWarning(
-                "InfoCarrier rolled back transaction {TransactionId}: no request named it for {IdleTimeout}. "
-                + "The client that began it did not commit, roll back, or dispose. "
-                + "See AddInfoCarrierServerTransactionTimeout.",
-                token,
-                idleTimeout);
+    private void Log(LogLevel level, int eventId, string message)
+    {
+        // Transaction tokens and exception messages can contain credentials or application data.
+        try { _logger.Log(level, new EventId(eventId), message); }
+        catch (Exception) { }
+    }
 
     /// <summary>
     ///     Stops the sweep and releases every transaction still open.
@@ -738,19 +723,16 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     /// </remarks>
     public async ValueTask DisposeAsync()
     {
+        Task[] background;
         lock (_lifecycle)
         {
-            if (_disposed)
-            {
-                return;
-            }
-
+            if (_disposed) { return; }
             _disposed = true;
+            background = _backgroundCleanups.ToArray();
         }
 
         _sweepTimer?.Dispose();
         _sweepTimer = null;
-
         foreach (string token in _transactions.Keys)
         {
             if (_transactions.TryRemove(token, out OpenTransaction? open))
@@ -758,6 +740,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
                 await DiscardAsync(open).ConfigureAwait(false);
             }
         }
+
+        await Task.WhenAll(background).ConfigureAwait(false);
     }
 
     /// <summary>

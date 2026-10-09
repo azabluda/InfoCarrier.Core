@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core.AspNetCore;
 
@@ -39,7 +40,8 @@ namespace InfoCarrier.Core.AspNetCore;
 ///     </para>
 ///     <para>
 ///         Neither catch touches <see cref="OperationCanceledException" />: a cancelled request is
-///         the caller's own signal, not a server-side failure to report.
+///         the caller's own signal and still propagates. Diagnostics use the request token
+///         to distinguish expected cancellation from an unrelated cancellation exception.
 ///     </para>
 ///     <para>
 ///         <b>Deliberately free of sample types</b>, so promoting it into an
@@ -68,41 +70,74 @@ public static class InfoCarrierEndpointExtensions
 
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
-            IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
-
-            using var buffer = new MemoryStream();
-            await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
-
-            InfoCarrierEnvelope request;
+            ILogger logger = http.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint");
+            string phase = "request body reading";
+            bool dispatching = false;
             try
             {
-                request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())
-                    ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
-                return;
-            }
+                IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
+                using var buffer = new MemoryStream();
+                await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
 
-            var envelopeServer = new InfoCarrierEnvelopeServer(
-                http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer);
+                InfoCarrierEnvelope request;
+                try
+                {
+                    request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())
+                        ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    Log(logger, LogLevel.Warning, 35010, "InfoCarrier request was rejected because its envelope could not be read.");
+                    phase = "bad request response writing";
+                    await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
+                    return;
+                }
 
-            InfoCarrierEnvelope response;
-            try
-            {
-                response = await envelopeServer.DispatchAsync(request, http.RequestAborted).ConfigureAwait(false);
-            }
-            catch (NotSupportedException exception)
-            {
-                await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
-                return;
-            }
+                var server = new InfoCarrierEnvelopeServer(
+                    http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer,
+                    http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
+                InfoCarrierEnvelope response;
+                try
+                {
+                    dispatching = true;
+                    response = await server.DispatchAsync(request, http.RequestAborted).ConfigureAwait(false);
+                }
+                catch (NotSupportedException exception)
+                {
+                    dispatching = false;
+                    phase = "bad request response writing";
+                    await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
+                    return;
+                }
 
-            http.Response.ContentType = "application/json";
-            await http.Response.Body.WriteAsync(serializer.Serialize(response), http.RequestAborted)
-                .ConfigureAwait(false);
+                dispatching = false;
+                http.Response.ContentType = "application/json";
+                phase = "response envelope serialization";
+                byte[] bytes = serializer.Serialize(response);
+                phase = "response body writing";
+                await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // Dispatch owns its failures. The adapter observes only HTTP boundary failures.
+                if (!dispatching)
+                {
+                    bool cancelled = http.RequestAborted.IsCancellationRequested
+                        && exception is OperationCanceledException or IOException;
+                    Log(logger, cancelled ? LogLevel.Debug : LogLevel.Error, 35011,
+                        cancelled ? "InfoCarrier HTTP request was cancelled during {Phase}."
+                            : "InfoCarrier HTTP request failed during {Phase}.", phase);
+                }
+                throw;
+            }
         });
+    }
+
+    private static void Log(ILogger? logger, LogLevel level, int eventId, string message, params object?[] values)
+    {
+        try { logger?.Log(level, new EventId(eventId), message, values); }
+        catch (Exception) { }
     }
 
     private static async Task WriteBadRequestAsync(HttpContext http, string message)
