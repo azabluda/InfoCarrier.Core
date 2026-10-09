@@ -30,6 +30,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 {
     private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
 
+    private readonly InfoCarrierServerDiagnostics? _diagnostics = serviceProvider.GetService<InfoCarrierServerDiagnostics>();
+
     /// <summary>
     ///     The transactions this server is holding open, by token (wire-protocol W3).
     /// </summary>
@@ -74,6 +76,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     private ITimer? _sweepTimer;
 
     private readonly object _lifecycle = new();
+    private readonly HashSet<Task> _backgroundCleanups = [];
+    private readonly CleanupLogging _cleanupLogging = new(serviceProvider);
 
     private bool _disposed;
 
@@ -193,15 +197,16 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     How long a transaction may go untouched before this server rolls it back
     ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
     /// </summary>
-    private IInfoCarrierServerTransactionTimeout? TransactionTimeout
-        => _serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
+    private IInfoCarrierServerTransactionTimeout? TransactionTimeout { get; }
+        = serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
 
     /// <summary>
     ///     The clock the idle timeout is measured against.
     /// </summary>
     /// <remarks>
     ///     <b>From the root provider, defaulting to the real one</b>, which is the same shape as
-    ///     every other optional service here and is what lets a test drive eviction without
+    ///     other optional services here. Captured during construction so timer callbacks never
+    ///     resolve from a disposed root during shutdown. It lets a test drive eviction without
     ///     sleeping. <c>FakeTimeProvider.Advance</c> fires a <c>CreateTimer</c> callback synchronously on
     ///     the calling thread, so a test asserts immediately after advancing.
     ///     <para>
@@ -211,8 +216,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///         inline.
     ///     </para>
     /// </remarks>
-    private TimeProvider Clock
-        => _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+    private TimeProvider Clock { get; }
+        = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
@@ -225,7 +230,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
                 lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
             var executor = new ServerQueryExecutor(
-                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
+                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots) { Diagnostics = _diagnostics };
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             QueryDataResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -440,10 +445,18 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             return;
         }
 
-        throw new InvalidOperationException(
+        throw ServerFailureClassification.Mark(new InvalidOperationException(
             $"Transaction '{transactionId}' was opened by a different caller, so this caller may "
                 + "not use it. This server binds a transaction to the caller that opened it, "
-                + "because the token alone is a bearer credential.");
+                + "because the token alone is a bearer credential."), InfoCarrierServerFailureReason.CallerMismatch);
+    }
+
+    private InvalidOperationException NotOpenException(string transactionId, string message)
+    {
+        string? mintedBy = MintedBy(transactionId);
+        return ServerFailureClassification.Mark(new InvalidOperationException(message),
+            mintedBy is not null && mintedBy != _instanceId ? InfoCarrierServerFailureReason.WrongInstance
+                : InfoCarrierServerFailureReason.TransactionNotOpen);
     }
 
     private OpenTransaction Open(string transactionId)
@@ -452,8 +465,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
         if (!_transactions.TryGetValue(transactionId, out OpenTransaction? open))
         {
-            throw new InvalidOperationException(
-                NotOpenHere(
+            throw NotOpenException(
+                transactionId, NotOpenHere(
                     transactionId,
                     $"Transaction '{transactionId}' is not open on this server. It was committed, "
                         + "rolled back, evicted after its configured idle timeout, or never "
@@ -509,8 +522,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             // after it. A wrong answer is worse than an exception, so a commit throws.
             if (commit)
             {
-                throw new InvalidOperationException(
-                    NotOpenHere(
+                throw NotOpenException(
+                    transactionId, NotOpenHere(
                         transactionId,
                         $"Transaction '{transactionId}' is not open on this server, so it cannot "
                             + "be committed. It was already committed or rolled back, it was "
@@ -657,74 +670,82 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
         foreach (KeyValuePair<string, OpenTransaction> entry in _transactions)
         {
-            if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
-                || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
+            lock (_lifecycle)
             {
-                continue;
+                if (_disposed) { return; }
+                if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
+                    || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
+                {
+                    continue;
+                }
+
+                string cleanupId = Guid.NewGuid().ToString("N");
+                LogEviction(evicted, cleanupId);
+                Task cleanup = DiscardAsync(evicted, cleanupId);
+                _backgroundCleanups.Add(cleanup);
+                _ = cleanup.ContinueWith(completed =>
+                {
+                    _ = completed.Exception;
+                    lock (_lifecycle) { _backgroundCleanups.Remove(completed); }
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
-
-            LogEviction(evicted, entry.Key, timeout.IdleTimeout);
-            _ = DiscardAsync(evicted);
         }
     }
 
-    /// <summary>
-    ///     Rolls an evicted transaction back and releases everything it pinned.
-    /// </summary>
-    /// <remarks>
-    ///     Every failure is swallowed deliberately: this runs unobserved, the caller that would
-    ///     have cared is gone by definition, and a store that refuses the rollback of a connection
-    ///     that is about to be disposed has nothing left to tell anyone.
-    /// </remarks>
-    private static async Task DiscardAsync(OpenTransaction evicted)
+    /// <summary>Attempts every cleanup stage and observes failures without exposing credentials.</summary>
+    private async Task DiscardAsync(OpenTransaction evicted, string? cleanupId = null)
     {
-        try
+        cleanupId ??= Guid.NewGuid().ToString("N");
+        ILogger? logger = _cleanupLogging.Logger;
+        bool failed = false;
+        try { await evicted.Transaction.RollbackAsync().ConfigureAwait(false); }
+        catch (Exception)
         {
-            await evicted.Transaction.RollbackAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // Intentionally ignored; see the remarks.
+            failed = true;
+            _diagnostics?.Cleanup(logger, InfoCarrierServerFailureReason.CleanupRollbackFailure, "Rollback", cleanupId);
         }
 
-        try
+        try { await evicted.Transaction.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception)
         {
-            await evicted.Transaction.DisposeAsync().ConfigureAwait(false);
+            failed = true;
+            _diagnostics?.Cleanup(logger, InfoCarrierServerFailureReason.CleanupTransactionDisposalFailure, "TransactionDisposal", cleanupId);
         }
-        finally
+
+        try { await evicted.Scope.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception)
         {
-            await evicted.Scope.DisposeAsync().ConfigureAwait(false);
+            failed = true;
+            _diagnostics?.Cleanup(logger, InfoCarrierServerFailureReason.CleanupScopeDisposalFailure, "ScopeDisposal", cleanupId);
+        }
+
+        if (!failed)
+        {
+            _diagnostics?.Cleanup(logger, InfoCarrierServerFailureReason.CleanupCompleted, "Cleanup", cleanupId);
         }
     }
 
-    /// <summary>
-    ///     Says on the server's own log that a transaction was evicted.
-    /// </summary>
-    /// <remarks>
-    ///     <b>The client is told nothing new</b>, by decision: a later request naming the token
-    ///     gets the same message it gets for a transaction that was committed or rolled back,
-    ///     because that is what happened to it. The distinction lives here, and
-    ///     <c>AddInfoCarrierServerLogForwarding</c> carries it to the client where a deployment has
-    ///     granted that as well. <b>The token is logged and nothing else</b>: it is a random
-    ///     <c>Guid</c> this server minted, so it names no user and no row.
-    ///     <para>
-    ///         <b>The logger comes from the EVICTED TRANSACTION'S OWN SCOPE, not from the root
-    ///         provider</b>, and that is not a stylistic choice. <c>ILoggerFactory</c> can be registered
-    ///         scoped, and resolving a scoped service from the root is the defect
-    ///         <c>BuildServiceProvider(validateScopes: true)</c> exists to catch. It caught this one.
-    ///         The scope is alive here by construction: <c>DiscardAsync</c> disposes it after this
-    ///         returns.
-    ///     </para>
-    /// </remarks>
-    private static void LogEviction(OpenTransaction evicted, string token, TimeSpan idleTimeout)
-        => evicted.Scope.ServiceProvider.GetService<ILoggerFactory>()
-            ?.CreateLogger<InProcessInfoCarrierServer>()
-            .LogWarning(
-                "InfoCarrier rolled back transaction {TransactionId}: no request named it for {IdleTimeout}. "
-                + "The client that began it did not commit, roll back, or dispose. "
-                + "See AddInfoCarrierServerTransactionTimeout.",
-                token,
-                idleTimeout);
+    /// <summary>Reports eviction intent; the cleanup reports whether rollback and disposal succeeded.</summary>
+    private void LogEviction(OpenTransaction evicted, string cleanupId)
+    {
+        ILogger? logger = _diagnostics is not null ? _cleanupLogging.Logger
+            : InfoCarrierServerDiagnostics.Logger(evicted.Scope.ServiceProvider);
+        if (_diagnostics is not null)
+        {
+            _diagnostics.Cleanup(logger, InfoCarrierServerFailureReason.TransactionEvicted, "IdleEviction", cleanupId);
+            return;
+        }
+
+        // Preserve the pre-existing warning when diagnostics were not registered.
+        // Removal is intent, not proof of successful rollback. Never include the bearer token.
+        try
+        {
+            logger?.LogWarning(new EventId(35002, "CleanupOutcome"),
+                "InfoCarrier server outcome {Reason} in {Phase}; operation {Operation}, request {RequestId}.",
+                "TransactionEvicted", "IdleEviction", "Cleanup", cleanupId);
+        }
+        catch (Exception) { }
+    }
 
     /// <summary>
     ///     Stops the sweep and releases every transaction still open.
@@ -738,24 +759,61 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     /// </remarks>
     public async ValueTask DisposeAsync()
     {
+        Task[] background;
         lock (_lifecycle)
         {
-            if (_disposed)
-            {
-                return;
-            }
-
+            if (_disposed) { return; }
             _disposed = true;
+            background = _backgroundCleanups.ToArray();
         }
 
-        _sweepTimer?.Dispose();
-        _sweepTimer = null;
-
-        foreach (string token in _transactions.Keys)
+        try
         {
-            if (_transactions.TryRemove(token, out OpenTransaction? open))
+            _sweepTimer?.Dispose();
+            _sweepTimer = null;
+            foreach (string token in _transactions.Keys)
             {
-                await DiscardAsync(open).ConfigureAwait(false);
+                if (_transactions.TryRemove(token, out OpenTransaction? open))
+                {
+                    await DiscardAsync(open).ConfigureAwait(false);
+                }
+            }
+
+            await Task.WhenAll(background).ConfigureAwait(false);
+        }
+        finally
+        {
+            await _cleanupLogging.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    // Resolve the cleanup logger while constructing the server, before its owning container
+    // can begin shutdown. A scoped factory lives here through resource-scope disposal; a
+    // singleton factory is also captured before the server in the container's disposal order.
+    private sealed class CleanupLogging : IAsyncDisposable
+    {
+        private readonly AsyncServiceScope? _scope;
+        public ILogger? Logger { get; }
+
+        public CleanupLogging(IServiceProvider provider)
+        {
+            try
+            {
+                if (provider.GetService<InfoCarrierServerDiagnostics>() is not null)
+                {
+                    _scope = provider.CreateAsyncScope();
+                    Logger = InfoCarrierServerDiagnostics.Logger(_scope.Value.ServiceProvider);
+                }
+            }
+            catch (Exception) { }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_scope is { } scope)
+            {
+                try { await scope.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception) { }
             }
         }
     }

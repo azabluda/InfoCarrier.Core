@@ -39,6 +39,20 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
 {
     private readonly IInfoCarrierServer _server = server;
     private readonly IInfoCarrierSerializer _serializer = serializer;
+    private readonly InfoCarrierServerDiagnostics? _diagnostics;
+    private readonly Microsoft.Extensions.Logging.ILoggerFactory? _loggerFactory;
+
+    /// <summary>Creates a dispatcher with the host's shared safe diagnostics.</summary>
+    /// <param name="server">The operation server.</param>
+    /// <param name="serializer">The payload serializer.</param>
+    /// <param name="diagnostics">One diagnostics instance shared by the host.</param>
+    /// <param name="loggerFactory">The logger factory from the current host scope.</param>
+    public InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCarrierSerializer serializer,
+        InfoCarrierServerDiagnostics? diagnostics, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) : this(server, serializer)
+    {
+        _diagnostics = diagnostics;
+        _loggerFactory = loggerFactory;
+    }
 
     /// <summary>
     ///     Handles one request envelope and produces the response envelope.
@@ -48,19 +62,27 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using IDisposable? diagnosticScope = _diagnostics?.BeginRequest(request.Operation, _loggerFactory);
 
         if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
         {
-            throw new NotSupportedException(
+            var mismatch = ServerFailureClassification.Mark(new NotSupportedException(
                 $"InfoCarrier protocol version {request.ProtocolVersion} is not supported by this "
-                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
+                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}."), InfoCarrierServerFailureReason.ProtocolVersion);
+            _diagnostics?.ReportFailure(mismatch);
+            throw mismatch;
         }
 
         try
         {
             return await ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (OperationCanceledException exception)
+        {
+            _diagnostics?.ReportFailure(exception, cancellationToken);
+            throw;
+        }
+        catch (Exception exception)
         {
             // **A failure is a result, not an escape** (wire-protocol W5). In-process an exception
             // reaches the caller by propagating; no network transport can do that, so it has to
@@ -76,18 +98,34 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
             // its own `OperationCanceledException` rather than a rebuilt copy. W6 closed on that
             // footing: the server stops the query when the token trips, and the exception stays
             // the caller's.
-            return request with
+            InfoCarrierServerPhase failurePhase = Enum.TryParse(_diagnostics?.CurrentPhase, out InfoCarrierServerPhase parsed) ? parsed : InfoCarrierServerPhase.Execution;
+            InfoCarrierEnvelope response;
+            try
             {
-                Payload = _serializer.Serialize<object?>(null),
-                Fault = InfoCarrierFaultMapper.Capture(exception),
-            };
+                _diagnostics?.SetPhase(InfoCarrierServerPhase.FaultSerialization);
+                response = request with
+                {
+                    Payload = _serializer.Serialize<object?>(null),
+                    Fault = InfoCarrierFaultMapper.Capture(exception),
+                };
+            }
+            catch (Exception faultFailure)
+            {
+                _diagnostics?.ReportFailure(faultFailure, cancellationToken);
+                throw;
+            }
+
+            _diagnostics?.ReportFailure(exception, cancellationToken, phase: failurePhase);
+            return response;
         }
     }
 
     private async Task<InfoCarrierEnvelope> ExecuteAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken)
-        => request.Operation switch
+    {
+        _diagnostics?.SetPhase(InfoCarrierServerPhase.Execution);
+        return request.Operation switch
         {
             InfoCarrierOperation.Query
                 => await RespondAsync(
@@ -135,18 +173,36 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
 
             // Default-deny, like everything else the wire admits: an operation this server does
             // not implement is refused by name rather than silently treated as one it does.
-            _ => throw new NotSupportedException(
-                $"InfoCarrier operation '{request.Operation}' is not supported by this server."),
+            _ => throw ServerFailureClassification.Mark(new NotSupportedException(
+                $"InfoCarrier operation '{request.Operation}' is not supported by this server."), InfoCarrierServerFailureReason.UnknownOperation),
         };
+    }
 
     private T Payload<T>(InfoCarrierEnvelope request)
-        => _serializer.Deserialize<T>(request.Payload)
-            ?? throw new InvalidOperationException(
-                $"The {request.Operation} envelope carried no {typeof(T).Name} payload.");
+    {
+        _diagnostics?.SetPhase(InfoCarrierServerPhase.Input);
+        try
+        {
+            T payload = _serializer.Deserialize<T>(request.Payload)
+                ?? throw ServerFailureClassification.Mark(new InvalidOperationException(
+                    $"The {request.Operation} envelope carried no {typeof(T).Name} payload."), InfoCarrierServerFailureReason.InvalidPayload);
+            _diagnostics?.SetPhase(InfoCarrierServerPhase.Execution);
+            return payload;
+        }
+        catch (Exception failure) when (request.Payload is null)
+        {
+            ServerFailureClassification.Mark(failure, InfoCarrierServerFailureReason.InvalidPayload);
+            throw;
+        }
+    }
 
     private async Task<InfoCarrierEnvelope> RespondAsync<TResult>(
         InfoCarrierEnvelope request, Task<TResult> operation)
-        => request with { Payload = _serializer.Serialize(await operation.ConfigureAwait(false)) };
+    {
+        TResult result = await operation.ConfigureAwait(false);
+        _diagnostics?.SetPhase(InfoCarrierServerPhase.ResultSerialization);
+        return request with { Payload = _serializer.Serialize(result) };
+    }
 
     /// <summary>
     ///     A response to an operation that returns nothing. The payload is still written, because
@@ -155,6 +211,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
     private async Task<InfoCarrierEnvelope> AcknowledgeAsync(InfoCarrierEnvelope request, Task operation)
     {
         await operation.ConfigureAwait(false);
+        _diagnostics?.SetPhase(InfoCarrierServerPhase.ResultSerialization);
         return request with { Payload = _serializer.Serialize<object?>(null) };
     }
 

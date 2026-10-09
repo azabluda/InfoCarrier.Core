@@ -524,6 +524,18 @@ in the archive; this step tests the missing integration without a sleep or a slo
       Named records retain the existing type permission registration. Component permissions,
       recursive limits, model binding, and request-independent generation remain mandatory.
 
+## Phase LOG: safe server failure diagnostics ([#214](https://github.com/azabluda/InfoCarrier.Core/issues/214))
+
+The owner approved the audited issue and requested implementation in this session on 2026-10-08.
+
+- [x] **LOG1. Add injected safe request diagnostics and observe transaction cleanup.** Preserve
+      constructors and the fault contract. Add fixed reasons/phases, generated request identities,
+      opt-in trusted caller pseudonyms, bounded per-reason suppression, and total/suppressed counters.
+      Separate eviction intent from cleanup outcome and attempt every resource cleanup stage.
+      The [hosting and diagnostic policy](server-failure-diagnostics.md) records lifecycle, privacy,
+      severity, compatibility, and owned coverage. Run regular, transport, strict Release, trim,
+      pack, documentation, and hygiene gates; create one pull request and stop while checks run.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

@@ -22,6 +22,8 @@ builder.Services.AddDbContext<NorthwindContext>(
 builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindContext>());
 
 builder.Services
+    .AddMetrics()
+    .AddInfoCarrierServerDiagnostics()
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
 

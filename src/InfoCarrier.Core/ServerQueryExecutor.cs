@@ -77,6 +77,8 @@ public class ServerQueryExecutor(
     private readonly Metadata.IInfoCarrierRelationalQueryRoots _relationalQueryRoots
         = relationalQueryRoots ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
 
+    internal InfoCarrierServerDiagnostics? Diagnostics { get; init; }
+
     /// <summary>
     ///     Executes the query described by <paramref name="request" /> and returns the wire result.
     /// </summary>
@@ -95,7 +97,9 @@ public class ServerQueryExecutor(
         try
         {
             // Deserialize + rebind the tree against the server model.
+            Diagnostics?.SetPhase(InfoCarrierServerPhase.Validation);
             ExpressionNode node = DeserializeNode(request.SerializedQuery);
+            Diagnostics?.SetPhase(InfoCarrierServerPhase.Rebinding);
             Expression query = Rebind(node);
 
             // The client stripped `AsSplitQuery`/`AsSingleQuery` before drawing the boundary and
@@ -116,9 +120,11 @@ public class ServerQueryExecutor(
             _context.ChangeTracker.QueryTrackingBehavior = TrackingBehaviorFor(request.TrackingBehavior, query, shape);
 
             // Execute against the server context.
+            Diagnostics?.SetPhase(InfoCarrierServerPhase.Execution);
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
 
             // Map results to the wire format (entity rows vs columnar projections).
+            Diagnostics?.SetPhase(InfoCarrierServerPhase.ResultMapping);
             return MapResults(result, request.ReturnsSingleResult, shape);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
@@ -288,14 +294,14 @@ public class ServerQueryExecutor(
     {
         if (!_arbitrarySqlAllowed)
         {
-            throw new InvalidOperationException(
+            throw ServerFailureClassification.Mark(new InvalidOperationException(
                 "This server does not permit a payload to carry SQL it will execute. A "
                 + "raw-SQL query (FromSql/FromSqlRaw/FromSqlInterpolated/Database.SqlQuery) "
                 + "reached it and was refused. Register it with "
                 + "services.AddInfoCarrierArbitrarySqlExecution() only after reading "
                 + "docs/security-review.md section 5a: it grants arbitrary SQL execution on "
                 + "this server's connection, and the server's own query filters are not "
-                + "applied to such a query.");
+                + "applied to such a query."), InfoCarrierServerFailureReason.Permission);
         }
     }
 

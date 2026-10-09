@@ -30,6 +30,26 @@ namespace InfoCarrier.Core;
 /// </summary>
 public static class InfoCarrierServiceCollectionExtensions
 {
+    /// <summary>Registers safe server diagnostics with host-owned state and meter lifetime.</summary>
+    /// <remarks>
+    ///     The host must register System.Diagnostics.Metrics.IMeterFactory (AddMetrics on a .NET
+    ///     host). Logger factories are resolved from request/transaction scopes, not the root.
+    ///     Register a TimeProvider before this call to use a different monotonic clock.
+    /// </remarks>
+    /// <param name="services">The server's service collection.</param>
+    /// <param name="includeCallerIdentity">Opt in to host-keyed pseudonyms of trusted caller identities.</param>
+    /// <returns>The same collection.</returns>
+    public static IServiceCollection AddInfoCarrierServerDiagnostics(this IServiceCollection services,
+        bool includeCallerIdentity = false)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton(sp => new InfoCarrierServerDiagnostics(
+            sp.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>(),
+            sp.GetRequiredService<TimeProvider>(), includeCallerIdentity));
+        return services;
+    }
+
     /// <summary>
     ///     Registers anonymous data structures from trusted prototypes. Only property names,
     ///     order, and types are used; prototype values are ignored. Nested shapes are included.
