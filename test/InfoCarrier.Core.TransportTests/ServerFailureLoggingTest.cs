@@ -274,7 +274,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Logger_creation_failure_does_not_replace_protocol_refusal(bool typedLogger)
+    public async Task Logger_configuration_failure_is_not_hidden_by_protocol_refusal(bool typedLogger)
     {
         await using var host = factory.WithWebHostBuilder(b => b
             .ConfigureLogging(l => { if (!typedLogger) { l.AddProvider(new FailingLoggerCreation()); } })
@@ -288,8 +288,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var client = host.CreateClient();
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var request = new InfoCarrierEnvelope { ProtocolVersion = 999, Operation = InfoCarrierOperation.BeginTransaction, Payload = [] };
-        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(request)));
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(request))));
+        Assert.Equal("secret-logger", failure.Message);
     }
 
     private sealed class FailingLoggerCreation : ILoggerProvider

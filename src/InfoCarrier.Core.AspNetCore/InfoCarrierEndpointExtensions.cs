@@ -70,7 +70,8 @@ public static class InfoCarrierEndpointExtensions
 
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
-            ILogger? logger = EndpointLogger(http.RequestServices);
+            ILogger logger = http.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint");
             string phase = "request body reading";
             bool dispatching = false;
             try
@@ -95,7 +96,7 @@ public static class InfoCarrierEndpointExtensions
 
                 var server = new InfoCarrierEnvelopeServer(
                     http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer,
-                    DispatcherLogger(http.RequestServices));
+                    http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
                 InfoCarrierEnvelope response;
                 try
                 {
@@ -131,22 +132,6 @@ public static class InfoCarrierEndpointExtensions
                 throw;
             }
         });
-    }
-
-    private static ILogger? EndpointLogger(IServiceProvider services)
-    {
-        try { return services.GetService<ILoggerFactory>()?.CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint"); }
-        catch (Exception) { return null; }
-    }
-
-    private static ILogger<InfoCarrierEnvelopeServer> DispatcherLogger(IServiceProvider services)
-    {
-        try
-        {
-            return services.GetService<ILogger<InfoCarrierEnvelopeServer>>()
-                ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<InfoCarrierEnvelopeServer>.Instance;
-        }
-        catch (Exception) { return Microsoft.Extensions.Logging.Abstractions.NullLogger<InfoCarrierEnvelopeServer>.Instance; }
     }
 
     private static void Log(ILogger? logger, LogLevel level, int eventId, string message, params object?[] values)

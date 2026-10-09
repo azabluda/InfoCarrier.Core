@@ -59,7 +59,10 @@ There is no built-in rate limiter, suppression counter, custom meter, caller has
 request context. Every failed dispatch remains observable. Hosts needing output limits or
 aggregation must configure their logging pipeline; category filtering alone is not rate limiting.
 This narrows the original issue proposal according to the owner's design review.
-Logging backend failures are caught so they cannot replace a fault or interrupt resource cleanup.
+Logger registration, resolution, and creation failures propagate to the host. The adapter requires
+its logging services and does not substitute a null logger for broken configuration. Exceptions
+from event delivery are still caught so they cannot replace an existing fault or interrupt cleanup.
+The original explicit constructors without logging remain available for compatibility.
 
 ## Verification
 
@@ -75,4 +78,13 @@ tests, with unchanged failing names and reasons against server-failure-diagnosti
 Release transport reported Passed: 64, Failed: 0, Total: 64. Strict Release rebuilding, binary
 package compatibility, documentation, links, word budgets, and file hygiene passed. Trimming
 remained at 107 product warnings; the strict build retained five documented Razor warnings.
-Independent review found no remaining material issues after logger-acquisition protection.
+The subsequent owner review rejected silent logger-acquisition fallbacks. Both acquisition
+regressions now require the original configuration exception to propagate instead of HTTP 400.
+
+The configuration correction was measured as visible-logger-configuration: zero failures across
+30,120 specification tests, with unchanged failures and reasons against simple-class-logging.
+All 64 transport tests passed; strict Release rebuilding and trimming passed with unchanged
+warning counts. Isolated published samples passed console queries, anonymous projection, saves,
+and rollback; Blazor passed customer paging, explicit loads, saving, transaction commit, and
+deliberate database failure with rollback. The dispatcher emitted event 35001 for that failure,
+and server SQL commands remained visible. The owned test server was stopped afterward.

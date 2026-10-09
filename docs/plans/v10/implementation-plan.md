@@ -537,6 +537,11 @@ The owner approved the audited issue and requested implementation in this sessio
       [logging policy](server-failure-diagnostics.md) records ownership, severity, and the explicitly
       narrowed scope. Run transport, specification, strict Release, trim, package, and document gates.
       Update the existing pull request and stop while checks run.
+- [x] **LOG3. Surface logger configuration failures.** The owner rejected silent logger acquisition
+      fallbacks on 2026-10-09. Require adapter logging services and propagate resolution/creation
+      failures. Preserve explicit legacy constructors and protect fault delivery/resource cleanup
+      from logging emission failures. Reverse both acquisition regressions, run the required gates,
+      and update the existing pull request.
 
 ## Branches that outlive their pull request
 
