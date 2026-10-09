@@ -543,6 +543,13 @@ The owner approved the audited issue and requested implementation in this sessio
       from logging emission failures. Reverse both acquisition regressions, run the required gates,
       and update the existing pull request.
 
+- [x] **LOG4. Add bounded reasons and exception type diagnostics.** Approved on 2026-10-10 after
+      the owner tested the missing-registration sample failure. Identify that refusal with a
+      fixed reason and explanation without changing its exception or wire fault. Other mapped
+      faults report an unclassified reason and runtime exception type, without exception contents.
+      Test diagnostic output, privacy, and preserved contracts. Preserve the owner's temporary
+      sample failures uncommitted, verify normal samples separately, and update the existing pull request.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

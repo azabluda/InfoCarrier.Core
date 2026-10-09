@@ -42,15 +42,21 @@ Messages identify the failed action. Dispatch fields contain only a bounded oper
 locally observed phase. Result serialization explicitly follows operation completion; a failure
 there does not imply that a completed write was rolled back. A fault-response serialization
 failure is observed before it escapes. No exception messages are parsed to infer a cause.
-A missing shape registration, validation refusal, or transaction refusal therefore uses the
-generic operation-failure message and Error severity. This deliberately avoids the previous
-cross-component exception markers and detailed reason taxonomy. Host category filters control
+On 2026-10-10 the owner approved a bounded diagnostic addition after exercising the samples.
+A missing anonymous shape registration logs Reason=AnonymousShapeNotRegistered and a fixed
+explanation. The catalog marks this exception with a server-only Data entry keyed by its Type;
+the dispatcher reads only that entry, never message text. The exception remains an
+InvalidOperationException, and the fault mapper does not transmit the marker. Other mapped faults
+use Reason=UnclassifiedFailure, which does not label every refusal as unexpected. Each mapped
+fault also logs ExceptionType, using the exception's runtime type name. Operation, phase, severity,
+and fault responses retain their existing behavior. No classifier service or taxonomy is added.
+Host category filters control
 verbosity. Normal successful cleanup is silent; eviction reports intent rather than claiming
 rollback completion. Cleanup attempts every resource stage and shutdown awaits pending evictions.
 
 ## Privacy and limits
 
-Application events do not attach exception objects, messages, stacks, Data, payloads, expressions,
+Application events do not attach exception objects, messages, stacks, Data contents, payloads, expressions,
 SQL, transaction/savepoint tokens, client correlation values, or caller identities. Existing
 Entity Framework and host providers keep their own policies. SQL command logging remains available
 under Microsoft.EntityFrameworkCore.Database.Command when enabled by host filters.
@@ -63,6 +69,11 @@ Logger registration, resolution, and creation failures propagate to the host. Th
 its logging services and does not substitute a null logger for broken configuration. Exceptions
 from event delivery are still caught so they cannot replace an existing fault or interrupt cleanup.
 The original explicit constructors without logging remain available for compatibility.
+
+For unexpected mapped failures, the safe default is the operation, phase, runtime exception type,
+and UnclassifiedFailure reason. Raw exception diagnostics remain outside these application events;
+the host's other logging categories retain their own policies. Additional known reasons require
+an explicit source signal and privacy tests, rather than interpreting arbitrary exception text.
 
 ## Verification
 
@@ -88,3 +99,14 @@ warning counts. Isolated published samples passed console queries, anonymous pro
 and rollback; Blazor passed customer paging, explicit loads, saving, transaction commit, and
 deliberate database failure with rollback. The dispatcher emitted event 35001 for that failure,
 and server SQL commands remained visible. The owned test server was stopped afterward.
+
+Validation on 2026-10-10: safe-failure-reasons reported zero failures across 30,120 specification
+cases, with the same 234 skips and unchanged failing names/reasons against visible-logger-configuration.
+All 65 transport tests passed. The reason and exception-type tests failed before implementation;
+they also verify the unchanged exception/message, a marker-free wire fault, and rejection of
+message-based or string-key-based classification. Strict Release rebuilding passed with the five
+known Razor warnings; trimming retained 107 product warnings. Independent review found no material
+issue. Normal isolated console and Blazor samples passed queries, projection, paging, explicit
+loads, saves, commit, and failure rollback. The database failure logged its exception type without
+its message. The owned validation server was stopped, and the owner's sample failure probes were
+restored byte-for-byte and left uncommitted.

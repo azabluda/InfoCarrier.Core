@@ -28,12 +28,17 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             .ConfigureLogging(l => l.AddProvider(logs))
             .ConfigureServices(s => s.RemoveAll<AnonymousShapeCatalog>()));
         using var context = NorthwindOverHttpTest.CreateClientContext(host);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync());
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync());
+        Assert.Equal("The anonymous shape is not registered in this server's trusted catalog.", failure.Message);
+        Assert.False(failure.Data.Contains(typeof(AnonymousShapeCatalog)));
         FailureLogs.Entry entry = Assert.Single(logs.Entries);
 
 
         Assert.Equal(LogLevel.Error, entry.Level);
         Assert.Null(entry.Exception);
+        Assert.Equal("AnonymousShapeNotRegistered", entry.Properties["Reason"]);
+        Assert.Contains("anonymous shape is not registered", entry.Message);
+        Assert.Equal(typeof(InvalidOperationException).FullName, entry.Properties["ExceptionType"]);
         Assert.DoesNotContain("CustomerId", entry.Message);
     }
 

@@ -40,7 +40,11 @@ public sealed class AnonymousShapeCatalog
     {
         if (!_entries.TryGetValue(AnonymousShapeTypes.StructuralIdentity(node), out Entry? entry))
         {
-            throw new InvalidOperationException("The anonymous shape is not registered in this server's trusted catalog.");
+            // Server-only diagnostic marker. Preserve the exception type and wire fault contract.
+            throw new InvalidOperationException("The anonymous shape is not registered in this server's trusted catalog.")
+            {
+                Data = { [typeof(AnonymousShapeCatalog)] = true },
+            };
         }
 
         return entry;

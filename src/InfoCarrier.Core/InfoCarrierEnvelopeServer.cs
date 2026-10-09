@@ -115,8 +115,13 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
                 throw;
             }
 
+            bool missingShape = exception.Data[typeof(Expressions.AnonymousShapeCatalog)] is true;
+            string reason = missingShape ? "AnonymousShapeNotRegistered" : "UnclassifiedFailure";
             Log(exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ? LogLevel.Information : LogLevel.Error,
-                35001, "InfoCarrier {Operation} failed during {Phase}.", operation, failedPhase);
+                35001, missingShape
+                    ? "InfoCarrier {Operation} failed during {Phase}: an anonymous shape is not registered in the server's trusted catalog. Reason={Reason}; ExceptionType={ExceptionType}."
+                    : "InfoCarrier {Operation} failed during {Phase}. Reason={Reason}; ExceptionType={ExceptionType}.",
+                operation, failedPhase, reason, exception.GetType().FullName);
             return response;
         }
 

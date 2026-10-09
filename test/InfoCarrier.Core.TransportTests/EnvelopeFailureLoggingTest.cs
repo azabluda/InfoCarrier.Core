@@ -18,6 +18,32 @@ public class EnvelopeFailureLoggingTest
         Payload = Serializer.Serialize<object?>(null),
     };
 
+    [Fact]
+    public async Task Unexpected_failure_reports_type_without_exception_contents_or_a_guessed_reason()
+    {
+        var logs = new FailureLogs();
+        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
+        var failure = new InvalidOperationException("The anonymous shape is not registered in this server's trusted catalog.",
+            new Exception("secret-inner"));
+        failure.Data["secret-key"] = "secret-value";
+        failure.Data["AnonymousShapeNotRegistered"] = true;
+        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer,
+            factory.CreateLogger<InfoCarrierEnvelopeServer>());
+
+        InfoCarrierEnvelope response = await dispatcher.DispatchAsync(Request);
+        Assert.Equal(failure.Message, response.Fault!.Message);
+        Assert.Equal(typeof(InvalidOperationException).FullName, response.Fault.TypeName);
+        var entry = Assert.Single(logs.Entries);
+        Assert.Equal(typeof(InvalidOperationException).FullName, entry.Properties["ExceptionType"]);
+        Assert.Equal("UnclassifiedFailure", entry.Properties["Reason"]);
+        Assert.Equal("BeginTransaction", entry.Properties["Operation"]);
+        Assert.Equal("operation execution", entry.Properties["Phase"]);
+        Assert.Null(entry.Exception);
+        Assert.DoesNotContain(failure.Message, entry.Message);
+        Assert.DoesNotContain("secret", entry.Message);
+        Assert.All(entry.Properties.Values, value => Assert.DoesNotContain("secret", value?.ToString() ?? ""));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
