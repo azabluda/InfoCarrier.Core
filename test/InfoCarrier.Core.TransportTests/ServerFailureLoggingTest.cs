@@ -21,7 +21,7 @@ namespace InfoCarrier.Core.TransportTests;
 public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
     [Fact]
-    public async Task Missing_shape_registration_is_logged_as_configuration_without_payload_values()
+    public async Task Missing_shape_registration_logs_a_failed_query_without_payload_values()
     {
         var logs = new FailureLogs();
         await using var host = factory.WithWebHostBuilder(b => b
@@ -30,18 +30,18 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var context = NorthwindOverHttpTest.CreateClientContext(host);
         await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync());
         FailureLogs.Entry entry = Assert.Single(logs.Entries);
-        Assert.Equal("Configuration", entry.Properties["Reason"]);
-        Assert.Equal("Rebinding", entry.Properties["Phase"]);
-        Assert.Equal(LogLevel.Warning, entry.Level);
+
+
+        Assert.Equal(LogLevel.Error, entry.Level);
         Assert.Null(entry.Exception);
         Assert.DoesNotContain("CustomerId", entry.Message);
     }
 
     [Theory]
-    [InlineData("version", "ProtocolVersion", HttpStatusCode.BadRequest)]
-    [InlineData("operation", "UnknownOperation", HttpStatusCode.OK)]
-    [InlineData("body", "InvalidPayload", HttpStatusCode.BadRequest)]
-    public async Task Refusals_have_one_safe_server_event(string scenario, string reason, HttpStatusCode status)
+    [InlineData("version", HttpStatusCode.BadRequest)]
+    [InlineData("operation", HttpStatusCode.OK)]
+    [InlineData("body", HttpStatusCode.BadRequest)]
+    public async Task Refusals_have_one_safe_server_event(string scenario, HttpStatusCode status)
     {
         var logs = new FailureLogs();
         using var host = factory.WithWebHostBuilder(b => b.ConfigureLogging(l => l.AddProvider(logs)));
@@ -57,20 +57,20 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var response = await client.PostAsync("infocarrier", new ByteArrayContent(body));
         Assert.Equal(status, response.StatusCode);
         FailureLogs.Entry entry = Assert.Single(logs.Entries);
-        Assert.Equal(reason, entry.Properties["Reason"]);
+
         Assert.Null(entry.Exception);
         Assert.DoesNotContain("secret", entry.Message);
         Assert.All(entry.Properties.Values, value => Assert.DoesNotContain("secret", value?.ToString() ?? ""));
-        Assert.False(string.IsNullOrEmpty(entry.Properties["RequestId"]?.ToString()));
+
     }
     [Theory]
-    [InlineData("inner", "InvalidPayload", "Input")]
-    [InlineData("query", "InvalidPayload", "Validation")]
-    [InlineData("descriptor", "InvalidDescriptor", "Rebinding")]
-    [InlineData("type", "Permission", "Rebinding")]
-    [InlineData("operator", "InvalidDescriptor", "Rebinding")]
-    [InlineData("method", "Permission", "Rebinding")]
-    public async Task Invalid_query_inputs_have_bounded_reasons(string scenario, string reason, string phase)
+    [InlineData("inner")]
+    [InlineData("query")]
+    [InlineData("descriptor")]
+    [InlineData("type")]
+    [InlineData("operator")]
+    [InlineData("method")]
+    public async Task Invalid_query_inputs_preserve_faults_and_exclude_input_text(string scenario)
     {
         var logs = new FailureLogs();
         await using var host = factory.WithWebHostBuilder(b => b.ConfigureLogging(l => l.AddProvider(logs))
@@ -113,19 +113,19 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync())!.Fault);
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal(reason, entry.Properties["Reason"]);
-        Assert.Equal(phase, entry.Properties["Phase"]);
-        Assert.Equal(LogLevel.Information, entry.Level);
+
+
+        Assert.Equal(LogLevel.Error, entry.Level);
         Assert.Null(entry.Exception);
         Assert.DoesNotContain("secret", entry.Message);
         Assert.DoesNotContain("FileInfo", entry.Message);
     }
 
     [Theory]
-    [InlineData("missing", "TransactionNotOpen")]
-    [InlineData("instance", "WrongInstance")]
-    [InlineData("caller", "CallerMismatch")]
-    public async Task Transaction_refusals_exclude_bearer_tokens(string scenario, string reason)
+    [InlineData("missing")]
+    [InlineData("instance")]
+    [InlineData("caller")]
+    public async Task Transaction_refusals_exclude_bearer_tokens(string scenario)
     {
         var logs = new FailureLogs();
         var caller = new CallerIdentity();
@@ -150,8 +150,8 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync())!.Fault);
             var entry = Assert.Single(logs.Entries);
-            Assert.Equal(reason, entry.Properties["Reason"]);
-            Assert.Equal(LogLevel.Warning, entry.Level);
+
+            Assert.Equal(LogLevel.Error, entry.Level);
             Assert.DoesNotContain(token, entry.Message);
             Assert.DoesNotContain("secret", entry.Message);
         }
@@ -174,15 +174,15 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var response = await client.PostAsync("infocarrier", new ByteArrayContent(new byte[33]));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal("PayloadLimit", entry.Properties["Reason"]);
-        Assert.Equal(LogLevel.Information, entry.Level);
+
+        Assert.Equal(LogLevel.Warning, entry.Level);
     }
 
 
     [Theory]
-    [InlineData(false, "ExecutionFailure")]
-    [InlineData(true, "Database")]
-    public async Task Real_query_pipeline_reports_translation_and_database_failures(bool databaseFailure, string reason)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Real_query_pipeline_reports_translation_and_database_failures(bool databaseFailure)
     {
         var logs = new FailureLogs();
         await using var host = factory.WithWebHostBuilder(b => b
@@ -202,14 +202,14 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
                 .Where(c => c.Id.StartsWith("secret-expression", StringComparison.Ordinal)).ToListAsync());
         }
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal(reason, entry.Properties["Reason"]);
+
         Assert.Equal(LogLevel.Error, entry.Level);
         Assert.Null(entry.Exception);
         Assert.DoesNotContain("secret", entry.Message);
     }
 
     [Fact]
-    public async Task Final_envelope_serialization_failure_identifies_the_completed_operation()
+    public async Task Final_envelope_serialization_failure_logs_the_http_boundary()
     {
         var logs = new FailureLogs();
         var server = new EnvelopeFailureLoggingTest.TestServer(null);
@@ -231,9 +231,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         await Assert.ThrowsAsync<FormatException>(() => client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope))));
         Assert.Equal(1, server.Completed);
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal("ResponseSerialization", entry.Properties["Reason"]);
-        Assert.Equal("EnvelopeSerialization", entry.Properties["Phase"]);
-        Assert.Equal("BeginTransaction", entry.Properties["Operation"]);
+
+
+
         Assert.Null(entry.Exception);
         Assert.DoesNotContain("secret", entry.Message);
     }
@@ -251,11 +251,53 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         });
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => context.SaveChangesAsync());
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal("Concurrency", entry.Properties["Reason"]);
-        Assert.Equal("SaveChanges", entry.Properties["Operation"]);
+
+
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.DoesNotContain("secret", entry.Message);
         Assert.Null(entry.Exception);
+    }
+
+    [Fact]
+    public async Task Host_sql_command_logging_remains_available()
+    {
+        var logs = new BoundaryLogs();
+        await using var host = factory.WithWebHostBuilder(b => b.ConfigureLogging(l => l
+            .AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information).AddProvider(logs)));
+        using var context = NorthwindOverHttpTest.CreateClientContext(host);
+        logs.Entries.Clear();
+        await context.Customers.Where(c => c.Country == "Germany").ToListAsync();
+        Assert.Contains(logs.Entries, entry => entry.Category == "Microsoft.EntityFrameworkCore.Database.Command"
+            && entry.Level == LogLevel.Information && entry.Message.Contains("SELECT", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Logger_creation_failure_does_not_replace_protocol_refusal(bool typedLogger)
+    {
+        await using var host = factory.WithWebHostBuilder(b => b
+            .ConfigureLogging(l => { if (!typedLogger) { l.AddProvider(new FailingLoggerCreation()); } })
+            .ConfigureServices(s =>
+            {
+                if (typedLogger)
+                {
+                    s.AddScoped<ILogger<InfoCarrierEnvelopeServer>>(_ => throw new InvalidOperationException("secret-logger"));
+                }
+            }));
+        using var client = host.CreateClient();
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var request = new InfoCarrierEnvelope { ProtocolVersion = 999, Operation = InfoCarrierOperation.BeginTransaction, Payload = [] };
+        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(request)));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    private sealed class FailingLoggerCreation : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => categoryName == "InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint"
+            ? throw new InvalidOperationException("secret-logger")
+            : Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+        public void Dispose() { }
     }
 
     private sealed class FinalEnvelopeFailure : IInfoCarrierSerializer
@@ -301,7 +343,7 @@ internal sealed class FailureLogs(Action<FailureLogs.Entry>? recorded = null) : 
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
-            if (category == "InfoCarrier.Server")
+            if (category.StartsWith("InfoCarrier.Core.", StringComparison.Ordinal))
             {
                 var entry = new Entry(logLevel, eventId, formatter(state, exception), exception,
                     state is IEnumerable<KeyValuePair<string, object?>> values ? values.ToDictionary(v => v.Key, v => v.Value) : []);

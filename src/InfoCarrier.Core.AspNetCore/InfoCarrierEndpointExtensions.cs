@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core.AspNetCore;
 
@@ -40,7 +41,7 @@ namespace InfoCarrier.Core.AspNetCore;
 ///     <para>
 ///         Neither catch touches <see cref="OperationCanceledException" />: a cancelled request is
 ///         the caller's own signal and still propagates. Diagnostics use the request token
-    ///         to distinguish expected cancellation from an unrelated cancellation exception.
+///         to distinguish expected cancellation from an unrelated cancellation exception.
 ///     </para>
 ///     <para>
 ///         <b>Deliberately free of sample types</b>, so promoting it into an
@@ -67,76 +68,91 @@ public static class InfoCarrierEndpointExtensions
         // Fail trusted catalog construction during endpoint setup, before requests arrive.
         _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
 
-        InfoCarrierServerDiagnostics? diagnostics = endpoints.ServiceProvider.GetService<InfoCarrierServerDiagnostics>();
-
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
-            using IDisposable? diagnosticScope = diagnostics?.BeginRequest(null,
-                LoggerFactory(http.RequestServices), Caller(http.RequestServices));
+            ILogger? logger = EndpointLogger(http.RequestServices);
+            string phase = "request body reading";
+            bool dispatching = false;
             try
             {
                 IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
-
                 using var buffer = new MemoryStream();
                 await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
 
                 InfoCarrierEnvelope request;
                 try
                 {
-                    request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())!;
-                    if (request is null)
-                    {
-                        var failure = new InvalidOperationException("The request body is not an InfoCarrier envelope.");
-                        diagnostics?.ReportFailure(failure, http.RequestAborted, InfoCarrierServerFailureReason.InvalidPayload);
-                        throw failure;
-                    }
+                    request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())
+                        ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
-                    diagnostics?.ReportFailure(exception, http.RequestAborted);
+                    Log(logger, LogLevel.Warning, 35010, "InfoCarrier request was rejected because its envelope could not be read.");
+                    phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
                     return;
                 }
 
-                var envelopeServer = new InfoCarrierEnvelopeServer(
-                    http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer, diagnostics);
-
+                var server = new InfoCarrierEnvelopeServer(
+                    http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer,
+                    DispatcherLogger(http.RequestServices));
                 InfoCarrierEnvelope response;
                 try
                 {
-                    response = await envelopeServer.DispatchAsync(request, http.RequestAborted).ConfigureAwait(false);
+                    dispatching = true;
+                    response = await server.DispatchAsync(request, http.RequestAborted).ConfigureAwait(false);
                 }
                 catch (NotSupportedException exception)
                 {
+                    dispatching = false;
+                    phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
                     return;
                 }
 
+                dispatching = false;
                 http.Response.ContentType = "application/json";
-                diagnostics?.SetPhase(InfoCarrierServerPhase.EnvelopeSerialization);
+                phase = "response envelope serialization";
                 byte[] bytes = serializer.Serialize(response);
-                diagnostics?.SetPhase(InfoCarrierServerPhase.ResponseWrite);
-                await http.Response.Body.WriteAsync(bytes, http.RequestAborted)
-                    .ConfigureAwait(false);
+                phase = "response body writing";
+                await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                diagnostics?.ReportFailure(exception, http.RequestAborted);
+                // Dispatch owns its failures. The adapter observes only HTTP boundary failures.
+                if (!dispatching)
+                {
+                    bool cancelled = http.RequestAborted.IsCancellationRequested
+                        && exception is OperationCanceledException or IOException;
+                    Log(logger, cancelled ? LogLevel.Debug : LogLevel.Error, 35011,
+                        cancelled ? "InfoCarrier HTTP request was cancelled during {Phase}."
+                            : "InfoCarrier HTTP request failed during {Phase}.", phase);
+                }
                 throw;
             }
         });
     }
 
-    private static Microsoft.Extensions.Logging.ILoggerFactory? LoggerFactory(IServiceProvider services)
+    private static ILogger? EndpointLogger(IServiceProvider services)
     {
-        try { return services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>(); }
+        try { return services.GetService<ILoggerFactory>()?.CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint"); }
         catch (Exception) { return null; }
     }
 
-    private static string? Caller(IServiceProvider services)
+    private static ILogger<InfoCarrierEnvelopeServer> DispatcherLogger(IServiceProvider services)
     {
-        try { return services.GetService<IInfoCarrierServerCallerIdentity>()?.CurrentCallerId; }
-        catch (Exception) { return null; }
+        try
+        {
+            return services.GetService<ILogger<InfoCarrierEnvelopeServer>>()
+                ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<InfoCarrierEnvelopeServer>.Instance;
+        }
+        catch (Exception) { return Microsoft.Extensions.Logging.Abstractions.NullLogger<InfoCarrierEnvelopeServer>.Instance; }
+    }
+
+    private static void Log(ILogger? logger, LogLevel level, int eventId, string message, params object?[] values)
+    {
+        try { logger?.Log(level, new EventId(eventId), message, values); }
+        catch (Exception) { }
     }
 
     private static async Task WriteBadRequestAsync(HttpContext http, string message)

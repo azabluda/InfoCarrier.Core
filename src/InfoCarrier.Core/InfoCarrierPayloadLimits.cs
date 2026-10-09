@@ -146,10 +146,10 @@ public sealed class InfoCarrierPayloadLimits
         {
             // Both numbers, and which limit: a refusal naming neither the size nor the bound is
             // indistinguishable from a corrupt payload to whoever has to raise the limit.
-            throw ServerFailureClassification.Mark(new InvalidOperationException(
+            throw new InvalidOperationException(
                 $"The {what} is {payloadLength} bytes, which exceeds the maximum of {limit} bytes "
                 + $"(InfoCarrierPayloadLimits.{limitName}). Raise the limit on the configured "
-                + "serializer, or pass null to opt out of it."), InfoCarrierServerFailureReason.PayloadLimit);
+                + "serializer, or pass null to opt out of it.");
         }
     }
 

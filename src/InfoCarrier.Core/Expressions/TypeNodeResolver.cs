@@ -113,22 +113,14 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     /// </summary>
     public virtual Type Resolve(TypeNode node)
     {
-        try
-        {
-            TypeNodeComplexity.Validate(node);
-            ValidateShapes(node, 0);
-        }
-        catch (InvalidOperationException failure)
-        {
-            ServerFailureClassification.Mark(failure, InfoCarrierServerFailureReason.InvalidDescriptor);
-            throw;
-        }
+        TypeNodeComplexity.Validate(node);
+        ValidateShapes(node, 0);
         if (HasShape(node))
         {
             Type shaped = ResolveCore(node);
             if (!_effective.IsAllowed(shaped))
             {
-                throw ServerFailureClassification.Mark(new InvalidOperationException(BuildRejection(shaped)), InfoCarrierServerFailureReason.Permission);
+                throw new InvalidOperationException(BuildRejection(shaped));
             }
 
             return shaped;
@@ -156,7 +148,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
         // what it denotes, but nothing is constructed from it until it clears the allowlist.
         if (ContainsAnonymous(resolved) || !_effective.IsAllowed(resolved))
         {
-            throw ServerFailureClassification.Mark(new InvalidOperationException(BuildRejection(resolved)), InfoCarrierServerFailureReason.Permission);
+            throw new InvalidOperationException(BuildRejection(resolved));
         }
 
         _cache[cacheKey] = resolved;

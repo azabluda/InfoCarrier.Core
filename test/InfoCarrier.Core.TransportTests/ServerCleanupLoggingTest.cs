@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -24,7 +23,7 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         int outcomes = 0;
         var logs = new FailureLogs(e =>
         {
-            if (Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupScopeDisposalFailure")
+            if (e.Id.Id == 35023
                 && Interlocked.Increment(ref outcomes) == 2) { completed.TrySetResult(); }
         });
         var clock = new FakeTimeProvider();
@@ -57,9 +56,9 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         Assert.Equal(2, interceptor.Rollbacks);
         Assert.Equal(2, interceptor.Disposals);
         Assert.Equal(2, scopesDisposed);
-        Assert.Equal(2, logs.Entries.Count(e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupRollbackFailure")));
-        Assert.Equal(2, logs.Entries.Count(e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupTransactionDisposalFailure")));
-        Assert.Equal(2, logs.Entries.Count(e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupScopeDisposalFailure")));
+        Assert.Equal(2, logs.Entries.Count(e => e.Id.Id == 35021));
+        Assert.Equal(2, logs.Entries.Count(e => e.Id.Id == 35022));
+        Assert.Equal(2, logs.Entries.Count(e => e.Id.Id == 35023));
         Assert.All(logs.Entries, e =>
         {
             Assert.Null(e.Exception);
@@ -68,45 +67,10 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
     }
 
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task Scope_disposal_outcomes_use_a_live_scoped_logger(bool disposeContainer, bool scopedFactory)
+    [Fact]
+    public async Task Normal_idle_eviction_does_not_claim_rollback_completion_or_log_tokens()
     {
         var logs = new FailureLogs();
-        var interceptor = new FailingTransactions();
-        var services = new ServiceCollection().AddMetrics().AddInfoCarrierServerDiagnostics();
-        if (scopedFactory) { services.AddScoped<ILoggerFactory>(_ => new OwnedLoggerFactory(logs)); }
-        else { services.AddSingleton<ILoggerFactory>(_ => new OwnedLoggerFactory(logs)); }
-        services.AddDbContext<Northwind.Shared.NorthwindContext>(b => b
-            .UseSqlite("Data Source=:memory:").AddInterceptors(interceptor));
-        services.AddScoped(_ => new FailingScope(() => { }));
-        services.AddScoped<DbContext>(sp =>
-        {
-            _ = sp.GetRequiredService<FailingScope>();
-            return sp.GetRequiredService<Northwind.Shared.NorthwindContext>();
-        });
-        services.AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>();
-        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var server = (InProcessInfoCarrierServer)provider.GetRequiredService<IInfoCarrierServer>();
-        await server.BeginTransactionAsync();
-        if (disposeContainer) { await provider.DisposeAsync(); }
-        else { await server.DisposeAsync(); }
-        Assert.Single(logs.Entries, e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupScopeDisposalFailure"));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Normal_idle_eviction_is_truthful_and_preserves_existing_host_warnings(bool diagnosticsEnabled)
-    {
-        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var logs = new FailureLogs(e =>
-        {
-            if (Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupCompleted")) { completed.TrySetResult(); }
-        });
         var clock = new FakeTimeProvider();
         await using var host = factory.WithWebHostBuilder(b => b
             .ConfigureLogging(l => l.AddProvider(logs))
@@ -114,21 +78,17 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
             {
                 s.AddSingleton<TimeProvider>(clock);
                 s.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
-                if (!diagnosticsEnabled) { s.RemoveAll<InfoCarrierServerDiagnostics>(); }
             }));
         using var client = host.CreateClient();
-        var server = host.Services.GetRequiredService<IInfoCarrierServer>();
+        var server = (InProcessInfoCarrierServer)host.Services.GetRequiredService<IInfoCarrierServer>();
         string token = (await server.BeginTransactionAsync()).TransactionId;
         clock.Advance(TimeSpan.FromMinutes(11));
-        if (diagnosticsEnabled) { await completed.Task.WaitAsync(TimeSpan.FromSeconds(10)); }
-        var eviction = Assert.Single(logs.Entries, e => Equals(e.Properties.GetValueOrDefault("Reason"), "TransactionEvicted"));
+        await server.DisposeAsync();
+        var eviction = Assert.Single(logs.Entries);
         Assert.Equal(LogLevel.Warning, eviction.Level);
         Assert.DoesNotContain(token, eviction.Message);
         Assert.DoesNotContain("rolled back", eviction.Message);
-        await server.RollbackTransactionAsync(token);
-        Assert.DoesNotContain(logs.Entries, e => e.Level == LogLevel.Error);
     }
-
 
     [Fact]
     public async Task Container_shutdown_waits_for_evicted_cleanup_before_disposing_its_logger()
@@ -137,10 +97,10 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         var clock = new FakeTimeProvider();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var interceptor = new FailingTransactions { PauseRollback = release.Task };
-        var services = new ServiceCollection().AddMetrics().AddInfoCarrierServerDiagnostics()
+        var services = new ServiceCollection().AddLogging()
             .AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
         services.AddSingleton<TimeProvider>(clock);
-        services.AddScoped<ILoggerFactory>(_ => new OwnedLoggerFactory(logs));
+        services.AddSingleton<ILoggerFactory>(_ => new OwnedLoggerFactory(logs));
         services.AddDbContext<Northwind.Shared.NorthwindContext>(b => b.UseSqlite("Data Source=:memory:").AddInterceptors(interceptor));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<Northwind.Shared.NorthwindContext>());
         services.AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>();
@@ -154,8 +114,8 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         try { Assert.False(shutdown.IsCompleted); }
         finally { release.TrySetResult(); }
         await shutdown.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Single(logs.Entries, e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupRollbackFailure"));
-        Assert.Single(logs.Entries, e => Equals(e.Properties.GetValueOrDefault("Reason"), "CleanupTransactionDisposalFailure"));
+        Assert.Single(logs.Entries, e => e.Id.Id == 35021);
+        Assert.Single(logs.Entries, e => e.Id.Id == 35022);
     }
 
     private sealed class AdvanceOnDispose(FakeTimeProvider clock) : IDisposable

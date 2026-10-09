@@ -1,10 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Diagnostics.Metrics;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -21,190 +19,97 @@ public class EnvelopeFailureLoggingTest
     };
 
     [Theory]
-    [InlineData("unexpected", "ExecutionFailure", LogLevel.Error)]
-    [InlineData("database", "Database", LogLevel.Error)]
-    [InlineData("concurrency", "Concurrency", LogLevel.Information)]
-    public async Task Non_http_faults_preserve_the_exception_contract_and_log_only_safe_fields(string kind, string reason, LogLevel level)
-    {
-        Exception failure = kind switch
-        {
-            "database" => new DbUpdateException("secret-message", new FormatException("secret-inner")),
-            "concurrency" => new DbUpdateConcurrencyException("secret-message"),
-            _ => new InvalidOperationException("secret-message", new FormatException("secret-inner")),
-        };
-        failure.Data["secret-data"] = "secret-value";
-        var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer, Diagnostics(provider), factory);
-        InfoCarrierEnvelope response = await dispatcher.DispatchAsync(Request);
-        Assert.Equal(failure.Message, response.Fault!.Message);
-        Assert.Equal(failure.GetType().FullName, response.Fault.TypeName);
-        var entry = Assert.Single(logs.Entries);
-        Assert.Equal(reason, entry.Properties["Reason"]);
-        Assert.Equal(level, entry.Level);
-        Assert.Null(entry.Exception);
-        Assert.DoesNotContain("secret", entry.Message);
-        Assert.All(entry.Properties.Values, v => Assert.DoesNotContain("secret", v?.ToString() ?? ""));
-    }
-
-    [Theory]
-    [InlineData(true, "Cancellation", LogLevel.Information)]
-    [InlineData(false, "UnexpectedCancellation", LogLevel.Error)]
-    public async Task Cancellation_propagates_and_uses_the_request_token_for_severity(bool cancelled, string reason, LogLevel level)
-    {
-        using var token = new CancellationTokenSource();
-        if (cancelled) { token.Cancel(); }
-        var failure = new OperationCanceledException("secret-cancellation");
-        var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer, Diagnostics(provider), factory);
-        Assert.Same(failure, await Assert.ThrowsAsync<OperationCanceledException>(() => dispatcher.DispatchAsync(Request, token.Token)));
-        var entry = Assert.Single(logs.Entries);
-        Assert.Equal(reason, entry.Properties["Reason"]);
-        Assert.Equal(level, entry.Level);
-    }
-
-    [Theory]
-    [InlineData(false, "ResultSerialization")]
-    [InlineData(true, "FaultSerialization")]
-    public async Task Serialization_failures_name_the_phase_after_execution(bool faultPlaceholder, string phase)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Serialization_failure_distinguishes_completed_operation_from_fault_response(bool faultPlaceholder)
     {
         var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
         var server = new TestServer(faultPlaceholder ? new InvalidOperationException("secret-original") : null);
-        var serializer = new FailingSerializer(faultPlaceholder);
-        var dispatcher = new InfoCarrierEnvelopeServer(server, serializer, Diagnostics(provider), factory);
-        if (faultPlaceholder)
-        {
-            await Assert.ThrowsAsync<FormatException>(() => dispatcher.DispatchAsync(Request));
-        }
+        var dispatcher = new InfoCarrierEnvelopeServer(server, new FailingSerializer(faultPlaceholder), factory.CreateLogger<InfoCarrierEnvelopeServer>());
+        if (faultPlaceholder) { await Assert.ThrowsAsync<FormatException>(() => dispatcher.DispatchAsync(Request)); }
         else
         {
             Assert.NotNull((await dispatcher.DispatchAsync(Request)).Fault);
             Assert.Equal(1, server.Completed);
         }
         var entry = Assert.Single(logs.Entries);
-        Assert.Equal("ResponseSerialization", entry.Properties["Reason"]);
-        Assert.Equal(phase, entry.Properties["Phase"]);
+        Assert.Contains(faultPlaceholder ? "fault response" : "after operation completion", entry.Message);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Null(entry.Exception);
+        Assert.DoesNotContain("secret", entry.Message);
     }
 
     [Fact]
-    public async Task Repeated_failures_are_bounded_and_counters_include_suppressed_events()
-    {
-        var clock = new ManualClock();
-        var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new DbUpdateConcurrencyException("secret")), Serializer,
-            Diagnostics(provider, clock), factory);
-        long failures = 0, suppressed = 0;
-        var observing = new AsyncLocal<bool>();
-        using var listener = new MeterListener();
-        listener.InstrumentPublished = (instrument, l) => { if (instrument.Meter.Name == "InfoCarrier.Server") { l.EnableMeasurementEvents(instrument); } };
-        listener.SetMeasurementEventCallback<long>((instrument, count, tags, state) =>
-        {
-            if (!observing.Value) { return; }
-            Assert.All(tags.ToArray(), tag => Assert.Equal("reason", tag.Key));
-            if (instrument.Name == "infocarrier.server.failures") { Interlocked.Add(ref failures, count); }
-            if (instrument.Name == "infocarrier.server.suppressed") { Interlocked.Add(ref suppressed, count); }
-        });
-        listener.Start();
-        observing.Value = true;
-        await Task.WhenAll(Enumerable.Range(0, 100).Select(_ => dispatcher.DispatchAsync(Request)));
-        Assert.Equal(5, logs.Entries.Count);
-        Assert.Equal(100, failures);
-        Assert.Equal(95, suppressed);
-        clock.Advance();
-        await dispatcher.DispatchAsync(Request);
-        Assert.Equal(7, logs.Entries.Count);
-        Assert.Equal(95L, logs.Entries.Single(e => e.Id.Name == "FailuresSuppressed").Properties["SuppressedCount"]);
-        Assert.Equal(101, failures);
-        observing.Value = false;
-    }
-
-    [Fact]
-    public async Task A_null_inner_payload_is_an_input_refusal()
+    public async Task Concurrent_dispatches_have_independent_outcomes_without_shared_suppression()
     {
         var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(null), Serializer, Diagnostics(provider), factory);
-        var response = await dispatcher.DispatchAsync(Request with { Operation = InfoCarrierOperation.Query, Payload = null! });
-        Assert.Equal(typeof(NullReferenceException).FullName, response.Fault!.TypeName);
-        var entry = Assert.Single(logs.Entries);
-        Assert.Equal("InvalidPayload", entry.Properties["Reason"]);
-        Assert.Equal("Input", entry.Properties["Phase"]);
-    }
-
-    [Fact]
-    public async Task Logger_failures_never_replace_faults()
-    {
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var factory = LoggerFactory.Create(b => b.AddProvider(new ThrowingLogs()));
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("original")), Serializer,
-            Diagnostics(provider), factory);
-        Assert.Equal("original", (await dispatcher.DispatchAsync(Request)).Fault!.Message);
-    }
-
-
-    [Fact]
-    public async Task Overlapping_requests_keep_separate_outcomes_and_identifiers()
-    {
-        var logs = new FailureLogs();
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
-        var diagnostics = Diagnostics(provider);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int arrivals = 0;
-        async Task WaitTogether()
+        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("secret"))
         {
-            if (Interlocked.Increment(ref arrivals) == 3) { entered.TrySetResult(); }
-            await release.Task;
-        }
-        Exception[] errors = [new InvalidOperationException("secret"), new DbUpdateException("secret"), new DbUpdateConcurrencyException("secret")];
-        Task<InfoCarrierEnvelope>[] requests = errors.Select(error => new InfoCarrierEnvelopeServer(
-            new TestServer(error) { BeforeBegin = WaitTogether }, Serializer, diagnostics, factory).DispatchAsync(Request)).ToArray();
-        try
-        {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.Empty(logs.Entries);
-        }
+            BeforeBegin = async () =>
+            {
+                if (Interlocked.Increment(ref arrivals) == 20) { entered.TrySetResult(); }
+                await release.Task;
+            },
+        }, Serializer, factory.CreateLogger<InfoCarrierEnvelopeServer>());
+        Task<InfoCarrierEnvelope>[] requests = Enumerable.Range(0, 20).Select(_ => dispatcher.DispatchAsync(Request)).ToArray();
+        try { await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)); }
         finally { release.TrySetResult(); }
-        await Task.WhenAll(requests);
-        Assert.Equal(3, logs.Entries.Count);
-        Assert.Equal(3, logs.Entries.Select(e => e.Properties["RequestId"]).Distinct().Count());
-        Assert.Equal(new[] { "Concurrency", "Database", "ExecutionFailure" },
-            logs.Entries.Select(e => e.Properties["Reason"]!.ToString()).Order());
+        var responses = await Task.WhenAll(requests);
+        Assert.All(responses, response => Assert.NotNull(response.Fault));
+        Assert.Equal(20, logs.Entries.Count);
+        Assert.All(logs.Entries, entry => Assert.DoesNotContain("secret", entry.Message));
     }
 
     [Fact]
-    public async Task A_failing_metric_listener_cannot_replace_a_fault()
+    public async Task Logger_failure_never_replaces_the_original_fault()
     {
-        using var provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        using var listener = new MeterListener();
-        listener.InstrumentPublished = (instrument, l) =>
-        {
-            if (instrument.Meter.Name == "InfoCarrier.Server") { l.EnableMeasurementEvents(instrument); }
-        };
-        listener.SetMeasurementEventCallback<long>((_, _, _, _) => throw new InvalidOperationException("secret-listener"));
-        listener.Start();
-        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("original")), Serializer, Diagnostics(provider));
+        using var factory = LoggerFactory.Create(b => b.AddProvider(new ThrowingLogs()));
+        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("original")), Serializer,
+            factory.CreateLogger<InfoCarrierEnvelopeServer>());
         Assert.Equal("original", (await dispatcher.DispatchAsync(Request)).Fault!.Message);
     }
 
-    private static InfoCarrierServerDiagnostics Diagnostics(ServiceProvider provider, TimeProvider? clock = null)
-        => new(provider.GetRequiredService<IMeterFactory>(), clock ?? TimeProvider.System);
-
-    internal sealed class ManualClock : TimeProvider
+    [Fact]
+    public async Task Concurrency_conflict_keeps_its_fault_and_uses_information()
     {
-        private long _ticks;
-        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-        public override long GetTimestamp() => Volatile.Read(ref _ticks);
-        public void Advance() => Interlocked.Add(ref _ticks, TimeSpan.FromMinutes(1).Ticks);
+        var logs = new FailureLogs();
+        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
+        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new DbUpdateConcurrencyException("secret")), Serializer,
+            factory.CreateLogger<InfoCarrierEnvelopeServer>());
+        Assert.Equal("secret", (await dispatcher.DispatchAsync(Request)).Fault!.Message);
+        Assert.Equal(LogLevel.Information, Assert.Single(logs.Entries).Level);
+    }
+
+    [Fact]
+    public async Task Nested_dispatches_log_each_failed_boundary()
+    {
+        var logs = new FailureLogs();
+        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
+        var logger = factory.CreateLogger<InfoCarrierEnvelopeServer>();
+        var inner = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("secret-inner")), Serializer, logger);
+        var outer = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("secret-outer"))
+        {
+            BeforeBegin = async () => Assert.NotNull((await inner.DispatchAsync(Request)).Fault),
+        }, Serializer, logger);
+        Assert.NotNull((await outer.DispatchAsync(Request)).Fault);
+        Assert.Equal(2, logs.Entries.Count);
+        Assert.All(logs.Entries, entry => Assert.DoesNotContain("secret", entry.Message));
+    }
+
+    [Fact]
+    public async Task Unrelated_cancellation_remains_an_error_and_propagates()
+    {
+        var logs = new FailureLogs();
+        using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
+        var failure = new OperationCanceledException("secret");
+        var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer, factory.CreateLogger<InfoCarrierEnvelopeServer>());
+        Assert.Same(failure, await Assert.ThrowsAsync<OperationCanceledException>(() => dispatcher.DispatchAsync(Request)));
+        Assert.Equal(LogLevel.Error, Assert.Single(logs.Entries).Level);
     }
 
     internal sealed class TestServer(Exception? failure) : IInfoCarrierServer

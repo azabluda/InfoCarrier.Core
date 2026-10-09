@@ -528,13 +528,15 @@ in the archive; this step tests the missing integration without a sleep or a slo
 
 The owner approved the audited issue and requested implementation in this session on 2026-10-08.
 
-- [x] **LOG1. Add injected safe request diagnostics and observe transaction cleanup.** Preserve
-      constructors and the fault contract. Add fixed reasons/phases, generated request identities,
-      opt-in trusted caller pseudonyms, bounded per-reason suppression, and total/suppressed counters.
-      Separate eviction intent from cleanup outcome and attempt every resource cleanup stage.
-      The [hosting and diagnostic policy](server-failure-diagnostics.md) records lifecycle, privacy,
-      severity, compatibility, and owned coverage. Run regular, transport, strict Release, trim,
-      pack, documentation, and hygiene gates; create one pull request and stop while checks run.
+- [x] **LOG1. Add safe request diagnostics and observe transaction cleanup.** Initial implementation
+      committed in the logging pull request. Superseded by the owner's simplification below.
+- [x] **LOG2. Replace shared diagnostics with injected class loggers.** Approved on 2026-10-09.
+      Remove ambient context, exception markers, counters, suppression, caller hashing, and custom
+      registration. Keep safe boundary messages, existing contracts, independent resource cleanup,
+      and pending-cleanup shutdown coordination. Preserve server SQL logging. The
+      [logging policy](server-failure-diagnostics.md) records ownership, severity, and the explicitly
+      narrowed scope. Run transport, specification, strict Release, trim, package, and document gates.
+      Update the existing pull request and stop while checks run.
 
 ## Branches that outlive their pull request
 

@@ -18,12 +18,7 @@ internal static class TypeNodeComplexity
     internal static void Validate(TypeNode node)
     {
         int remainingNodes = MaximumNodes;
-        try { Validate(node, depth: 0, ref remainingNodes); }
-        catch (InvalidOperationException failure)
-        {
-            ServerFailureClassification.Mark(failure, InfoCarrierServerFailureReason.InvalidDescriptor);
-            throw;
-        }
+        Validate(node, depth: 0, ref remainingNodes);
     }
 
     private static void Validate(TypeNode node, int depth, ref int remainingNodes)

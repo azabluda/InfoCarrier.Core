@@ -323,11 +323,11 @@ public class NodeToExpressionTranslator(
             return method;
         }
 
-        throw ServerFailureClassification.Mark(new InvalidOperationException(
+        throw new InvalidOperationException(
             $"Method '{node.Name}' on '{declaringType}' is not public and is not on the "
             + "deserialization method allowlist (ADR-008 constraint 2). A payload may name a public "
             + "method on an allowed type; the only non-public methods admitted are the marker "
-            + "overloads EF's own query rewrites produce."), InfoCarrierServerFailureReason.Permission);
+            + "overloads EF's own query rewrites produce.");
     }
 
     private Expression TranslateLambda(LambdaNode node)
@@ -553,10 +553,10 @@ public class NodeToExpressionTranslator(
             return result;
         }
 
-        throw ServerFailureClassification.Mark(new NotSupportedException(
+        throw new NotSupportedException(
             $"Operator '{name}' is not on the deserialization operator allowlist for {nodeKind} "
             + "(ADR-008 constraint 2). A payload may name a pure operator of that node kind; the "
             + "assignment and control-flow forms are refused because no expression-tree lambda "
-            + "can contain one."), InfoCarrierServerFailureReason.InvalidDescriptor);
+            + "can contain one.");
     }
 }
