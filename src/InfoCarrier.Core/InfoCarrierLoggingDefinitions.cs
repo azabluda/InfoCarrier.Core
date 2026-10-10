@@ -14,6 +14,45 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
     private EventDefinitionBase? _logQuerySplit;
     private EventDefinitionBase? _logQuerySplitClientOperators;
     private EventDefinitionBase? _logQuerySplitUnregisteredKeyTypes;
+    private EventDefinitionBase? _clientQueryError;
+    private EventDefinitionBase? _clientQueryInformation;
+    private EventDefinitionBase? _clientQueryDebug;
+    private EventDefinitionBase? _clientSaveError;
+    private EventDefinitionBase? _clientSaveDebug;
+
+    /// <summary>
+    ///     The definition for a client query or save failure at its default severity.
+    /// </summary>
+    /// <remarks>
+    ///     Definitions are cached on this instance by event and default severity. Query failures
+    ///     use Debug, Information, or Error; save failures use Debug or Error. Warning configuration
+    ///     can override the effective severity without changing the cached classification.
+    /// </remarks>
+    /// <param name="logger">The logger whose options supply the warnings configuration.</param>
+    /// <param name="eventId">
+    ///     <see cref="InfoCarrierEventId.ClientQueryFailure" /> or
+    ///     <see cref="InfoCarrierEventId.ClientSaveFailure" />.
+    /// </param>
+    /// <param name="level">The default severity for this failure classification.</param>
+    /// <returns>The cached definition for the event and default severity.</returns>
+    public virtual EventDefinition<string, string, string, string> LogClientFailure(
+        IDiagnosticsLogger logger, EventId eventId, LogLevel level)
+        => (EventDefinition<string, string, string, string>)(eventId == InfoCarrierEventId.ClientQueryFailure
+            ? level switch
+            {
+                LogLevel.Debug => _clientQueryDebug ??= CreateClientFailure(logger, eventId, level),
+                LogLevel.Information => _clientQueryInformation ??= CreateClientFailure(logger, eventId, level),
+                _ => _clientQueryError ??= CreateClientFailure(logger, eventId, level),
+            }
+            : level == LogLevel.Debug
+                ? _clientSaveDebug ??= CreateClientFailure(logger, eventId, level)
+                : _clientSaveError ??= CreateClientFailure(logger, eventId, level));
+
+    private EventDefinition<string, string, string, string> CreateClientFailure(
+        IDiagnosticsLogger logger, EventId eventId, LogLevel level)
+        => new(logger.Options, eventId, level, eventId.Name!,
+            configuredLevel => LoggerMessage.Define<string, string, string, string>(configuredLevel, eventId,
+                "InfoCarrier client {Operation} failed during {Phase}. Outcome={Outcome}; ExceptionType={ExceptionType}."));
 
     /// <summary>
     ///     The definition for <see cref="InfoCarrierEventId.QuerySplit" />.

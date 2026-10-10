@@ -2,6 +2,7 @@
 
 using System.Diagnostics.Metrics;
 using InfoCarrier.Core.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -76,7 +77,8 @@ public class RoundTripMetricsTest
 
     private static async Task<List<Recorded>> Measure(
         Func<IInfoCarrierClient, Task> work,
-        Func<InfoCarrierEnvelope, InfoCarrierEnvelope>? respond = null)
+        Func<InfoCarrierEnvelope, InfoCarrierEnvelope>? respond = null,
+        IInfoCarrierSerializer? serializer = null)
     {
         var recorded = new List<Recorded>();
 
@@ -98,11 +100,53 @@ public class RoundTripMetricsTest
         listener.Start();
 
         var client = new TransportInfoCarrierClient(
-            new StubTransport(respond ?? Answer), Serializer);
+            new StubTransport(respond ?? Answer), serializer ?? Serializer, NullLogger<TransportInfoCarrierClient>.Instance);
 
         await work(client);
 
         return recorded;
+    }
+
+    [Theory]
+    [InlineData("serialize")]
+    [InlineData("deserialize")]
+    [InlineData("fault")]
+    [InlineData("cancel")]
+    public async Task Every_failure_boundary_preserves_single_metric_pair(string phase)
+    {
+        Exception failure = phase == "cancel" ? new OperationCanceledException("secret") : new InvalidOperationException("secret");
+        using var cancellation = new CancellationTokenSource();
+        if (phase == "cancel") { cancellation.Cancel(); }
+        int sends = 0;
+        List<Recorded> recorded = await Measure(async client =>
+        {
+            Assert.NotNull(await Record.ExceptionAsync(() => client.CommitTransactionAsync("secret", cancellation.Token)));
+        }, request =>
+        {
+            sends++;
+            if (phase == "cancel") { throw failure; }
+            return phase == "fault" ? Answer(request) with { Fault = InfoCarrierFaultMapper.Capture(failure) } : Answer(request);
+        }, new PhaseSerializer(phase, failure));
+        Assert.Equal(phase == "serialize" ? 0 : 1, sends);
+        Recorded count = Assert.Single(recorded, r => r.Instrument == InfoCarrierMetrics.RoundTripCountInstrumentName);
+        Recorded duration = Assert.Single(recorded, r => r.Instrument == InfoCarrierMetrics.RoundTripDurationInstrumentName);
+        Assert.Equal(1, count.Value);
+        Assert.True(duration.Value >= 0);
+        Assert.All(recorded, r =>
+        {
+            Assert.Equal(nameof(InfoCarrierOperation.CommitTransaction), r.Operation);
+            Assert.Equal(failure.GetType().FullName, r.ErrorType);
+        });
+    }
+
+    private sealed class PhaseSerializer(string phase, Exception failure) : IInfoCarrierSerializer
+    {
+        public byte[] Serialize<T>(T value) => Serializer.Serialize(value);
+        public T? Deserialize<T>(byte[] payload) => Serializer.Deserialize<T>(payload);
+        public ValueTask<byte[]> SerializeAsync<T>(T value, CancellationToken cancellationToken = default)
+            => phase == "serialize" ? ValueTask.FromException<byte[]>(failure) : new(Serialize(value));
+        public ValueTask<T?> DeserializeAsync<T>(byte[] payload, CancellationToken cancellationToken = default)
+            => phase == "deserialize" ? ValueTask.FromException<T?>(failure) : new(Deserialize<T>(payload));
     }
 
     private static InfoCarrierEnvelope Answer(InfoCarrierEnvelope request)

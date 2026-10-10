@@ -46,4 +46,12 @@ public static class InfoCarrierEventId
     /// </remarks>
     public static readonly EventId QuerySplit =
         new((int)Id.QuerySplit, QueryPrefix + Id.QuerySplit);
+
+    /// <summary>A local client query failed during preparation or result processing.</summary>
+    /// <remarks>The event carries bounded phase, outcome, and exception type, without exception contents.</remarks>
+    public static readonly EventId ClientQueryFailure = new(35101, QueryPrefix + nameof(ClientQueryFailure));
+
+    /// <summary>A local client save failed while constructing changes or processing a response.</summary>
+    /// <remarks>A processing failure does not imply that the server write was rolled back.</remarks>
+    public static readonly EventId ClientSaveFailure = new(35102, DbLoggerCategory.Update.Name + "." + nameof(ClientSaveFailure));
 }

@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
 
@@ -68,84 +69,92 @@ internal sealed class QueryExecutor<TElement>
         _queryContext = queryContext;
         _client = client;
         _expressionSerializer = expressionSerializer;
-        _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
-
-        // Before the substitution below, because after it a closure-captured value is a constant
-        // too, and EF lets that one pass (#113). See `CapturedConstantValidator`.
-        IReadOnlySet<ConstantExpression> refusableConstants = CapturedConstantValidator.FindRefusable(
-            query,
-            queryContext.Context.GetInfrastructure().GetRequiredService<ITypeMappingSource>());
-
-        // Substitute compiled-query parameters as plain constants (research-findings §6).
-        Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
-
-        // Since 2026-10-07, anonymous join keys travel as bounded data descriptors. The former
-        // Tuple rewrite lost member names and refused keys wider than seven members.
-
-        // Then, and only then, decide what the server can execute: a surviving closure field
-        // access names a compiler-generated display class and would push the boundary in for
-        // no reason (ADR-010, docs/projection-split.md).
-        // The allowlist is built here rather than taken as null, so the application's own
-        // registered types reach the boundary analysis. Read per execution and never captured, for
-        // the reason `InfoCarrierDatabase.ClientFor` records.
-        // ONE READER FOR BOTH DIRECTIONS. The boundary analyzer below decides what may be SENT;
-        // the result materializer decides what may be READ BACK, and it resolves through a
-        // DI-scoped `TypeNodeResolver` whose own allowlist knows only the model. Those are the two
-        // carriers R120 warns about, and they disagreed silently here until a declared projection
-        // type came back over the wire: `Database.SqlQuery<UnmappedCustomer>` cleared the boundary
-        // and then failed to materialize its own rows. A `DbParameter` -- the only registered type
-        // this suite had before -- is sent and never returned, which is why nothing showed.
-        IReadOnlyList<Type> allowedTypes = InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context);
-
-        if (expressionSerializer is ExpressionSerializer serializer)
+        try
         {
-            serializer.UseExecutionAllowedTypes(allowedTypes);
+            _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
+
+            // Before the substitution below, because after it a closure-captured value is a constant
+            // too, and EF lets that one pass (#113). See `CapturedConstantValidator`.
+            IReadOnlySet<ConstantExpression> refusableConstants = CapturedConstantValidator.FindRefusable(
+                query,
+                queryContext.Context.GetInfrastructure().GetRequiredService<ITypeMappingSource>());
+
+            // Substitute compiled-query parameters as plain constants (research-findings §6).
+            Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
+
+            // Since 2026-10-07, anonymous join keys travel as bounded data descriptors. The former
+            // Tuple rewrite lost member names and refused keys wider than seven members.
+
+            // Then, and only then, decide what the server can execute: a surviving closure field
+            // access names a compiler-generated display class and would push the boundary in for
+            // no reason (ADR-010, docs/projection-split.md).
+            // The allowlist is built here rather than taken as null, so the application's own
+            // registered types reach the boundary analysis. Read per execution and never captured, for
+            // the reason `InfoCarrierDatabase.ClientFor` records.
+            // ONE READER FOR BOTH DIRECTIONS. The boundary analyzer below decides what may be SENT;
+            // the result materializer decides what may be READ BACK, and it resolves through a
+            // DI-scoped `TypeNodeResolver` whose own allowlist knows only the model. Those are the two
+            // carriers R120 warns about, and they disagreed silently here until a declared projection
+            // type came back over the wire: `Database.SqlQuery<UnmappedCustomer>` cleared the boundary
+            // and then failed to materialize its own rows. A `DbParameter` -- the only registered type
+            // this suite had before -- is sent and never returned, which is why nothing showed.
+            IReadOnlyList<Type> allowedTypes = InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context);
+
+            if (expressionSerializer is ExpressionSerializer serializer)
+            {
+                serializer.UseExecutionAllowedTypes(allowedTypes);
+            }
+
+            var splitter = new QuerySplitter(
+                queryContext.Context.Model,
+                Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
+                queryContext.QueryLogger,
+                InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
+                _relationalRoots)
+            {
+                // Read here and handed in, so one reader answers for the whole execution. That is
+                // R120's rule: a fact two components read independently can disagree with itself.
+                ServerStoreIsRelational =
+                    InfoCarrierOptionsExtension.ServerStoreIsRelationalFor(queryContext.Context),
+            };
+
+            _split = splitter.Split(substituted);
+            CapturedConstantValidator.Validate(_split.Residual, refusableConstants);
+
+            // Read AFTER the split, because the splitter records it while stripping. See
+            // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.
+            _splitQueryBehavior = splitter.SplitQueryBehavior;
+
+            _trackingBehavior = TrackingBehaviorFinder.Find(
+                query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
+
+            // `EnableThreadSafetyChecks(false)` is answered here, not by the detector.
+            // `QueryContext.ConcurrencyDetector` is never null in EF 10 and always throws when
+            // re-entered from a second operation, so a provider that calls it unconditionally ignores
+            // the option outright — which is what every `ConcurrencyDetectorDisabledTestBase` method
+            // caught (A59). EF's own providers read the same flag:
+            // `InMemoryShapedQueryCompilingExpressionVisitor` and its relational counterpart both hold
+            // `dependencies.CoreSingletonOptions.AreThreadSafetyChecksEnabled` and emit the call only
+            // when it is set.
+            _threadSafetyChecks = queryContext.Context
+                .GetInfrastructure()
+                .GetRequiredService<ICoreSingletonOptions>()
+                .AreThreadSafetyChecksEnabled;
+
+            // A split query materializes every row the server sent, but only the entities the
+            // residual yields belong in the change tracker (docs/projection-split.md §4). One
+            // materializer for the whole execution, so identity is resolved across its parts.
+            _materializer = new ClientResultMaterializer(
+                queryContext.Context,
+                expressionSerializer,
+                _trackingBehavior,
+                deferTracking: !_split.IsPassThrough && _trackingBehavior == QueryTrackingBehavior.TrackAll);
         }
-
-        var splitter = new QuerySplitter(
-            queryContext.Context.Model,
-            Expressions.TypeAllowlist.ForModel(queryContext.Context.Model, allowedTypes),
-            queryContext.QueryLogger,
-            InfoCarrierOptionsExtension.ArbitrarySqlExecutionAllowedFor(queryContext.Context),
-            _relationalRoots)
+        catch (Exception exception)
         {
-            // Read here and handed in, so one reader answers for the whole execution. That is
-            // R120's rule: a fact two components read independently can disagree with itself.
-            ServerStoreIsRelational =
-                InfoCarrierOptionsExtension.ServerStoreIsRelationalFor(queryContext.Context),
-        };
-
-        _split = splitter.Split(substituted);
-        CapturedConstantValidator.Validate(_split.Residual, refusableConstants);
-
-        // Read AFTER the split, because the splitter records it while stripping. See
-        // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.
-        _splitQueryBehavior = splitter.SplitQueryBehavior;
-
-        _trackingBehavior = TrackingBehaviorFinder.Find(
-            query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
-
-        // `EnableThreadSafetyChecks(false)` is answered here, not by the detector.
-        // `QueryContext.ConcurrencyDetector` is never null in EF 10 and always throws when
-        // re-entered from a second operation, so a provider that calls it unconditionally ignores
-        // the option outright — which is what every `ConcurrencyDetectorDisabledTestBase` method
-        // caught (A59). EF's own providers read the same flag:
-        // `InMemoryShapedQueryCompilingExpressionVisitor` and its relational counterpart both hold
-        // `dependencies.CoreSingletonOptions.AreThreadSafetyChecksEnabled` and emit the call only
-        // when it is set.
-        _threadSafetyChecks = queryContext.Context
-            .GetInfrastructure()
-            .GetRequiredService<ICoreSingletonOptions>()
-            .AreThreadSafetyChecksEnabled;
-
-        // A split query materializes every row the server sent, but only the entities the
-        // residual yields belong in the change tracker (docs/projection-split.md §4). One
-        // materializer for the whole execution, so identity is resolved across its parts.
-        _materializer = new ClientResultMaterializer(
-            queryContext.Context,
-            expressionSerializer,
-            _trackingBehavior,
-            deferTracking: !_split.IsPassThrough && _trackingBehavior == QueryTrackingBehavior.TrackAll);
+            LogFailure("query preparation", exception, queryContext.CancellationToken);
+            throw;
+        }
     }
 
     public object Execute(bool async, bool singleResult)
@@ -202,7 +211,7 @@ internal sealed class QueryExecutor<TElement>
             // Anything the server logged while running this query, raised on the client's own
             // logger under the server's category and event id. Empty unless the server has
             // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
-            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
+            ReplayServerLog(result.ServerLog);
             results.Add(Materialize(serverQuery, result));
         }
 
@@ -235,7 +244,12 @@ internal sealed class QueryExecutor<TElement>
             bool moved;
             using (CriticalSection())
             {
-                moved = enumerator.MoveNext();
+                try { moved = enumerator.MoveNext(); }
+                catch (Exception exception)
+                {
+                    LogFailure("client projection", exception, _queryContext.CancellationToken);
+                    throw;
+                }
             }
 
             if (!moved)
@@ -296,7 +310,7 @@ internal sealed class QueryExecutor<TElement>
             // Anything the server logged while running this query, raised on the client's own
             // logger under the server's category and event id. Empty unless the server has
             // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
-            ServerLogReplay.Replay(result.ServerLog, _queryContext.Context);
+            ReplayServerLog(result.ServerLog);
             results.Add(Materialize(serverQuery, result));
         }
 
@@ -308,30 +322,38 @@ internal sealed class QueryExecutor<TElement>
 
     private QueryDataRequest BuildRequest(ServerQuery serverQuery, bool async)
     {
-        // Start of a message exchange: wire reference ids restart at 1 on both sides. One scope
-        // per round trip, so a split query's second request does not decode against the first's
-        // reference table.
-        ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
-            .ResetReferenceScope();
-
-        return new QueryDataRequest
+        try
         {
-            // THE SAME `_relationalRoots` THE BOUNDARY ANALYSIS ABOVE USED, and that is the point
-            // of the field rather than a second lookup here. The analyzer admits a raw-SQL root
-            // only when it recognises one; this translator carries the root's SQL only when it
-            // recognises one. Two lookups can disagree, and when they did the root crossed with
-            // its SQL dropped -- `FromSql_arguments_cross_as_values...` answered 2 where 1 is
-            // correct, silently.
-            SerializedQuery = SerializeNode(
-                ((ExpressionSerializer)_expressionSerializer).ToNode(serverQuery.Query, _relationalRoots)),
-            TrackingBehavior = _trackingBehavior,
-            IsAsync = async,
-            ReturnsSingleResult = serverQuery.ReturnsSingleResult,
-            TransactionId = InfoCarrierDatabase.ServerTransactionId(_queryContext.Context),
+            // Start of a message exchange: wire reference ids restart at 1 on both sides. One scope
+            // per round trip, so a split query's second request does not decode against the first's
+            // reference table.
+            ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
+                .ResetReferenceScope();
 
-            // Stripped from the tree by the splitter and carried here instead. See the property.
-            SplitQueryBehavior = _splitQueryBehavior,
-        };
+            return new QueryDataRequest
+            {
+                // THE SAME `_relationalRoots` THE BOUNDARY ANALYSIS ABOVE USED, and that is the point
+                // of the field rather than a second lookup here. The analyzer admits a raw-SQL root
+                // only when it recognises one; this translator carries the root's SQL only when it
+                // recognises one. Two lookups can disagree, and when they did the root crossed with
+                // its SQL dropped -- `FromSql_arguments_cross_as_values...` answered 2 where 1 is
+                // correct, silently.
+                SerializedQuery = SerializeNode(
+                    ((ExpressionSerializer)_expressionSerializer).ToNode(serverQuery.Query, _relationalRoots)),
+                TrackingBehavior = _trackingBehavior,
+                IsAsync = async,
+                ReturnsSingleResult = serverQuery.ReturnsSingleResult,
+                TransactionId = InfoCarrierDatabase.ServerTransactionId(_queryContext.Context),
+
+                // Stripped from the tree by the splitter and carried here instead. See the property.
+                SplitQueryBehavior = _splitQueryBehavior,
+            };
+        }
+        catch (Exception exception)
+        {
+            LogFailure("request construction", exception, _queryContext.CancellationToken);
+            throw;
+        }
     }
 
     /// <summary>
@@ -345,17 +367,25 @@ internal sealed class QueryExecutor<TElement>
     /// </remarks>
     private object? Materialize(ServerQuery serverQuery, QueryDataResult result)
     {
-        ClientResultMaterializer materializer = _materializer;
-
-        object rows = Invoke(MaterializeMethod.MakeGenericMethod(serverQuery.ElementType), materializer, [result])!;
-        object list = Invoke(ToListMethod.MakeGenericMethod(serverQuery.ElementType), null, [rows])!;
-
-        if (serverQuery.ReturnsSingleResult)
+        try
         {
-            return ((System.Collections.IEnumerable)list).Cast<object?>().FirstOrDefault();
-        }
+            ClientResultMaterializer materializer = _materializer;
 
-        return Invoke(AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType), null, [list])!;
+            object rows = Invoke(MaterializeMethod.MakeGenericMethod(serverQuery.ElementType), materializer, [result])!;
+            object list = Invoke(ToListMethod.MakeGenericMethod(serverQuery.ElementType), null, [rows])!;
+
+            if (serverQuery.ReturnsSingleResult)
+            {
+                return ((System.Collections.IEnumerable)list).Cast<object?>().FirstOrDefault();
+            }
+
+            return Invoke(AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType), null, [list])!;
+        }
+        catch (Exception exception)
+        {
+            LogFailure("result materialization", exception, _queryContext.CancellationToken);
+            throw;
+        }
     }
 
     /// <summary>
@@ -385,20 +415,28 @@ internal sealed class QueryExecutor<TElement>
 
     private IEnumerable<TElement> ApplyResidual(IReadOnlyList<object?> results, bool singleResult)
     {
-        if (_split.IsPassThrough)
+        try
         {
-            // Nothing to apply. Keep the untouched path allocation-for-allocation what it was
-            // before the split existed.
-            return results[0] is IEnumerable<TElement> sequence ? sequence : [(TElement)results[0]!];
+            if (_split.IsPassThrough)
+            {
+                // Nothing to apply. Keep the untouched path allocation-for-allocation what it was
+                // before the split existed.
+                return results[0] is IEnumerable<TElement> sequence ? sequence : [(TElement)results[0]!];
+            }
+
+            object? applied = _split.Apply(results);
+
+            IEnumerable<TElement> produced = singleResult
+                ? [(TElement)applied!]
+                : ((System.Collections.IEnumerable)applied!).Cast<TElement>();
+
+            return _materializer.Deferred.Count == 0 ? produced : Attaching(produced);
         }
-
-        object? applied = _split.Apply(results);
-
-        IEnumerable<TElement> produced = singleResult
-            ? [(TElement)applied!]
-            : ((System.Collections.IEnumerable)applied!).Cast<TElement>();
-
-        return _materializer.Deferred.Count == 0 ? produced : Attaching(produced);
+        catch (Exception exception)
+        {
+            LogFailure("client projection", exception, _queryContext.CancellationToken);
+            throw;
+        }
     }
 
     /// <summary>
@@ -1419,4 +1457,34 @@ internal sealed class QueryExecutor<TElement>
             }
         }
     }
+    private void ReplayServerLog(IReadOnlyList<ServerLogEvent>? events)
+    {
+        try { ServerLogReplay.Replay(events, _queryContext.Context); }
+        catch (Exception exception)
+        {
+            LogFailure("server log replay", exception, _queryContext.CancellationToken);
+            throw;
+        }
+    }
+
+    private void LogFailure(string phase, Exception exception, CancellationToken cancellationToken)
+    {
+        (LogLevel level, string outcome) = exception switch
+        {
+            OperationCanceledException when cancellationToken.IsCancellationRequested => (LogLevel.Debug, "CallerCancellation"),
+            OperationCanceledException => (LogLevel.Error, "UnrelatedCancellation"),
+            _ when phase == "query preparation" => (LogLevel.Information, "PreparationFailed"),
+            _ => (LogLevel.Error, "UnclassifiedFailure"),
+        };
+        try
+        {
+            _queryContext.QueryLogger.ClientFailure(InfoCarrierEventId.ClientQueryFailure,
+                level, "Query", phase, outcome, exception.GetType().FullName ?? exception.GetType().Name);
+        }
+        catch (Exception)
+        {
+            // Event delivery must not replace the operation failure.
+        }
+    }
+
 }

@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <ProjectReference Include="..\Northwind.Shared\Northwind.Shared.csproj" />
   </ItemGroup>

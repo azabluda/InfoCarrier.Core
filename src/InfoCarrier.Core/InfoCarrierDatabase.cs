@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
+using Microsoft.Extensions.Logging;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -224,98 +225,110 @@ public class InfoCarrierDatabase(
 
     private async Task<int> SaveAsync(IList<IUpdateEntry> entries, bool async, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(entries);
-
-        var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
-        mapper.ResetReferenceScope();
-
-        // Correlation ids are positions in *this* list, so the expansion has to be materialized
-        // once and reused when the generated values come back.
-        List<IUpdateEntry> sent = [.. Expand(entries)];
-
-        var request = new Common.SaveChangesRequest
-        {
-            Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
-            TransactionId = ServerTransactionId(_currentContext.Context),
-        };
-
-
-        Common.SaveChangesResult result;
+        string phase = "change request construction";
         try
         {
-            result = await _client
-                .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (DbUpdateConcurrencyException exception)
-        {
-            // A concurrency conflict is detected by the *store*, which is on the far side, so the
-            // server's logger recorded it and this context's never did — and
-            // `OptimisticConcurrencyTestBase` asserts on the client's:
-            // `Fixture.ListLoggerFactory.Log.Single(l => l.Id == CoreEventId.OptimisticConcurrencyException)`.
-            //
-            // Logging it here is what every other provider does from the same position: EF's
-            // InMemory provider from `InMemoryTable`, the relational ones from
-            // `AffectedCountModificationCommandBatch`. This provider *is* the store as far as the
-            // client context is concerned.
-            IReadOnlyList<IUpdateEntry> conflicting =
-                FailedByOrdinal(exception, sent) ?? Translate(exception.Entries, sent);
+            ArgumentNullException.ThrowIfNull(entries);
 
-            // Re-raised rather than rethrown, because `Entries` is the part callers use and the
-            // server's entries are useless here: they belong to the server's context, which is
-            // disposed with the request scope. Rethrowing gave "cannot access a disposed context
-            // instance" the moment `OptimisticConcurrencyTestBase`'s resolver touched
-            // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
-            //
-            // Built before the event and handed to it, because EF's event carries the exception
-            // the save then throws, and an interceptor may compare the two. Until 2026-09-27 the
-            // event carried the server's, the inner one here (#167's slow run).
-            var raised = new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
+            var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+            mapper.ResetReferenceScope();
 
-            InterceptionResult logged = async
-                ? await _updateLogger.OptimisticConcurrencyExceptionAsync(
-                        _currentContext.Context, conflicting, raised, null, cancellationToken)
-                    .ConfigureAwait(false)
-                : _updateLogger.OptimisticConcurrencyException(_currentContext.Context, conflicting, raised, null);
+            // Correlation ids are positions in *this* list, so the expansion has to be materialized
+            // once and reused when the generated values come back.
+            List<IUpdateEntry> sent = [.. Expand(entries)];
 
-            if (logged.IsSuppressed)
+            var request = new Common.SaveChangesRequest
             {
-                // An interceptor asked us not to throw. EF's own providers answer that by
-                // completing the write anyway; there is nothing to complete here, because the
-                // server has already refused the batch. Zero rows is what actually happened.
-                return 0;
+                Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
+                TransactionId = ServerTransactionId(_currentContext.Context),
+            };
+
+
+            phase = "exchange";
+            Common.SaveChangesResult result;
+            try
+            {
+                result = await _client
+                    .SaveChangesAsync(request, _currentContext.Context, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                // A concurrency conflict is detected by the *store*, which is on the far side, so the
+                // server's logger recorded it and this context's never did — and
+                // `OptimisticConcurrencyTestBase` asserts on the client's:
+                // `Fixture.ListLoggerFactory.Log.Single(l => l.Id == CoreEventId.OptimisticConcurrencyException)`.
+                //
+                // Logging it here is what every other provider does from the same position: EF's
+                // InMemory provider from `InMemoryTable`, the relational ones from
+                // `AffectedCountModificationCommandBatch`. This provider *is* the store as far as the
+                // client context is concerned.
+                IReadOnlyList<IUpdateEntry> conflicting =
+                    FailedByOrdinal(exception, sent) ?? Translate(exception.Entries, sent);
+
+                // Re-raised rather than rethrown, because `Entries` is the part callers use and the
+                // server's entries are useless here: they belong to the server's context, which is
+                // disposed with the request scope. Rethrowing gave "cannot access a disposed context
+                // instance" the moment `OptimisticConcurrencyTestBase`'s resolver touched
+                // `ex.Entries` — `GetDatabaseValues`, `SetValues`, `Reload` all do.
+                //
+                // Built before the event and handed to it, because EF's event carries the exception
+                // the save then throws, and an interceptor may compare the two. Until 2026-09-27 the
+                // event carried the server's, the inner one here (#167's slow run).
+                var raised = new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
+
+                InterceptionResult logged = async
+                    ? await _updateLogger.OptimisticConcurrencyExceptionAsync(
+                            _currentContext.Context, conflicting, raised, null, cancellationToken)
+                        .ConfigureAwait(false)
+                    : _updateLogger.OptimisticConcurrencyException(_currentContext.Context, conflicting, raised, null);
+
+                if (logged.IsSuppressed)
+                {
+                    // An interceptor asked us not to throw. EF's own providers answer that by
+                    // completing the write anyway; there is nothing to complete here, because the
+                    // server has already refused the batch. Zero rows is what actually happened.
+                    return 0;
+                }
+
+                throw raised;
+            }
+            catch (DbUpdateException exception)
+            {
+                // The same re-raise, one level up the hierarchy, and W5 is what made it necessary.
+                // `DbUpdateException.Entries` is the part callers use — the spec base does
+                // `ex.Entries.Single()` and asserts the entity's type — and those entries are *update
+                // entries of the server's context*. They cannot cross a wire under any encoding, and
+                // in-process they only arrived because the exception was the same object.
+                //
+                // So the exception is re-raised naming the entries *this* context sent. The server
+                // tags which ones the store rejected by their position in the batch (#70); where that
+                // tag is present `FailedByOrdinal` picks exactly those, and only where it is absent
+                // does the re-raise name the whole sent list — the honest answer when the server
+                // could not narrow it either.
+                throw new DbUpdateException(
+                    exception.Message,
+                    exception,
+                    FailedByOrdinal(exception, sent) ?? Translate([], sent));
             }
 
-            throw raised;
+            // EF raises its write-time warnings from the update pipeline, which runs on the SERVER, so
+            // a caller holding only the client context never hears them. Same position and same
+            // reasoning as the concurrency exception above: this provider *is* the store as far as the
+            // client context is concerned, and a store's diagnostics belong in the context's log. The
+            // server only sends any when it has granted forwarding, which is off by default.
+            phase = "server log replay";
+            ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
+
+            phase = "generated value application after response";
+            ApplyGeneratedValues(sent, result, mapper);
+            return result.Count;
         }
-        catch (DbUpdateException exception)
+        catch (Exception exception) when (phase != "exchange")
         {
-            // The same re-raise, one level up the hierarchy, and W5 is what made it necessary.
-            // `DbUpdateException.Entries` is the part callers use — the spec base does
-            // `ex.Entries.Single()` and asserts the entity's type — and those entries are *update
-            // entries of the server's context*. They cannot cross a wire under any encoding, and
-            // in-process they only arrived because the exception was the same object.
-            //
-            // So the exception is re-raised naming the entries *this* context sent. The server
-            // tags which ones the store rejected by their position in the batch (#70); where that
-            // tag is present `FailedByOrdinal` picks exactly those, and only where it is absent
-            // does the re-raise name the whole sent list — the honest answer when the server
-            // could not narrow it either.
-            throw new DbUpdateException(
-                exception.Message,
-                exception,
-                FailedByOrdinal(exception, sent) ?? Translate([], sent));
+            LogFailure(phase, exception, cancellationToken);
+            throw;
         }
-
-        // EF raises its write-time warnings from the update pipeline, which runs on the SERVER, so
-        // a caller holding only the client context never hears them. Same position and same
-        // reasoning as the concurrency exception above: this provider *is* the store as far as the
-        // client context is concerned, and a store's diagnostics belong in the context's log. The
-        // server only sends any when it has granted forwarding, which is off by default.
-        ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
-
-        ApplyGeneratedValues(sent, result, mapper);
-        return result.Count;
     }
 
     /// <summary>
@@ -790,4 +803,23 @@ public class InfoCarrierDatabase(
             }
         }
     }
+    private void LogFailure(string phase, Exception exception, CancellationToken cancellationToken)
+    {
+        (LogLevel level, string outcome) = exception switch
+        {
+            OperationCanceledException when cancellationToken.IsCancellationRequested => (LogLevel.Debug, "CallerCancellation"),
+            OperationCanceledException => (LogLevel.Error, "UnrelatedCancellation"),
+            _ => (LogLevel.Error, "UnclassifiedFailure"),
+        };
+        try
+        {
+            _updateLogger.ClientFailure(InfoCarrierEventId.ClientSaveFailure,
+                level, "SaveChanges", phase, outcome, exception.GetType().FullName ?? exception.GetType().Name);
+        }
+        catch (Exception)
+        {
+            // Event delivery must not replace the operation failure.
+        }
+    }
+
 }

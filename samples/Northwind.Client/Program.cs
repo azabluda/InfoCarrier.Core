@@ -39,7 +39,8 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
     // HttpInfoCarrierTransport free of sample types and therefore promotable by a file move.
     transport = new InspectingTransport(transport, serializer, services.GetRequiredService<WireLog>());
 
-    return new TransportInfoCarrierClient(transport, serializer);
+    return new TransportInfoCarrierClient(transport, serializer,
+        services.GetRequiredService<ILogger<TransportInfoCarrierClient>>());
 });
 
 // A factory, not a context: each page owns its own unit of work, which is exactly what the Order
