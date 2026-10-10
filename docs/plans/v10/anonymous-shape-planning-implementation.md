@@ -169,7 +169,7 @@ Expected: these cases pass before production changes affecting named types and r
 - Consume: structural shape membership and planner behavior from tasks 1 and 2.
 - Preserve: independent component permission and provider translation decisions.
 
-- [ ] **Step 1: Add focused boundary cases**
+- [x] **Step 1: Add focused boundary cases**
 
 Add tests proving:
 
@@ -178,15 +178,15 @@ Add tests proving:
 - a declared construction refused by SQLite returns SQLite's refusal;
 - that refusal makes one request and starts no client retry.
 
-- [ ] **Step 2: Prove test sensitivity**
+- [x] **Step 2: Prove test sensitivity**
 
 Temporarily omit the nested descriptor or component permission in each test setup. Verify each test fails for its stated reason. Restore the intended setup before production edits.
 
-- [ ] **Step 3: Apply only required corrections**
+- [x] **Step 3: Apply only required corrections**
 
 If a focused test exposes a defect in descriptor recursion or permission ordering, make the smallest production correction. Do not widen `TypeAllowlist` and do not catch provider refusal.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 

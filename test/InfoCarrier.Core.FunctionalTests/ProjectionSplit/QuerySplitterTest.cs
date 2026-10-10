@@ -118,6 +118,25 @@ public class QuerySplitterTest : IDisposable
     }
 
     [Fact]
+    public void A_registered_wrapper_does_not_admit_its_named_component()
+    {
+        var prototype = new { Value = new ClientRow("", null!) };
+        var splitter = new QuerySplitter(_context.Model)
+        {
+            RegisteredAnonymousShapes = [prototype.GetType()],
+        };
+        IQueryable query = _context.Authors.Select(author => new
+        {
+            Value = new ClientRow(author.Name, author),
+        });
+
+        SplitQuery split = splitter.Split(query.Expression);
+
+        Assert.False(split.IsPassThrough);
+        Assert.DoesNotContain(split.ServerQueries, server => server.ElementType == prototype.GetType());
+    }
+
+    [Fact]
     public void A_client_dto_projection_is_applied_on_the_client()
     {
         SplitQuery split = Split(_context.Authors.Select(a => new BookSummary { AuthorName = a.Name }));

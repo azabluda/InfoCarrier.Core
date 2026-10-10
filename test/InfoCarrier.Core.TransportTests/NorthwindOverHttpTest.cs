@@ -85,6 +85,50 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task Matching_nested_shape_declarations_restore_both_client_types()
+    {
+        var prototype = new { Id = 0, Customer = new { CustomerId = (string?)null } };
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
+            services => services.AddInfoCarrierAnonymousShapes(prototype)));
+        using NorthwindContext context = CreateClientContext(
+            configured,
+            registerShape: false,
+            out RecordingHandler recorder,
+            anonymousShapes: [prototype]);
+
+        var rows = await context.Orders.OrderBy(order => order.Id).Select(order => new
+        {
+            order.Id,
+            Customer = new { order.CustomerId },
+        }).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal(prototype.GetType(), rows[0].GetType());
+        Assert.Equal(prototype.Customer.GetType(), rows[0].Customer.GetType());
+        Assert.Equal("ALFKI", rows[0].Customer.CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
+    public async Task A_registered_shape_refused_by_sqlite_is_not_retried_on_the_client()
+    {
+        var counter = new CommandCounter();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
+            services => services.AddSingleton<IInterceptor>(counter)));
+        using HttpClient warmup = configured.CreateClient();
+        int executionsBeforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(
+            configured, registerShape: true, out RecordingHandler recorder);
+
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
+            .OrderBy(order => new { order.Id, order.CustomerId }).ToListAsync());
+
+        Assert.Contains("translated", refusal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, recorder.RequestCount);
+        Assert.Equal(executionsBeforeQuery, counter.ReaderExecutions);
+    }
+
+    [Fact]
     public async Task An_unregistered_record_projection_is_reconstructed_on_the_client()
     {
         using NorthwindContext context = CreateClientContext(
@@ -266,7 +310,8 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         WebApplicationFactory<Program> factory,
         bool registerShape,
         out RecordingHandler recorder,
-        bool allowRecord = false)
+        bool allowRecord = false,
+        object[]? anonymousShapes = null)
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var handler = new RecordingHandler();
@@ -283,6 +328,11 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
                     if (registerShape)
                     {
                         options.UseRegisteredAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+                    }
+
+                    if (anonymousShapes is not null)
+                    {
+                        options.UseRegisteredAnonymousShapes(anonymousShapes);
                     }
 
                     if (allowRecord)
