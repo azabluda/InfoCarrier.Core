@@ -49,7 +49,7 @@ Server admission remains strict. A missing catalog entry, denied component type,
 
 ## Internal design
 
-`InfoCarrierOptionsExtension` stores immutable client anonymous-shape descriptors beside its allowed types and other planning settings. The descriptors use ordered member names and component types, not compiler-generated runtime type identity. Option hashing and debug information include the descriptor set so Entity Framework does not reuse incompatible internal service providers.
+`InfoCarrierOptionsExtension` stores immutable client anonymous-shape descriptors beside its allowed types and other planning settings. The descriptors use ordered member names and component types, not compiler-generated runtime type identity. `QueryExecutor` reads them from the current context for every execution. They do not enter the service-provider hash because the extension deliberately shares one internal provider across client contexts.
 
 The new builder method validates prototypes through one shared internal validator. The existing server extension uses the same validator, preventing different client and server structural rules.
 
