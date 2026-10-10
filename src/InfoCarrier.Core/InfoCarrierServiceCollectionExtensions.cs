@@ -43,13 +43,7 @@ public static class InfoCarrierServiceCollectionExtensions
         this IServiceCollection services, params object[] shapes)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(shapes);
-        Type[] types = shapes.Select(shape => shape?.GetType()
-            ?? throw new ArgumentException("Anonymous-shape prototypes cannot be null.", nameof(shapes))).ToArray();
-        if (types.Any(type => !AnonymousShapeTypes.IsOriginal(type) || type.ContainsGenericParameters))
-        {
-            throw new ArgumentException("Use anonymous objects as shape prototypes; register named records with AddInfoCarrierAllowedTypes.", nameof(shapes));
-        }
+        Type[] types = AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
 
         services.AddSingleton(new AnonymousShapeRegistration(types));
         services.TryAddSingleton(provider =>
