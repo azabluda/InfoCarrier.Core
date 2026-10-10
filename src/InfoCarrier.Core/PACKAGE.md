@@ -1,12 +1,10 @@
 `InfoCarrier.Core` is an Entity Framework Core provider for the client side of a multi-tier
-application. Your client is a WPF, Blazor WebAssembly, MAUI or console app. It gets a real
-`DbContext` with LINQ, change tracking, the identity map, navigation fix-up, lazy loading and
-transactions, but no connection string and no database driver. Queries and units of work travel to
-your application server, which executes them with an ordinary EF Core provider.
+application. A WPF, Blazor WebAssembly, MAUI or console client gets a real `DbContext`, but no
+connection string or database driver. Queries and units of work travel to your application server,
+which executes them with an ordinary EF Core provider.
 
-Reference it from your client, and from your server alongside `InfoCarrier.Core.AspNetCore`,
-which depends on it. The `DbContext` and the entity classes are shared source, so both halves build
-the same model.
+Reference it from both applications. The server also references `InfoCarrier.Core.AspNetCore`.
+Both applications share the `DbContext` and entity source.
 
 Both halves need .NET 10 and EF Core 10. Install with
 `dotnet add package InfoCarrier.Core`.
@@ -25,18 +23,31 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
     new HttpInfoCarrierTransport(http, serializer), serializer);
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-    .UseInfoCarrier(client)
+    .UseInfoCarrier(client, remote => remote.UseRegisteredAnonymousShapes(
+        new { Id = 0, CustomerId = (string?)null }))
     .Options;
 
 await using var context = new ShopContext(options);
 ```
 
+Register the same anonymous structures on the server:
+
+```csharp
+services.AddInfoCarrierAnonymousShapes(
+    new { Id = 0, CustomerId = (string?)null });
+```
+
+With neither declaration, or only the server declaration, eligible projections are rebuilt on the
+client. A client-only declaration reaches the server and is refused. Matching declarations let the
+server provider translate or refuse the query. A refusal returns to the caller without a client
+evaluation retry.
+
 `client` is safe to share: it holds no mutable state, so one instance serves every `DbContext` in
 your application. `MapInfoCarrier()` and the transport both default to the route `infocarrier`,
 so the `BaseAddress` above needs no path.
 
-Everything after that is ordinary EF Core. A query is not evaluated on the client: it crosses the
-wire as an expression tree, and the server runs it against its own provider.
+Everything after that is ordinary EF Core. The server executes the database query. The client can
+rebuild an eligible final projection from returned values.
 `HttpInfoCarrierTransport` is in this package; to serve what it sends, add
 [InfoCarrier.Core.AspNetCore](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore) to your
 server.

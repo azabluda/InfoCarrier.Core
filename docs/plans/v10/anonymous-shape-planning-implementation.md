@@ -212,15 +212,15 @@ Expected: all selected cases pass with no unexpected warnings.
 - Explain: client declaration controls planning; server registration controls admission.
 - Refer: shared recommended configuration remains issue #221.
 
-- [ ] **Step 1: Update both sample clients**
+- [x] **Step 1: Update both sample clients**
 
 Declare every anonymous structure their normal flows send. Keep the existing server registrations unchanged.
 
-- [ ] **Step 2: Update package documentation**
+- [x] **Step 2: Update package documentation**
 
 Use the humanizer skill before editing `PACKAGE.md`. Document the two-sided version 10 syntax, the four registration states, provider refusal, and no automatic retry. Do not describe the issue #221 API as available.
 
-- [ ] **Step 3: Validate samples**
+- [x] **Step 3: Validate samples**
 
 Build and run the existing console and Blazor sample validation commands.
 
