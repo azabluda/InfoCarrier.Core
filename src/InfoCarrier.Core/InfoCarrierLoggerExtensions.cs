@@ -5,6 +5,7 @@ using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
 
@@ -14,6 +15,30 @@ namespace InfoCarrier.Core;
 /// </summary>
 public static class InfoCarrierLoggerExtensions
 {
+    internal static void ClientFailure<TCategory>(this IDiagnosticsLogger<TCategory> diagnostics, EventId eventId,
+        LogLevel level, string operation, string phase, string outcome, string exceptionType)
+        where TCategory : LoggerCategory<TCategory>, new()
+    {
+        var definitions = (InfoCarrierLoggingDefinitions)diagnostics.Definitions;
+        EventDefinition<string, string, string, string> definition = definitions.LogClientFailure(diagnostics, eventId, level);
+        if (diagnostics.ShouldLog(definition))
+        {
+            definition.Log(diagnostics, operation, phase, outcome, exceptionType);
+        }
+        if (diagnostics.NeedsEventData(definition, out bool diagnosticSourceEnabled, out bool simpleLogEnabled))
+        {
+            var data = new ClientFailureEventData(definition, ClientFailureMessage, operation, phase, outcome, exceptionType);
+            diagnostics.DispatchEventData(definition, data, diagnosticSourceEnabled, simpleLogEnabled);
+        }
+    }
+
+    private static string ClientFailureMessage(EventDefinitionBase definition, EventData data)
+    {
+        var failure = (ClientFailureEventData)data;
+        return ((EventDefinition<string, string, string, string>)definition)
+            .GenerateMessage(failure.Operation, failure.Phase, failure.Outcome, failure.ExceptionType);
+    }
+
     /// <summary>
     ///     Raises <see cref="InfoCarrierEventId.QuerySplit" />.
     /// </summary>

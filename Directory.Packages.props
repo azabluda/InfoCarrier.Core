@@ -60,6 +60,7 @@
       THE LAST THREE ARE COMMUNITY PACKAGES CARRYING NATIVE CODE, published by one author, and
       that is worth knowing rather than discovering. They run only inside this test project.
     -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
     <PackageVersion Include="FirebirdSql.EntityFrameworkCore.Firebird" Version="13.0.0" />
     <PackageVersion Include="FirebirdDb.Embedded.NativeAssetManager" Version="1.0.6" />
     <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" Version="2.0.6" />

@@ -2,6 +2,9 @@
 
 using System.Diagnostics;
 using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace InfoCarrier.Core;
 
@@ -17,6 +20,18 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
 {
     private readonly IInfoCarrierTransport _transport = transport;
     private readonly IInfoCarrierSerializer _serializer = serializer;
+    private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
+
+    /// <summary>Creates a client with an explicitly supplied class logger.</summary>
+    /// <param name="transport">The transport used for exchanges.</param>
+    /// <param name="serializer">The payload serializer.</param>
+    /// <param name="logger">The host-owned logger.</param>
+    public TransportInfoCarrierClient(IInfoCarrierTransport transport, IInfoCarrierSerializer serializer,
+        ILogger<TransportInfoCarrierClient> logger) : this(transport, serializer)
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+        _logger = logger;
+    }
 
     /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(
@@ -122,24 +137,64 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         TRequest request,
         CancellationToken cancellationToken)
     {
-        var envelope = new InfoCarrierEnvelope
+        string phase = "request payload serialization";
+        bool returnedFault = false;
+        try
         {
-            ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
-            Operation = operation,
-            Payload = await _serializer.SerializeAsync(request, cancellationToken).ConfigureAwait(false),
-        };
+            var envelope = new InfoCarrierEnvelope
+            {
+                ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
+                Operation = operation,
+                Payload = await _serializer.SerializeAsync(request, cancellationToken).ConfigureAwait(false),
+            };
 
-        InfoCarrierEnvelope response = await _transport.SendAsync(envelope, cancellationToken).ConfigureAwait(false);
+            phase = "transport exchange";
+            InfoCarrierEnvelope response = await _transport.SendAsync(envelope, cancellationToken).ConfigureAwait(false);
 
-        // The fault first, and before the payload is looked at (wire-protocol W5). A failed
-        // response carries a placeholder payload, so reading it first would deserialize a null
-        // and report the failure as an empty result — which is the one way an error can do more
-        // damage than the operation that caused it.
-        if (response.Fault is { } fault)
-        {
-            throw InfoCarrierFaultMapper.Rehydrate(fault);
+            // The fault first, and before the payload is looked at (wire-protocol W5). A failed
+            // response carries a placeholder payload, so reading it first would deserialize a null
+            // and report the failure as an empty result — which is the one way an error can do more
+            // damage than the operation that caused it.
+            if (response.Fault is { } fault)
+            {
+                phase = "returned server fault";
+                returnedFault = true;
+                throw InfoCarrierFaultMapper.Rehydrate(fault);
+            }
+
+            phase = "response payload deserialization";
+            return (await _serializer.DeserializeAsync<TResponse>(response.Payload, cancellationToken).ConfigureAwait(false))!;
         }
+        catch (Exception exception)
+        {
+            LogFailure(operation, phase, exception, cancellationToken, returnedFault);
+            throw;
+        }
+    }
 
-        return (await _serializer.DeserializeAsync<TResponse>(response.Payload, cancellationToken).ConfigureAwait(false))!;
+    private void LogFailure(InfoCarrierOperation operation, string phase, Exception exception,
+        CancellationToken cancellationToken, bool returnedFault)
+    {
+        (LogLevel level, string outcome) = exception switch
+        {
+            OperationCanceledException when cancellationToken.IsCancellationRequested => (LogLevel.Debug, "CallerCancellation"),
+            OperationCanceledException => (LogLevel.Error, "UnrelatedCancellation"),
+            DbUpdateConcurrencyException => (LogLevel.Information, "ConcurrencyConflict"),
+            _ when returnedFault => (LogLevel.Information, "ServerFaultReceived"),
+            _ => (LogLevel.Error, "UnclassifiedFailure"),
+        };
+        try
+        {
+            if (_logger.IsEnabled(level))
+            {
+                _logger.Log(level, new EventId(35100),
+                    "InfoCarrier client {Operation} failed during {Phase}. Outcome={Outcome}; ExceptionType={ExceptionType}.",
+                    operation, phase, outcome, exception.GetType().FullName);
+            }
+        }
+        catch (Exception)
+        {
+            // Event delivery must not replace the operation failure.
+        }
     }
 }

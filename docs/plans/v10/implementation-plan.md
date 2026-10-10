@@ -550,6 +550,23 @@ The owner approved the audited issue and requested implementation in this sessio
       Test diagnostic output, privacy, and preserved contracts. Preserve the owner's temporary
       sample failures uncommitted, verify normal samples separately, and update the existing pull request.
 
+## Phase CL: client failure logging ([#215](https://github.com/azabluda/InfoCarrier.Core/issues/215))
+
+The owner requested an implementation plan on 2026-10-10. The
+[audit](client-logging-audit.md) records requirements; the
+[implementation plan](client-logging-plan.md) records the approved work and the revision following
+comparison with Microsoft's provider diagnostic conventions.
+Chained deployments use ordinary loggers and may retain duplicate logs rather than add coordination.
+
+- [x] **CL1. Add safe client exchange observations.** Preserve constructors and metrics; add a typed
+      logger overload with bounded local phases and privacy tests.
+- [x] **CL2. Observe client preparation and result processing.** Use existing injected Entity Framework
+      diagnostic loggers and dispatch through ordinary logging, simple logging, and diagnostic sources.
+      Cover synchronous/asynchronous paths, deferred projections, mapping, generated values, warning
+      configuration, and original exception preservation.
+- [x] **CL3. Validate chaining and wire sample loggers.** Exercise actual chained store contexts,
+      forwarding grants, scope isolation, and normal console and Blazor behavior.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

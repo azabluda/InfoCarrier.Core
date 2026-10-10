@@ -14,6 +14,30 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
     private EventDefinitionBase? _logQuerySplit;
     private EventDefinitionBase? _logQuerySplitClientOperators;
     private EventDefinitionBase? _logQuerySplitUnregisteredKeyTypes;
+    private EventDefinitionBase? _clientQueryError;
+    private EventDefinitionBase? _clientQueryInformation;
+    private EventDefinitionBase? _clientQueryDebug;
+    private EventDefinitionBase? _clientSaveError;
+    private EventDefinitionBase? _clientSaveDebug;
+
+    internal EventDefinition<string, string, string, string> LogClientFailure(
+        IDiagnosticsLogger logger, EventId eventId, LogLevel level)
+        => (EventDefinition<string, string, string, string>)(eventId == InfoCarrierEventId.ClientQueryFailure
+            ? level switch
+            {
+                LogLevel.Debug => _clientQueryDebug ??= CreateClientFailure(logger, eventId, level),
+                LogLevel.Information => _clientQueryInformation ??= CreateClientFailure(logger, eventId, level),
+                _ => _clientQueryError ??= CreateClientFailure(logger, eventId, level),
+            }
+            : level == LogLevel.Debug
+                ? _clientSaveDebug ??= CreateClientFailure(logger, eventId, level)
+                : _clientSaveError ??= CreateClientFailure(logger, eventId, level));
+
+    private EventDefinition<string, string, string, string> CreateClientFailure(
+        IDiagnosticsLogger logger, EventId eventId, LogLevel level)
+        => new(logger.Options, eventId, level, eventId.Name!,
+            configuredLevel => LoggerMessage.Define<string, string, string, string>(configuredLevel, eventId,
+                "InfoCarrier client {Operation} failed during {Phase}. Outcome={Outcome}; ExceptionType={ExceptionType}."));
 
     /// <summary>
     ///     The definition for <see cref="InfoCarrierEventId.QuerySplit" />.

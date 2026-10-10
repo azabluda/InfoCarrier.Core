@@ -5,21 +5,25 @@ using Microsoft.EntityFrameworkCore;
 using Northwind.Demo;
 using Northwind.Shared;
 using Northwind.Shared.Model;
+using Microsoft.Extensions.Logging;
 
 // The address of Northwind.Server. Its launch profile pins this port, so both commands are bare.
 var baseAddress = new Uri(args.Length > 0 ? args[0] : "http://localhost:5199");
 
 var serializer = new SystemTextJsonInfoCarrierSerializer();
+using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
 var counter = new CountingHandler(new HttpClientHandler());
 using var httpClient = new HttpClient(counter) { BaseAddress = baseAddress };
 
 // This is the whole client wiring, and it is the point of the sample: an HttpClient, the
 // transport, and `UseInfoCarrier`. Nothing below configures a database, because there is none.
 var client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(httpClient, serializer), serializer);
+    new HttpInfoCarrierTransport(httpClient, serializer), serializer,
+    loggerFactory.CreateLogger<TransportInfoCarrierClient>());
 
 DbContextOptions<NorthwindContext> options = new DbContextOptionsBuilder<NorthwindContext>()
     .UseInfoCarrier(client)
+    .UseLoggerFactory(loggerFactory)
     .UseLazyLoadingProxies()
     .Options;
 
