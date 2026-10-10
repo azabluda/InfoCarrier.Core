@@ -47,7 +47,7 @@
 - Produce: `InfoCarrierOptionsExtension.AnonymousShapeTypesFor(DbContext)` for execution-time reading.
 - Preserve: existing service-provider hash value `0`.
 
-- [ ] **Step 1: Write failing public API tests**
+- [x] **Step 1: Write failing public API tests**
 
 Add tests named:
 
@@ -57,7 +57,7 @@ Add tests named:
 
 Assert that repeated calls retain both shape sets, later input mutation cannot change them, and validation matches the server registration API.
 
-- [ ] **Step 2: Verify the tests fail for the missing API**
+- [x] **Step 2: Verify the tests fail for the missing API**
 
 Run:
 
@@ -67,17 +67,17 @@ dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTes
 
 Expected: compilation fails because `UseRegisteredAnonymousShapes` does not exist.
 
-- [ ] **Step 3: Implement the smallest registration surface**
+- [x] **Step 3: Implement the smallest registration surface**
 
 Create an immutable internal shape set that snapshots prototype types and compares structural descriptors. Move prototype validation into one internal helper used by both client and server entry points. Add the builder method, options clone method, and per-context reader. Do not add these descriptors to `ExtensionInfo.GetServiceProviderHashCode()`.
 
-- [ ] **Step 4: Verify the focused tests pass**
+- [x] **Step 4: Verify the focused tests pass**
 
 Run the command from step 2.
 
 Expected: all `AnonymousShapeClientRegistrationTest` cases pass.
 
-- [ ] **Step 5: Check public compatibility**
+- [x] **Step 5: Check public compatibility**
 
 Run the repository package-compatibility target used by continuous integration.
 
@@ -107,7 +107,7 @@ Expected: no removed or changed version 10 API.
 - Produce: declared original anonymous types retain current transport eligibility.
 - Preserve: every existing public constructor signature.
 
-- [ ] **Step 1: Write failing boundary tests**
+- [x] **Step 1: Write failing boundary tests**
 
 Replace the unconditional anonymous-shipping expectation with two explicit cases:
 
@@ -116,7 +116,7 @@ Replace the unconditional anonymous-shipping expectation with two explicit cases
 
 Add a safe anonymous join-key case proving the database-executed rewrite remains server-ready without declaration.
 
-- [ ] **Step 2: Write failing transport matrix tests**
+- [x] **Step 2: Write failing transport matrix tests**
 
 Add focused cases for neither-side, client-only, server-only, and both-side declarations. Record requests and server database commands.
 
@@ -127,7 +127,7 @@ Assert:
 - server-only matches the neither-side client plan;
 - both-side matches the direct provider result and retains the original client anonymous type.
 
-- [ ] **Step 3: Verify the new behavior tests fail correctly**
+- [x] **Step 3: Verify the new behavior tests fail correctly**
 
 Run:
 
@@ -138,19 +138,19 @@ dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests
 
 Expected: undeclared projections still ship, so the new legacy-planning assertions fail.
 
-- [ ] **Step 4: Implement planning membership**
+- [x] **Step 4: Implement planning membership**
 
 Give `ServerBoundaryAnalyzer` an additive init-only structural shape setting. Give `QuerySplitter` the matching additive setting and apply it before analysis. `QueryExecutor` reads the current context's shape set and supplies it to the splitter.
 
 During each node verdict, keep `TypeAllowlist` component checks. Additionally refuse an original anonymous wire type whose descriptor is absent. Apply this after children and existing rewrites have been analyzed.
 
-- [ ] **Step 5: Verify the focused behavior passes**
+- [x] **Step 5: Verify the focused behavior passes**
 
 Run both commands from step 3.
 
 Expected: all selected functional and transport tests pass.
 
-- [ ] **Step 6: Pin existing named-type compatibility**
+- [x] **Step 6: Pin existing named-type compatibility**
 
 Add characterization cases for a named record declared on neither side, only the client, and both sides. Verify local final reconstruction, strict server refusal, and backend execution respectively. Run them before and after any further refactoring.
 

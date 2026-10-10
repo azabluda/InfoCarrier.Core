@@ -51,9 +51,25 @@ public class ServerBoundaryAnalyzerTest : IDisposable
     }
 
     [Fact]
-    public void An_anonymous_projection_ships_with_its_shape()
+    public void An_unregistered_anonymous_projection_stops_at_the_source()
     {
         BoundaryAnalysis analysis = Analyze(_context.Authors.Select(a => new { a.Name }));
+
+        Expression shipped = Assert.Single(analysis.Shippable);
+        Assert.Equal(typeof(IQueryable<Author>), shipped.Type);
+        Assert.Empty(analysis.OpenFragments);
+    }
+
+    [Fact]
+    public void A_registered_anonymous_projection_ships_with_its_shape()
+    {
+        var shape = new { Name = "" };
+        var analyzer = new ServerBoundaryAnalyzer(TypeAllowlist.ForModel(_context.Model))
+        {
+            RegisteredAnonymousShapes = [shape.GetType()],
+        };
+
+        BoundaryAnalysis analysis = analyzer.Analyze(_context.Authors.Select(a => new { a.Name }).Expression);
 
         Assert.True(analysis.IsWhollyServerExecutable);
         Expression shipped = Assert.Single(analysis.Shippable);
@@ -95,7 +111,7 @@ public class ServerBoundaryAnalyzerTest : IDisposable
     }
 
     [Fact]
-    public void A_join_with_an_anonymous_result_ships_whole()
+    public void A_join_with_an_unregistered_anonymous_result_stops_at_its_sources()
     {
         BoundaryAnalysis analysis = Analyze(
             _context.Authors.Join(
@@ -104,8 +120,10 @@ public class ServerBoundaryAnalyzerTest : IDisposable
                 b => b.AuthorId,
                 (a, b) => new { a.Name, b.Title }));
 
-        Assert.True(analysis.IsWhollyServerExecutable);
-        Assert.Equal(nameof(Queryable.Join), Assert.IsAssignableFrom<MethodCallExpression>(Assert.Single(analysis.Shippable)).Method.Name);
+        Assert.False(analysis.IsWhollyServerExecutable);
+        Assert.Equal(
+            [typeof(IQueryable<Author>), typeof(IQueryable<Book>)],
+            analysis.Shippable.Select(expression => expression.Type));
     }
 
     [Fact]

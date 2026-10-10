@@ -50,6 +50,27 @@ public sealed class ServerBoundaryAnalyzer(
     private readonly TypeAllowlist _allowlist = allowlist;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
     private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots = relationalRoots;
+    private IReadOnlyCollection<Type> _registeredAnonymousShapes = [];
+
+    /// <summary>
+    ///     Anonymous structures this client expects the server to have registered.
+    /// </summary>
+    /// <remarks>
+    ///     This setting controls client planning only. The server independently enforces its
+    ///     trusted anonymous-shape catalog and all component-type permissions.
+    /// </remarks>
+    public IReadOnlyCollection<Type> RegisteredAnonymousShapes
+    {
+        get => _registeredAnonymousShapes;
+        init => _registeredAnonymousShapes = [.. value ?? throw new ArgumentNullException(nameof(value))];
+    }
+
+    internal void UseRegisteredAnonymousShapes(IReadOnlyCollection<Type> shapes)
+        => _registeredAnonymousShapes = [.. shapes ?? throw new ArgumentNullException(nameof(shapes))];
+
+    internal bool IsRegisteredAnonymousShape(Type type)
+        => !AnonymousShapeTypes.IsOriginal(type)
+            || AnonymousShapeSet.Empty.Add(_registeredAnonymousShapes).Contains(type);
 
     /// <summary>
     ///     Creates an analyzer that refuses a query carrying raw SQL.
@@ -73,12 +94,19 @@ public sealed class ServerBoundaryAnalyzer(
     ///     Analyzes a captured query tree.
     /// </summary>
     public BoundaryAnalysis Analyze(Expression root)
+        => AnalyzeCore(root, deniedType: null);
+
+    internal BoundaryAnalysis Analyze(Expression root, Type deniedType)
+        => AnalyzeCore(root, deniedType);
+
+    private BoundaryAnalysis AnalyzeCore(Expression root, Type? deniedType)
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var walker = new Walker(_allowlist, _arbitrarySqlAllowed, _relationalRoots);
+        var registeredAnonymousShapes = AnonymousShapeSet.Empty.Add(RegisteredAnonymousShapes);
+        var walker = new Walker(_allowlist, deniedType, _arbitrarySqlAllowed, _relationalRoots);
         walker.Visit(root);
-        return new BoundaryAnalysis(root, walker.Results);
+        return new BoundaryAnalysis(root, walker.Results, registeredAnonymousShapes);
     }
 
     /// <summary>
@@ -308,12 +336,12 @@ public sealed class ServerBoundaryAnalyzer(
     /// </summary>
     private sealed class Walker(
         TypeAllowlist allowlist,
+        Type? deniedType,
         bool arbitrarySqlAllowed,
         Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots) : ExpressionVisitor
     {
         // One entry per direct child, popped when the parent folds them.
         private readonly List<NodeFacts> _pending = [];
-
         public Dictionary<Expression, NodeFacts> Results { get; } = new(ReferenceEqualityComparer.Instance);
 
         public override Expression? Visit(Expression? node)
@@ -364,7 +392,7 @@ public sealed class ServerBoundaryAnalyzer(
             {
                 foreach (Type type in WireTypeCollector.CollectOwn(node))
                 {
-                    if (!allowlist.IsAllowed(type))
+                    if (type == deniedType || !allowlist.IsAllowed(type))
                     {
                         serverOk = false;
                         break;
@@ -413,16 +441,21 @@ public readonly record struct NodeFacts(
 }
 
 /// <summary>
-///     The result of <see cref="ServerBoundaryAnalyzer.Analyze" />.
+///     The result of <see cref="ServerBoundaryAnalyzer.Analyze(Expression)" />.
 /// </summary>
 public sealed class BoundaryAnalysis
 {
     private readonly Dictionary<Expression, NodeFacts> _facts;
+    private readonly AnonymousShapeSet _registeredAnonymousShapes;
 
-    internal BoundaryAnalysis(Expression root, Dictionary<Expression, NodeFacts> facts)
+    internal BoundaryAnalysis(
+        Expression root,
+        Dictionary<Expression, NodeFacts> facts,
+        AnonymousShapeSet registeredAnonymousShapes)
     {
         Root = root;
         _facts = facts;
+        _registeredAnonymousShapes = registeredAnonymousShapes;
 
         var shippable = new List<Expression>();
         var open = new List<Expression>();
@@ -477,7 +510,10 @@ public sealed class BoundaryAnalysis
             return;
         }
 
-        if (facts.ServerOk && ServerBoundaryAnalyzer.IsExecutableQuery(node))
+        Type resultType = ServerBoundaryAnalyzer.SequenceElementType(node.Type);
+        bool resultShapeRegistered = !AnonymousShapeTypes.IsOriginal(resultType)
+            || _registeredAnonymousShapes.Contains(resultType);
+        if (facts.ServerOk && resultShapeRegistered && ServerBoundaryAnalyzer.IsExecutableQuery(node))
         {
             // Maximal by construction: descent stops here, so the first node on any path that is
             // both server-ok and runnable is the largest one there.

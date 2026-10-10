@@ -116,6 +116,19 @@ public sealed class QuerySplitter
     public bool ServerStoreIsRelational { get; init; } = true;
 
     /// <summary>
+    ///     Anonymous structures this client expects the server to have registered.
+    /// </summary>
+    /// <remarks>
+    ///     This setting permits the original structures during client planning. The server still
+    ///     requires independent catalog registration and component-type permission.
+    /// </remarks>
+    public IReadOnlyCollection<Type> RegisteredAnonymousShapes
+    {
+        get => _analyzer.RegisteredAnonymousShapes;
+        init => _analyzer.UseRegisteredAnonymousShapes(value);
+    }
+
+    /// <summary>
     ///     What the last <see cref="Split" /> found the query asking for, or
     ///     <see langword="null" /> when it asked for nothing.
     /// </summary>
@@ -260,6 +273,7 @@ public sealed class QuerySplitter
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
         // DefaultIfEmpty()` stays on the client and answers a left join's null rows by throwing.
         query = GroupJoinFlattener.Flatten(query);
+        query = new JoinKeyRewriter().Visit(query)!;
 
         // Replace the carrier types the query creates and consumes internally — transparent
         // identifiers, mostly — with tuples, so the operators above them stay on the server

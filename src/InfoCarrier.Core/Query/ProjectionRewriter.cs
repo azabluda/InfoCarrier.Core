@@ -420,7 +420,11 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
             }
         }
 
-        BoundaryAnalysis bodyAnalysis = analyzer.Analyze(selector);
+        bool unregisteredRootShape = ReferenceEquals(node, _root)
+            && !analyzer.IsRegisteredAnonymousShape(selector.Body.Type);
+        BoundaryAnalysis bodyAnalysis = unregisteredRootShape
+            ? analyzer.Analyze(selector, selector.Body.Type)
+            : analyzer.Analyze(selector);
         if (bodyAnalysis.FactsFor(selector.Body).ServerOk)
         {
             // The projection is server-executable as written.

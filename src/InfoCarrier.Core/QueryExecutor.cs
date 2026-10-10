@@ -116,6 +116,8 @@ internal sealed class QueryExecutor<TElement>
                 // R120's rule: a fact two components read independently can disagree with itself.
                 ServerStoreIsRelational =
                     InfoCarrierOptionsExtension.ServerStoreIsRelationalFor(queryContext.Context),
+                RegisteredAnonymousShapes =
+                    InfoCarrierOptionsExtension.RegisteredAnonymousShapesFor(queryContext.Context).Types,
             };
 
             _split = splitter.Split(substituted);

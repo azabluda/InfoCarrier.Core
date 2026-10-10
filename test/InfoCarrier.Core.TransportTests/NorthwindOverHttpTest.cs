@@ -1,9 +1,12 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Data.Common;
 using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Northwind.Shared;
 using Northwind.Shared.Model;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using InfoCarrier.Core.Expressions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,16 +21,123 @@ namespace InfoCarrier.Core.TransportTests;
 public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
     [Fact]
-    public async Task An_unregistered_projection_is_refused_over_http()
+    public async Task A_projection_declared_on_neither_side_is_reconstructed_on_the_client()
     {
         await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
             services => services.RemoveAll<AnonymousShapeCatalog>()));
-        using NorthwindContext context = CreateClientContext(unconfigured);
+        using NorthwindContext context = CreateClientContext(unconfigured, registerShape: false, out RecordingHandler recorder);
+
+        var rows = await context.Orders.OrderBy(o => o.Id)
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal("ALFKI", rows[0].CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
+    public async Task A_client_only_shape_declaration_is_refused_without_database_execution_or_retry()
+    {
+        var counter = new CommandCounter();
+        await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AnonymousShapeCatalog>();
+            services.AddSingleton<IInterceptor>(counter);
+        }));
+        using HttpClient warmup = unconfigured.CreateClient();
+        int executionsBeforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(unconfigured, registerShape: true, out RecordingHandler recorder);
 
         InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
             .Select(o => new { o.Id, o.CustomerId }).ToListAsync());
 
         Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, recorder.RequestCount);
+        Assert.Equal(executionsBeforeQuery, counter.ReaderExecutions);
+    }
+
+    [Fact]
+    public async Task A_server_only_shape_declaration_keeps_client_reconstruction()
+    {
+        using NorthwindContext context = CreateClientContext(factory, registerShape: false, out RecordingHandler recorder);
+
+        var rows = await context.Orders.OrderBy(o => o.Id)
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal("ALFKI", rows[0].CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
+    public async Task Matching_shape_declarations_use_the_catalog_and_restore_the_client_type()
+    {
+        var prototype = new { Id = 0, CustomerId = (string?)null };
+        using NorthwindContext context = CreateClientContext(factory, registerShape: true, out RecordingHandler recorder);
+
+        var rows = await context.Orders.OrderBy(o => o.Id)
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal(prototype.GetType(), rows[0].GetType());
+        Assert.Equal("ALFKI", rows[0].CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
+    public async Task An_unregistered_record_projection_is_reconstructed_on_the_client()
+    {
+        using NorthwindContext context = CreateClientContext(
+            factory, registerShape: false, out RecordingHandler recorder, allowRecord: false);
+
+        List<OrderCard> rows = await context.Orders.OrderBy(order => order.Id)
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal("ALFKI", rows[0].CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
+    public async Task A_client_only_record_declaration_is_refused_without_database_execution()
+    {
+        var counter = new CommandCounter();
+        await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
+            services => services.AddSingleton<IInterceptor>(counter)));
+        using HttpClient warmup = unconfigured.CreateClient();
+        int executionsBeforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(
+            unconfigured, registerShape: false, out RecordingHandler recorder, allowRecord: true);
+
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync());
+
+        Assert.Contains("allowed", refusal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, recorder.RequestCount);
+        Assert.Equal(executionsBeforeQuery, counter.ReaderExecutions);
+    }
+
+    [Fact]
+    public async Task Matching_record_declarations_use_backend_execution()
+    {
+        var counter = new CommandCounter();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddInfoCarrierAllowedTypes(typeof(OrderCard));
+            services.AddSingleton<IInterceptor>(counter);
+        }));
+        using HttpClient warmup = configured.CreateClient();
+        int executionsBeforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(
+            configured, registerShape: false, out RecordingHandler recorder, allowRecord: true);
+
+        List<OrderCard> rows = await context.Orders.OrderBy(order => order.Id)
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync();
+
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal("ALFKI", rows[0].CustomerId);
+        Assert.Equal(1, recorder.RequestCount);
+        Assert.True(counter.ReaderExecutions > executionsBeforeQuery);
     }
 
     [Fact]
@@ -150,6 +260,13 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         => CreateClientContext(factory, out _);
 
     internal static NorthwindContext CreateClientContext(WebApplicationFactory<Program> factory, out RecordingHandler recorder)
+        => CreateClientContext(factory, registerShape: false, out recorder);
+
+    private static NorthwindContext CreateClientContext(
+        WebApplicationFactory<Program> factory,
+        bool registerShape,
+        out RecordingHandler recorder,
+        bool allowRecord = false)
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var handler = new RecordingHandler();
@@ -161,8 +278,45 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         return new NorthwindContext(
             new DbContextOptionsBuilder<NorthwindContext>()
-                .UseInfoCarrier(client)
+                .UseInfoCarrier(client, options =>
+                {
+                    if (registerShape)
+                    {
+                        options.UseRegisteredAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+                    }
+
+                    if (allowRecord)
+                    {
+                        options.AllowTypes(typeof(OrderCard));
+                    }
+                })
                 .UseLazyLoadingProxies()
                 .Options);
     }
+
+    private sealed class CommandCounter : DbCommandInterceptor
+    {
+        public int ReaderExecutions { get; private set; }
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result)
+        {
+            ReaderExecutions++;
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderExecutions++;
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed record OrderCard(int Id, string? CustomerId);
 }

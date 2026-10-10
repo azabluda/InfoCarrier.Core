@@ -112,8 +112,8 @@ public class QuerySplitterTest : IDisposable
         // minimal-column payload are the same mechanism (§3.2).
         SplitQuery split = Split(_context.Authors.Select(a => new { a.Name }));
 
-        Assert.True(split.IsPassThrough);
-        Assert.Equal(typeof(string), Assert.Single(Assert.Single(split.ServerQueries).ElementType.GetProperties()).PropertyType);
+        Assert.False(split.IsPassThrough);
+        Assert.Equal(typeof(string), Assert.Single(split.ServerQueries).ElementType);
         Assert.Equal(["Austen", "Woolf"], Rows(Run(split), "Name"));
     }
 
@@ -164,8 +164,8 @@ public class QuerySplitterTest : IDisposable
         SplitQuery split = Split(
             _context.Authors.Select(a => new { a.Name, Count = a.Books.Count }));
 
-        Assert.True(split.IsPassThrough);
-        Assert.Equal(["Name", "Count"], Assert.Single(split.ServerQueries).ElementType.GetProperties().Select(p => p.Name));
+        Assert.False(split.IsPassThrough);
+        Assert.Single(split.ServerQueries);
         Assert.Equal([1, 0], Rows(Run(split), "Count"));
     }
 
@@ -224,9 +224,8 @@ public class QuerySplitterTest : IDisposable
                 b => b.AuthorId,
                 (a, b) => new { a.Name, b.Title }));
 
-        ServerQuery server = Assert.Single(split.ServerQueries);
-        Assert.True(split.IsPassThrough);
-        Assert.Equal(["Name", "Title"], server.ElementType.GetProperties().Select(p => p.Name));
+        Assert.Single(split.ServerQueries);
+        Assert.False(split.IsPassThrough);
         Assert.Equal(["Austen"], Rows(Run(split), "Name"));
         Assert.Equal(["Emma"], Rows(Run(split), "Title"));
     }
@@ -380,15 +379,24 @@ public class QuerySplitterTest : IDisposable
     ///     store propagates the null. That is the `GearsOfWar` `let` pair (C61, C75).
     /// </remarks>
     [Fact]
-    public void A_carrier_holding_a_sequence_is_re_carried_when_the_sequence_is_read()
+    public void Registered_nested_anonymous_shapes_keep_null_handling_on_the_server()
     {
-        SplitQuery split = Split(
-            _context.Authors
-                .Select(a => new { a, books = a.Books.Where(b => b.Id < 5) })
-                .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault()!.Title }));
+        var carrier = new { a = default(Author)!, books = Enumerable.Empty<Book>() };
+        var result = new { Name = "", Title = (string?)null };
+        var splitter = new QuerySplitter(_context.Model)
+        {
+            RegisteredAnonymousShapes = [carrier.GetType(), result.GetType()],
+        };
+        IQueryable query = _context.Authors
+            .Select(a => new { a, books = a.Books.Where(b => b.Id < 5) })
+            .Select(x => new { x.a.Name, Title = x.books.FirstOrDefault()!.Title });
+
+        SplitQuery split = splitter.Split(query.Expression);
 
         Assert.True(split.IsPassThrough);
-        Assert.Equal(["Name", "Title"], Assert.Single(split.ServerQueries).ElementType.GetProperties().Select(p => p.Name));
+        Assert.Equal(
+            ["Name", "Title"],
+            Assert.Single(split.ServerQueries).ElementType.GetProperties().Select(property => property.Name));
     }
 
     /// <summary>
@@ -479,6 +487,7 @@ public class QuerySplitterTest : IDisposable
                 (a, b) => b.Title));
 
         Assert.Equal(["Emma"], (IEnumerable<string?>)Run(split)!);
+        Assert.Single(split.ServerQueries);
     }
 
     [Fact]
