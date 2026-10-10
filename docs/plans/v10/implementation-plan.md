@@ -566,6 +566,9 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       configuration, and original exception preservation.
 - [x] **CL3. Validate chaining and wire sample loggers.** Exercise actual chained store contexts,
       forwarding grants, scope isolation, and normal console and Blazor behavior.
+- [x] **CL4. Align diagnostic declarations with existing conventions.** Make the failure logger
+      extension, overridable definition method, and event payload constructor public with XML documentation.
+      Use a primary constructor for the payload and verify IDE0290 across changed C# files.
 
 ## Branches that outlive their pull request
 

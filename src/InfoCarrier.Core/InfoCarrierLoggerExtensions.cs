@@ -15,7 +15,25 @@ namespace InfoCarrier.Core;
 /// </summary>
 public static class InfoCarrierLoggerExtensions
 {
-    internal static void ClientFailure<TCategory>(this IDiagnosticsLogger<TCategory> diagnostics, EventId eventId,
+    /// <summary>
+    ///     Raises a client query or save failure through the configured diagnostic channels.
+    /// </summary>
+    /// <remarks>
+    ///     Reports classification details only. Callers must not include exception messages,
+    ///     queries, entity values, or request contents in these fields.
+    /// </remarks>
+    /// <typeparam name="TCategory">The query or update diagnostic category.</typeparam>
+    /// <param name="diagnostics">The logger for the current operation.</param>
+    /// <param name="eventId">
+    ///     <see cref="InfoCarrierEventId.ClientQueryFailure" /> or
+    ///     <see cref="InfoCarrierEventId.ClientSaveFailure" />.
+    /// </param>
+    /// <param name="level">The default severity for this failure classification.</param>
+    /// <param name="operation">The bounded local operation name.</param>
+    /// <param name="phase">The phase observed by this client.</param>
+    /// <param name="outcome">The bounded outcome classification.</param>
+    /// <param name="exceptionType">The runtime exception type name, without its contents.</param>
+    public static void ClientFailure<TCategory>(this IDiagnosticsLogger<TCategory> diagnostics, EventId eventId,
         LogLevel level, string operation, string phase, string outcome, string exceptionType)
         where TCategory : LoggerCategory<TCategory>, new()
     {

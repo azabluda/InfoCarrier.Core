@@ -20,7 +20,22 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
     private EventDefinitionBase? _clientSaveError;
     private EventDefinitionBase? _clientSaveDebug;
 
-    internal EventDefinition<string, string, string, string> LogClientFailure(
+    /// <summary>
+    ///     The definition for a client query or save failure at its default severity.
+    /// </summary>
+    /// <remarks>
+    ///     Definitions are cached on this instance by event and default severity. Query failures
+    ///     use Debug, Information, or Error; save failures use Debug or Error. Warning configuration
+    ///     can override the effective severity without changing the cached classification.
+    /// </remarks>
+    /// <param name="logger">The logger whose options supply the warnings configuration.</param>
+    /// <param name="eventId">
+    ///     <see cref="InfoCarrierEventId.ClientQueryFailure" /> or
+    ///     <see cref="InfoCarrierEventId.ClientSaveFailure" />.
+    /// </param>
+    /// <param name="level">The default severity for this failure classification.</param>
+    /// <returns>The cached definition for the event and default severity.</returns>
+    public virtual EventDefinition<string, string, string, string> LogClientFailure(
         IDiagnosticsLogger logger, EventId eventId, LogLevel level)
         => (EventDefinition<string, string, string, string>)(eventId == InfoCarrierEventId.ClientQueryFailure
             ? level switch
