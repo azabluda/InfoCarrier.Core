@@ -585,8 +585,9 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
 - [ ] **SDC1. Add the version 10.3 shared deployment contract.** The owner approved one reusable
       configuration delegate for anonymous structures, extra named types, custom value mappers and
       arbitrary SQL permission. The [design](shared-deployment-contract-design.md) preserves every
-      version 10 public API and keeps role-specific settings outside the contract. Write the detailed
-      implementation plan after the owner reviews the committed design.
+      version 10 public API and keeps role-specific settings outside the contract. The approved
+      [implementation plan](shared-deployment-contract-implementation.md) covers public validation,
+      client mapper isolation, server translation, the registration matrix, documentation and gates.
 
 ## Branches that outlive their pull request
 
