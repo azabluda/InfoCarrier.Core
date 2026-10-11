@@ -13,9 +13,10 @@ namespace InfoCarrier.Core.Query;
 /// <remarks>
 ///     <para>
 ///         A node is <em>server-ok</em> when the serializer can express it and every type it puts
-///         on the wire clears <see cref="TypeAllowlist" /> — the same list the server enforces on
-///         deserialization, so the two sides cannot disagree about where the boundary lies
-///         ([ADR-010](../../../docs/decisions.md)).
+///         on the wire clears a planning view of <see cref="TypeAllowlist" />. That view keeps
+///         undeclared anonymous types on their released reconstruction path. Client declarations
+///         permit planning only; the server independently enforces its trusted anonymous-shape
+///         catalog and component-type permissions ([ADR-010](../../../docs/decisions.md)).
 ///     </para>
 ///     <para>
 ///         Server-ok alone does not make a subtree shippable. It must also contain a query root
@@ -47,9 +48,30 @@ public sealed class ServerBoundaryAnalyzer(
     bool arbitrarySqlAllowed = false,
     Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
 {
-    private readonly TypeAllowlist _allowlist = allowlist;
+    private TypeAllowlist _allowlist = allowlist.ForAnonymousPlanning(AnonymousShapeSet.Empty);
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
     private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots = relationalRoots;
+    private IReadOnlyCollection<Type> _registeredAnonymousShapes = [];
+
+    /// <summary>
+    ///     Anonymous structures this client expects the server to have registered.
+    /// </summary>
+    /// <remarks>
+    ///     This setting controls client planning only. The server independently enforces its
+    ///     trusted anonymous-shape catalog and all component-type permissions.
+    /// </remarks>
+    public IReadOnlyCollection<Type> RegisteredAnonymousShapes
+    {
+        get => _registeredAnonymousShapes;
+        init => UseRegisteredAnonymousShapes(value);
+    }
+
+    internal void UseRegisteredAnonymousShapes(IReadOnlyCollection<Type> shapes)
+    {
+        AnonymousShapeSet registered = AnonymousShapeSet.Empty.Add(shapes);
+        _registeredAnonymousShapes = registered.Types;
+        _allowlist = _allowlist.ForAnonymousPlanning(registered);
+    }
 
     /// <summary>
     ///     Creates an analyzer that refuses a query carrying raw SQL.
@@ -73,10 +95,16 @@ public sealed class ServerBoundaryAnalyzer(
     ///     Analyzes a captured query tree.
     /// </summary>
     public BoundaryAnalysis Analyze(Expression root)
+        => AnalyzeCore(root, deniedExpressions: null);
+
+    internal BoundaryAnalysis Analyze(Expression root, IReadOnlySet<Expression> deniedExpressions)
+        => AnalyzeCore(root, deniedExpressions);
+
+    private BoundaryAnalysis AnalyzeCore(Expression root, IReadOnlySet<Expression>? deniedExpressions)
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var walker = new Walker(_allowlist, _arbitrarySqlAllowed, _relationalRoots);
+        var walker = new Walker(_allowlist, deniedExpressions, _arbitrarySqlAllowed, _relationalRoots);
         walker.Visit(root);
         return new BoundaryAnalysis(root, walker.Results);
     }
@@ -308,12 +336,12 @@ public sealed class ServerBoundaryAnalyzer(
     /// </summary>
     private sealed class Walker(
         TypeAllowlist allowlist,
+        IReadOnlySet<Expression>? deniedExpressions,
         bool arbitrarySqlAllowed,
         Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots) : ExpressionVisitor
     {
         // One entry per direct child, popped when the parent folds them.
         private readonly List<NodeFacts> _pending = [];
-
         public Dictionary<Expression, NodeFacts> Results { get; } = new(ReferenceEqualityComparer.Instance);
 
         public override Expression? Visit(Expression? node)
@@ -356,6 +384,11 @@ public sealed class ServerBoundaryAnalyzer(
             }
 
             if (serverOk && CarriesTheClientsContext(node))
+            {
+                serverOk = false;
+            }
+
+            if (serverOk && deniedExpressions?.Contains(node) == true)
             {
                 serverOk = false;
             }
@@ -413,13 +446,15 @@ public readonly record struct NodeFacts(
 }
 
 /// <summary>
-///     The result of <see cref="ServerBoundaryAnalyzer.Analyze" />.
+///     The result of <see cref="ServerBoundaryAnalyzer.Analyze(Expression)" />.
 /// </summary>
 public sealed class BoundaryAnalysis
 {
     private readonly Dictionary<Expression, NodeFacts> _facts;
 
-    internal BoundaryAnalysis(Expression root, Dictionary<Expression, NodeFacts> facts)
+    internal BoundaryAnalysis(
+        Expression root,
+        Dictionary<Expression, NodeFacts> facts)
     {
         Root = root;
         _facts = facts;

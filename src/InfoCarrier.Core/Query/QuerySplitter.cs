@@ -14,9 +14,9 @@ namespace InfoCarrier.Core.Query;
 ///     results (<c>docs/projection-split.md</c>, [ADR-010](../../../docs/decisions.md)).
 /// </summary>
 /// <remarks>
-///     The split runs on the client, before serialization, because the allowlist rejects during
-///     <em>deserialization</em>: a tree naming an anonymous type throws before the server has an
-///     expression to analyze. This must therefore run <b>after</b> query parameters are
+///     The split runs on the client, before serialization, because server admission occurs during
+///     <em>deserialization</em>: an unapproved type or anonymous shape throws before the server has
+///     an expression to analyze. This must therefore run <b>after</b> query parameters are
 ///     substituted — a surviving closure field access would name a compiler-generated display
 ///     class and push the boundary in for no reason.
 /// </remarks>
@@ -116,6 +116,23 @@ public sealed class QuerySplitter
     public bool ServerStoreIsRelational { get; init; } = true;
 
     /// <summary>
+    ///     Anonymous structures this client expects the server to have registered.
+    /// </summary>
+    /// <remarks>
+    ///     This setting permits the original structures during client planning. The server still
+    ///     requires independent catalog registration and component-type permission.
+    /// </remarks>
+    public IReadOnlyCollection<Type> RegisteredAnonymousShapes
+    {
+        get => _analyzer.RegisteredAnonymousShapes;
+        init
+        {
+            _analyzer.UseRegisteredAnonymousShapes(value);
+            _allowlist = _allowlist.ForAnonymousPlanning(AnonymousShapeSet.Empty.Add(value));
+        }
+    }
+
+    /// <summary>
     ///     What the last <see cref="Split" /> found the query asking for, or
     ///     <see langword="null" /> when it asked for nothing.
     /// </summary>
@@ -168,7 +185,7 @@ public sealed class QuerySplitter
         Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
     {
         _model = model;
-        _allowlist = allowlist ?? TypeAllowlist.ForModel(model);
+        _allowlist = (allowlist ?? TypeAllowlist.ForModel(model)).ForAnonymousPlanning(AnonymousShapeSet.Empty);
         _arbitrarySqlAllowed = arbitrarySqlAllowed;
         _relationalRoots = relationalRoots;
         _analyzer = new ServerBoundaryAnalyzer(_allowlist, arbitrarySqlAllowed, relationalRoots);
@@ -260,6 +277,7 @@ public sealed class QuerySplitter
         // refuse to put in a tuple slot — so unless it is removed here, `join … into … from …
         // DefaultIfEmpty()` stays on the client and answers a left join's null rows by throwing.
         query = GroupJoinFlattener.Flatten(query);
+        query = new JoinKeyRewriter().Visit(query)!;
 
         // Replace the carrier types the query creates and consumes internally — transparent
         // identifiers, mostly — with tuples, so the operators above them stay on the server
@@ -278,8 +296,9 @@ public sealed class QuerySplitter
             rootRebuild,
             _model);
 
-        BoundaryAnalysis analysis = _analyzer.Analyze(query);
-
+        // Reassemblies are deliberate client work. Refuse those exact nodes without rejecting
+        // unrelated executable queries merely because their result structure is anonymous.
+        BoundaryAnalysis analysis = _analyzer.Analyze(query, reassemblies);
 
         if (analysis.IsWhollyServerExecutable)
         {

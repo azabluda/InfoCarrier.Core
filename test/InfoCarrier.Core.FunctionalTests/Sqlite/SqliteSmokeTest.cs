@@ -902,12 +902,15 @@ public class SqliteSmokeTest
         Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
     }
 
-    [ConditionalFact]
-    public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member()
+    [ConditionalTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member(bool registered)
     {
-        // R64 originally tested a tuple carrier's automatic tracking downgrade. Since
-        // 2026-10-07 the anonymous data descriptor reaches EF as the original projection does:
-        // tracking an owned value without its owner is refused, and AsNoTracking is required.
+        // R64 originally tested a tuple carrier's automatic tracking downgrade. With
+        // matching declarations, the anonymous descriptor reaches EF as the original projection
+        // does: tracking an owned value without its owner is refused, and AsNoTracking is required.
+        // Without a client declaration, the released tuple reconstruction remains available.
         //
         // The quiet consequence is the worse one and this model does not reproduce it: with four
         // owned types sharing one CLR type, as `OwnedQueryTestBase` has, the mapper falls back to
@@ -929,12 +932,26 @@ public class SqliteSmokeTest
                 await context.SaveChangesAsync();
             });
 
-        await using SqliteSmokeContext client = CreateClient(store);
+        await using SqliteSmokeContext client = CreateClient(store, options =>
+        {
+            if (registered)
+            {
+                options.UseRegisteredAnonymousShapes(new { Title = "", Address = default(LocatedAddress)! });
+            }
+        });
 
         var query = client.Blogs
             .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address });
-        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
-        Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
+        if (registered)
+        {
+            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+            Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
+        }
+        else
+        {
+            var tracked = Assert.Single(await query.ToListAsync());
+            Assert.Equal("Bahnhofstrasse 1", tracked.Address["Line"]);
+        }
         var rows = await query.AsNoTracking().ToListAsync();
 
         var row = Assert.Single(rows);

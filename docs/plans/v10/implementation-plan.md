@@ -570,6 +570,16 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       extension, overridable definition method, and event payload constructor public with XML documentation.
       Use a primary constructor for the payload and verify IDE0290 across changed C# files.
 
+## Phase ASP: anonymous-shape planning ([#218](https://github.com/azabluda/InfoCarrier.Core/issues/218))
+
+- [x] **ASP1. Preserve released planning and add explicit client shape declarations.** The owner
+      approved additive version 10 configuration without removing or deprecating released APIs.
+      The [design](anonymous-shape-planning-design.md) and
+      [implementation plan](anonymous-shape-planning-implementation.md) cover the four registration
+      states, structural nesting, independent server admission, and refusal without retry.
+      Undeclared shapes retain version 10.2 planning throughout the rewrite pipeline, including
+      existing exact type grants. Shared configuration and version 11 tightening remain separate.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

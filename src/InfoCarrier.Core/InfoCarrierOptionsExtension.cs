@@ -2,6 +2,7 @@
 
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using InfoCarrier.Core.Expressions;
 
 namespace InfoCarrier.Core;
 
@@ -37,6 +38,8 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     /// </summary>
     public virtual IReadOnlyList<Type> AllowedTypes { get; private set; } = [];
 
+    internal AnonymousShapeSet RegisteredAnonymousShapes { get; private set; } = AnonymousShapeSet.Empty;
+
     /// <summary>
     ///     Adds to <see cref="AllowedTypes" /> for this options instance.
     /// </summary>
@@ -51,6 +54,15 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
         var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
         clone.AllowedTypes = [.. AllowedTypes, .. types];
+        return clone;
+    }
+
+    internal InfoCarrierOptionsExtension WithRegisteredAnonymousShapes(IEnumerable<Type> types)
+    {
+        ArgumentNullException.ThrowIfNull(types);
+
+        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
+        clone.RegisteredAnonymousShapes = RegisteredAnonymousShapes.Add(types);
         return clone;
     }
 
@@ -172,6 +184,13 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
             .OfType<InfoCarrierOptionsExtension>()
             .FirstOrDefault()
             ?.AllowedTypes ?? [];
+
+    internal static AnonymousShapeSet RegisteredAnonymousShapesFor(Microsoft.EntityFrameworkCore.DbContext context)
+        => Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<IDbContextOptions>(context)
+            .Extensions
+            .OfType<InfoCarrierOptionsExtension>()
+            .FirstOrDefault()
+            ?.RegisteredAnonymousShapes ?? AnonymousShapeSet.Empty;
 
     /// <inheritdoc />
     public virtual DbContextOptionsExtensionInfo Info

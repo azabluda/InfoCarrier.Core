@@ -82,7 +82,7 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
             CoreStrings.TranslationFailed("")[47..],
             Assert.Throws<InvalidOperationException>(() => base.Value_conversion_on_enum_collection_contains()).Message);
 
-    // Since 2026-10-07, bounded anonymous shapes preserve the inherited converted-list
+    // With matching declarations, bounded anonymous shapes preserve the inherited converted-list
     // refusal diagnostic. The former tuple-specific override and attribution are removed.
     // Layout still requires explicit fixture registration; owned tests retain both boundaries.
 
@@ -99,6 +99,17 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     public class CustomConvertersInfoCarrierFixture : CustomConvertersFixtureBase
     {
         private ITestStoreFactory? _testStoreFactory;
+
+        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
+        {
+            if (!DirectClient.IsEnabled)
+            {
+                new InfoCarrierDbContextOptionsBuilder(builder).UseRegisteredAnonymousShapes(
+                    new { Id = 0, Name = "", Layouts = new[] { new { H = 0, W = 0 } }.ToList() });
+            }
+
+            return base.AddOptions(builder);
+        }
 
         protected override string StoreName
             => "CustomConvertersInfoCarrierTest";

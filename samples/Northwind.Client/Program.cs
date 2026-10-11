@@ -60,7 +60,10 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 // it is about this call, and hiding it project-wide would also hide the next one.
 #pragma warning disable IL2026 // UseInfoCarrier is [RequiresUnreferencedCode]; see above.
 builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
-    .UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>())
+    .UseInfoCarrier(
+        services.GetRequiredService<IInfoCarrierClient>(),
+        infoCarrier => infoCarrier.UseRegisteredAnonymousShapes(
+            new { Id = 0, CustomerId = (string?)null }))
 
     // NOTE THE ABSENCE: there is no UseLazyLoadingProxies() here, and the server does call it.
     //
