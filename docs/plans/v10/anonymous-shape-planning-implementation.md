@@ -2,9 +2,9 @@
 
 > For agentic workers: use `superpowers:executing-plans` to implement this plan task by task. Steps use checkbox syntax for tracking.
 
-**Goal:** Preserve version 10.2 planning for undeclared anonymous shapes and permit the trusted catalog path only after explicit client declaration.
+**Goal:** Preserve version 10.2 planning for undeclared anonymous shapes, including existing exact type grants, and add explicit client declarations for the trusted catalog path.
 
-**Architecture:** Add a composable client declaration to the existing context options extension. Represent declared shapes structurally, then let boundary analysis refuse undeclared original anonymous types after existing safe rewrites. Keep server admission independent and unchanged.
+**Architecture:** Add a composable client declaration to the existing context options extension. Represent declared shapes structurally and apply one narrowed planning allowlist throughout carrier rewriting, boundary analysis, and client-evaluation guards. Preserve existing safe rewrites for undeclared anonymous types. Keep server admission independent and unchanged.
 
 **Tech stack:** C# 14, .NET 10, Entity Framework Core 10, xUnit, SQLite, ASP.NET Core transport tests.
 
@@ -44,16 +44,17 @@
 
 - Produce: `InfoCarrierDbContextOptionsBuilder.UseRegisteredAnonymousShapes(params object[] shapes)`.
 - Produce: immutable structural membership for ordered member names and recursively described component types.
-- Produce: `InfoCarrierOptionsExtension.AnonymousShapeTypesFor(DbContext)` for execution-time reading.
+- Produce: `InfoCarrierOptionsExtension.RegisteredAnonymousShapesFor(DbContext)` for execution-time reading.
 - Preserve: existing service-provider hash value `0`.
 
 - [x] **Step 1: Write failing public API tests**
 
-Add tests named:
+Cover validation in `AnonymousShapeClientRegistrationTest`, planning closure in `QuerySplitterTest`, and execution-time option scope over HTTP in `NorthwindOverHttpTest`:
 
-- `Client_shape_calls_compose_and_snapshot_their_inputs`
+- `Client_shape_calls_compose_snapshot_inputs_and_remain_context_scoped`
 - `Client_shape_registration_rejects_named_and_null_prototypes`
-- `Client_shape_registration_includes_nested_shapes`
+- `Registration_includes_anonymous_shapes_inside_containers`
+- `Matching_nested_shape_declarations_restore_both_client_types`
 
 Assert that repeated calls retain both shape sets, later input mutation cannot change them, and validation matches the server registration API.
 
@@ -92,6 +93,7 @@ Expected: no removed or changed version 10 API.
 
 **Files:**
 
+- Modify: `src/InfoCarrier.Core/Expressions/TypeAllowlist.cs`
 - Modify: `src/InfoCarrier.Core/Query/ServerBoundaryAnalyzer.cs`
 - Modify: `src/InfoCarrier.Core/Query/QuerySplitter.cs`
 - Modify: `src/InfoCarrier.Core/QueryExecutor.cs`
@@ -142,7 +144,7 @@ Expected: undeclared projections still ship, so the new legacy-planning assertio
 
 Give `ServerBoundaryAnalyzer` an additive init-only structural shape setting. Give `QuerySplitter` the matching additive setting and apply it before analysis. `QueryExecutor` reads the current context's shape set and supplies it to the splitter.
 
-During each node verdict, keep `TypeAllowlist` component checks. Additionally refuse an original anonymous wire type whose descriptor is absent. Apply this after children and existing rewrites have been analyzed.
+Apply the planning view during every rewrite pass and node verdict. Keep component checks for declared shapes. Undeclared original anonymous types retain only existing exact `AllowTypes` grants; otherwise use the released rewrite boundary. Refuse deliberate reconstruction nodes during final analysis.
 
 - [x] **Step 5: Verify the focused behavior passes**
 
@@ -238,17 +240,17 @@ Expected: normal flows succeed with matching declarations.
 
 - Modify only files required by failures caused by this change.
 
-- [ ] **Step 1: Run file hygiene**
+- [x] **Step 1: Run file hygiene**
 
 Run `.claude/hooks/file-hygiene.py` against every changed file.
 
-- [ ] **Step 2: Run focused Release suites**
+- [x] **Step 2: Run focused Release suites**
 
 Run the full transport suite and the relevant projection, parameterization, protocol, and catalog families.
 
 Expected: zero failures beyond existing skips.
 
-- [ ] **Step 3: Run the complete repository validation**
+- [x] **Step 3: Run the complete repository validation**
 
 Run the repository's strict Release build, full functional suites, document-store suite, trimming comparison, package compatibility, IDE0290 check, and sample checks.
 
@@ -265,10 +267,46 @@ dotnet build samples/Northwind.Demo/Northwind.Demo.csproj --configuration Releas
 
 Expected: zero failures or errors, existing skips only, and unchanged warning counts and names.
 
-- [ ] **Step 4: Review the public change**
+Also run the owner-requested slow live SQL comparisons for SQLite and Firebird, using
+`INFOCARRIER_LIVE_COMPARE=1` with each provider's functional-test filter. Run these after
+the regular measurement, using isolated Release output to preserve the running sample host.
+Inspect every reported difference against the existing decisions. These comparisons are
+investigation reports, not acceptance gates. Keep their output under ignored artifacts;
+never commit captured SQL or change expected outcomes merely to clear a difference.
+
+- [x] **Step 4: Review the public change**
 
 Confirm XML documentation distinguishes planning knowledge from server permission. Confirm no existing API has an `[Obsolete]` attribute. Confirm package validation sees only additive public members.
 
-- [ ] **Step 5: Commit implementation**
+- [x] **Step 5: Commit implementation**
 
 Commit focused tests and production changes with no Codex co-author trailer.
+
+## Validation evidence, 2026-10-11
+
+Independent review found that result-only registration checks and a flat-scalar exception did
+not preserve the approved all-expression compatibility rule. The corrected planner view applies
+throughout the pipeline. The entity-wrapper regression failed before this correction; nested
+array/list registration tests failed before container traversal was corrected.
+
+- Required measurement `anon218-final`: functional 29,660 passed, 234 existing skips, 29,894 total;
+  document store 235 passed, zero failures. Combined: 30,129 cases, zero failures. Failure names
+  and reasons remain empty, as in `client-logging-primary`.
+- Full transport suite: 140 passed, zero failures.
+- The additional exact anonymous `AllowTypes` compatibility test passed separately after the
+  measurement build. It is not included in that measurement's total.
+- Strict isolated Release rebuild: zero errors and five existing Razor trimming warnings.
+  Final incremental strict build: zero warnings and zero errors.
+- Trimming: 107 product warnings, unchanged. Package compatibility and IDE0290 passed.
+- Console sample: 14 successful round trips. Blazor build and trimmed publish passed.
+- Strict documentation build, link checks, and word-budget checks passed.
+- Slow Firebird comparison: 109 passed, one existing skip, zero failures.
+- Full slow SQLite comparison: 27,544 passed, 60 failed, 167 skipped, 27,771 total. All 60
+  failures came from the newly configured converter fixture adding InfoCarrier options to the
+  plain-EF control. Restricting that configuration to the InfoCarrier side restored the control;
+  rerunning the complete affected class with live comparison passed all 60 tests. No other class
+  reported comparison failures. The full slow run was not repeated after this fixture correction.
+- Final normal converter and exact-permission checks: 61 passed. The final strict test-project
+  build and repeated IDE0290 check passed. File hygiene passed across all 24 branch files.
+
+Logs remain under ignored `artifacts/`. No captured SQL is committed.

@@ -2340,8 +2340,8 @@ public partial class ServerParameterizationTest
     ///     asserts the store saw one statement, not two — for a query whose terminal operator cannot
     ///     be expressed as an <see cref="IQueryable{T}" />.
     /// </summary>
-    private Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run)
-        => AssertSameStatementFor(context => run(context.Set<Blog>()), collectionMode: null);
+    private Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run, params object[] anonymousShapes)
+        => AssertSameStatementFor(context => run(context.Set<Blog>()), collectionMode: null, anonymousShapes);
 
     [ConditionalFact]
     public Task A_nine_member_anonymous_join_key_runs_as_one_database_join()
@@ -2352,7 +2352,7 @@ public partial class ServerParameterizationTest
                 b => new { A = b.Id, B = b.Id, C = b.Id, D = b.Id, E = b.Id, F = b.Id, G = b.Id, H = b.Id, I = b.Id },
                 (left, right) => left.Id).OrderBy(id => id).ToArrayAsync();
             Assert.Equal([1, 2, 3], rows);
-        });
+        }, new { A = 0, B = 0, C = 0, D = 0, E = 0, F = 0, G = 0, H = 0, I = 0 });
 
     [ConditionalFact]
     public Task Anonymous_shapes_restore_nested_lists_and_empty_objects()
@@ -2391,7 +2391,8 @@ public partial class ServerParameterizationTest
     /// <param name="collectionMode">
     ///     The server's collection mode, or <see langword="null" /> for EF's default.
     /// </param>
-    private async Task AssertSameStatementFor(Func<DbContext, Task> run, ParameterTranslationMode? collectionMode)
+    private async Task AssertSameStatementFor(
+        Func<DbContext, Task> run, ParameterTranslationMode? collectionMode, params object[] anonymousShapes)
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(collectionMode: collectionMode);
         await store.InitializeAsync(
@@ -2409,7 +2410,8 @@ public partial class ServerParameterizationTest
         Drain();
 
         await using (SqliteSmokeContext client = new(
-            new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
+            new DbContextOptionsBuilder<SqliteSmokeContext>()
+                .UseInfoCarrier(store, options => options.UseRegisteredAnonymousShapes(anonymousShapes)).Options))
         {
             await run(client);
         }

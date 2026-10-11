@@ -58,7 +58,7 @@ public class NonRelationalStoreTest(DocumentStoreFixture fixture) : IClassFixtur
     /// </summary>
     /// <remarks>
     ///     Before 2026-10-07 this was a tuple reassembly guarded by the non-relational switch.
-    ///     A bounded anonymous descriptor reaches MongoDB directly with either client setup.
+    ///     Matching client and server declarations reach MongoDB directly with either store setting.
     ///     Its owned collection requires no tracking when the owner is absent from the result.
     ///     MongoDB also refuses materializing this DISTINCT projection without its document key.
     ///     Compare both refusals with a direct backend context instead of inventing support.
@@ -68,8 +68,11 @@ public class NonRelationalStoreTest(DocumentStoreFixture fixture) : IClassFixtur
     [InlineData(true)]
     public async Task Anonymous_collection_distinct_follows_backend_tracking_rules(bool nonRelational)
     {
-        await using ShopClientContext document = nonRelational
-            ? fixture.CreateNonRelationalClient() : fixture.CreateClient();
+        var options = new DbContextOptionsBuilder<ShopClientContext>(nonRelational
+            ? fixture.NonRelationalClientOptions : fixture.ClientOptions);
+        new InfoCarrierDbContextOptionsBuilder(options)
+            .UseRegisteredAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() });
+        await using ShopClientContext document = new(options.Options);
         var query = document.Customers
             .Select(c => new { c.Name, c.Lines })
             .Distinct();

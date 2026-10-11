@@ -41,7 +41,7 @@ The name deliberately exposes the low-level fact: the caller asserts that the sa
 | absent | present | Preserve version 10.2 client planning; the server declaration is unused |
 | present | present | Permit transport; the backing provider decides translation |
 
-An unregistered anonymous final projection uses existing client reconstruction when that position is eligible. Registration permits the original construction to reach the backend. Filtering, ordering, grouping, joins, distinct, and equality retain their existing position-specific planning rules.
+Without a client declaration, every anonymous expression uses the version 10.2 planning boundary. This includes final projections, nested collections, entity wrappers, grouping, ordering, filters, joins, distinct, equality, parameters, and constants. Existing tuple rewrites and client reconstruction remain available at their established positions. Registration permits an original construction to reach the backend; it does not promise that the provider can translate it.
 
 Safe internal carrier rewrites remain supported. A rewrite is safe here when the database still executes the operator and the original anonymous carrier is not observable. Registration must not disable such rewrites merely to ship an original anonymous type.
 
@@ -53,9 +53,11 @@ Server admission remains strict. A missing catalog entry, denied component type,
 
 The new builder method validates prototypes through one shared internal validator. The existing server extension uses the same validator, preventing different client and server structural rules.
 
-`QueryExecutor` passes the configured descriptors into `QuerySplitter`. Existing public `QuerySplitter` constructors remain binary compatible. A new overload can accept the descriptor set, while every shipped constructor delegates with an empty set.
+`QueryExecutor` passes the configured descriptors into `QuerySplitter`. Existing public `QuerySplitter` constructors remain binary compatible. An additive init property accepts the descriptor types; every shipped constructor starts with an empty set.
 
-`ServerBoundaryAnalyzer` distinguishes general type admission from anonymous-shape planning knowledge. `TypeAllowlist` continues enforcing component permissions. An original anonymous type may cross the client boundary only when its descriptor is configured or an earlier safe rewrite removed it from the shipped tree.
+`QuerySplitter` and `ServerBoundaryAnalyzer` use a private planning view of `TypeAllowlist`. The same view reaches carrier rewrites, rewrite verification, projection analysis, and client-evaluation guards. Undeclared original anonymous types retain the pre-catalog boundary; declared types still require component permission. Arrays and generic containers recurse through this same view. The normal serializer and server allowlists are unchanged. An original anonymous type may cross the client boundary only when its descriptor is configured or an earlier safe rewrite removed it from the shipped tree.
+
+Existing exact anonymous `AllowTypes` grants retain their released planning behavior. The new declaration does not replace those explicit grants.
 
 The server continues resolving anonymous descriptors through `AnonymousShapeCatalog.Require`. Client configuration never changes the server catalog and never authorizes a component type.
 

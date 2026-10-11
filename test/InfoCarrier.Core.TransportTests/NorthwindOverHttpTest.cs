@@ -21,6 +21,81 @@ namespace InfoCarrier.Core.TransportTests;
 public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
     [Fact]
+    public async Task Client_shape_calls_compose_snapshot_inputs_and_remain_context_scoped()
+    {
+        var counter = new CommandCounter();
+        await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AnonymousShapeCatalog>();
+            services.AddSingleton<IInterceptor>(counter);
+        }));
+        using HttpClient warmup = unconfigured.CreateClient();
+        int beforeQuery = counter.ReaderExecutions;
+        object[] shapes = [new { Code = (string?)null }];
+        using NorthwindContext context = CreateClientContext(unconfigured, registerShape: true,
+            out RecordingHandler recorder, anonymousShapes: shapes);
+        shapes[0] = new { Other = 0 };
+
+        InvalidOperationException first = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
+            .Select(order => new { order.Id, order.CustomerId }).ToListAsync());
+        InvalidOperationException second = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
+            .Select(order => new { Code = order.CustomerId }).ToListAsync());
+
+        Assert.Contains("catalog", first.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("catalog", second.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, recorder.RequestCount);
+        Assert.Equal(beforeQuery, counter.ReaderExecutions);
+
+        using NorthwindContext undeclared = CreateClientContext(unconfigured, registerShape: false, out RecordingHandler other);
+        var rows = await undeclared.Orders.Select(order => new { Code = order.CustomerId }).ToListAsync();
+        Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
+        Assert.Equal(1, other.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Group_aggregate_projection_obeys_both_registration_states(bool clientShape, bool serverShape)
+    {
+        var prototype = new { Key = (string?)null, Count = 0 };
+        var counter = new CommandCounter();
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AnonymousShapeCatalog>();
+            if (serverShape)
+            {
+                services.AddInfoCarrierAnonymousShapes(prototype);
+            }
+
+            services.AddSingleton<IInterceptor>(counter);
+        }));
+        using HttpClient warmup = configured.CreateClient();
+        int beforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(configured, registerShape: false,
+            out RecordingHandler recorder, anonymousShapes: clientShape ? [prototype] : []);
+        var query = context.Orders.GroupBy(order => order.CustomerId)
+            .Select(group => new { group.Key, Count = group.Count() });
+
+        if (clientShape && !serverShape)
+        {
+            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+            Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(beforeQuery, counter.ReaderExecutions);
+        }
+        else
+        {
+            var rows = await query.ToListAsync();
+            Assert.Equal(NorthwindSeed.OrderCount, rows.Sum(row => row.Count));
+            Assert.All(rows, row => Assert.Equal(prototype.GetType(), row.GetType()));
+            Assert.True(counter.ReaderExecutions > beforeQuery);
+        }
+
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
+    [Fact]
     public async Task A_projection_declared_on_neither_side_is_reconstructed_on_the_client()
     {
         await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
@@ -306,7 +381,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     internal static NorthwindContext CreateClientContext(WebApplicationFactory<Program> factory, out RecordingHandler recorder)
         => CreateClientContext(factory, registerShape: false, out recorder);
 
-    private static NorthwindContext CreateClientContext(
+    internal static NorthwindContext CreateClientContext(
         WebApplicationFactory<Program> factory,
         bool registerShape,
         out RecordingHandler recorder,

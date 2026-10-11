@@ -155,9 +155,18 @@ public sealed class TypeAllowlist
 
     private readonly HashSet<Type> _allowed;
     private readonly ConcurrentDictionary<Type, bool> _cache = new();
+    private readonly AnonymousShapeSet? _planningShapes;
 
-    private TypeAllowlist(HashSet<Type> allowed)
-        => _allowed = allowed;
+    private TypeAllowlist(HashSet<Type> allowed, AnonymousShapeSet? planningShapes = null)
+    {
+        _allowed = allowed;
+        _planningShapes = planningShapes;
+    }
+
+    // Planning must retain the pre-catalog boundary for undeclared anonymous types. The wire
+    // allowlist remains unchanged: server admission independently requires its trusted catalog.
+    internal TypeAllowlist ForAnonymousPlanning(AnonymousShapeSet shapes)
+        => new(_allowed, shapes);
 
     /// <summary>
     ///     A copy of this list that also admits <paramref name="extra" />.
@@ -197,7 +206,7 @@ public sealed class TypeAllowlist
 
         var widened = new HashSet<Type>(_allowed);
         widened.UnionWith(extra);
-        return new TypeAllowlist(widened);
+        return new TypeAllowlist(widened, _planningShapes);
     }
 
     /// <summary>
@@ -512,6 +521,12 @@ public sealed class TypeAllowlist
 
         if (AnonymousShapeTypes.IsOriginal(type))
         {
+            if (_planningShapes is not null && !_planningShapes.Contains(type))
+            {
+                // Preserve the released exact AllowTypes grant without inferring new permission.
+                return _allowed.Contains(type);
+            }
+
             Type[] components = type.IsGenericType ? type.GetGenericArguments() : [];
             return components.Length <= AnonymousShapeTypes.MaximumMembers
                 && components.All(IsAllowed);

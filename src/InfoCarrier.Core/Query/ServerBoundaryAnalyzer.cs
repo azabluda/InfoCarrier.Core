@@ -13,9 +13,10 @@ namespace InfoCarrier.Core.Query;
 /// <remarks>
 ///     <para>
 ///         A node is <em>server-ok</em> when the serializer can express it and every type it puts
-///         on the wire clears <see cref="TypeAllowlist" /> — the same list the server enforces on
-///         deserialization, so the two sides cannot disagree about where the boundary lies
-///         ([ADR-010](../../../docs/decisions.md)).
+///         on the wire clears a planning view of <see cref="TypeAllowlist" />. That view keeps
+///         undeclared anonymous types on their released reconstruction path. Client declarations
+///         permit planning only; the server independently enforces its trusted anonymous-shape
+///         catalog and component-type permissions ([ADR-010](../../../docs/decisions.md)).
 ///     </para>
 ///     <para>
 ///         Server-ok alone does not make a subtree shippable. It must also contain a query root
@@ -47,7 +48,7 @@ public sealed class ServerBoundaryAnalyzer(
     bool arbitrarySqlAllowed = false,
     Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots = null)
 {
-    private readonly TypeAllowlist _allowlist = allowlist;
+    private TypeAllowlist _allowlist = allowlist.ForAnonymousPlanning(AnonymousShapeSet.Empty);
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
     private readonly Metadata.IInfoCarrierRelationalQueryRoots? _relationalRoots = relationalRoots;
     private IReadOnlyCollection<Type> _registeredAnonymousShapes = [];
@@ -62,15 +63,15 @@ public sealed class ServerBoundaryAnalyzer(
     public IReadOnlyCollection<Type> RegisteredAnonymousShapes
     {
         get => _registeredAnonymousShapes;
-        init => _registeredAnonymousShapes = [.. value ?? throw new ArgumentNullException(nameof(value))];
+        init => UseRegisteredAnonymousShapes(value);
     }
 
     internal void UseRegisteredAnonymousShapes(IReadOnlyCollection<Type> shapes)
-        => _registeredAnonymousShapes = [.. shapes ?? throw new ArgumentNullException(nameof(shapes))];
-
-    internal bool IsRegisteredAnonymousShape(Type type)
-        => !AnonymousShapeTypes.IsOriginal(type)
-            || AnonymousShapeSet.Empty.Add(_registeredAnonymousShapes).Contains(type);
+    {
+        AnonymousShapeSet registered = AnonymousShapeSet.Empty.Add(shapes);
+        _registeredAnonymousShapes = registered.Types;
+        _allowlist = _allowlist.ForAnonymousPlanning(registered);
+    }
 
     /// <summary>
     ///     Creates an analyzer that refuses a query carrying raw SQL.
@@ -94,19 +95,18 @@ public sealed class ServerBoundaryAnalyzer(
     ///     Analyzes a captured query tree.
     /// </summary>
     public BoundaryAnalysis Analyze(Expression root)
-        => AnalyzeCore(root, deniedType: null);
+        => AnalyzeCore(root, deniedExpressions: null);
 
-    internal BoundaryAnalysis Analyze(Expression root, Type deniedType)
-        => AnalyzeCore(root, deniedType);
+    internal BoundaryAnalysis Analyze(Expression root, IReadOnlySet<Expression> deniedExpressions)
+        => AnalyzeCore(root, deniedExpressions);
 
-    private BoundaryAnalysis AnalyzeCore(Expression root, Type? deniedType)
+    private BoundaryAnalysis AnalyzeCore(Expression root, IReadOnlySet<Expression>? deniedExpressions)
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var registeredAnonymousShapes = AnonymousShapeSet.Empty.Add(RegisteredAnonymousShapes);
-        var walker = new Walker(_allowlist, deniedType, _arbitrarySqlAllowed, _relationalRoots);
+        var walker = new Walker(_allowlist, deniedExpressions, _arbitrarySqlAllowed, _relationalRoots);
         walker.Visit(root);
-        return new BoundaryAnalysis(root, walker.Results, registeredAnonymousShapes);
+        return new BoundaryAnalysis(root, walker.Results);
     }
 
     /// <summary>
@@ -336,7 +336,7 @@ public sealed class ServerBoundaryAnalyzer(
     /// </summary>
     private sealed class Walker(
         TypeAllowlist allowlist,
-        Type? deniedType,
+        IReadOnlySet<Expression>? deniedExpressions,
         bool arbitrarySqlAllowed,
         Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots) : ExpressionVisitor
     {
@@ -388,11 +388,16 @@ public sealed class ServerBoundaryAnalyzer(
                 serverOk = false;
             }
 
+            if (serverOk && deniedExpressions?.Contains(node) == true)
+            {
+                serverOk = false;
+            }
+
             if (serverOk)
             {
                 foreach (Type type in WireTypeCollector.CollectOwn(node))
                 {
-                    if (type == deniedType || !allowlist.IsAllowed(type))
+                    if (!allowlist.IsAllowed(type))
                     {
                         serverOk = false;
                         break;
@@ -446,16 +451,13 @@ public readonly record struct NodeFacts(
 public sealed class BoundaryAnalysis
 {
     private readonly Dictionary<Expression, NodeFacts> _facts;
-    private readonly AnonymousShapeSet _registeredAnonymousShapes;
 
     internal BoundaryAnalysis(
         Expression root,
-        Dictionary<Expression, NodeFacts> facts,
-        AnonymousShapeSet registeredAnonymousShapes)
+        Dictionary<Expression, NodeFacts> facts)
     {
         Root = root;
         _facts = facts;
-        _registeredAnonymousShapes = registeredAnonymousShapes;
 
         var shippable = new List<Expression>();
         var open = new List<Expression>();
@@ -510,10 +512,7 @@ public sealed class BoundaryAnalysis
             return;
         }
 
-        Type resultType = ServerBoundaryAnalyzer.SequenceElementType(node.Type);
-        bool resultShapeRegistered = !AnonymousShapeTypes.IsOriginal(resultType)
-            || _registeredAnonymousShapes.Contains(resultType);
-        if (facts.ServerOk && resultShapeRegistered && ServerBoundaryAnalyzer.IsExecutableQuery(node))
+        if (facts.ServerOk && ServerBoundaryAnalyzer.IsExecutableQuery(node))
         {
             // Maximal by construction: descent stops here, so the first node on any path that is
             // both server-ok and runnable is the largest one there.

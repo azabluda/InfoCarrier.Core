@@ -54,12 +54,21 @@ internal sealed class AnonymousShapeSet
 
     private static void Add(Type type, ISet<string> identities, ICollection<Type> types)
     {
-        if (!AnonymousShapeTypes.IsOriginal(type) || !identities.Add(Identity(type)))
+        if (AnonymousShapeTypes.IsOriginal(type))
         {
-            return;
+            if (!identities.Add(Identity(type)))
+            {
+                return;
+            }
+
+            types.Add(type);
         }
 
-        types.Add(type);
+        if (type.HasElementType)
+        {
+            Add(type.GetElementType()!, identities, types);
+        }
+
         foreach (Type component in type.GetGenericArguments())
         {
             Add(component, identities, types);
