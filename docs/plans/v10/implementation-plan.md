@@ -580,6 +580,14 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       Undeclared shapes retain version 10.2 planning throughout the rewrite pipeline, including
       existing exact type grants. Shared configuration and version 11 tightening remain separate.
 
+## Phase SDC: shared deployment contract ([#221](https://github.com/azabluda/InfoCarrier.Core/issues/221))
+
+- [ ] **SDC1. Add the version 10.3 shared deployment contract.** The owner approved one reusable
+      configuration delegate for anonymous structures, extra named types, custom value mappers and
+      arbitrary SQL permission. The [design](shared-deployment-contract-design.md) preserves every
+      version 10 public API and keeps role-specific settings outside the contract. Write the detailed
+      implementation plan after the owner reviews the committed design.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
