@@ -31,6 +31,64 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierServiceCollectionExtensions
 {
     /// <summary>
+    ///     Applies deployment facts that the application configures identically on its server
+    ///     and clients.
+    /// </summary>
+    /// <remarks>
+    ///     This server registration is the admission boundary. Matching client configuration
+    ///     guides planning and sending, but does not grant server permission.
+    /// </remarks>
+    /// <param name="services">The server application's service collection.</param>
+    /// <param name="configure">The application-owned shared configuration method.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrierDeployment(
+        this IServiceCollection services,
+        Action<InfoCarrierDeploymentOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var deployment = new InfoCarrierDeploymentOptions();
+        configure(deployment);
+
+        AddInfoCarrierAnonymousShapeTypes(services, deployment.AnonymousShapeTypes);
+        if (deployment.AllowedTypes.Count > 0)
+        {
+            services.AddInfoCarrierAllowedTypes([.. deployment.AllowedTypes]);
+        }
+
+        MoveStandardValueMappersAfter(services, deployment.ValueMappers);
+        services.AddInfoCarrierStandardValueMappers();
+        if (deployment.AllowArbitrarySqlExecution)
+        {
+            services.AddInfoCarrierArbitrarySqlExecution();
+        }
+
+        return services;
+    }
+
+    private static void MoveStandardValueMappersAfter(
+        IServiceCollection services,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper> mappers)
+    {
+        ServiceDescriptor[] standardDescriptors = services
+            .Where(static descriptor => descriptor.ServiceType == typeof(ValueMapping.IInfoCarrierValueMapper)
+                && descriptor.ImplementationType is Type implementation
+                && (implementation == typeof(ValueMapping.IPAddressValueMapper)
+                    || implementation == typeof(ValueMapping.UriValueMapper)))
+            .ToArray();
+        foreach (ServiceDescriptor descriptor in standardDescriptors)
+        {
+            services.Remove(descriptor);
+        }
+
+        foreach (ValueMapping.IInfoCarrierValueMapper mapper in mappers)
+        {
+            services.AddSingleton<ValueMapping.IInfoCarrierValueMapper>(mapper);
+        }
+    }
+
+    /// <summary>
     ///     Registers anonymous data structures from trusted prototypes. Only property names,
     ///     order, and types are used; prototype values are ignored. Nested shapes are included.
     ///     Calls compose, and component-type permissions still require their existing registration.
@@ -45,7 +103,20 @@ public static class InfoCarrierServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         Type[] types = AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
 
-        services.AddSingleton(new AnonymousShapeRegistration(types));
+        return AddInfoCarrierAnonymousShapeTypes(services, types);
+    }
+
+    private static IServiceCollection AddInfoCarrierAnonymousShapeTypes(
+        IServiceCollection services,
+        IEnumerable<Type> types)
+    {
+        Type[] snapshot = [.. types];
+        if (snapshot.Length == 0)
+        {
+            return services;
+        }
+
+        services.AddSingleton(new AnonymousShapeRegistration(snapshot));
         services.TryAddSingleton(provider =>
         {
             using IServiceScope scope = provider.CreateScope();

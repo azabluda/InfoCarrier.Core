@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.ValueMapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,108 @@ namespace InfoCarrier.Core.FunctionalTests.Deployment;
 
 public class InfoCarrierDeploymentOptionsTest
 {
+    [Fact]
+    public void Server_shared_configuration_translates_all_four_facts()
+    {
+        var mapper = new StubMapper();
+        var shape = new { Id = 0 };
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrierDeployment(options =>
+        {
+            options.AddAnonymousShapes(shape);
+            options.AddAllowedTypes(typeof(DateOnly));
+            options.AddValueMappers(mapper);
+            options.AllowArbitrarySqlExecution = true;
+        });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Equal(
+            shape.GetType(),
+            Assert.Single(provider.GetServices<InfoCarrierServiceCollectionExtensions.AnonymousShapeRegistration>())
+                .Types.Single());
+        Assert.Equal(
+            typeof(DateOnly),
+            Assert.Single(provider.GetServices<IInfoCarrierAllowedTypes>()).Types.Single());
+        Assert.IsAssignableFrom<IInfoCarrierArbitrarySqlExecution>(
+            provider.GetRequiredService<IInfoCarrierArbitrarySqlExecution>());
+        Assert.Same(mapper, provider.GetServices<IInfoCarrierValueMapper>().First());
+    }
+
+    [Fact]
+    public void Server_shared_calls_compose_with_existing_low_level_calls()
+    {
+        var firstShape = new { Id = 0 };
+        var secondShape = new { Name = "" };
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrierAnonymousShapes(firstShape);
+        services.AddInfoCarrierAllowedTypes(typeof(DateOnly));
+        services.AddInfoCarrierDeployment(options =>
+        {
+            options.AddAnonymousShapes(secondShape);
+            options.AddAllowedTypes(typeof(TimeOnly));
+        });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Equal(
+            [firstShape.GetType(), secondShape.GetType()],
+            provider.GetServices<InfoCarrierServiceCollectionExtensions.AnonymousShapeRegistration>()
+                .SelectMany(registration => registration.Types));
+        Assert.Equal(
+            [typeof(DateOnly), typeof(TimeOnly)],
+            provider.GetServices<IInfoCarrierAllowedTypes>().SelectMany(allowed => allowed.Types));
+    }
+
+    [Fact]
+    public void Server_configuration_invokes_the_delegate_once_and_rejects_null()
+    {
+        var services = new ServiceCollection();
+        var calls = 0;
+
+        services.AddInfoCarrierDeployment(_ => calls++);
+
+        Assert.Equal(1, calls);
+        Assert.Throws<ArgumentNullException>(() => services.AddInfoCarrierDeployment(null!));
+    }
+
+    [Fact]
+    public void Repeated_server_calls_keep_custom_order_without_standard_duplicates()
+    {
+        var firstMapper = new StubMapper();
+        var secondMapper = new StubMapper();
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrierDeployment(options => options.AddValueMappers(firstMapper));
+        services.AddInfoCarrierDeployment(options => options.AddValueMappers(secondMapper));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
+        Assert.Same(firstMapper, mappers[0]);
+        Assert.Same(secondMapper, mappers[1]);
+        Assert.Single(mappers, mapper => mapper is IPAddressValueMapper);
+        Assert.Single(mappers, mapper => mapper is UriValueMapper);
+    }
+
+    [Fact]
+    public void One_application_method_configures_a_custom_mapper_on_both_roles()
+    {
+        var mapper = new StubMapper();
+        var clientOptions = new DbContextOptionsBuilder();
+        var serverServices = new ServiceCollection();
+
+        void Configure(InfoCarrierDeploymentOptions options)
+            => options.AddValueMappers(mapper);
+
+        new InfoCarrierDbContextOptionsBuilder(clientOptions).UseInfoCarrierDeployment(Configure);
+        serverServices.AddInfoCarrierDeployment(Configure);
+
+        InfoCarrierOptionsExtension client = clientOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+        using ServiceProvider server = serverServices.BuildServiceProvider();
+        Assert.Same(mapper, Assert.Single(client.ValueMappers));
+        Assert.Same(mapper, server.GetServices<IInfoCarrierValueMapper>().First());
+    }
+
     [Fact]
     public void Client_shared_configuration_translates_all_four_facts()
     {
