@@ -588,12 +588,14 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       version 10 public API and keeps role-specific settings outside the contract. The approved
       [implementation plan](shared-deployment-contract-implementation.md) covers public validation,
       client mapper isolation, server translation, the registration matrix, documentation and gates.
-      `eng/measure.sh shared-deployment` reported `FAILING: 0  TOTAL: 30146`. The transport suite
-      reported `Failed: 0, Passed: 144, Skipped: 0, Total: 144`. The release solution build had
-      zero errors. Package creation passed validation against version 10.2.0 and produced both
-      library packages. IDE0290 verification reported no changes. The trimming gate reported
-      `OK (107 <= 107)`. All three sample builds had zero errors. Documentation reported zero
-      broken links, zero files over budget, and a successful site build.
+      Native verification reported `Failed: 0, Passed: 29681, Skipped: 234, Total: 29915` for the
+      functional suite and `Failed: 0, Passed: 235, Skipped: 0, Total: 235` for the document-store
+      suite. The transport suite reported `Failed: 0, Passed: 144, Skipped: 0, Total: 144`. The
+      release solution build had zero errors and four network-dependent `NU1900` warnings. Package
+      validation produced the Core, ASP.NET Core, and abstractions packages. IDE0290 verification
+      reported no changes. The trimming gate reported `OK (107 <= 107)`. All three sample builds
+      had zero errors. Documentation reported zero broken links, zero files over budget, and a
+      successful site build.
 
 ## Branches that outlive their pull request
 
