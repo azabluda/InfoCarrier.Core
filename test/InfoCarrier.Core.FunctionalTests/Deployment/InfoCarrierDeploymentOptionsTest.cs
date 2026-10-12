@@ -10,6 +10,101 @@ namespace InfoCarrier.Core.FunctionalTests.Deployment;
 public class InfoCarrierDeploymentOptionsTest
 {
     [Fact]
+    public void Client_shared_configuration_translates_all_four_facts()
+    {
+        var mapper = new StubMapper();
+        var shape = new { Id = 0 };
+        var builder = new DbContextOptionsBuilder();
+
+        new InfoCarrierDbContextOptionsBuilder(builder).UseInfoCarrierDeployment(options =>
+        {
+            options.AddAnonymousShapes(shape);
+            options.AddAllowedTypes(typeof(DateOnly));
+            options.AddValueMappers(mapper);
+            options.AllowArbitrarySqlExecution = true;
+        });
+
+        InfoCarrierOptionsExtension extension = builder.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+        Assert.Equal(shape.GetType(), Assert.Single(extension.RegisteredAnonymousShapes.Types));
+        Assert.Equal(typeof(DateOnly), Assert.Single(extension.AllowedTypes));
+        Assert.Same(mapper, Assert.Single(extension.ValueMappers));
+        Assert.True(extension.ArbitrarySqlExecutionAllowed);
+    }
+
+    [Fact]
+    public void Client_shared_calls_compose_with_existing_low_level_calls()
+    {
+        var firstShape = new { Id = 0 };
+        var secondShape = new { Name = "" };
+        var options = new DbContextOptionsBuilder();
+        var builder = new InfoCarrierDbContextOptionsBuilder(options);
+
+        builder.AllowTypes(typeof(DateOnly)).UseRegisteredAnonymousShapes(firstShape);
+        builder.UseInfoCarrierDeployment(deployment =>
+        {
+            deployment.AddAnonymousShapes(secondShape);
+            deployment.AddAllowedTypes(typeof(TimeOnly));
+        });
+
+        InfoCarrierOptionsExtension extension = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+        Assert.Equal([typeof(DateOnly), typeof(TimeOnly)], extension.AllowedTypes);
+        Assert.Equal([firstShape.GetType(), secondShape.GetType()], extension.RegisteredAnonymousShapes.Types);
+    }
+
+    [Fact]
+    public void Client_configuration_invokes_the_delegate_once_and_rejects_null()
+    {
+        var builder = new InfoCarrierDbContextOptionsBuilder(new DbContextOptionsBuilder());
+        var calls = 0;
+
+        builder.UseInfoCarrierDeployment(_ => calls++);
+
+        Assert.Equal(1, calls);
+        Assert.Throws<ArgumentNullException>(() => builder.UseInfoCarrierDeployment(null!));
+    }
+
+    [Fact]
+    public void Different_mapper_instances_do_not_share_an_internal_provider()
+    {
+        var firstMapper = new StubMapper();
+        var secondMapper = new StubMapper();
+        InfoCarrierOptionsExtension first = ClientExtension(firstMapper);
+        InfoCarrierOptionsExtension second = ClientExtension(secondMapper);
+
+        Assert.NotEqual(0, first.Info.GetServiceProviderHashCode());
+        Assert.NotEqual(0, second.Info.GetServiceProviderHashCode());
+        Assert.False(first.Info.ShouldUseSameServiceProvider(second.Info));
+    }
+
+    [Fact]
+    public void No_custom_mapper_keeps_the_existing_internal_provider_identity()
+    {
+        InfoCarrierOptionsExtension first = ClientExtension();
+        InfoCarrierOptionsExtension second = ClientExtension();
+
+        Assert.Equal(0, first.Info.GetServiceProviderHashCode());
+        Assert.Equal(0, second.Info.GetServiceProviderHashCode());
+        Assert.True(first.Info.ShouldUseSameServiceProvider(second.Info));
+    }
+
+    [Fact]
+    public void Custom_mappers_run_before_standard_and_model_mappers()
+    {
+        var mapper = new StubMapper();
+        InfoCarrierOptionsExtension extension = ClientExtension(mapper);
+        var services = new ServiceCollection();
+
+        extension.ApplyServices(services);
+
+        ServiceDescriptor[] descriptors = services
+            .Where(descriptor => descriptor.ServiceType == typeof(IInfoCarrierValueMapper))
+            .ToArray();
+        Assert.Same(mapper, descriptors[0].ImplementationInstance);
+        Assert.Equal(typeof(IPAddressValueMapper), descriptors[1].ImplementationType);
+        Assert.Equal(typeof(UriValueMapper), descriptors[2].ImplementationType);
+    }
+
+    [Fact]
     public void Additive_methods_compose_and_preserve_order()
     {
         var firstMapper = new StubMapper();
@@ -86,6 +181,14 @@ public class InfoCarrierDeploymentOptionsTest
     }
 
     private sealed record NamedRecord(int Value);
+
+    private static InfoCarrierOptionsExtension ClientExtension(params IInfoCarrierValueMapper[] mappers)
+    {
+        var options = new DbContextOptionsBuilder();
+        new InfoCarrierDbContextOptionsBuilder(options).UseInfoCarrierDeployment(
+            deployment => deployment.AddValueMappers(mappers));
+        return options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+    }
 
     private sealed class StubMapper : IInfoCarrierValueMapper
     {

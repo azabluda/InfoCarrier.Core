@@ -20,6 +20,30 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
 
     /// <summary>
+    ///     Applies deployment facts that the application configures identically on its client
+    ///     and server.
+    /// </summary>
+    /// <remarks>
+    ///     This client declaration guides query planning and sending. The server must apply the
+    ///     same configuration independently, and remains the admission boundary.
+    /// </remarks>
+    /// <param name="configure">The application-owned shared configuration method.</param>
+    /// <returns>The same builder, so calls chain.</returns>
+    public virtual InfoCarrierDbContextOptionsBuilder UseInfoCarrierDeployment(
+        Action<InfoCarrierDeploymentOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var deployment = new InfoCarrierDeploymentOptions();
+        configure(deployment);
+
+        InfoCarrierOptionsExtension extension =
+            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
+                .WithDeployment(deployment);
+        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
+        return this;
+    }
+
+    /// <summary>
     ///     States which anonymous structures this client expects the server to have registered.
     /// </summary>
     /// <remarks>
