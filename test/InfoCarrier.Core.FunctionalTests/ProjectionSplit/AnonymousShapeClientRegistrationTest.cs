@@ -21,5 +21,22 @@ public class AnonymousShapeClientRegistrationTest
         Assert.Throws<ArgumentException>(() => services.AddInfoCarrierAnonymousShapes(new object[] { null! }));
     }
 
+    [Fact]
+    public void Shared_registration_keeps_existing_anonymous_validation()
+    {
+        var options = new DbContextOptionsBuilder();
+        var client = new InfoCarrierDbContextOptionsBuilder(options);
+        var services = new ServiceCollection();
+
+        Assert.Throws<ArgumentException>(() => client.UseInfoCarrierDeployment(
+            deployment => deployment.AddAnonymousShapes(new NamedRecord(1))));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierDeployment(
+            deployment => deployment.AddAnonymousShapes(new NamedRecord(1))));
+        Assert.Throws<ArgumentException>(() => client.UseInfoCarrierDeployment(
+            deployment => deployment.AddAnonymousShapes(new object[] { null! })));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierDeployment(
+            deployment => deployment.AddAnonymousShapes(new object[] { null! })));
+    }
+
     private sealed record NamedRecord(int Value);
 }
