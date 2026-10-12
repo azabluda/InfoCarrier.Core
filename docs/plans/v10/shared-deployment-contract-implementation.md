@@ -2,9 +2,9 @@
 
 > For agentic workers: REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add one version 10.3 deployment configuration delegate that applies matching shared facts to InfoCarrier clients and servers without changing existing version 10 APIs.
+**Goal:** Ship a minimal abstractions package and one shared builder that configures matching version 10.3 client and server facts.
 
-**Architecture:** A new plain `InfoCarrierDeploymentOptions` snapshots four shared facts. The client entry point translates them into the existing context options extension, while the server entry point translates them into existing dependency-injection registrations. Existing low-level methods remain independent, composable and behaviorally unchanged.
+**Architecture:** `InfoCarrier.Core.Abstractions` owns only the shared builder and value-mapper interface. The existing client builder derives from the shared builder. A new server `AddInfoCarrier` entry point consumes the same application extension. Core reads an internal immutable snapshot through production-only friendship.
 
 **Tech Stack:** C# 14, .NET 10, Entity Framework Core 10, Microsoft.Extensions.DependencyInjection, xUnit, SQLite, ASP.NET Core transport tests.
 
@@ -12,306 +12,400 @@
 
 ## Global Constraints
 
-- Keep every released version 10 public type and member binary compatible.
-- Keep the current anonymous catalog public signatures even though they were not released in version 10.2.
-- Do not add `[Obsolete]` warnings during version 10.
-- Preserve version 10.2 planning when the client has no new anonymous-shape declaration.
-- Keep the server as the admission boundary for anonymous shapes, named types and arbitrary SQL.
-- Never retry a refused query with client evaluation.
-- Keep endpoints, serializers, payload limits, transactions, logging, caller identity and store behavior role-specific.
-- Do not implement version 11 role options, removals, negotiation or mismatch diagnostics.
+- Keep `InfoCarrier.Core.Abstractions` limited to `InfoCarrierDeploymentBuilder` and `IInfoCarrierValueMapper` as public contracts.
+- Give the abstractions package only Base Class Library dependencies; do not reference Entity Framework Core or dependency injection.
+- Keep `IInfoCarrierValueMapper` in `InfoCarrier.Core.ValueMapping` and type-forward it from `InfoCarrier.Core`.
+- Grant `InternalsVisibleTo` only from `InfoCarrier.Core.Abstractions` to `InfoCarrier.Core`; grant no test friendship.
+- Keep the existing `UseInfoCarrier` overload set unchanged.
+- Preserve version 10.2 planning when the client has no anonymous-shape declaration.
+- Keep the server as the admission boundary, and never retry a refused query with client evaluation.
+- Start each application mapper list empty; install standard mappers automatically after application mappers.
+- Remove the unreleased anonymous-shape role methods instead of retaining internal versions with the same names.
+- Add warning-level obsolete attributes only to the five approved version 11 removals.
+- Do not implement version 11 role options, negotiation, agreement checks, or removals.
 - Do not edit files under `subrepos/**`.
 - Write new C# classes with primary constructors where a constructor only assigns fields.
 
 ## Review Focus
 
-- Two client configurations with different mapper instances must not share one Entity Framework internal provider.
-- A client configuration without custom mappers must retain the existing service-provider identity and standard mapper chain.
-- A null item in any additive method must fail during configuration, before a context or server is created.
-- A shared server call mixed with existing low-level registrations must compose without duplicate standard mappers.
-- A client-only anonymous declaration must produce one refusal, zero database commands and no retry.
+- A failing additive call must leave all earlier builder state unchanged. Task 3 observes the final server registrations.
+- A legacy mapper compiled against version 10.2 must load through the type forwarder. Task 1 runs a separate binary fixture.
+- Two client configurations with different mapper instances must not share an Entity Framework internal provider. Task 2 tests reference identity.
+- Repeated server calls must preserve mapper order without duplicating standard mappers. Task 3 compares the final service sequence.
+- A client-only anonymous declaration must cause one refusal, zero database commands, and no retry. Task 3 retains this transport assertion.
 
 ---
 
-### Task 1: Shared options value and validation
+### Task 1: Minimal abstractions package and binary compatibility
 
 **Files:**
 
-- Create: `src/InfoCarrier.Core/InfoCarrierDeploymentOptions.cs`
-- Create: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs`
-- Modify: `test/InfoCarrier.Core.FunctionalTests/InfrastructureInfoCarrierTests.cs`
+- Create: `src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj`
+- Create: `src/InfoCarrier.Core.Abstractions/InfoCarrierDeploymentBuilder.cs`
+- Create: `src/InfoCarrier.Core.Abstractions/ValueMapping/IInfoCarrierValueMapper.cs`
+- Create: `src/InfoCarrier.Core.Abstractions/Properties/InternalsVisibleTo.cs`
+- Create: `src/InfoCarrier.Core.Abstractions/PACKAGE.md`
+- Create: `src/InfoCarrier.Core/Properties/TypeForwards.cs`
+- Create: `test/InfoCarrier.Core.BinaryCompatibility/LegacyMapperConsumer/LegacyMapperConsumer.csproj`
+- Create: `test/InfoCarrier.Core.BinaryCompatibility/LegacyMapperConsumer/LegacyMapper.cs`
+- Create: `test/InfoCarrier.Core.BinaryCompatibility/TypeForwardHost/TypeForwardHost.csproj`
+- Create: `test/InfoCarrier.Core.BinaryCompatibility/TypeForwardHost/Program.cs`
+- Create: `eng/verify-type-forwarding.ps1`
+- Modify: `InfoCarrier.Core.slnx`
+- Modify: `src/InfoCarrier.Core/InfoCarrier.Core.csproj`
+- Delete: `src/InfoCarrier.Core/ValueMapping/IInfoCarrierValueMapper.cs`
+- Delete: `src/InfoCarrier.Core/Properties/InternalsVisibleTo.cs`
+- Test: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentBuilderTest.cs`
 
 **Interfaces:**
 
-- Produce: public sealed `InfoCarrierDeploymentOptions`.
+- Produce: public `InfoCarrier.Core.InfoCarrierDeploymentBuilder`.
 - Produce: `void AddAnonymousShapes(params object[] shapes)`.
 - Produce: `void AddAllowedTypes(params Type[] types)`.
 - Produce: `void AddValueMappers(params IInfoCarrierValueMapper[] mappers)`.
 - Produce: `bool AllowArbitrarySqlExecution { get; set; }`.
-- Produce internally: immutable snapshots of anonymous types, allowed types and mapper instances.
-- Reuse: `AnonymousShapeSet.ValidatePrototypes` for anonymous prototype validation.
+- Produce internally: immutable ordered snapshots for Core and one shared anonymous-prototype validator.
+- Preserve: `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` with its existing two methods.
 
-- [ ] **Step 1: Write failing options tests**
+- [ ] **Step 1: Write failing builder and package-boundary tests**
 
-Add these tests to `InfoCarrierDeploymentOptionsTest`:
+Add `InfoCarrierDeploymentBuilderTest`. Test these cases:
 
-- `Additive_methods_compose_and_preserve_order`
-- `Inputs_are_snapshotted_before_configuration_returns`
 - `Null_arrays_and_items_fail_during_configuration`
-- `Anonymous_shape_validation_matches_existing_role_APIs`
+- `Anonymous_prototypes_accept_nested_anonymous_types_and_reject_named_types`
+- `Abstractions_assembly_exposes_only_the_two_approved_contracts`
+- `Abstractions_assembly_references_only_framework_assemblies`
 
-Assert exact ordered snapshots for two calls. Mutate caller-owned arrays afterward and assert no change. Compare named, nested and null prototype outcomes with the existing client and server methods.
+Use reflection only for the assembly surface and dependency assertions. Defer ordered-state assertions until public role entry points consume the builder.
 
-- [ ] **Step 2: Run the tests and verify the missing API failure**
+- [ ] **Step 2: Run the focused tests and verify the missing-type failure**
 
 Run:
 
 ```powershell
-dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentOptionsTest
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentBuilderTest
 ```
 
-Expected: compilation fails because `InfoCarrierDeploymentOptions` does not exist.
+Expected: compilation fails because `InfoCarrierDeploymentBuilder` and the abstractions assembly do not exist.
 
-- [ ] **Step 3: Implement the shared options class**
+- [ ] **Step 3: Add the abstractions package**
 
-Add the exact public members from the Interfaces block. Keep collection access internal. Snapshot every input. Preserve insertion order. Validate each item before changing state, so a failed call adds nothing.
+Apply the humanizer skill before creating `PACKAGE.md`. Add the project to `InfoCarrier.Core.slnx`. Set `IsPackable` to `true`. Disable package validation only for this first package version, with a comment that no published baseline exists. Pack its own `PACKAGE.md` and the repository icon.
 
-- [ ] **Step 4: Add public API convention coverage**
+Implement the exact public surface from the Interfaces block. Keep mutable lists private. Validate every input before appending. Return immutable copied snapshots through internal members.
 
-Add `InfoCarrierDeploymentOptions` and `InfoCarrierDbContextOptionsBuilder` to the appropriate `InfoCarrierApiConsistencyFixture.FluentApiTypes` expectations only where their return conventions apply. Do not suppress a convention globally.
+Move `IInfoCarrierValueMapper` without changing its namespace, accessibility, or signatures. Add `[assembly: InternalsVisibleTo("InfoCarrier.Core")]` in the abstractions assembly.
 
-- [ ] **Step 5: Run focused tests**
+- [ ] **Step 4: Add Core forwarding and consume the shared internals**
 
-Run the command from step 2.
+Reference `InfoCarrier.Core.Abstractions` from `InfoCarrier.Core`. Add `[assembly: TypeForwardedTo(typeof(IInfoCarrierValueMapper))]` in Core. Remove the Core interface source and test friendship.
 
-Expected: all `InfoCarrierDeploymentOptionsTest` cases pass.
+Move anonymous-prototype validation behind an internal abstractions member. Make Core's existing anonymous helpers consume that member instead of keeping a second validator.
 
-- [ ] **Step 6: Commit task 1**
+- [ ] **Step 5: Add the compiled version 10.2 compatibility fixture**
+
+Build `LegacyMapperConsumer` only against the published `InfoCarrier.Core` version 10.2.0 package. It implements `IInfoCarrierValueMapper`.
+
+Build `TypeForwardHost` against the current projects. Load the legacy assembly, instantiate its mapper, and cast it to the current interface. `eng/verify-type-forwarding.ps1` builds the two projects in separate restore graphs and runs the host.
+
+- [ ] **Step 6: Verify the package boundary and forwarding behavior**
+
+Run:
 
 ```powershell
-git add src/InfoCarrier.Core/InfoCarrierDeploymentOptions.cs test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs test/InfoCarrier.Core.FunctionalTests/InfrastructureInfoCarrierTests.cs
-git commit -m "feat: add shared deployment options"
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentBuilderTest
+powershell -File eng/verify-type-forwarding.ps1
+dotnet pack src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj -c Release --output artifacts/pack
 ```
 
-### Task 2: Client entry point and mapper isolation
+Expected: focused tests pass, the legacy cast succeeds, and the package contains no non-framework dependency.
+
+- [ ] **Step 7: Commit task 1**
+
+```powershell
+git add InfoCarrier.Core.slnx src/InfoCarrier.Core.Abstractions src/InfoCarrier.Core test/InfoCarrier.Core.BinaryCompatibility eng/verify-type-forwarding.ps1 test/InfoCarrier.Core.FunctionalTests/Deployment
+git commit -m "feat: add minimal deployment abstractions"
+```
+
+### Task 2: Client builder hierarchy and mapper isolation
 
 **Files:**
 
 - Modify: `src/InfoCarrier.Core/InfoCarrierDbContextOptionsBuilder.cs`
 - Modify: `src/InfoCarrier.Core/InfoCarrierOptionsExtension.cs`
 - Modify: `src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs`
-- Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs`
+- Delete: `src/InfoCarrier.Core/InfoCarrierDeploymentOptions.cs`
+- Delete: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs`
+- Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentBuilderTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeClientRegistrationTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/Expressions/GeometryWireFormatTest.cs`
+- Create: `test/InfoCarrier.Core.CompileTests/ClientOnlyAfterShared/ClientOnlyAfterShared.csproj`
+- Create: `test/InfoCarrier.Core.CompileTests/ClientOnlyAfterShared/Program.cs`
+- Create: `eng/verify-client-fluent-syntax.ps1`
 
 **Interfaces:**
 
-- Consume: internal snapshots from task 1.
-- Produce: `InfoCarrierDbContextOptionsBuilder.UseInfoCarrierDeployment(Action<InfoCarrierDeploymentOptions> configure)`.
-- Produce internally: `InfoCarrierOptionsExtension.WithDeployment(InfoCarrierDeploymentOptions options)`.
-- Produce internally: ordered custom mapper registrations during `InfoCarrierOptionsExtension.ApplyServices`.
-- Preserve: service-provider hash `0` and current sharing when no custom mapper exists.
-- Isolate: configurations with different mapper instance sequences through `GetServiceProviderHashCode` and `ShouldUseSameServiceProvider`.
+- Consume: internal shared snapshot from task 1.
+- Produce: `InfoCarrierDbContextOptionsBuilder : InfoCarrierDeploymentBuilder`.
+- Preserve: all existing `UseInfoCarrier(..., Action<InfoCarrierDbContextOptionsBuilder>?)` signatures.
+- Remove: `InfoCarrierDbContextOptionsBuilder.UseInfoCarrierDeployment`.
+- Remove: `InfoCarrierDbContextOptionsBuilder.UseRegisteredAnonymousShapes`.
+- Remove: unreleased `InfoCarrierServiceCollectionExtensions.AddInfoCarrierDeployment` before deleting its options type.
+- Preserve internally: ordered application mapper registrations and existing zero hash without application mappers.
 
-- [ ] **Step 1: Write failing client translation tests**
+- [ ] **Step 1: Write failing client hierarchy tests**
 
 Add these tests:
 
-- `Client_shared_configuration_translates_all_four_facts`
-- `Client_shared_calls_compose_with_existing_low_level_calls`
-- `Client_configuration_invokes_the_delegate_once_and_rejects_null`
+- `Existing_UseInfoCarrier_callback_accepts_shared_extension`
+- `Client_specific_calls_chain_before_shared_extension`
+- `Client_specific_calls_do_not_compile_after_shared_extension`
+- `Client_callback_invokes_shared_configuration_once`
 - `Different_mapper_instances_do_not_share_an_internal_provider`
-- `No_custom_mapper_keeps_the_existing_internal_provider_identity`
-- `Custom_mappers_run_before_standard_and_model_mappers`
+- `No_application_mapper_keeps_zero_service_provider_hash`
+- `Application_mappers_run_before_standard_and_model_mappers`
 
-Use two stateful mapper instances of the same runtime type for the provider-isolation case. Assert that each context uses its own instance and cannot observe the other's state.
+Build the intentional negative fixture separately from the solution. `eng/verify-client-fluent-syntax.ps1` must require compiler diagnostic `CS1061` for `UseNonRelationalServerStore` after `ConfigureInfoCarrier`.
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [ ] **Step 2: Run focused client tests and verify failure**
 
 Run:
 
 ```powershell
-dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter "FullyQualifiedName~InfoCarrierDeploymentOptionsTest|FullyQualifiedName~AnonymousShapeClientRegistrationTest|FullyQualifiedName~GeometryWireFormatTest"
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter "FullyQualifiedName~InfoCarrierDeploymentBuilderTest|FullyQualifiedName~AnonymousShapeClientRegistrationTest|FullyQualifiedName~GeometryWireFormatTest"
 ```
 
-Expected: compilation fails because `UseInfoCarrierDeployment` does not exist.
+Expected: the hierarchy and direct shared extension tests fail against the old nested deployment method.
 
-- [ ] **Step 3: Implement client translation**
+- [ ] **Step 3: Derive the client builder from the shared builder**
 
-Add the exact public method from the Interfaces block. Create one options object, invoke the delegate once and apply one immutable extension clone. Translate anonymous shapes, allowed types and arbitrary SQL into their existing extension state.
+Remove `UseInfoCarrierDeployment`. During the existing `UseInfoCarrier` callback, use the same derived builder for client-only and shared methods. After the callback, translate its inherited snapshot into `InfoCarrierOptionsExtension`.
 
-- [ ] **Step 4: Register custom client mappers safely**
+Keep `UseNonRelationalServerStore` returning `InfoCarrierDbContextOptionsBuilder`. Remove both unreleased deployment entry points and the old options type. Remove the unreleased `UseRegisteredAnonymousShapes` public method. Retain only smaller private or internal translation helpers.
 
-Store the mapper snapshot on the options extension. Register each mapper instance before standard mappers in `ApplyServices`. Keep `GetServiceProviderHashCode() == 0` when the mapper snapshot is empty. For configured mappers, hash the ordered object identities and compare ordered instances by reference in `ShouldUseSameServiceProvider`.
+- [ ] **Step 4: Preserve client mapper ordering and provider isolation**
+
+Store the ordered application mapper snapshot on the options extension. Register those instances before standard mappers in `ApplyServices`.
+
+Keep `GetServiceProviderHashCode() == 0` for an empty application mapper list. Otherwise hash ordered object identities. Compare ordered mapper instances by reference in `ShouldUseSameServiceProvider`.
 
 - [ ] **Step 5: Verify focused client behavior**
 
 Run the command from step 2.
 
-Expected: all selected tests pass. Existing no-mapper provider-sharing assertions remain unchanged.
+Then run:
+
+```powershell
+powershell -File eng/verify-client-fluent-syntax.ps1
+```
+
+Expected: all selected tests pass. The compile fixture rejects client-only calls after the shared extension.
 
 - [ ] **Step 6: Commit task 2**
 
 ```powershell
-git add src/InfoCarrier.Core/InfoCarrierDbContextOptionsBuilder.cs src/InfoCarrier.Core/InfoCarrierOptionsExtension.cs src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeClientRegistrationTest.cs test/InfoCarrier.Core.FunctionalTests/Expressions/GeometryWireFormatTest.cs
-git commit -m "feat: apply shared deployment options to clients"
+git add src/InfoCarrier.Core test/InfoCarrier.Core.FunctionalTests test/InfoCarrier.Core.CompileTests eng/verify-client-fluent-syntax.ps1
+git commit -m "feat: configure shared facts through the client builder"
 ```
 
-### Task 3: Server entry point and shared-fact parity
+### Task 3: Server entry point, defaults, and anonymous registration matrix
 
 **Files:**
 
 - Modify: `src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs`
-- Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs`
+- Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentBuilderTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeStructuralRegistrationTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/Sqlite/RawSqlExecutionProbeTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/Sqlite/SpatialiteServerTest.cs`
+- Modify: `test/InfoCarrier.Core.TransportTests/NorthwindOverHttpTest.cs`
+- Modify if required: `test/InfoCarrier.Core.TransportTests/NorthwindServerFactory.cs`
 
 **Interfaces:**
 
-- Consume: internal snapshots from task 1.
-- Produce: `IServiceCollection AddInfoCarrierDeployment(this IServiceCollection services, Action<InfoCarrierDeploymentOptions> configure)`.
-- Reuse: existing anonymous catalog, allowed-type and arbitrary-SQL registration paths.
-- Register: custom mapper instances in order, before idempotent standard mappers.
+- Produce: `IServiceCollection AddInfoCarrier(this IServiceCollection services, Action<InfoCarrierDeploymentBuilder> configure)`.
+- Remove: `InfoCarrierServiceCollectionExtensions.AddInfoCarrierAnonymousShapes`.
+- Consume: shared snapshot from task 1.
+- Preserve: first-claim-wins application mapper order.
+- Install: standard `IPAddress` and `Uri` mappers once, after application mappers.
 
 - [ ] **Step 1: Write failing server translation tests**
 
 Add these tests:
 
-- `Server_shared_configuration_translates_all_four_facts`
-- `Server_shared_calls_compose_with_existing_low_level_calls`
-- `Server_configuration_invokes_the_delegate_once_and_rejects_null`
-- `Repeated_server_calls_keep_custom_order_without_standard_duplicates`
-- `One_application_method_configures_a_custom_mapper_on_both_roles`
+- `Server_AddInfoCarrier_translates_all_four_shared_facts`
+- `Server_AddInfoCarrier_invokes_configuration_once_and_rejects_null`
+- `Repeated_server_calls_compose_application_mappers_in_order`
+- `Standard_mappers_are_automatic_and_not_duplicated`
+- `Application_mapper_lists_start_empty_on_both_roles`
+- `One_application_extension_configures_both_roles_without_shared_state`
+- `Additive_calls_compose_and_preserve_order`
+- `Failed_additive_call_does_not_change_existing_state`
+- `Caller_owned_arrays_are_snapshotted_before_configuration_returns`
 
-Resolve the service collection to assert ordered mapper identities. Exercise one custom value end to end through client and server. Assert application mappers precede standard mappers.
+Assert the exact mapper instance order after building the service provider. Invoke the application extension twice and assert separate mapper instances.
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [ ] **Step 2: Run focused server tests and verify failure**
 
 Run:
 
 ```powershell
-dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter "FullyQualifiedName~InfoCarrierDeploymentOptionsTest|FullyQualifiedName~AnonymousShapeStructuralRegistrationTest|FullyQualifiedName~RawSqlExecutionProbeTest|FullyQualifiedName~SpatialiteServerTest"
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter "FullyQualifiedName~InfoCarrierDeploymentBuilderTest|FullyQualifiedName~AnonymousShapeStructuralRegistrationTest|FullyQualifiedName~RawSqlExecutionProbeTest|FullyQualifiedName~SpatialiteServerTest"
 ```
 
-Expected: compilation fails because `AddInfoCarrierDeployment` does not exist.
+Expected: compilation fails because the new `AddInfoCarrier` overload does not exist.
 
-- [ ] **Step 3: Implement server translation**
+- [ ] **Step 3: Implement server translation and automatic defaults**
 
-Add the exact extension method from the Interfaces block. Invoke the delegate once. Apply only requested permissions. Route each setting through the same internal helper used by its existing public method where practical. Add standard mappers with the existing idempotent method.
+Create one builder, invoke the callback once, and translate its snapshot. Apply only requested permissions. Route each fact through one private helper shared with its released low-level method.
 
-- [ ] **Step 4: Verify shared facts and compatibility**
+Register application mapper instances in order. Install standard mappers idempotently afterward. Remove the unreleased public anonymous-shape server method.
 
-Run the command from step 2.
+- [ ] **Step 4: Move the four-state matrix to the shared public surface**
 
-Expected: all selected tests pass. Existing low-level registration tests retain their outcomes.
+Cover absent on both roles, client only, server only, and both roles. For client-only declaration, assert one transport request, zero database commands, the existing refusal, and no retry.
 
-- [ ] **Step 5: Commit task 3**
+For both-side declaration, assert backend execution and the original client anonymous identity. For absent-client cases, assert version 10.2 planning.
+
+- [ ] **Step 5: Verify focused server and transport behavior**
+
+Run:
 
 ```powershell
-git add src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentOptionsTest.cs test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeStructuralRegistrationTest.cs test/InfoCarrier.Core.FunctionalTests/Sqlite/RawSqlExecutionProbeTest.cs test/InfoCarrier.Core.FunctionalTests/Sqlite/SpatialiteServerTest.cs
-git commit -m "feat: apply shared deployment options to servers"
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter "FullyQualifiedName~InfoCarrierDeploymentBuilderTest|FullyQualifiedName~AnonymousShapeStructuralRegistrationTest|FullyQualifiedName~RawSqlExecutionProbeTest|FullyQualifiedName~SpatialiteServerTest"
+dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj -c Release --filter FullyQualifiedName~NorthwindOverHttpTest
 ```
 
-### Task 4: Anonymous registration matrix through the shared contract
+Expected: all selected tests pass, and the client-only case records no database command.
+
+- [ ] **Step 6: Commit task 3**
+
+```powershell
+git add src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs test/InfoCarrier.Core.FunctionalTests test/InfoCarrier.Core.TransportTests
+git commit -m "feat: add shared server configuration"
+```
+
+### Task 4: Version 10.3 obsolete warnings and public-surface checks
 
 **Files:**
 
-- Modify: `test/InfoCarrier.Core.TransportTests/NorthwindOverHttpTest.cs`
-- Modify if needed: `test/InfoCarrier.Core.TransportTests/NorthwindServerFactory.cs`
-- Modify: `test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeClientRegistrationTest.cs`
+- Modify: `src/InfoCarrier.Core/InfoCarrierDbContextOptionsBuilder.cs`
+- Modify: `src/InfoCarrier.Core/InfoCarrierServiceCollectionExtensions.cs`
+- Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentBuilderTest.cs`
+- Modify: package compatibility fixtures selected by existing build failures.
 
 **Interfaces:**
 
-- Consume: both public entry points from tasks 2 and 3.
-- Preserve: version 10.2 planning with no client declaration.
-- Preserve: strict server admission and one-way refusal.
+- Mark warning `ICC1001`: `InfoCarrierDbContextOptionsBuilder.AllowTypes`.
+- Mark warning `ICC1002`: `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution`.
+- Mark warning `ICC1003`: `AddInfoCarrierAllowedTypes`.
+- Mark warning `ICC1004`: `AddInfoCarrierArbitrarySqlExecution`.
+- Mark warning `ICC1005`: `AddInfoCarrierStandardValueMappers`.
+- Use: `https://github.com/azabluda/InfoCarrier.Core/issues/221` as each obsolete warning URL.
 
-- [ ] **Step 1: Convert the permanent four-state matrix to shared entry points**
+- [ ] **Step 1: Write failing obsolete-metadata tests**
 
-Cover absent on both roles, client only, server only and both roles. Use one application configuration method in declared cases. Keep the low-level matrix tests as compatibility coverage rather than deleting them.
+Assert each approved method has a warning-level `ObsoleteAttribute`, its assigned diagnostic identifier, its URL, and a replacement message.
 
-- [ ] **Step 2: Assert observable boundaries**
+Assert no other released public member gains `ObsoleteAttribute`. Assert both unreleased anonymous methods are absent from the public API.
 
-For client-only declaration, assert one transport request, zero database commands, the existing anonymous-catalog refusal and no retry. For both-side declaration, assert backend execution and original client anonymous identity. For absent-client cases, assert the existing version 10.2 plan.
-
-- [ ] **Step 3: Run the matrix**
+- [ ] **Step 2: Run the metadata tests and verify failure**
 
 Run:
 
 ```powershell
-dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj -c Release --filter FullyQualifiedName~NorthwindOverHttpTest
-dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~AnonymousShapeClientRegistrationTest
+dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentBuilderTest
 ```
 
-Expected: all matrix and compatibility cases pass.
+Expected: the five approved methods have no obsolete metadata.
 
-- [ ] **Step 4: Commit task 4**
+- [ ] **Step 3: Add exact warning metadata**
+
+Add warning-level `[Obsolete]` attributes with identifiers `ICC1001` through `ICC1005`. Name the shared-builder replacement in each message. Set `UrlFormat` to the issue URL from the Interfaces block.
+
+Refactor product internals to call private helpers instead of obsolete public methods. Keep consumer migration warnings without creating warnings in the product build.
+
+- [ ] **Step 4: Verify the public surface**
+
+Run the command from step 2, then run:
 
 ```powershell
-git add test/InfoCarrier.Core.TransportTests/NorthwindOverHttpTest.cs test/InfoCarrier.Core.TransportTests/NorthwindServerFactory.cs test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeClientRegistrationTest.cs
-git commit -m "test: verify shared deployment registration states"
+$env:CI='true'; dotnet build InfoCarrier.Core.slnx -c Release; Remove-Item Env:CI
+dotnet pack InfoCarrier.Core.slnx --no-build -c Release --output artifacts/pack
 ```
 
-### Task 5: Samples, documentation and version 11 removal table
+Expected: metadata tests pass, the strict build has zero warnings, and package validation accepts only approved changes.
+
+- [ ] **Step 5: Commit task 4**
+
+```powershell
+git add src/InfoCarrier.Core test/InfoCarrier.Core.FunctionalTests
+git commit -m "feat: announce version 11 configuration removals"
+```
+
+### Task 5: Shared application examples and migration documentation
 
 **Files:**
 
+- Modify: `samples/Northwind.Shared/Northwind.Shared.csproj`
+- Modify: `samples/Northwind.Shared/NorthwindDeployment.cs`
+- Modify: `samples/Northwind.Client/Program.cs`
 - Modify: `samples/Northwind.Demo/Program.cs`
 - Modify: `samples/Northwind.Server/Program.cs`
-- Modify if used by normal flow: `samples/Northwind.Client/Program.cs`
 - Modify: `src/InfoCarrier.Core/PACKAGE.md`
+- Modify: `src/InfoCarrier.Core.Abstractions/PACKAGE.md`
 - Modify: `website/docs/configuration/client.md`
 - Modify: `website/docs/configuration/server.md`
 - Modify: `website/docs/configuration/value-mappers.md`
-- Modify if required by navigation: `mkdocs.yml`
-- Update externally: [issue #104](https://github.com/azabluda/InfoCarrier.Core/issues/104)
+- Modify if required: `mkdocs.yml`
 
 **Interfaces:**
 
-- Consume: the shared public entry points from tasks 2 and 3.
-- Recommend: one application-owned `ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)` method.
-- Preserve: low-level API documentation as legacy version 10 paths without `[Obsolete]` warnings.
+- Recommend: `InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)`.
+- Demonstrate client order: client-specific calls first, then `ConfigureInfoCarrier()`.
+- Demonstrate server use: `services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier())`.
+- Reference: `InfoCarrier.Core.Abstractions` from the shared sample project instead of `InfoCarrier.Core`.
 
 - [ ] **Step 1: Apply the humanizer skill**
 
-Read and apply the humanizer skill before changing `PACKAGE.md` or `website/`. Preserve security statements and exact API names.
+Read and apply the humanizer skill before changing either `PACKAGE.md` file or `website/`. Preserve exact API names and security statements.
 
-- [ ] **Step 2: Update normal sample configuration**
+- [ ] **Step 2: Update the Northwind shared extension and role calls**
 
-Place one shared configuration method beside model configuration. Pass it to client and server entry points. Keep role-specific setup in its current location.
+Return the base builder from the non-generic extension. Put `UseNonRelationalServerStore()` before it where required. Use a lambda on both roles because the return-valued method group cannot bind to `Action<T>`.
 
-- [ ] **Step 3: Update user documentation**
+Remove redundant standard mapper registration. Keep application mapper lists empty unless the sample has an application mapper.
 
-Recommend the shared path for anonymous structures, named types, value mappers and arbitrary SQL. Explain that matching configuration guides planning but does not grant provider translation. State that server admission remains authoritative and refusals are not retried.
+- [ ] **Step 3: Document supported project layouts and migration**
 
-- [ ] **Step 4: Update issue 104 after the additive names are final**
+Recommend reusing an existing shared model project. Describe a separate deployment project when the model must remain unaware of InfoCarrier. Describe linked source as a small-repository alternative.
 
-Replace the provisional version 11 table entries for these four facts with the exact version 10.3 names. Do not change issue state, milestone or broader version 11 scope.
+State that the abstractions package itself has no Entity Framework Core dependency. State that a consumer project may reference both packages. Explain that server `AddInfoCarrier` configures only shared facts and does not replace context, serializer, server, or endpoint setup.
 
-- [ ] **Step 5: Validate samples and documentation**
+List all five obsolete methods and replacements. Explain that the two unreleased anonymous methods were removed before version 10.3.
+
+- [ ] **Step 4: Validate samples and documentation**
 
 Run:
 
 ```powershell
-dotnet build samples/Northwind.Demo/Northwind.Demo.csproj --configuration Release
-dotnet build samples/Northwind.Server/Northwind.Server.csproj --configuration Release
-dotnet build samples/Northwind.Client/Northwind.Client.csproj --configuration Release
-python eng/doc-links.py src/InfoCarrier.Core/PACKAGE.md website/docs/configuration/client.md website/docs/configuration/server.md website/docs/configuration/value-mappers.md
+dotnet build samples/Northwind.Demo/Northwind.Demo.csproj -c Release
+dotnet build samples/Northwind.Server/Northwind.Server.csproj -c Release
+dotnet build samples/Northwind.Client/Northwind.Client.csproj -c Release
+python eng/doc-links.py src/InfoCarrier.Core/PACKAGE.md src/InfoCarrier.Core.Abstractions/PACKAGE.md website/docs/configuration/client.md website/docs/configuration/server.md website/docs/configuration/value-mappers.md
 python eng/doc-words.py --budget
 bash eng/docs-serve.sh --build
 ```
 
-Expected: builds succeed and all documentation gates pass.
+Expected: all sample builds and documentation gates pass.
 
-- [ ] **Step 6: Commit task 5**
+- [ ] **Step 5: Commit task 5**
 
 ```powershell
-git add samples/Northwind.Demo/Program.cs samples/Northwind.Server/Program.cs samples/Northwind.Client/Program.cs src/InfoCarrier.Core/PACKAGE.md website/docs/configuration/client.md website/docs/configuration/server.md website/docs/configuration/value-mappers.md mkdocs.yml
+git add samples src/InfoCarrier.Core/PACKAGE.md src/InfoCarrier.Core.Abstractions/PACKAGE.md website mkdocs.yml
 git commit -m "docs: recommend shared deployment configuration"
 ```
 
-### Task 6: Complete verification and delivery
+### Task 6: Complete verification and pull-request update
 
 **Files:**
 
@@ -320,9 +414,9 @@ git commit -m "docs: recommend shared deployment configuration"
 
 **Interfaces:**
 
-- Verify: all product, transport, package and documentation gates.
+- Verify: product, transport, binary compatibility, package, sample, trimming, and documentation gates.
 - Record: exact results from command output without derived counts.
-- Complete: phase SDC only after every required gate succeeds.
+- Complete: the shared deployment phase only after every required gate succeeds.
 
 - [ ] **Step 1: Run file hygiene on every changed file**
 
@@ -330,51 +424,39 @@ Run `.claude/hooks/file-hygiene.py` with the complete changed-file list.
 
 Expected: no findings.
 
-- [ ] **Step 2: Run the complete specification measurement**
+- [ ] **Step 2: Run complete product verification**
 
 Run:
 
 ```powershell
 bash eng/measure.sh shared-deployment
-```
-
-Expected: `FAILING 0`, no broken tests and unchanged reason inventory.
-
-- [ ] **Step 3: Run transport, strict build, package and analyzer gates**
-
-Run:
-
-```powershell
-dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --configuration Release
-dotnet build InfoCarrier.Core.slnx --configuration Release
-dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release --output artifacts/pack
+dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj -c Release
+powershell -File eng/verify-type-forwarding.ps1
+$env:CI='true'; dotnet build InfoCarrier.Core.slnx -c Release; Remove-Item Env:CI
+dotnet pack InfoCarrier.Core.slnx --no-build -c Release --output artifacts/pack
 dotnet format InfoCarrier.Core.slnx analyzers --no-restore --verify-no-changes --diagnostics IDE0290
 bash eng/trim-ratchet.sh
 ```
 
-Expected: zero failures and errors, existing skips only, package compatibility success, no IDE0290 findings and no trimming regression.
+Expected: `FAILING 0`, zero transport failures, a successful legacy cast, zero build errors, package compatibility success, no IDE0290 findings, and no trimming regression.
 
-- [ ] **Step 4: Run documentation and sample gates**
+- [ ] **Step 3: Repeat final sample and documentation gates**
 
-Repeat task 5 step 5 after the final product build.
+Repeat task 5 step 4 after the final product build.
 
 Expected: all sample builds and documentation gates pass.
 
-- [ ] **Step 5: Review public compatibility and security boundaries**
+- [ ] **Step 4: Record evidence and close the phase**
 
-Confirm package validation reports only additive APIs. Confirm no existing member moved, changed or gained `[Obsolete]`. Confirm client-only grants cannot execute on an unconfigured server.
+Update `docs/plans/v10/implementation-plan.md` with the exact command results. Mark the shared deployment phase complete only after all gates pass.
 
-- [ ] **Step 6: Record evidence and close the phase checkbox**
-
-Update `docs/plans/v10/implementation-plan.md` phase SDC with the exact command results. Mark SDC1 complete only after all gates pass.
-
-- [ ] **Step 7: Commit final evidence**
+- [ ] **Step 5: Commit final evidence**
 
 ```powershell
 git add docs/plans/v10/implementation-plan.md
 git commit -m "Step SDC1: complete shared deployment contract"
 ```
 
-- [ ] **Step 8: Request code review and prepare the pull request**
+- [ ] **Step 6: Request review and update the pull request**
 
-Use `superpowers:requesting-code-review`. Correct verified findings. Push the feature branch and open one pull request for issue 221. Add `Assisted by OpenAI Codex.` to the pull-request body. Stop while continuous integration runs.
+Use `superpowers:requesting-code-review`. Correct verified findings. Push the branch and update [pull request #223](https://github.com/azabluda/InfoCarrier.Core/pull/223). Keep `Assisted by OpenAI Codex.` in its body. Reply to review comments with the implemented decisions, resolve completed threads, and stop while continuous integration runs.

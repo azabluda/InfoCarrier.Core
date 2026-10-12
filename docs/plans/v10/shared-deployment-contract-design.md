@@ -3,7 +3,7 @@
 Date: 2026-10-12  
 Issue: [#221](https://github.com/azabluda/InfoCarrier.Core/issues/221)  
 Release: 10.3  
-Status: approved design, written revision pending review
+Status: approved for implementation
 
 ## Purpose
 
