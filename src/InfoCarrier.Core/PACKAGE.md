@@ -23,25 +23,26 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
     new HttpInfoCarrierTransport(http, serializer), serializer);
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-    .UseInfoCarrier(client, remote =>
-        remote.UseInfoCarrierDeployment(ConfigureInfoCarrier))
+    .UseInfoCarrier(client, remote => remote.ConfigureInfoCarrier())
     .Options;
 
 await using var context = new ShopContext(options);
 
-static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
 {
-    options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    return builder;
 }
 ```
 
 Use the same method on the server:
 
 ```csharp
-services.AddInfoCarrierDeployment(ConfigureInfoCarrier);
+services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
 ```
 
-The shared method can also register named types, custom value mappers, and arbitrary SQL access.
+Reference `InfoCarrier.Core.Abstractions` from the project containing the shared method. The method
+can also register named types, custom value mappers, and arbitrary SQL access.
 Matching settings guide query planning. They do not grant translation support to the server's
 database provider. The server remains the admission boundary. A refusal returns without a client
 evaluation retry.

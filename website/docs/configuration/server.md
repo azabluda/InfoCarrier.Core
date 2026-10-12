@@ -1,7 +1,7 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Five base registrations and one endpoint make it an
-InfoCarrier server. Shared deployment facts add one configuration call.
+The server is an ordinary EF Core application. Add its base registrations, shared facts, and one
+endpoint.
 
 ```csharp
 using InfoCarrier.Core;
@@ -13,16 +13,16 @@ builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>()
 builder.Services
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrierStandardValueMappers()
-    .AddInfoCarrierDeployment(ConfigureInfoCarrier);
+    .AddInfoCarrier(infoCarrier => infoCarrier.ConfigureInfoCarrier());
 
 WebApplication app = builder.Build();
 
 app.MapInfoCarrier();
 
-static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
 {
-    options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    return builder;
 }
 ```
 
@@ -32,12 +32,28 @@ static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
 | `AddScoped<DbContext>` | The server resolves the context per request as the base type, so the base type has to resolve. Without this line every request fails with a service-resolution error. |
 | `IInfoCarrierSerializer` | The same format the client uses. Both ends must agree. |
 | `IInfoCarrierServer` | `InProcessInfoCarrierServer` executes a request against a `DbContext` from this service provider. *In-process* means the same process as the database connection; it is the normal implementation, not a test double. |
-| `AddInfoCarrierStandardValueMappers()` | The mappers for BCL types the wire cannot walk, `IPAddress` and `Uri`. The client gets these automatically; a server builds its own service collection, so it has to ask. See [Value mappers](value-mappers.md). |
-| `AddInfoCarrierDeployment(...)` | Deployment facts shared with clients. |
+| `AddInfoCarrier(...)` | Applies shared deployment facts and adds the standard value mappers. See [Value mappers](value-mappers.md). |
 
-Use the method with `UseInfoCarrierDeployment` on clients. It covers anonymous structures, named
-types, value mappers, and arbitrary SQL. Matching settings guide planning, but cannot add provider
-support. The server controls admission. Refusals are not retried.
+Use the same method in the client callback. It covers shapes, named types, mappers, and arbitrary
+SQL. These settings cannot add provider support. The server controls admission.
+
+`AddInfoCarrier` adds shared facts and standard mappers. It does not add the context, serializer,
+server implementation, or endpoint.
+
+## Migrating existing configuration
+
+Version 10.3 warns about five planned version 11 removals:
+
+| Existing method | Replacement |
+|---|---|
+| `InfoCarrierDbContextOptionsBuilder.AllowTypes(...)` | `InfoCarrierDeploymentBuilder.AddAllowedTypes(...)` |
+| `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()` | `InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution = true` |
+| `AddInfoCarrierAllowedTypes(...)` | `AddAllowedTypes(...)` inside `AddInfoCarrier(...)` |
+| `AddInfoCarrierArbitrarySqlExecution()` | `AllowArbitrarySqlExecution = true` inside `AddInfoCarrier(...)` |
+| `AddInfoCarrierStandardValueMappers()` | `AddInfoCarrier(...)` |
+
+Version 10 continues to support these methods. The unreleased `UseRegisteredAnonymousShapes` and
+prototype `AddInfoCarrierAnonymousShapes` methods were removed. Use shared `AddAnonymousShapes`.
 
 ## The endpoint
 
@@ -84,13 +100,14 @@ Two deployment settings widen what a client may send. Both deny by default, and 
 server's decision alone.
 
 ```csharp
-static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
 {
-    options.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-    options.AllowArbitrarySqlExecution = true;
+    builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+    builder.AllowArbitrarySqlExecution = true;
+    return builder;
 }
 
-builder.Services.AddInfoCarrierDeployment(ConfigureInfoCarrier);
+builder.Services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
 ```
 
 The first admits CLR types beyond those implied by your model. The usual reason is your provider's
@@ -104,13 +121,13 @@ statements. Query filters do not apply. The database account's rights limit the 
 Register anonymous data structures in the shared deployment method using prototype objects:
 
 ```csharp
-options.AddAnonymousShapes(
+builder.AddAnonymousShapes(
     new { Name = "", Age = 0 },
     new { Country = "", City = "" },
     new { CustomerId = 0, Year = 0 });
 
 // Named records use the existing type permission registration.
-options.AddAllowedTypes(typeof(CustomerSummary));
+builder.AddAllowedTypes(typeof(CustomerSummary));
 ```
 
 Prototype values are ignored. Names, property order, and property types must match the client's

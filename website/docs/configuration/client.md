@@ -12,20 +12,19 @@ Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual: lo
 
 ## What the client is told about the server
 
-A second argument carries the three things the client cannot work out for itself, because it never
-sees the server's provider:
+The callback carries deployment facts and client-only store information. Put client-only calls
+before the shared method:
 
 ```csharp
 optionsBuilder.UseInfoCarrier(client, o => o
-    .AllowTypes(typeof(SqlServerDbFunctionsExtensions))
-    .AllowArbitrarySqlExecution()
-    .UseNonRelationalServerStore());
+    .UseNonRelationalServerStore()
+    .ConfigureInfoCarrier());
 ```
 
-| Call | What it says |
+| Setting | What it says |
 |---|---|
-| `AllowTypes(...)` | These CLR types may appear in a query beyond the ones the model implies. The usual reason is the `EF.Functions` family your server's provider declares. It also decides where a query runs: a key of a type you have not named here keeps its `GroupBy` or `Join` on the client, so the server sends every row. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). Register the same types on the server. |
-| `AllowArbitrarySqlExecution()` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server has to grant it too, and only the server's half is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
+| `AddAllowedTypes(...)` | These Common Language Runtime types may appear beyond those implied by the model. Register them on both sides. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). |
+| `AllowArbitrarySqlExecution = true` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server must grant it too. Only the server's setting is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
 | `UseNonRelationalServerStore()` | The server's store is not a relational database, so three relational query rules do not apply, and a change to part of a document sends the whole document. **On a document store the server needs [its own registration](server.md#saying-the-store-is-a-document-store) as well**, and that one is what keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
 
 Leave all three alone unless one of those sentences is true of your deployment.
@@ -35,22 +34,30 @@ Leave all three alone unless one of those sentences is true of your deployment.
 Put shared deployment facts in one application-owned method:
 
 ```csharp
-static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+    this InfoCarrierDeploymentBuilder builder)
 {
-    options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    options.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-    options.AddValueMappers(new MoneyValueMapper());
-    options.AllowArbitrarySqlExecution = true;
+    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+    builder.AddValueMappers(new MoneyValueMapper());
+    builder.AllowArbitrarySqlExecution = true;
+    return builder;
 }
 
-optionsBuilder.UseInfoCarrier(client, o =>
-    o.UseInfoCarrierDeployment(ConfigureInfoCarrier));
+optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
 ```
 
-Pass the method to `AddInfoCarrierDeployment` on the server. Matching settings guide planning,
-but cannot add provider support. The server controls admission. Refusals are not retried.
+Pass the method through `AddInfoCarrier` on the server. Matching settings guide planning, but
+cannot add provider support. The server controls admission. Refusals are not retried.
+
+Reference `InfoCarrier.Core.Abstractions` from this method's project. Prefer an existing shared
+model project. A separate project keeps the model unaware of InfoCarrier. Small repositories can
+link the source file. Abstractions has no Entity Framework Core dependency. A project can reference
+both InfoCarrier packages.
 
 Keep client-only settings outside this method. Existing low-level methods remain supported.
+See [Migrating existing configuration](server.md#migrating-existing-configuration) for version 11
+warnings and replacements.
 
 ## The three objects
 
