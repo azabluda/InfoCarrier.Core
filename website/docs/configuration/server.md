@@ -1,7 +1,7 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Five registrations and one endpoint make it an
-InfoCarrier server.
+The server is an ordinary EF Core application. Five base registrations and one endpoint make it an
+InfoCarrier server. Shared deployment facts add one configuration call.
 
 ```csharp
 using InfoCarrier.Core;
