@@ -3,41 +3,42 @@
 Date: 2026-10-12  
 Issue: [#221](https://github.com/azabluda/InfoCarrier.Core/issues/221)  
 Release: 10.3  
-Status: approved
+Status: approved revision pending implementation
 
 ## Purpose
 
 Version 10.3 adds one shared deployment contract for facts that must agree across the wire. An
-application defines one configuration method and passes it to both role-specific entry points.
-Existing version 10 APIs remain public, keep their signatures and behavior, and receive no
-`[Obsolete]` warnings.
+application defines one configuration method and passes it to direct client and server entry points.
+Shared application projects depend only on a small abstractions package. Existing released version
+10 APIs remain public, keep their signatures and behavior, and receive no `[Obsolete]` warnings.
 
 The first consumer is anonymous-shape planning. Matching client and server declarations select the
 trusted catalog path. Missing client declaration preserves version 10.2 planning. Server admission
 remains strict, and a refusal never triggers automatic client-evaluation retry.
 
-## Scope
+## Package boundary
 
-The shared contract contains four facts:
+Version 10.3 adds `InfoCarrier.Core.Abstractions`. It contains only two public contracts:
 
-- anonymous structures;
-- extra named types;
-- custom value mappers;
-- arbitrary SQL permission.
+- `InfoCarrierDeploymentOptions`;
+- `IInfoCarrierValueMapper`.
 
-These facts need matching application intent on both roles. Store kind stays outside this contract
-because the existing client and server switches describe different facts. Endpoints, serializers,
-payload limits, transactions, logging, server construction, caller identity and store behavior also
-remain role-specific.
+The abstractions package uses only Base Class Library dependencies. It does not reference Entity
+Framework Core or dependency injection. `InfoCarrier.Core` references the abstractions package, and
+`InfoCarrier.Core.AspNetCore` continues to reference `InfoCarrier.Core`.
 
-Version 11 work remains in [issue #104](https://github.com/azabluda/InfoCarrier.Core/issues/104).
-This design does not add role options, contract fingerprints, mismatch negotiation, new server entry
-points, dependency-injection client construction, removals, renames or marker-interface changes.
+A shared application project can reference only `InfoCarrier.Core.Abstractions`. Client and server
+applications reference their existing packages and receive abstractions transitively. No other
+InfoCarrier interface moves into the abstractions package without a separate requirement.
 
-## Public contract
+`IInfoCarrierValueMapper` keeps its namespace and public signature. It moves to the abstractions
+assembly. `InfoCarrier.Core` type-forwards it so binaries compiled against version 10.2 continue to
+resolve the original type identity. Package validation and a compiled compatibility fixture verify
+the forwarding behavior.
 
-`InfoCarrierDeploymentOptions` is a plain public sealed class in the `InfoCarrier.Core` namespace.
-It exposes validated additive methods and one permission property:
+## Shared public contract
+
+`InfoCarrierDeploymentOptions` is a plain public sealed class in the `InfoCarrier.Core` namespace:
 
 ```csharp
 public sealed class InfoCarrierDeploymentOptions
@@ -49,14 +50,51 @@ public sealed class InfoCarrierDeploymentOptions
 }
 ```
 
-The client adds this method to `InfoCarrierDbContextOptionsBuilder`:
+The contract contains four shared facts:
+
+- anonymous structures;
+- extra named types;
+- custom value mappers;
+- arbitrary SQL permission.
+
+Store kind stays outside this contract because the existing client and server switches describe
+different facts. Endpoints, serializers, payload limits, transactions, logging, server construction,
+caller identity, and store behavior also remain role-specific.
+
+Each additive method validates all input before changing state and preserves insertion order. Calls
+on one options instance compose. Arrays are copied before the configuration delegate returns.
+Anonymous prototype values are ignored. Named prototypes and null items fail during configuration.
+
+The options object keeps private mutable lists. It produces one internal immutable snapshot for the
+core package. The abstractions assembly grants `InternalsVisibleTo` only to `InfoCarrier.Core`. Test
+assemblies receive no friendship and verify behavior through public entry points.
+
+## Client entry point
+
+The client adds generic and non-generic direct entry points:
 
 ```csharp
-public virtual InfoCarrierDbContextOptionsBuilder UseInfoCarrierDeployment(
+public static DbContextOptionsBuilder UseInfoCarrierDeployment(
+    this DbContextOptionsBuilder optionsBuilder,
+    IInfoCarrierClient client,
+    Action<InfoCarrierDeploymentOptions> configure);
+
+public static DbContextOptionsBuilder<TContext> UseInfoCarrierDeployment<TContext>(
+    this DbContextOptionsBuilder<TContext> optionsBuilder,
+    IInfoCarrierClient client,
     Action<InfoCarrierDeploymentOptions> configure);
 ```
 
-The server adds this extension method:
+The entry points create one options object, invoke the delegate once, apply its snapshot, and attach
+the supplied client. Existing `UseInfoCarrier` overloads remain supported for lower-level and
+client-specific configuration.
+
+The nested `InfoCarrierDbContextOptionsBuilder.UseInfoCarrierDeployment` method introduced during
+development is removed before release. It never becomes part of the version 10.3 public surface.
+
+## Server entry point
+
+The server entry point remains:
 
 ```csharp
 public static IServiceCollection AddInfoCarrierDeployment(
@@ -64,10 +102,19 @@ public static IServiceCollection AddInfoCarrierDeployment(
     Action<InfoCarrierDeploymentOptions> configure);
 ```
 
-An application can keep one method beside its Entity Framework model configuration:
+It translates the snapshot into existing service registrations. Repeated calls compose. Application
+value mappers retain first-claim-wins order. Standard value mappers are installed automatically and
+idempotently after application mappers.
+
+Applications do not call `AddInfoCarrierStandardValueMappers` separately when using the deployment
+entry point. The existing method remains public for released low-level composition scenarios.
+
+## Application usage
+
+A shared application project owns one method:
 
 ```csharp
-static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+public static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
 {
     options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
     options.AddAllowedTypes(typeof(ApplicationDbFunctions));
@@ -76,55 +123,56 @@ static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
 }
 ```
 
-The application passes `ConfigureInfoCarrier` to both new entry points. Each role creates a separate
-options instance and invokes the delegate once. The application therefore shares configuration code
-without sharing mutable option collections.
+Each role passes the same method to its direct entry point:
 
-## Composition and validation
+```csharp
+clientOptions.UseInfoCarrierDeployment(client, ConfigureInfoCarrier);
+serverServices.AddInfoCarrierDeployment(ConfigureInfoCarrier);
+```
 
-Each additive method preserves insertion order. Calls on one options instance compose. Repeated role
-entry-point calls also compose with earlier calls and with existing low-level registrations.
+Each role creates a separate options instance. The application shares configuration code without
+sharing mutable option collections. Mapper instances are created during each delegate invocation.
 
-All delegates, arrays and array items reject `null` immediately. Anonymous structures use the
-existing prototype validation. Prototype values are ignored, nested anonymous structures are
-included, and named prototypes retain the existing error. Allowed types and mapper instances are
-snapshotted before the role entry point returns.
+The Northwind shared project references `InfoCarrier.Core.Abstractions`, not `InfoCarrier.Core`.
+Client, server, and console applications already reference the core package directly.
 
-Custom value mappers retain the current first-claim-wins order. A mapper instance is not cloned.
-Applications that need separate mutable mapper state must create an instance during each delegate
-invocation. The package's standard `IPAddress` and `Uri` mappers remain after application mappers.
+## Mapper ownership and defaults
 
-## Client integration
+`IInfoCarrierValueMapper` belongs in abstractions because the shared options contract names it.
+Nothing else moves merely because it is an interface.
 
-`UseInfoCarrierDeployment` translates the shared options into the existing
-`InfoCarrierOptionsExtension` state:
+The application mapper list starts empty. Standard `IPAddress` and `Uri` mappers do not appear in
+that list. Core installs them after application mappers on both roles. This keeps application intent
+separate from package defaults and preserves the existing zero client service-provider hash when no
+application mapper exists.
 
-- anonymous structures use the same structural set as `UseRegisteredAnonymousShapes`;
-- allowed types use the same list as `AllowTypes`;
-- arbitrary SQL uses the same flag as `AllowArbitrarySqlExecution`;
-- custom value mappers are registered in the Entity Framework internal service collection.
+A mapper instance is not cloned. Applications that need separate mutable mapper state create an
+instance during each delegate invocation.
 
-The options extension owns the mapper snapshot so `ApplyServices` can add the mapper instances when
-Entity Framework builds the client provider. The extension's service-provider identity must include
-configuration that changes service registrations. This prevents incompatible mapper sets from
-sharing one internal provider.
+## Client service-provider isolation
 
-Existing client methods continue to write the same internal settings. The shared path does not
-change behavior when it is unused.
+The client options extension owns the application mapper snapshot. `ApplyServices` registers those
+instances before standard mappers. The extension's service-provider identity includes the ordered
+mapper object identities. Two configurations with different mapper instances cannot share one
+Entity Framework internal provider.
 
-## Server integration
+Configurations without application mappers retain service-provider hash zero and existing provider
+sharing. Allowed types, anonymous shapes, and arbitrary SQL remain per-context state and do not alter
+service registrations.
 
-`AddInfoCarrierDeployment` translates the shared options into existing service registrations:
+## Anonymous-shape surface reduction
 
-- anonymous structures use the existing trusted catalog registration;
-- allowed types use the existing allowlist registration;
-- arbitrary SQL uses the existing permission marker;
-- custom value mappers use ordered singleton registrations;
-- standard value mappers are registered idempotently.
+The anonymous-shape APIs introduced before version 10.3 are unreleased. Remove these public methods
+rather than retaining internal versions with the same names:
 
-Existing server methods remain independent and composable. The new method grants no permission that
-the shared options do not request. The server remains the admission boundary for anonymous shapes,
-named types and arbitrary SQL.
+```csharp
+InfoCarrierDbContextOptionsBuilder.UseRegisteredAnonymousShapes(...)
+InfoCarrierServiceCollectionExtensions.AddInfoCarrierAnonymousShapes(...)
+```
+
+The shared deployment contract becomes the only public anonymous-shape registration path. Core keeps
+only smaller private or internal helpers needed for validation, planning, catalog construction, and
+service registration. Tests migrate to the shared public entry points.
 
 ## Anonymous registration states
 
@@ -141,30 +189,58 @@ The four states retain the policy selected in
 Registration guides planning and admission. It does not promise provider translation. A server
 refusal returns through the existing fault path and never causes an automatic retry.
 
-## Tests
+## Version 10 compatibility policy
 
-Focused tests cover all four anonymous registration states through the shared entry points. The
-client-only case records database commands and proves zero execution. It also proves one request and
-no automatic retry. The absent-client cases pin version 10.2 planning.
+Released low-level APIs remain public and supported throughout version 10. They receive no obsolete
+attributes. The new deployment API is a recommended facade over supported plumbing, not proof that
+the plumbing is deprecated.
 
-Additional tests prove that:
+Removing a released member, reducing its accessibility, moving it without type forwarding, or adding
+an obsolete warning can break consumers. Such reductions wait for version 11. Documentation can
+recommend the facade while continuing to document supported low-level composition.
 
-- nested anonymous prototypes compose and retain existing validation;
-- named types cross only when both roles use the shared declaration;
-- arbitrary SQL crosses only when both roles use the shared permission;
-- one application method installs a custom mapper on both roles;
-- mapper precedence and repeated registrations preserve order;
-- existing low-level APIs still compile and retain their behavior;
-- the public API compatibility gate reports no removed or changed version 10 member.
+## Version 11 reduction inventory
 
-Product changes run the focused tests first. Final verification runs the specification measurement,
-transport tests, strict Release build, trimming gate, package validation and documentation gates.
+[Issue #104](https://github.com/azabluda/InfoCarrier.Core/issues/104) records candidates for breaking
+surface reduction in version 11:
+
+- `InfoCarrierDbContextOptionsBuilder.AllowTypes`;
+- `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution`;
+- `AddInfoCarrierAllowedTypes`;
+- `AddInfoCarrierArbitrarySqlExecution`;
+- `AddInfoCarrierStandardValueMappers`;
+- manual client mapper registration through an Entity Framework internal service provider;
+- configuration-only marker interfaces;
+- public `InfoCarrierOptionsExtension`, if external construction is unnecessary;
+- redundant role-specific overloads replaced by version 11 role options.
+
+Each candidate must be classified before removal. Extension points and configuration plumbing have
+different compatibility value. Transport, serializer, client, and server building blocks remain
+public unless a separate design replaces their advanced composition scenarios.
+
+## Tests and gates
+
+Focused tests verify:
+
+- shared projects compile with only the abstractions package;
+- the abstractions package has no non-framework package dependencies;
+- a version 10.2 mapper consumer runs through the type forwarder;
+- all inputs validate before configuration changes state;
+- mapper order, repeated calls, and client provider isolation remain correct;
+- all four anonymous registration states preserve their selected behavior;
+- client-only declarations cause one refusal, zero database commands, and no retry;
+- removed anonymous methods are absent from the public API;
+- every released low-level API remains unchanged.
+
+Final verification runs package compatibility, the complete specification measurement, transport
+tests, strict release builds, trimming, sample builds, and documentation gates.
 
 ## Documentation and migration
 
-Package and website configuration examples recommend the shared method. Existing low-level methods
-are described as legacy version 10 paths without compiler deprecation warnings. Documentation states
-that matching declarations express application intent and do not weaken server admission.
+Package and website examples recommend the direct shared entry points. They state that matching
+configuration guides planning but does not grant provider translation. Server admission remains
+authoritative, and refusals are not retried.
 
-After the additive surface is final, issue #104 receives the version 11 removal table. That update
-records the actual version 10.3 names and does not start version 11 implementation.
+The Northwind sample removes redundant standard mapper registration. Documentation keeps released
+low-level paths available without deprecation warnings. Issue #104 receives the expanded version 11
+reduction inventory without starting version 11 implementation.
