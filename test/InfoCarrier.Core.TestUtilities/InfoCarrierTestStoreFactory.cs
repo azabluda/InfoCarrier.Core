@@ -121,7 +121,9 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             return _tier.AddDirectClientServices(serviceCollection);
         }
 
-        serviceCollection = serviceCollection.AddEntityFrameworkInfoCarrier();
+        serviceCollection = serviceCollection
+            .AddEntityFrameworkInfoCarrier()
+            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
         // THERE IS NO PER-TIER CLIENT SEAM, and there has not been one worth keeping since R135.
         // `InfoCarrierTier.AddClientServices` used to sit here so the relational tier could call
