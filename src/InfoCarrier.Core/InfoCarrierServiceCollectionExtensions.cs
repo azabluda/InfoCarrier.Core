@@ -30,43 +30,6 @@ namespace InfoCarrier.Core;
 /// </summary>
 public static class InfoCarrierServiceCollectionExtensions
 {
-    /// <summary>
-    ///     Applies deployment facts that the application configures identically on its server
-    ///     and clients.
-    /// </summary>
-    /// <remarks>
-    ///     This server registration is the admission boundary. Matching client configuration
-    ///     guides planning and sending, but does not grant server permission.
-    /// </remarks>
-    /// <param name="services">The server application's service collection.</param>
-    /// <param name="configure">The application-owned shared configuration method.</param>
-    /// <returns>The same collection, so calls chain.</returns>
-    public static IServiceCollection AddInfoCarrierDeployment(
-        this IServiceCollection services,
-        Action<InfoCarrierDeploymentOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configure);
-
-        var deployment = new InfoCarrierDeploymentOptions();
-        configure(deployment);
-
-        AddInfoCarrierAnonymousShapeTypes(services, deployment.AnonymousShapeTypes);
-        if (deployment.AllowedTypes.Count > 0)
-        {
-            services.AddInfoCarrierAllowedTypes([.. deployment.AllowedTypes]);
-        }
-
-        MoveStandardValueMappersAfter(services, deployment.ValueMappers);
-        services.AddInfoCarrierStandardValueMappers();
-        if (deployment.AllowArbitrarySqlExecution)
-        {
-            services.AddInfoCarrierArbitrarySqlExecution();
-        }
-
-        return services;
-    }
-
     private static void MoveStandardValueMappersAfter(
         IServiceCollection services,
         IEnumerable<ValueMapping.IInfoCarrierValueMapper> mappers)

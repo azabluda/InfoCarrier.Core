@@ -164,4 +164,6 @@ public struct SharedTestStoreProperties
     ///     </para>
     /// </remarks>
     public Type[]? AllowedTypes;
+
+    public object[]? AnonymousShapes;
 }

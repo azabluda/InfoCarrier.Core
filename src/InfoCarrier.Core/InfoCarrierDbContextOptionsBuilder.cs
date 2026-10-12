@@ -16,59 +16,9 @@ namespace InfoCarrier.Core;
 /// </remarks>
 /// <param name="optionsBuilder">The builder being configured.</param>
 public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsBuilder)
+    : InfoCarrierDeploymentBuilder
 {
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
-
-    /// <summary>
-    ///     Applies deployment facts that the application configures identically on its client
-    ///     and server.
-    /// </summary>
-    /// <remarks>
-    ///     This client declaration guides query planning and sending. The server must apply the
-    ///     same configuration independently, and remains the admission boundary.
-    /// </remarks>
-    /// <param name="configure">The application-owned shared configuration method.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public virtual InfoCarrierDbContextOptionsBuilder UseInfoCarrierDeployment(
-        Action<InfoCarrierDeploymentOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(configure);
-        var deployment = new InfoCarrierDeploymentOptions();
-        configure(deployment);
-
-        InfoCarrierOptionsExtension extension =
-            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
-                .WithDeployment(deployment);
-        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
-        return this;
-    }
-
-    /// <summary>
-    ///     States which anonymous structures this client expects the server to have registered.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         This setting controls client query planning. The server still requires its own
-    ///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierAnonymousShapes(Microsoft.Extensions.DependencyInjection.IServiceCollection, object[])" />
-    ///         registration, which is the admission boundary.
-    ///     </para>
-    ///     <para>
-    ///         Calls compose. Prototype values are ignored, nested anonymous structures are
-    ///         included, and named types must use <see cref="AllowTypes" /> instead.
-    ///     </para>
-    /// </remarks>
-    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public virtual InfoCarrierDbContextOptionsBuilder UseRegisteredAnonymousShapes(params object[] shapes)
-    {
-        Type[] types = Expressions.AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
-        InfoCarrierOptionsExtension extension =
-            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
-                .WithRegisteredAnonymousShapes(types);
-
-        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
-        return this;
-    }
 
     /// <summary>
     ///     Permits a wire payload to name these CLR types, in addition to the ones the model
@@ -143,7 +93,7 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     ///     </para>
     /// </remarks>
     /// <returns>The same builder, so calls chain.</returns>
-    public virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
+    public new virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
     {
         InfoCarrierOptionsExtension extension =
             (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())

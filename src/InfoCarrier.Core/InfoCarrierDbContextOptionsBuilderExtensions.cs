@@ -53,7 +53,14 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         // After the extension is in, because `InfoCarrierDbContextOptionsBuilder` reads the
         // current one back off the builder and adds to it. Running it first would have it clone an
         // extension this method then overwrites.
-        infoCarrierOptionsAction?.Invoke(new InfoCarrierDbContextOptionsBuilder(optionsBuilder));
+        if (infoCarrierOptionsAction is not null)
+        {
+            var builder = new InfoCarrierDbContextOptionsBuilder(optionsBuilder);
+            infoCarrierOptionsAction(builder);
+
+            extension = GetOrCreateExtension(optionsBuilder).WithDeployment(builder.CreateSnapshot());
+            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
+        }
 
         return optionsBuilder;
     }

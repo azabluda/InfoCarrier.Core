@@ -936,7 +936,7 @@ public class SqliteSmokeTest
         {
             if (registered)
             {
-                options.UseRegisteredAnonymousShapes(new { Title = "", Address = default(LocatedAddress)! });
+                options.AddAnonymousShapes(new { Title = "", Address = default(LocatedAddress)! });
             }
         });
 

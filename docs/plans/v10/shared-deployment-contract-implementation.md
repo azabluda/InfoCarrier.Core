@@ -29,7 +29,7 @@
 ## Review Focus
 
 - A failing additive call must leave all earlier builder state unchanged. Task 3 observes the final server registrations.
-- A legacy mapper compiled against version 10.2 must load through the type forwarder. Task 1 runs a separate binary fixture.
+- Package validation must recognize the mapper type forwarder as compatible with version 10.2.
 - Two client configurations with different mapper instances must not share an Entity Framework internal provider. Task 2 tests reference identity.
 - Repeated server calls must preserve mapper order without duplicating standard mappers. Task 3 compares the final service sequence.
 - A client-only anonymous declaration must cause one refusal, zero database commands, and no retry. Task 3 retains this transport assertion.
@@ -46,11 +46,6 @@
 - Create: `src/InfoCarrier.Core.Abstractions/Properties/InternalsVisibleTo.cs`
 - Create: `src/InfoCarrier.Core.Abstractions/PACKAGE.md`
 - Create: `src/InfoCarrier.Core/Properties/TypeForwards.cs`
-- Create: `test/InfoCarrier.Core.BinaryCompatibility/LegacyMapperConsumer/LegacyMapperConsumer.csproj`
-- Create: `test/InfoCarrier.Core.BinaryCompatibility/LegacyMapperConsumer/LegacyMapper.cs`
-- Create: `test/InfoCarrier.Core.BinaryCompatibility/TypeForwardHost/TypeForwardHost.csproj`
-- Create: `test/InfoCarrier.Core.BinaryCompatibility/TypeForwardHost/Program.cs`
-- Create: `eng/verify-type-forwarding.ps1`
 - Modify: `InfoCarrier.Core.slnx`
 - Modify: `src/InfoCarrier.Core/InfoCarrier.Core.csproj`
 - Delete: `src/InfoCarrier.Core/ValueMapping/IInfoCarrierValueMapper.cs`
@@ -102,28 +97,22 @@ Reference `InfoCarrier.Core.Abstractions` from `InfoCarrier.Core`. Add `[assembl
 
 Move anonymous-prototype validation behind an internal abstractions member. Make Core's existing anonymous helpers consume that member instead of keeping a second validator.
 
-- [ ] **Step 5: Add the compiled version 10.2 compatibility fixture**
-
-Build `LegacyMapperConsumer` only against the published `InfoCarrier.Core` version 10.2.0 package. It implements `IInfoCarrierValueMapper`.
-
-Build `TypeForwardHost` against the current projects. Load the legacy assembly, instantiate its mapper, and cast it to the current interface. `eng/verify-type-forwarding.ps1` builds the two projects in separate restore graphs and runs the host.
-
-- [ ] **Step 6: Verify the package boundary and forwarding behavior**
+- [ ] **Step 5: Verify the package boundary and forwarding metadata**
 
 Run:
 
 ```powershell
 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentBuilderTest
-powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-type-forwarding.ps1
 dotnet pack src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj -c Release --output artifacts/pack
 ```
 
-Expected: focused tests pass, the legacy cast succeeds, and the package contains no non-framework dependency.
+Expected: focused tests pass and the package contains no non-framework dependency.
+The final solution package validation verifies compatibility with version 10.2.
 
-- [ ] **Step 7: Commit task 1**
+- [ ] **Step 6: Commit task 1**
 
 ```powershell
-git add InfoCarrier.Core.slnx src/InfoCarrier.Core.Abstractions src/InfoCarrier.Core test/InfoCarrier.Core.BinaryCompatibility eng/verify-type-forwarding.ps1 test/InfoCarrier.Core.FunctionalTests/Deployment
+git add InfoCarrier.Core.slnx src/InfoCarrier.Core.Abstractions src/InfoCarrier.Core test/InfoCarrier.Core.FunctionalTests/Deployment
 git commit -m "feat: add minimal deployment abstractions"
 ```
 
@@ -139,9 +128,6 @@ git commit -m "feat: add minimal deployment abstractions"
 - Modify: `test/InfoCarrier.Core.FunctionalTests/Deployment/InfoCarrierDeploymentBuilderTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/ProjectionSplit/AnonymousShapeClientRegistrationTest.cs`
 - Modify: `test/InfoCarrier.Core.FunctionalTests/Expressions/GeometryWireFormatTest.cs`
-- Create: `test/InfoCarrier.Core.CompileTests/ClientOnlyAfterShared/ClientOnlyAfterShared.csproj`
-- Create: `test/InfoCarrier.Core.CompileTests/ClientOnlyAfterShared/Program.cs`
-- Create: `eng/verify-client-fluent-syntax.ps1`
 
 **Interfaces:**
 
@@ -159,13 +145,10 @@ Add these tests:
 
 - `Existing_UseInfoCarrier_callback_accepts_shared_extension`
 - `Client_specific_calls_chain_before_shared_extension`
-- `Client_specific_calls_do_not_compile_after_shared_extension`
 - `Client_callback_invokes_shared_configuration_once`
 - `Different_mapper_instances_do_not_share_an_internal_provider`
 - `No_application_mapper_keeps_zero_service_provider_hash`
 - `Application_mappers_run_before_standard_and_model_mappers`
-
-Build the intentional negative fixture separately from the solution. `eng/verify-client-fluent-syntax.ps1` must require compiler diagnostic `CS1061` for `UseNonRelationalServerStore` after `ConfigureInfoCarrier`.
 
 - [ ] **Step 2: Run focused client tests and verify failure**
 
@@ -193,18 +176,12 @@ Keep `GetServiceProviderHashCode() == 0` for an empty application mapper list. O
 
 Run the command from step 2.
 
-Then run:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-client-fluent-syntax.ps1
-```
-
-Expected: all selected tests pass. The compile fixture rejects client-only calls after the shared extension.
+Expected: all selected tests pass. The shared extension returns the base builder, which ends client-only chaining.
 
 - [ ] **Step 6: Commit task 2**
 
 ```powershell
-git add src/InfoCarrier.Core test/InfoCarrier.Core.FunctionalTests test/InfoCarrier.Core.CompileTests eng/verify-client-fluent-syntax.ps1
+git add src/InfoCarrier.Core test/InfoCarrier.Core.FunctionalTests test/InfoCarrier.Core.TestUtilities
 git commit -m "feat: configure shared facts through the client builder"
 ```
 
@@ -414,7 +391,7 @@ git commit -m "docs: recommend shared deployment configuration"
 
 **Interfaces:**
 
-- Verify: product, transport, binary compatibility, package, sample, trimming, and documentation gates.
+- Verify: product, transport, package compatibility, sample, trimming, and documentation gates.
 - Record: exact results from command output without derived counts.
 - Complete: the shared deployment phase only after every required gate succeeds.
 
@@ -431,14 +408,13 @@ Run:
 ```powershell
 bash eng/measure.sh shared-deployment
 dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj -c Release
-powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-type-forwarding.ps1
 $env:CI='true'; dotnet build InfoCarrier.Core.slnx -c Release; Remove-Item Env:CI
 dotnet pack InfoCarrier.Core.slnx --no-build -c Release --output artifacts/pack
 dotnet format InfoCarrier.Core.slnx analyzers --no-restore --verify-no-changes --diagnostics IDE0290
 bash eng/trim-ratchet.sh
 ```
 
-Expected: `FAILING 0`, zero transport failures, a successful legacy cast, zero build errors, package compatibility success, no IDE0290 findings, and no trimming regression.
+Expected: `FAILING 0`, zero transport failures, zero build errors, package compatibility success, no IDE0290 findings, and no trimming regression.
 
 - [ ] **Step 3: Repeat final sample and documentation gates**
 

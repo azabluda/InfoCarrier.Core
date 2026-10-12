@@ -44,16 +44,16 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
     internal IReadOnlyList<IInfoCarrierValueMapper> ValueMappers { get; private set; } = [];
 
-    internal InfoCarrierOptionsExtension WithDeployment(InfoCarrierDeploymentOptions options)
+    internal InfoCarrierOptionsExtension WithDeployment(InfoCarrierDeploymentSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(snapshot);
 
         var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
         clone._info = null;
-        clone.RegisteredAnonymousShapes = RegisteredAnonymousShapes.Add(options.AnonymousShapeTypes);
-        clone.AllowedTypes = [.. AllowedTypes, .. options.AllowedTypes];
-        clone.ValueMappers = [.. ValueMappers, .. options.ValueMappers];
-        clone.ArbitrarySqlExecutionAllowed |= options.AllowArbitrarySqlExecution;
+        clone.RegisteredAnonymousShapes = RegisteredAnonymousShapes.Add(snapshot.AnonymousShapeTypes);
+        clone.AllowedTypes = [.. AllowedTypes, .. snapshot.AllowedTypes];
+        clone.ValueMappers = [.. ValueMappers, .. snapshot.ValueMappers];
+        clone.ArbitrarySqlExecutionAllowed |= snapshot.AllowArbitrarySqlExecution;
         return clone;
     }
 

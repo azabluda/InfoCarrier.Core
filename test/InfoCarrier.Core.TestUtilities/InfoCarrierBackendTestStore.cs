@@ -254,6 +254,11 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     public Type[] AllowedTypes => _testStoreProperties.AllowedTypes ?? [];
 
     /// <summary>
+    ///     The fixture's declared anonymous prototypes for client query planning.
+    /// </summary>
+    public object[] AnonymousShapes => _testStoreProperties.AnonymousShapes ?? [];
+
+    /// <summary>
     ///     The backing store's <see cref="DbParameter" /> type, when it has one - admitted on both
     ///     sides alongside <see cref="ArbitrarySqlExecution" />.
     /// </summary>
