@@ -16,6 +16,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
 
+    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+
     <!--
       Automatic lazy loading (spec 3.2). Referenced explicitly: the functional test project gets
       this transitively through the spec-tests package, which a sample must not reference.

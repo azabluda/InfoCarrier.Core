@@ -22,8 +22,8 @@ var client = new TransportInfoCarrierClient(
     loggerFactory.CreateLogger<TransportInfoCarrierClient>());
 
 DbContextOptions<NorthwindContext> options = new DbContextOptionsBuilder<NorthwindContext>()
-    .UseInfoCarrier(client, infoCarrier => infoCarrier.UseRegisteredAnonymousShapes(
-        new { Id = 0, CustomerId = (string?)null }))
+    .UseInfoCarrier(client, infoCarrier =>
+        infoCarrier.UseInfoCarrierDeployment(NorthwindDeployment.ConfigureInfoCarrier))
     .UseLoggerFactory(loggerFactory)
     .UseLazyLoadingProxies()
     .Options;

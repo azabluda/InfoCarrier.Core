@@ -105,33 +105,21 @@ need not agree. The CLR type has one.
 ## Registering it
 
 Register the mapper on both halves, or a value that crosses in both directions is mapped in one
-direction only.
+direction only. Put the mapper in the same application-owned deployment method:
 
-=== "Server"
+```csharp
+static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+    => options.AddValueMappers(new MoneyValueMapper());
 
-    ```csharp
-    builder.Services
-        .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-        .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-        .AddInfoCarrierStandardValueMappers()
-        .AddSingleton<IInfoCarrierValueMapper, MoneyValueMapper>();
-    ```
+// Client
+optionsBuilder.UseInfoCarrier(client, o =>
+    o.UseInfoCarrierDeployment(ConfigureInfoCarrier));
 
-=== "Client"
+// Server
+builder.Services.AddInfoCarrierDeployment(ConfigureInfoCarrier);
+```
 
-    ```csharp
-    ServiceProvider providerServices = new ServiceCollection()
-        .AddEntityFrameworkInfoCarrier()
-        .AddSingleton<IInfoCarrierValueMapper, MoneyValueMapper>()
-        .BuildServiceProvider();
-
-    DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-        .UseInternalServiceProvider(providerServices)
-        .UseInfoCarrier(client)
-        .Options;
-    ```
-
-    Build that service provider once and share it across contexts.
+The existing service-provider registration remains available for version 10 applications.
 
 Your own mappers get first refusal, ahead of anything the library derives from the model, so
 registering one is never overridden.

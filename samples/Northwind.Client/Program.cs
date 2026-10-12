@@ -62,8 +62,7 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
     .UseInfoCarrier(
         services.GetRequiredService<IInfoCarrierClient>(),
-        infoCarrier => infoCarrier.UseRegisteredAnonymousShapes(
-            new { Id = 0, CustomerId = (string?)null }))
+        infoCarrier => infoCarrier.UseInfoCarrierDeployment(NorthwindDeployment.ConfigureInfoCarrier))
 
     // NOTE THE ABSENCE: there is no UseLazyLoadingProxies() here, and the server does call it.
     //

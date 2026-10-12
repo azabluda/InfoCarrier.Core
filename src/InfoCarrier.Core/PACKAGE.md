@@ -23,23 +23,27 @@ IInfoCarrierClient client = new TransportInfoCarrierClient(
     new HttpInfoCarrierTransport(http, serializer), serializer);
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-    .UseInfoCarrier(client, remote => remote.UseRegisteredAnonymousShapes(
-        new { Id = 0, CustomerId = (string?)null }))
+    .UseInfoCarrier(client, remote =>
+        remote.UseInfoCarrierDeployment(ConfigureInfoCarrier))
     .Options;
 
 await using var context = new ShopContext(options);
+
+static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+{
+    options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+}
 ```
 
-Register the same anonymous structures on the server:
+Use the same method on the server:
 
 ```csharp
-services.AddInfoCarrierAnonymousShapes(
-    new { Id = 0, CustomerId = (string?)null });
+services.AddInfoCarrierDeployment(ConfigureInfoCarrier);
 ```
 
-With neither declaration, or only the server declaration, eligible projections are rebuilt on the
-client. A client-only declaration reaches the server and is refused. Matching declarations let the
-server provider translate or refuse the query. A refusal returns to the caller without a client
+The shared method can also register named types, custom value mappers, and arbitrary SQL access.
+Matching settings guide query planning. They do not grant translation support to the server's
+database provider. The server remains the admission boundary. A refusal returns without a client
 evaluation retry.
 
 `client` is safe to share: it holds no mutable state, so one instance serves every `DbContext` in

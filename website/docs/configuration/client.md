@@ -30,6 +30,28 @@ optionsBuilder.UseInfoCarrier(client, o => o
 
 Leave all three alone unless one of those sentences is true of your deployment.
 
+## Configuration shared with the server
+
+Put shared deployment facts in one application-owned method:
+
+```csharp
+static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
+{
+    options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    options.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+    options.AddValueMappers(new MoneyValueMapper());
+    options.AllowArbitrarySqlExecution = true;
+}
+
+optionsBuilder.UseInfoCarrier(client, o =>
+    o.UseInfoCarrierDeployment(ConfigureInfoCarrier));
+```
+
+Pass the method to `AddInfoCarrierDeployment` on the server. Matching settings guide planning,
+but cannot add provider support. The server controls admission. Refusals are not retried.
+
+Keep client-only settings outside this method. Existing low-level methods remain supported.
+
 ## The three objects
 
 ```csharp
@@ -165,10 +187,8 @@ DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
     .Options;
 ```
 
-`AddEntityFrameworkInfoCarrier()` registers everything the provider needs, including the value
-mappers that ship with it. Build the provider once and share it: EF caches services on it, and a new
-one per context is a leak. If you need neither feature, do not do this. The default path builds and
-caches the service provider for you.
+`AddEntityFrameworkInfoCarrier()` registers the provider and its standard value mappers. Build and
+share this provider once. Otherwise, use the default provider.
 
 ## Client-side query filters and interceptors
 
