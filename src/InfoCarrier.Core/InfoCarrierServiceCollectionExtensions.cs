@@ -30,6 +30,43 @@ namespace InfoCarrier.Core;
 /// </summary>
 public static class InfoCarrierServiceCollectionExtensions
 {
+    /// <summary>
+    ///     Applies deployment facts that the application configures identically on its server
+    ///     and clients.
+    /// </summary>
+    /// <remarks>
+    ///     This server registration is the admission boundary. Matching client configuration
+    ///     guides planning and sending, but does not grant server permission.
+    /// </remarks>
+    /// <param name="services">The server application's service collection.</param>
+    /// <param name="configure">The application-owned shared configuration method.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrier(
+        this IServiceCollection services,
+        Action<InfoCarrierDeploymentBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var builder = new InfoCarrierDeploymentBuilder();
+        configure(builder);
+        InfoCarrierDeploymentSnapshot snapshot = builder.CreateSnapshot();
+
+        AddInfoCarrierAnonymousShapeTypes(services, snapshot.AnonymousShapeTypes);
+        if (snapshot.AllowedTypes.Length > 0)
+        {
+            AddAllowedTypes(services, snapshot.AllowedTypes);
+        }
+        MoveStandardValueMappersAfter(services, snapshot.ValueMappers);
+        services.AddInfoCarrierStandardValueMappers();
+        if (snapshot.AllowArbitrarySqlExecution)
+        {
+            AddArbitrarySqlExecution(services);
+        }
+
+        return services;
+    }
+
     private static void MoveStandardValueMappersAfter(
         IServiceCollection services,
         IEnumerable<ValueMapping.IInfoCarrierValueMapper> mappers)
@@ -49,24 +86,6 @@ public static class InfoCarrierServiceCollectionExtensions
         {
             services.AddSingleton<ValueMapping.IInfoCarrierValueMapper>(mapper);
         }
-    }
-
-    /// <summary>
-    ///     Registers anonymous data structures from trusted prototypes. Only property names,
-    ///     order, and types are used; prototype values are ignored. Nested shapes are included.
-    ///     Calls compose, and component-type permissions still require their existing registration.
-    ///     The catalog is built with the server context's model before accepting requests.
-    /// </summary>
-    /// <param name="services">The server application service collection.</param>
-    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
-    /// <returns>The same collection.</returns>
-    public static IServiceCollection AddInfoCarrierAnonymousShapes(
-        this IServiceCollection services, params object[] shapes)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        Type[] types = AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
-
-        return AddInfoCarrierAnonymousShapeTypes(services, types);
     }
 
     private static IServiceCollection AddInfoCarrierAnonymousShapeTypes(
@@ -285,7 +304,13 @@ public static class InfoCarrierServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(types);
 
-        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(types));
+        return AddAllowedTypes(services, types);
+    }
+
+    private static IServiceCollection AddAllowedTypes(IServiceCollection services, IEnumerable<Type> types)
+    {
+        Type[] snapshot = [.. types];
+        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(snapshot));
 
         return services;
     }
@@ -331,9 +356,12 @@ public static class InfoCarrierServiceCollectionExtensions
     public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        return AddArbitrarySqlExecution(services);
+    }
 
+    private static IServiceCollection AddArbitrarySqlExecution(IServiceCollection services)
+    {
         services.TryAddSingleton<IInfoCarrierArbitrarySqlExecution, ArbitrarySqlExecution>();
-
         return services;
     }
 

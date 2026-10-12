@@ -32,15 +32,15 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var prototype = new { Key = (string?)null, Count = 0 };
         var counter = new CommandCounter();
 
-        void Configure(InfoCarrierDeploymentOptions options)
-            => options.AddAnonymousShapes(prototype);
+        void Configure(InfoCarrierDeploymentBuilder builder)
+            => builder.AddAnonymousShapes(prototype);
 
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.RemoveAll<AnonymousShapeCatalog>();
             if (serverShape)
             {
-                services.AddInfoCarrierDeployment(Configure);
+                services.AddInfoCarrier(Configure);
             }
 
             services.AddSingleton<IInterceptor>(counter);
@@ -118,7 +118,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             services.RemoveAll<AnonymousShapeCatalog>();
             if (serverShape)
             {
-                services.AddInfoCarrierAnonymousShapes(prototype);
+                services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype));
             }
 
             services.AddSingleton<IInterceptor>(counter);
@@ -216,7 +216,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     {
         var prototype = new { Id = 0, Customer = new { CustomerId = (string?)null } };
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
-            services => services.AddInfoCarrierAnonymousShapes(prototype)));
+            services => services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype))));
         using NorthwindContext context = CreateClientContext(
             configured,
             registerShape: false,
@@ -439,7 +439,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         out RecordingHandler recorder,
         bool allowRecord = false,
         object[]? anonymousShapes = null,
-        Action<InfoCarrierDeploymentOptions>? deployment = null)
+        Action<InfoCarrierDeploymentBuilder>? deployment = null)
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var handler = new RecordingHandler();
@@ -455,22 +455,22 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
                 {
                     if (deployment is not null)
                     {
-                        options.UseInfoCarrierDeployment(deployment);
+                        deployment(options);
                     }
 
                     if (registerShape)
                     {
-                        options.UseRegisteredAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+                        options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
                     }
 
                     if (anonymousShapes is not null)
                     {
-                        options.UseRegisteredAnonymousShapes(anonymousShapes);
+                        options.AddAnonymousShapes(anonymousShapes);
                     }
 
                     if (allowRecord)
                     {
-                        options.AllowTypes(typeof(OrderCard));
+                        options.AddAllowedTypes(typeof(OrderCard));
                     }
                 })
                 .UseLazyLoadingProxies()

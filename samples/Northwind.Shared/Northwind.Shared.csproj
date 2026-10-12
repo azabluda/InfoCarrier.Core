@@ -16,7 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
 
-    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core.Abstractions\InfoCarrier.Core.Abstractions.csproj" />
 
     <!--
       Automatic lazy loading (spec 3.2). Referenced explicitly: the functional test project gets

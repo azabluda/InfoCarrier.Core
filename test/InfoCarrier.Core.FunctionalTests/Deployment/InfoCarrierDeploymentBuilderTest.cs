@@ -135,6 +135,141 @@ public class InfoCarrierDeploymentBuilderTest
         Assert.IsType<UriValueMapper>(mappers[2]);
     }
 
+    [Fact]
+    public void Server_AddInfoCarrier_translates_shared_permissions()
+    {
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrier(builder =>
+        {
+            builder.AddAllowedTypes(typeof(DateOnly));
+            builder.AllowArbitrarySqlExecution = true;
+        });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Equal(
+            typeof(DateOnly),
+            Assert.Single(provider.GetServices<global::InfoCarrier.Core.Expressions.IInfoCarrierAllowedTypes>()).Types.Single());
+        Assert.NotNull(provider.GetService<IInfoCarrierArbitrarySqlExecution>());
+    }
+
+    [Fact]
+    public void Server_AddInfoCarrier_invokes_configuration_once_and_rejects_null()
+    {
+        var services = new ServiceCollection();
+        var calls = 0;
+
+        services.AddInfoCarrier(_ => calls++);
+
+        Assert.Equal(1, calls);
+        Assert.Throws<ArgumentNullException>(() => services.AddInfoCarrier(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            InfoCarrierServiceCollectionExtensions.AddInfoCarrier(null!, _ => { }));
+    }
+
+    [Fact]
+    public void Repeated_server_calls_compose_application_mappers_before_standard_mappers()
+    {
+        var first = new StubMapper();
+        var second = new StubMapper();
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrier(builder => builder.AddValueMappers(first));
+        services.AddInfoCarrier(builder => builder.AddValueMappers(second));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
+        Assert.Equal(4, mappers.Length);
+        Assert.Same(first, mappers[0]);
+        Assert.Same(second, mappers[1]);
+        Assert.IsType<IPAddressValueMapper>(mappers[2]);
+        Assert.IsType<UriValueMapper>(mappers[3]);
+    }
+
+    [Fact]
+    public void Application_mapper_lists_start_empty_on_both_roles()
+    {
+        InfoCarrierOptionsExtension client = ClientExtension();
+        var clientServices = new ServiceCollection();
+        client.ApplyServices(clientServices);
+        var services = new ServiceCollection();
+
+        services.AddInfoCarrier(_ => { });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
+        Assert.Collection(
+            clientProvider.GetServices<IInfoCarrierValueMapper>(),
+            mapper => Assert.IsType<IPAddressValueMapper>(mapper),
+            mapper => Assert.IsType<UriValueMapper>(mapper));
+        Assert.Collection(
+            provider.GetServices<IInfoCarrierValueMapper>(),
+            mapper => Assert.IsType<IPAddressValueMapper>(mapper),
+            mapper => Assert.IsType<UriValueMapper>(mapper));
+    }
+
+    [Fact]
+    public void One_application_extension_configures_both_roles_without_shared_state()
+    {
+        var created = new List<StubMapper>();
+        InfoCarrierDeploymentBuilder Configure(InfoCarrierDeploymentBuilder builder)
+        {
+            var mapper = new StubMapper();
+            created.Add(mapper);
+            builder.AddValueMappers(mapper);
+            return builder;
+        }
+
+        var options = new DbContextOptionsBuilder();
+        options.UseInfoCarrier(StubClient.Instance, builder => Configure(builder));
+        InfoCarrierOptionsExtension client = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+        var clientServices = new ServiceCollection();
+        client.ApplyServices(clientServices);
+        var services = new ServiceCollection();
+        services.AddInfoCarrier(builder => Configure(builder));
+
+        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Equal(2, created.Count);
+        Assert.NotSame(created[0], created[1]);
+        Assert.Same(created[0], clientProvider.GetServices<IInfoCarrierValueMapper>().First());
+        Assert.Same(created[1], provider.GetServices<IInfoCarrierValueMapper>().First());
+    }
+
+    [Fact]
+    public void Failed_additive_server_call_does_not_change_existing_state()
+    {
+        var accepted = new StubMapper();
+        var rejected = new StubMapper();
+        var services = new ServiceCollection();
+        services.AddInfoCarrier(builder => builder.AddValueMappers(accepted));
+
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(builder =>
+        {
+            builder.AddValueMappers(rejected);
+            builder.AddAllowedTypes([typeof(DateOnly), null!]);
+        }));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
+        Assert.DoesNotContain(rejected, mappers);
+        Assert.Same(accepted, mappers[0]);
+    }
+
+    [Fact]
+    public void Server_configuration_snapshots_caller_owned_arrays()
+    {
+        var original = new StubMapper();
+        IInfoCarrierValueMapper[] mappers = [original];
+        var services = new ServiceCollection();
+        services.AddInfoCarrier(builder => builder.AddValueMappers(mappers));
+
+        mappers[0] = new StubMapper();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Same(original, provider.GetServices<IInfoCarrierValueMapper>().First());
+    }
+
     private static InfoCarrierOptionsExtension ClientExtension(params IInfoCarrierValueMapper[] mappers)
     {
         var options = new DbContextOptionsBuilder();

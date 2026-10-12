@@ -62,7 +62,7 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
     .UseInfoCarrier(
         services.GetRequiredService<IInfoCarrierClient>(),
-        infoCarrier => infoCarrier.UseInfoCarrierDeployment(NorthwindDeployment.ConfigureInfoCarrier))
+        infoCarrier => infoCarrier.ConfigureInfoCarrier())
 
     // NOTE THE ABSENCE: there is no UseLazyLoadingProxies() here, and the server does call it.
     //

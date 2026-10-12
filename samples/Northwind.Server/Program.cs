@@ -24,12 +24,7 @@ builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindConte
 builder.Services
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-
-    // ADR-012, amended C89. The client gets the standard value mappers from
-    // AddEntityFrameworkInfoCarrier; a server builds its own service collection, so it has to
-    // ask. A value mapped on one side only is worse than one mapped on neither.
-    .AddInfoCarrierStandardValueMappers()
-    .AddInfoCarrierDeployment(NorthwindDeployment.ConfigureInfoCarrier);
+    .AddInfoCarrier(infoCarrier => infoCarrier.ConfigureInfoCarrier());
 
 WebApplication app = builder.Build();
 

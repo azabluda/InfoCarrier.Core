@@ -16,9 +16,11 @@ public class AnonymousShapeClientRegistrationTest
         var services = new ServiceCollection();
 
         Assert.Throws<ArgumentException>(() => builder.AddAnonymousShapes(new NamedRecord(1)));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierAnonymousShapes(new NamedRecord(1)));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+            deployment => deployment.AddAnonymousShapes(new NamedRecord(1))));
         Assert.Throws<ArgumentException>(() => builder.AddAnonymousShapes(new object[] { null! }));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierAnonymousShapes(new object[] { null! }));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+            deployment => deployment.AddAnonymousShapes(new object[] { null! })));
     }
 
     [Fact]

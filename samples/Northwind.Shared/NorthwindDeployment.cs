@@ -6,6 +6,9 @@ namespace Northwind.Shared;
 
 public static class NorthwindDeployment
 {
-    public static void ConfigureInfoCarrier(InfoCarrierDeploymentOptions options)
-        => options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        return builder;
+    }
 }
