@@ -195,7 +195,7 @@ public class InfoCarrierDeploymentBuilderTest
         client.ApplyServices(clientServices);
         var services = new ServiceCollection();
 
-        services.AddInfoCarrier(_ => { });
+        services.AddInfoCarrier();
 
         using ServiceProvider provider = services.BuildServiceProvider();
         using ServiceProvider clientProvider = clientServices.BuildServiceProvider();

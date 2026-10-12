@@ -31,6 +31,14 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierServiceCollectionExtensions
 {
     /// <summary>
+    ///     Adds standard server deployment conventions without application-specific facts.
+    /// </summary>
+    /// <param name="services">The server application's service collection.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrier(this IServiceCollection services)
+        => services.AddInfoCarrier(static _ => { });
+
+    /// <summary>
     ///     Applies deployment facts that the application configures identically on its server
     ///     and clients.
     /// </summary>

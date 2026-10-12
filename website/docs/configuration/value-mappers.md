@@ -26,7 +26,7 @@ They are registered automatically on both sides. The server registration happens
 shared deployment configuration:
 
 ```csharp
-builder.Services.AddInfoCarrier(_ => { });
+builder.Services.AddInfoCarrier();
 ```
 
 A geometry mapper is deliberately not in the box, because shipping one would put a NetTopologySuite

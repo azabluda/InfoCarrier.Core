@@ -103,7 +103,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
             // The server half of ADR-012's standard mappers. The client gets them from
             // `AddEntityFrameworkInfoCarrier`; a server builds its own collection, so it asks.
-            .AddInfoCarrier(_ => { });
+            .AddInfoCarrier();
 
         // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
         // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`
