@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj" />
     <Project Path="src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
     <Project Path="src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
   </Folder>

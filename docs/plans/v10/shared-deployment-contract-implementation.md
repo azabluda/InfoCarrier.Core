@@ -114,7 +114,7 @@ Run:
 
 ```powershell
 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj -c Release --filter FullyQualifiedName~InfoCarrierDeploymentBuilderTest
-powershell -File eng/verify-type-forwarding.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-type-forwarding.ps1
 dotnet pack src/InfoCarrier.Core.Abstractions/InfoCarrier.Core.Abstractions.csproj -c Release --output artifacts/pack
 ```
 
@@ -196,7 +196,7 @@ Run the command from step 2.
 Then run:
 
 ```powershell
-powershell -File eng/verify-client-fluent-syntax.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-client-fluent-syntax.ps1
 ```
 
 Expected: all selected tests pass. The compile fixture rejects client-only calls after the shared extension.
@@ -431,7 +431,7 @@ Run:
 ```powershell
 bash eng/measure.sh shared-deployment
 dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj -c Release
-powershell -File eng/verify-type-forwarding.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File eng/verify-type-forwarding.ps1
 $env:CI='true'; dotnet build InfoCarrier.Core.slnx -c Release; Remove-Item Env:CI
 dotnet pack InfoCarrier.Core.slnx --no-build -c Release --output artifacts/pack
 dotnet format InfoCarrier.Core.slnx analyzers --no-restore --verify-no-changes --diagnostics IDE0290
