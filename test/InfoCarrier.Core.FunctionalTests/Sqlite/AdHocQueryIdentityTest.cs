@@ -26,7 +26,8 @@ public class AdHocQueryIdentityTest
                 ArbitrarySqlExecution = true,
             });
         await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
-        var options = new DbContextOptionsBuilder().UseInfoCarrier(store, builder => builder.AllowArbitrarySqlExecution()).Options;
+        var options = new DbContextOptionsBuilder().UseInfoCarrier(
+            store, builder => ((InfoCarrierDeploymentBuilder)builder).AllowArbitrarySqlExecution = true).Options;
         await using RowContext client = new(options);
         IQueryable<Row> query = mapped
             ? client.Set<Row>().FromSqlRaw("SELECT * FROM Rows")
@@ -65,7 +66,8 @@ public class AdHocQueryIdentityTest
         await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext, seed: async context =>
             await context.Database.ExecuteSqlRawAsync("INSERT INTO Rows (Value) VALUES ('visible'), ('excluded')"));
         using DbContext server = store.CreateDbContext();
-        var options = new DbContextOptionsBuilder().UseInfoCarrier(store, builder => builder.AllowArbitrarySqlExecution()).Options;
+        var options = new DbContextOptionsBuilder().UseInfoCarrier(
+            store, builder => ((InfoCarrierDeploymentBuilder)builder).AllowArbitrarySqlExecution = true).Options;
         await using RowContext client = new(options);
 
         async Task<string[]> Read(DbContext context)

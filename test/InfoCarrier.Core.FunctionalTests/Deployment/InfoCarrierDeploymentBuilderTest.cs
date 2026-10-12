@@ -4,6 +4,7 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.ValueMapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Deployment;
@@ -270,6 +271,58 @@ public class InfoCarrierDeploymentBuilderTest
         Assert.Same(original, provider.GetServices<IInfoCarrierValueMapper>().First());
     }
 
+    [Fact]
+    public void Version_10_3_marks_only_approved_v11_configuration_removals_obsolete()
+    {
+        const string url = "https://github.com/azabluda/InfoCarrier.Core/issues/221";
+        (MethodInfo Method, string DiagnosticId, string Replacement)[] expected =
+        [
+            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowTypes)),
+                "ICC1001", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
+            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution)),
+                "ICC1002", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierAllowedTypes)),
+                "ICC1003", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution)),
+                "ICC1004", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierStandardValueMappers)),
+                "ICC1005", "AddInfoCarrier")
+        ];
+
+        foreach ((MethodInfo method, string diagnosticId, string replacement) in expected)
+        {
+            ObsoleteAttribute obsolete = Assert.Single(method.GetCustomAttributes<ObsoleteAttribute>());
+            Assert.False(obsolete.IsError);
+            Assert.Equal(diagnosticId, obsolete.DiagnosticId);
+            Assert.Equal(url, obsolete.UrlFormat);
+            Assert.Contains(replacement, obsolete.Message, StringComparison.Ordinal);
+        }
+
+        MethodInfo[] obsoleteConfigurationMethods =
+        [
+            .. typeof(InfoCarrierDbContextOptionsBuilder).GetMethods(BindingFlags.Instance | BindingFlags.Public),
+            .. typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public)
+        ];
+        Assert.Equal(
+            expected.Select(item => item.Method).OrderBy(method => method.Name),
+            obsoleteConfigurationMethods
+                .Where(method => method.IsDefined(typeof(ObsoleteAttribute)))
+                .OrderBy(method => method.Name));
+    }
+
+    [Fact]
+    public void Unreleased_anonymous_role_methods_are_absent()
+    {
+        Assert.DoesNotContain(
+            typeof(InfoCarrierDbContextOptionsBuilder).GetMethods(BindingFlags.Instance | BindingFlags.Public),
+            method => method.Name is "UseInfoCarrierDeployment" or "UseRegisteredAnonymousShapes");
+        Assert.DoesNotContain(
+            typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public),
+            method => method.Name == "AddInfoCarrierDeployment"
+                || method.Name == "AddInfoCarrierAnonymousShapes"
+                    && method.GetParameters().LastOrDefault()?.ParameterType == typeof(object[]));
+    }
+
     private static InfoCarrierOptionsExtension ClientExtension(params IInfoCarrierValueMapper[] mappers)
     {
         var options = new DbContextOptionsBuilder();
@@ -278,6 +331,11 @@ public class InfoCarrierDeploymentBuilderTest
             builder => builder.AddValueMappers(mappers));
         return options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
     }
+
+    private static MethodInfo Method(Type type, string name)
+        => Assert.Single(
+            type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public),
+            method => method.Name == name);
 
     private sealed record NamedRecord(int Value);
 

@@ -2302,7 +2302,7 @@ public partial class ServerParameterizationTest
                     {
                         if (allowedTypes is not null)
                         {
-                            o.AllowTypes(allowedTypes);
+                            o.AddAllowedTypes(allowedTypes);
                         }
                     })
                 .Options))

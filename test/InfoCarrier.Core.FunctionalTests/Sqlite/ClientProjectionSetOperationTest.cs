@@ -34,7 +34,7 @@ public class ClientProjectionSetOperationTest
         });
         using DbContext server = store.CreateDbContext();
         await using SetContext client = new(new DbContextOptionsBuilder<SetContext>().UseInfoCarrier(store,
-            options => options.AllowTypes(registered ? [typeof(ClientProjectionSetOperationTest)] : [])).Options);
+            options => options.AddAllowedTypes(registered ? [typeof(ClientProjectionSetOperationTest)] : [])).Options);
 
         // Unregistered private helpers characterize ICC alone, not the backend's contract.
         foreach (DbContext context in registered ? new DbContext[] { server, client } : [client])
@@ -130,7 +130,11 @@ public class ClientProjectionSetOperationTest
         });
         using DbContext server = store.CreateDbContext();
         await using SetContext client = new(new DbContextOptionsBuilder<SetContext>().UseInfoCarrier(store,
-            options => options.UseNonRelationalServerStore().AllowTypes(typeof(ClientProjectionSetOperationTest))).Options);
+            options =>
+            {
+                options.UseNonRelationalServerStore();
+                options.AddAllowedTypes(typeof(ClientProjectionSetOperationTest));
+            }).Options);
 
         async Task Execute(DbContext context)
         {

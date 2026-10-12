@@ -38,7 +38,7 @@ public class ConstructedOrderingSqlTest
 
         using DbContext server = store.CreateDbContext();
         await using CityContext client = new(new DbContextOptionsBuilder<CityContext>()
-            .UseInfoCarrier(store, options => options.AllowTypes(registered ? [typeof(ConstructedItem)] : [])).Options);
+            .UseInfoCarrier(store, options => options.AddAllowedTypes(registered ? [typeof(ConstructedItem)] : [])).Options);
 
         async Task<string?[]> Execute(DbContext context)
         {

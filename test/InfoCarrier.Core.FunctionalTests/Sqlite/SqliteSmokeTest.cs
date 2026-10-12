@@ -131,10 +131,11 @@ public class SqliteSmokeTest
     public async Task A_provider_specific_EF_Functions_call_crosses_once_both_sides_admit_its_host()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrierAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
+            services => services.AddInfoCarrier(
+                builder => builder.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions))));
 
         await using SqliteSmokeContext client = CreateClient(
-            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+            store, o => o.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
 
         // Two of the three titles do not start with "al"; the answer proves the server ran GLOB
         // rather than the client running something equivalent, because the client cannot run it
@@ -152,7 +153,7 @@ public class SqliteSmokeTest
         // boundary. Without this test the two registrations look like duplication.
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
         await using SqliteSmokeContext client = CreateClient(
-            store, o => o.AllowTypes(typeof(SqliteDbFunctionsExtensions)));
+            store, o => o.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
 
         InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
             () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
@@ -190,9 +191,10 @@ public class SqliteSmokeTest
     public async Task A_FromSql_query_crosses_once_both_sides_grant_it()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrierArbitrarySqlExecution());
+            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
 
-        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
 
         // The store holds two blogs. THE `WHERE` IS THE POINT: before R75 a `FromSqlRaw` carrying
         // one came back as the whole table, because the wire's query-root node had no field for
@@ -217,7 +219,8 @@ public class SqliteSmokeTest
         // that is the security boundary. The client now ships the query and the SERVER refuses to
         // run the string, which is what `docs/security-review.md` section 5a is about.
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
-        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
 
         // Raised on the SERVER and rehydrated here by `InfoCarrierFaultMapper`, which round-trips
         // an `InvalidOperationException` as itself -- so the exception TYPE says nothing about
@@ -232,9 +235,10 @@ public class SqliteSmokeTest
     public async Task FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrierArbitrarySqlExecution());
+            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
 
-        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
 
         // An ordinary query keeps `{0}` bound as a DbParameter on the server. A quote in the
         // value guards against interpolating it into SQL text. Compiled constants have their
@@ -265,8 +269,9 @@ public class SqliteSmokeTest
         bool async, string title, int expected, ParameterTranslationMode collectionMode)
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrierArbitrarySqlExecution(), collectionMode);
-        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true), collectionMode);
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
         using DbContext server = store.CreateDbContext();
 
         // Compile separately for each provider: EF compiled delegates belong to one model.
@@ -308,8 +313,9 @@ public class SqliteSmokeTest
     public async Task An_ordinary_FromSqlRaw_argument_stays_bound(string title, int expected)
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrierArbitrarySqlExecution());
-        await using SqliteSmokeContext client = CreateClient(store, o => o.AllowArbitrarySqlExecution());
+            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
+        await using SqliteSmokeContext client = CreateClient(
+            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
         using DbContext server = store.CreateDbContext();
 
         Task<int> Execute(DbContext context)

@@ -51,7 +51,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // both directions.
         if (testStoreProperties.ArbitrarySqlExecution)
         {
-            services = services.AddInfoCarrierArbitrarySqlExecution();
+            services = services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true);
 
             // THERE IS NO PER-STORE SERVER SEAM EITHER, deleted 2026-09-09 with its sibling.
             // `AddStoreSpecificServices` existed so the SQLite store could register
@@ -67,7 +67,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             // ever wanted together.
             if (StoreParameterType is { } parameterType)
             {
-                services = services.AddInfoCarrierAllowedTypes(parameterType);
+                services = services.AddInfoCarrier(builder => builder.AddAllowedTypes(parameterType));
             }
         }
 
@@ -87,7 +87,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // declaration and never inferred. See `SharedTestStoreProperties.AllowedTypes`.
         if (AllowedTypes.Length > 0)
         {
-            services = services.AddInfoCarrierAllowedTypes(AllowedTypes);
+            services = services.AddInfoCarrier(builder => builder.AddAllowedTypes(AllowedTypes));
         }
 
         services = services
@@ -103,7 +103,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
 
             // The server half of ADR-012's standard mappers. The client gets them from
             // `AddEntityFrameworkInfoCarrier`; a server builds its own collection, so it asks.
-            .AddInfoCarrierStandardValueMappers();
+            .AddInfoCarrier(_ => { });
 
         // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
         // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`

@@ -189,7 +189,7 @@ public class SpatialiteServerTest
                     {
                         if (registerAggregate)
                         {
-                            o.AllowTypes(typeof(UnaryUnionOp));
+                            o.AddAllowedTypes(typeof(UnaryUnionOp));
                         }
                     })
                 .Options);

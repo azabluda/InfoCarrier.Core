@@ -83,15 +83,12 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
         // `SqlQueryTestBase` was adopted. A fixture may declare a DTO and grant no SQL.
         bool relationalStore = backend.ServerStoreIsRelational;
 
-        if (!arbitrarySql && allowedTypes.Length == 0 && anonymousShapes.Length == 0 && relationalStore)
-        {
-            return null;
-        }
-
         Type? parameterType = arbitrarySql ? backend.StoreParameterType : null;
 
         return o =>
         {
+            o.AddValueMappers(new InfoCarrierNetTopologySuiteValueMapper());
+
             // Knowledge the client cannot derive: only the store knows what it is. Tier A says so
             // because EF's InMemory provider answers queries every relational provider refuses.
             if (!relationalStore)
@@ -101,19 +98,19 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
             if (arbitrarySql)
             {
-                o.AllowArbitrarySqlExecution();
+                ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true;
             }
 
             // The client half of the same pair. Both halves or neither, as ADR-012 requires: a type
             // admitted on the client alone produces a query the server refuses to read.
             if (parameterType is not null)
             {
-                o.AllowTypes(parameterType);
+                o.AddAllowedTypes(parameterType);
             }
 
             if (allowedTypes.Length > 0)
             {
-                o.AllowTypes(allowedTypes);
+                o.AddAllowedTypes(allowedTypes);
             }
 
             if (anonymousShapes.Length > 0)

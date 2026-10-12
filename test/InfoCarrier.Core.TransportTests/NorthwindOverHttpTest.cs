@@ -294,7 +294,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var counter = new CommandCounter();
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.AddInfoCarrierAllowedTypes(typeof(OrderCard));
+            services.AddInfoCarrier(o => o.AddAllowedTypes(typeof(OrderCard)));
             services.AddSingleton<IInterceptor>(counter);
         }));
         using HttpClient warmup = configured.CreateClient();

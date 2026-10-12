@@ -54,6 +54,10 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     /// </remarks>
     /// <param name="types">The types to admit.</param>
     /// <returns>The same builder, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AddAllowedTypes instead.",
+        DiagnosticId = "ICC1001",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public virtual InfoCarrierDbContextOptionsBuilder AllowTypes(params Type[] types)
     {
         ArgumentNullException.ThrowIfNull(types);
@@ -93,6 +97,10 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     ///     </para>
     /// </remarks>
     /// <returns>The same builder, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution instead.",
+        DiagnosticId = "ICC1002",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public new virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
     {
         InfoCarrierOptionsExtension extension =

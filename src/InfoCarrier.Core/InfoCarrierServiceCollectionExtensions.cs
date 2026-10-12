@@ -58,7 +58,7 @@ public static class InfoCarrierServiceCollectionExtensions
             AddAllowedTypes(services, snapshot.AllowedTypes);
         }
         MoveStandardValueMappersAfter(services, snapshot.ValueMappers);
-        services.AddInfoCarrierStandardValueMappers();
+        AddStandardValueMappers(services);
         if (snapshot.AllowArbitrarySqlExecution)
         {
             AddArbitrarySqlExecution(services);
@@ -201,7 +201,7 @@ public static class InfoCarrierServiceCollectionExtensions
         // the visible behaviour is unchanged — but every one of these is `Scoped`, and an
         // `IEnumerable<T>` resolve would yield the service twice, which is exactly how the
         // value-mapper chain of ADR-012 is consumed.
-        services.AddInfoCarrierStandardValueMappers();
+        AddStandardValueMappers(services);
 
         // The one question this provider asks about how the backing store lays out a nested
         // structure (M9 J5, `docs/architecture.md` §6a D3). `InfoCarrierConventionSetBuilder` and
@@ -299,6 +299,10 @@ public static class InfoCarrierServiceCollectionExtensions
     /// <param name="services">The server's service collection.</param>
     /// <param name="types">The types to admit.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AddAllowedTypes through AddInfoCarrier instead.",
+        DiagnosticId = "ICC1003",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierAllowedTypes(this IServiceCollection services, params Type[] types)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -353,6 +357,10 @@ public static class InfoCarrierServiceCollectionExtensions
     /// </remarks>
     /// <param name="services">The server's service collection.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution through AddInfoCarrier instead.",
+        DiagnosticId = "ICC1004",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -560,10 +568,18 @@ public static class InfoCarrierServiceCollectionExtensions
     /// </remarks>
     /// <param name="services">The collection to register in.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use AddInfoCarrier instead. Standard value mappers are added automatically.",
+        DiagnosticId = "ICC1005",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierStandardValueMappers(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        return AddStandardValueMappers(services);
+    }
 
+    private static IServiceCollection AddStandardValueMappers(IServiceCollection services)
+    {
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ValueMapping.IInfoCarrierValueMapper, ValueMapping.IPAddressValueMapper>());
         services.TryAddEnumerable(
