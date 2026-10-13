@@ -11,10 +11,10 @@ or are EF Core defects that every provider hits and this one reports with a diff
 type.
 
 ```
-Total tests: 29958, Failed: 0
+Total tests: 30148, Failed: 0
 ```
 
-Measured against `10.2.0`. No test fails. Where this provider answers differently from EF Core, the
+Measured against `10.3.0`. No test fails. Where this provider answers differently from EF Core, the
 test that covers it says so, and this page names the differences you can observe. The skipped tests
 are EF Core's own: EF skips them itself for the store behind them, and none is a suppression added
 here.

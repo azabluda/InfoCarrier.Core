@@ -82,7 +82,7 @@ published trimmed.
 Where the server's store is relational, the client knows it. The three inheritance mappings, table
 and entity splitting, `EF.Functions` and your own `HasDbFunction` mappings all round trip, and
 `FromSql` runs where the server grants it. See the
-[10.1 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.1/).
+[10.3 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/10.3/).
 
 An HTTP transport ships in the package. To use gRPC, a message bus, or a direct call in the same
 process, write one small class. `IInfoCarrierTransport` has one method.

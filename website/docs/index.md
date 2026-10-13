@@ -93,7 +93,7 @@ types and compiled models.
 Where the server's store is relational, which is the usual case, the client knows it. The three
 inheritance mappings, table and entity splitting, `EF.Functions`, your own `HasDbFunction`
 mappings and `AsSplitQuery` all round trip, and `FromSql` runs where the server grants it. See
-[Release notes 10.1](release-notes/10.1.md).
+[Release notes 10.3](release-notes/10.3.md).
 
 Lazy loading costs one round trip for every navigation you touch, a different price here than
 against a local database. [Loading related data](guide/loading-related-data.md) compares the three
