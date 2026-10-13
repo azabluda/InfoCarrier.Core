@@ -175,11 +175,9 @@ public class InfoCarrierDeploymentBuilderTest
     {
         var services = new ServiceCollection();
 
-        services.AddInfoCarrier(builder =>
-        {
-            builder.AddAllowedTypes(typeof(DateOnly))
-                .AllowArbitrarySqlExecution(true);
-        });
+        services.AddInfoCarrier(builder => builder
+            .AddAllowedTypes(typeof(DateOnly))
+            .AllowArbitrarySqlExecution(true));
 
         using ServiceProvider provider = services.BuildServiceProvider();
         Assert.Equal(
