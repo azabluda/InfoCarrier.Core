@@ -61,7 +61,7 @@ public static class InfoCarrierServiceCollectionExtensions
         InfoCarrierDeploymentSnapshot snapshot = builder.CreateSnapshot();
 
         AddInfoCarrierAnonymousShapeTypes(services, snapshot.AnonymousShapeTypes);
-        if (snapshot.AllowedTypes.Length > 0)
+        if (snapshot.AllowedTypes.Count > 0)
         {
             AddAllowedTypes(services, snapshot.AllowedTypes);
         }
@@ -132,23 +132,6 @@ public static class InfoCarrierServiceCollectionExtensions
         }
 
         return provider;
-    }
-
-    /// <summary>
-    ///     Registers an immutable, already generated anonymous-shape catalog for the in-process
-    ///     server. Build it from trusted application types and the actual server model before
-    ///     accepting requests. This registration does not grant component-type permissions.
-    /// </summary>
-    /// <param name="services">The server application service collection.</param>
-    /// <param name="catalog">The complete trusted catalog.</param>
-    /// <returns>The same collection.</returns>
-    public static IServiceCollection AddInfoCarrierAnonymousShapes(
-        this IServiceCollection services, AnonymousShapeCatalog catalog)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(catalog);
-        services.AddSingleton(catalog);
-        return services;
     }
 
     /// <summary>

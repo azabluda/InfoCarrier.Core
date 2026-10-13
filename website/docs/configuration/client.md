@@ -34,17 +34,20 @@ Leave all three alone unless one of those sentences is true of your deployment.
 Put shared deployment facts in one application-owned method:
 
 ```csharp
-public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-    this InfoCarrierDeploymentBuilder builder)
-{
-    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-    builder.AddValueMappers(new MoneyValueMapper());
-    builder.AllowArbitrarySqlExecution = true;
-    return builder;
-}
-
 optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
+
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+        builder.AddValueMappers(new MoneyValueMapper());
+        builder.AllowArbitrarySqlExecution = true;
+        return builder;
+    }
+}
 ```
 
 Pass the method through `AddInfoCarrier` on the server. Matching settings guide planning, but

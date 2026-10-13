@@ -10,14 +10,16 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | Member | What it does |
 |---|---|
 | `DbContextOptionsBuilder.UseInfoCarrier(IInfoCarrierClient)` | Configures a context to remote its work through the given client. The whole client-side configuration. |
-| `UseInfoCarrier(IInfoCarrierClient, Action<InfoCarrierDbContextOptionsBuilder>)` | The same, with what the client is told about the server: `AllowTypes`, `AllowArbitrarySqlExecution`, `UseNonRelationalServerStore`. See [Configuring the client](configuration/client.md#what-the-client-is-told-about-the-server). |
+| `UseInfoCarrier(IInfoCarrierClient, Action<InfoCarrierDbContextOptionsBuilder>)` | The same, with shared deployment facts and client-only store information. See [Configuring the client](configuration/client.md#what-the-client-is-told-about-the-server). |
+| `IServiceCollection.AddInfoCarrier()` | Adds standard server conventions with default deployment facts. |
+| `IServiceCollection.AddInfoCarrier(Action<InfoCarrierDeploymentBuilder>)` | Adds shared deployment facts and standard server conventions. |
 | `IServiceCollection.AddInfoCarrierAllowedTypes(params Type[])` | On the server. Admits CLR types a payload may name beyond the ones the model implies. |
 | `IServiceCollection.AddInfoCarrierArbitrarySqlExecution()` | On the server. Lets a client send `FromSql` and `Database.SqlQuery<T>`. |
 | `IServiceCollection.AddInfoCarrierServerTransactionTimeout(TimeSpan)` | On the server. Rolls back a transaction left idle that long. Off unless called. |
 | `IServiceCollection.AddInfoCarrierServerDocumentStore()` | On the server. Says the store writes an owned type inside its owner, so a change set that leaves part of a document out does not erase it. Off unless called. |
 | `IServiceCollection.AddInfoCarrierHttpCallerIdentity(Func<HttpContext, string?>)` | On the server, from `InfoCarrier.Core.AspNetCore`. Refuses a token opened by a different caller. Off unless called. |
 | `IServiceCollection.AddInfoCarrierServerLogForwarding(LogLevel)` | On the server. Sends the log events it raises back with the result. `AddInfoCarrierSensitiveServerLogForwarding` is the second grant a context with sensitive logging needs. |
-| `IServiceCollection.AddInfoCarrierStandardValueMappers()` | Registers the value mappers for `IPAddress` and `Uri`. Automatic on the client; call it on the server yourself. |
+| `IServiceCollection.AddInfoCarrierStandardValueMappers()` | Version 10 compatibility API. `AddInfoCarrier` registers these mappers automatically. |
 | `IServiceCollection.AddEntityFrameworkInfoCarrier()` | Registers the provider's EF services. Only needed when you build EF's internal service provider yourself. |
 | `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")` | The server endpoint. In `InfoCarrier.Core.AspNetCore`. Returns `IEndpointConventionBuilder`. |
 | `DatabaseFacade.UseInfoCarrierTransaction(IDbContextTransaction)` | Joins a transaction another context began. Non-owning. |
@@ -55,8 +57,9 @@ unchanged.
 
 | Type | Notes |
 |---|---|
+| `InfoCarrierDeploymentBuilder` | Configures shared shapes, types, mappers, and arbitrary SQL. In `InfoCarrier.Core.Abstractions`. |
 | `InfoCarrierPayloadLimits` | `(int? maxRequestBytes = DefaultMaxRequestBytes, int? maxResponseBytes = null)`. `Default` is the static instance; `DefaultMaxRequestBytes` is 64 MiB. `null` opts out of a limit. |
-| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Immutable structural catalog. Use `AddInfoCarrierAnonymousShapes(params object[] shapes)` for anonymous prototypes, or `Create(IModel? model, IEnumerable<Type> shapes)` for advanced configuration. See [server configuration](configuration/server.md#registering-anonymous-projections). |
+| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Low-level immutable structural catalog. Applications register prototypes through `InfoCarrierDeploymentBuilder.AddAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
 
 ## Exceptions
 

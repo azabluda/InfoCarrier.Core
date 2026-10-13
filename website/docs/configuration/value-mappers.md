@@ -107,17 +107,21 @@ Register the mapper on both halves, or a value that crosses in both directions i
 direction only. Put the mapper in the same application-owned deployment method:
 
 ```csharp
-static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
-{
-    builder.AddValueMappers(new MoneyValueMapper());
-    return builder;
-}
-
 // Client
 optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
 
 // Server
 builder.Services.AddInfoCarrier(o => o.ConfigureInfoCarrier());
+
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddValueMappers(new MoneyValueMapper());
+        return builder;
+    }
+}
 ```
 
 The existing service-provider registration remains available for version 10 applications.

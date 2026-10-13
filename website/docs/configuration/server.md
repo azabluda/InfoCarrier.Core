@@ -19,10 +19,14 @@ WebApplication app = builder.Build();
 
 app.MapInfoCarrier();
 
-static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
+public static class ShopDeployment
 {
-    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    return builder;
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        return builder;
+    }
 }
 ```
 
@@ -100,14 +104,18 @@ Two deployment settings widen what a client may send. Both deny by default, and 
 server's decision alone.
 
 ```csharp
-static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
-{
-    builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-    builder.AllowArbitrarySqlExecution = true;
-    return builder;
-}
-
 builder.Services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
+        builder.AllowArbitrarySqlExecution = true;
+        return builder;
+    }
+}
 ```
 
 The first admits CLR types beyond those implied by your model. The usual reason is your provider's
@@ -141,11 +149,9 @@ descriptors have at most 1,024 nodes and nesting depth 16. Each exchange admits 
 identities. Rank-one non-vector arrays containing anonymous elements are unsupported.
 
 The provider builds the immutable catalog using the registered server `DbContext` model.
-`MapInfoCarrier()` constructs it during endpoint setup; an in-process server constructs it when
+`MapInfoCarrier()` constructs it during endpoint setup. An in-process server constructs it when
 created. Registered structures reuse fixed generated types across exchanges. Keep registrations in
-trusted startup code. Advanced hosts can build `AnonymousShapeCatalog.Create(model, types)` directly
-and supply one complete catalog per model instance. Use either prototypes or an explicit catalog;
-mixing these registration methods depends on call order.
+trusted startup code.
 
 An unregistered shape reaching server execution is rejected. There is no automatic client-evaluation
 fallback. Existing client projection reassembly still applies where the query planner chooses it.

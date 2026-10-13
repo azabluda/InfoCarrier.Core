@@ -28,10 +28,14 @@ DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
 
 await using var context = new ShopContext(options);
 
-static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(this InfoCarrierDeploymentBuilder builder)
+public static class ShopDeployment
 {
-    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    return builder;
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        return builder;
+    }
 }
 ```
 

@@ -58,9 +58,9 @@ public class InfoCarrierDeploymentBuilder
 
     internal InfoCarrierDeploymentSnapshot CreateSnapshot()
         => new(
-            _anonymousShapeTypes.ToArray(),
-            _allowedTypes.ToArray(),
-            _valueMappers.ToArray(),
+            Array.AsReadOnly(_anonymousShapeTypes.ToArray()),
+            Array.AsReadOnly(_allowedTypes.ToArray()),
+            Array.AsReadOnly(_valueMappers.ToArray()),
             AllowArbitrarySqlExecution);
 
     internal static Type[] ValidateAnonymousPrototypes(object[] shapes, string parameterName)
@@ -85,7 +85,7 @@ public class InfoCarrierDeploymentBuilder
 }
 
 internal sealed record InfoCarrierDeploymentSnapshot(
-    Type[] AnonymousShapeTypes,
-    Type[] AllowedTypes,
-    IInfoCarrierValueMapper[] ValueMappers,
+    IReadOnlyList<Type> AnonymousShapeTypes,
+    IReadOnlyList<Type> AllowedTypes,
+    IReadOnlyList<IInfoCarrierValueMapper> ValueMappers,
     bool AllowArbitrarySqlExecution);

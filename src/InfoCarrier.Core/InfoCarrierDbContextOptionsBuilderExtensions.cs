@@ -18,9 +18,8 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
     /// <param name="optionsBuilder">The options builder.</param>
     /// <param name="client">The client that ships operations to the server.</param>
     /// <param name="infoCarrierOptionsAction">
-    ///     Configures this provider's own options — currently
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> and nothing else. The
-    ///     shape every EF Core provider uses, so a second option needs no new overload here.
+    ///     Configures deployment facts shared with the server and client-only store information.
+    ///     Omit this callback when the deployment uses the default conventions.
     /// </param>
     /// <returns>The same builder for chaining.</returns>
     [RequiresUnreferencedCode(

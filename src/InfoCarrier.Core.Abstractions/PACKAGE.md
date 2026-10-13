@@ -11,11 +11,14 @@ can instead use a separate shared deployment project when the model must not kno
 InfoCarrier. A small application can also link one source file into both application projects.
 
 ```csharp
-public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-    this InfoCarrierDeploymentBuilder builder)
+public static class ShopDeployment
 {
-    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    return builder;
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+    {
+        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        return builder;
+    }
 }
 ```
 

@@ -4,6 +4,7 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.ValueMapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections;
 using System.Reflection;
 using Xunit;
 
@@ -272,6 +273,27 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
+    public void Internal_snapshot_collections_are_read_only()
+    {
+        var mapper = new StubMapper();
+        var builder = new InfoCarrierDeploymentBuilder();
+        builder.AddAnonymousShapes(new { Id = 0 });
+        builder.AddAllowedTypes(typeof(DateOnly));
+        builder.AddValueMappers(mapper);
+
+        object snapshot = typeof(InfoCarrierDeploymentBuilder)
+            .GetMethod("CreateSnapshot", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, null)!;
+
+        foreach (string propertyName in new[] { "AnonymousShapeTypes", "AllowedTypes", "ValueMappers" })
+        {
+            var values = Assert.IsAssignableFrom<IList>(snapshot.GetType().GetProperty(propertyName)!.GetValue(snapshot));
+            Assert.True(values.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() => values[0] = values[0]);
+        }
+    }
+
+    [Fact]
     public void Version_10_3_marks_only_approved_v11_configuration_removals_obsolete()
     {
         const string url = "https://github.com/azabluda/InfoCarrier.Core/issues/221";
@@ -319,8 +341,7 @@ public class InfoCarrierDeploymentBuilderTest
         Assert.DoesNotContain(
             typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public),
             method => method.Name == "AddInfoCarrierDeployment"
-                || method.Name == "AddInfoCarrierAnonymousShapes"
-                    && method.GetParameters().LastOrDefault()?.ParameterType == typeof(object[]));
+                || method.Name == "AddInfoCarrierAnonymousShapes");
     }
 
     private static InfoCarrierOptionsExtension ClientExtension(params IInfoCarrierValueMapper[] mappers)
