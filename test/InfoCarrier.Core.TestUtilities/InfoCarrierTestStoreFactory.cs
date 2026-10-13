@@ -49,7 +49,8 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         ServiceLifetime? serverOptionsLifetime = null,
         bool relationalClientStore = false,
         bool arbitrarySqlExecution = false,
-        Type[]? allowedTypes = null)
+        Type[]? allowedTypes = null,
+        object[]? anonymousShapes = null)
     {
         var props = new SharedTestStoreProperties
         {
@@ -62,6 +63,7 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             ServerOptionsLifetime = serverOptionsLifetime,
             ArbitrarySqlExecution = arbitrarySqlExecution,
             AllowedTypes = allowedTypes,
+            AnonymousShapes = anonymousShapes,
         };
 
         return new InfoCarrierTestStoreFactory(() => props, tier, relationalClientStore);

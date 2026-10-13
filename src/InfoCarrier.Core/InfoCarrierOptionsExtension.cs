@@ -3,6 +3,8 @@
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.ValueMapping;
+using System.Runtime.CompilerServices;
 
 namespace InfoCarrier.Core;
 
@@ -40,6 +42,21 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
     internal AnonymousShapeSet RegisteredAnonymousShapes { get; private set; } = AnonymousShapeSet.Empty;
 
+    internal IReadOnlyList<IInfoCarrierValueMapper> ValueMappers { get; private set; } = [];
+
+    internal InfoCarrierOptionsExtension WithDeployment(InfoCarrierDeploymentSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
+        clone._info = null;
+        clone.RegisteredAnonymousShapes = RegisteredAnonymousShapes.Add(snapshot.AnonymousShapeTypes);
+        clone.AllowedTypes = [.. AllowedTypes, .. snapshot.AllowedTypes];
+        clone.ValueMappers = [.. ValueMappers, .. snapshot.ValueMappers];
+        clone.ArbitrarySqlExecutionAllowed |= snapshot.AllowArbitrarySqlExecution;
+        return clone;
+    }
+
     /// <summary>
     ///     Adds to <see cref="AllowedTypes" /> for this options instance.
     /// </summary>
@@ -69,7 +86,7 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     /// <summary>
     ///     Whether this client may send a query carrying raw SQL (#60). <c>false</c> unless the
     ///     application called
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />.
     /// </summary>
     public virtual bool ArbitrarySqlExecutionAllowed { get; private set; }
 
@@ -198,7 +215,14 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
     /// <inheritdoc />
     public virtual void ApplyServices(IServiceCollection services)
-        => services.AddEntityFrameworkInfoCarrier();
+    {
+        foreach (IInfoCarrierValueMapper mapper in ValueMappers)
+        {
+            services.AddSingleton<IInfoCarrierValueMapper>(mapper);
+        }
+
+        services.AddEntityFrameworkInfoCarrier();
+    }
 
     /// <inheritdoc />
     public virtual void Validate(IDbContextOptions options)
@@ -212,16 +236,35 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
     private sealed class ExtensionInfo(InfoCarrierOptionsExtension extension) : DbContextOptionsExtensionInfo(extension)
     {
+        private readonly InfoCarrierOptionsExtension _extension = extension;
+
         public override bool IsDatabaseProvider => true;
 
         public override string LogFragment => "using InfoCarrier ";
 
-        public override int GetServiceProviderHashCode() => 0;
+        public override int GetServiceProviderHashCode()
+        {
+            var hash = new HashCode();
+            foreach (IInfoCarrierValueMapper mapper in _extension.ValueMappers)
+            {
+                hash.Add(RuntimeHelpers.GetHashCode(mapper));
+            }
+
+            return _extension.ValueMappers.Count == 0 ? 0 : hash.ToHashCode();
+        }
 
         public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
-            => debugInfo["InfoCarrier"] = "1";
+        {
+            debugInfo["InfoCarrier"] = "1";
+            if (_extension.ValueMappers.Count > 0)
+            {
+                debugInfo["InfoCarrier:ValueMappers"] = GetServiceProviderHashCode().ToString();
+            }
+        }
 
         public override bool ShouldUseSameServiceProvider(DbContextOptionsExtensionInfo other)
-            => other is ExtensionInfo;
+            => other is ExtensionInfo otherInfo
+                && _extension.ValueMappers.Count == otherInfo._extension.ValueMappers.Count
+                && _extension.ValueMappers.Zip(otherInfo._extension.ValueMappers, ReferenceEquals).All(static same => same);
     }
 }

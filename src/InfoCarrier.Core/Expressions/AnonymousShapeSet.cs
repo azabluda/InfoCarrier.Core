@@ -38,19 +38,7 @@ internal sealed class AnonymousShapeSet
     }
 
     internal static Type[] ValidatePrototypes(object[] shapes, string parameterName)
-    {
-        ArgumentNullException.ThrowIfNull(shapes);
-        Type[] types = shapes.Select(shape => shape?.GetType()
-            ?? throw new ArgumentException("Anonymous-shape prototypes cannot be null.", parameterName)).ToArray();
-        if (types.Any(type => !AnonymousShapeTypes.IsOriginal(type) || type.ContainsGenericParameters))
-        {
-            throw new ArgumentException(
-                "Use anonymous objects as shape prototypes; register named records with AddInfoCarrierAllowedTypes.",
-                parameterName);
-        }
-
-        return types;
-    }
+        => InfoCarrierDeploymentBuilder.ValidateAnonymousPrototypes(shapes, parameterName);
 
     private static void Add(Type type, ISet<string> identities, ICollection<Type> types)
     {

@@ -22,11 +22,11 @@ A mapper claims such a value and writes it as one wire primitive instead.
 application that stores one has chosen nothing unusual, so it should not have to discover this seam
 at all.
 
-They are registered for you on the client. On the server you register them yourself, because a
-server builds its own service collection:
+They are registered automatically on both sides. The server registration happens when you apply
+shared deployment configuration:
 
 ```csharp
-builder.Services.AddInfoCarrierStandardValueMappers();
+builder.Services.AddInfoCarrier();
 ```
 
 A geometry mapper is deliberately not in the box, because shipping one would put a NetTopologySuite
@@ -35,9 +35,8 @@ you supply the mapper, which is about thirty lines. There is a worked one in the
 utilities.
 
 A spatial aggregate such as `UnaryUnionOp.Union(g.Select(s => s.Location))` names a NetTopologySuite
-class that your model never mentions. Register that class on both halves, `AllowTypes(typeof(UnaryUnionOp))` on
-the client and `AddInfoCarrierAllowedTypes(typeof(UnaryUnionOp))` on the server. Without it the
-query still answers, but the server sends every row and the client computes the aggregate.
+class that your model never mentions. Add that class to the shared deployment builder. Without it,
+the query still answers, but the server sends every row and the client computes the aggregate.
 
 ## Writing one
 
@@ -105,33 +104,24 @@ need not agree. The CLR type has one.
 ## Registering it
 
 Register the mapper on both halves, or a value that crosses in both directions is mapped in one
-direction only.
+direction only. Put the mapper in the same application-owned deployment method:
 
-=== "Server"
+```csharp
+// Client
+optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
 
-    ```csharp
-    builder.Services
-        .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-        .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-        .AddInfoCarrierStandardValueMappers()
-        .AddSingleton<IInfoCarrierValueMapper, MoneyValueMapper>();
-    ```
+// Server
+builder.Services.AddInfoCarrier(o => o.ConfigureInfoCarrier());
 
-=== "Client"
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+        => builder.AddValueMappers(new MoneyValueMapper());
+}
+```
 
-    ```csharp
-    ServiceProvider providerServices = new ServiceCollection()
-        .AddEntityFrameworkInfoCarrier()
-        .AddSingleton<IInfoCarrierValueMapper, MoneyValueMapper>()
-        .BuildServiceProvider();
-
-    DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-        .UseInternalServiceProvider(providerServices)
-        .UseInfoCarrier(client)
-        .Options;
-    ```
-
-    Build that service provider once and share it across contexts.
+The existing service-provider registration remains available for version 10 applications.
 
 Your own mappers get first refusal, ahead of anything the library derives from the model, so
 registering one is never overridden.

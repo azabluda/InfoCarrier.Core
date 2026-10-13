@@ -39,4 +39,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\InfoCarrier.Core.Abstractions\InfoCarrier.Core.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

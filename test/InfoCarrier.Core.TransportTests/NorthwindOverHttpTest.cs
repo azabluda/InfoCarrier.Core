@@ -20,6 +20,58 @@ namespace InfoCarrier.Core.TransportTests;
 /// </summary>
 public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Shared_deployment_obeys_all_anonymous_registration_states(
+        bool clientShape,
+        bool serverShape)
+    {
+        var prototype = new { Key = (string?)null, Count = 0 };
+        var counter = new CommandCounter();
+
+        void Configure(InfoCarrierDeploymentBuilder builder)
+            => builder.AddAnonymousShapes(prototype);
+
+        await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<AnonymousShapeCatalog>();
+            if (serverShape)
+            {
+                services.AddInfoCarrier(Configure);
+            }
+
+            services.AddSingleton<IInterceptor>(counter);
+        }));
+        using HttpClient warmup = configured.CreateClient();
+        int beforeQuery = counter.ReaderExecutions;
+        using NorthwindContext context = CreateClientContext(
+            configured,
+            registerShape: false,
+            out RecordingHandler recorder,
+            deployment: clientShape ? Configure : null);
+        var query = context.Orders.GroupBy(order => order.CustomerId)
+            .Select(group => new { group.Key, Count = group.Count() });
+
+        if (clientShape && !serverShape)
+        {
+            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+            Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(beforeQuery, counter.ReaderExecutions);
+        }
+        else
+        {
+            var rows = await query.ToListAsync();
+            Assert.Equal(NorthwindSeed.OrderCount, rows.Sum(row => row.Count));
+            Assert.All(rows, row => Assert.Equal(prototype.GetType(), row.GetType()));
+            Assert.True(counter.ReaderExecutions > beforeQuery);
+        }
+
+        Assert.Equal(1, recorder.RequestCount);
+    }
+
     [Fact]
     public async Task Client_shape_calls_compose_snapshot_inputs_and_remain_context_scoped()
     {
@@ -66,7 +118,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             services.RemoveAll<AnonymousShapeCatalog>();
             if (serverShape)
             {
-                services.AddInfoCarrierAnonymousShapes(prototype);
+                services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype));
             }
 
             services.AddSingleton<IInterceptor>(counter);
@@ -164,7 +216,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     {
         var prototype = new { Id = 0, Customer = new { CustomerId = (string?)null } };
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
-            services => services.AddInfoCarrierAnonymousShapes(prototype)));
+            services => services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype))));
         using NorthwindContext context = CreateClientContext(
             configured,
             registerShape: false,
@@ -242,7 +294,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var counter = new CommandCounter();
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.AddInfoCarrierAllowedTypes(typeof(OrderCard));
+            services.AddInfoCarrier(o => o.AddAllowedTypes(typeof(OrderCard)));
             services.AddSingleton<IInterceptor>(counter);
         }));
         using HttpClient warmup = configured.CreateClient();
@@ -386,7 +438,8 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         bool registerShape,
         out RecordingHandler recorder,
         bool allowRecord = false,
-        object[]? anonymousShapes = null)
+        object[]? anonymousShapes = null,
+        Action<InfoCarrierDeploymentBuilder>? deployment = null)
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var handler = new RecordingHandler();
@@ -400,19 +453,24 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             new DbContextOptionsBuilder<NorthwindContext>()
                 .UseInfoCarrier(client, options =>
                 {
+                    if (deployment is not null)
+                    {
+                        deployment(options);
+                    }
+
                     if (registerShape)
                     {
-                        options.UseRegisteredAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+                        options.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
                     }
 
                     if (anonymousShapes is not null)
                     {
-                        options.UseRegisteredAnonymousShapes(anonymousShapes);
+                        options.AddAnonymousShapes(anonymousShapes);
                     }
 
                     if (allowRecord)
                     {
-                        options.AllowTypes(typeof(OrderCard));
+                        options.AddAllowedTypes(typeof(OrderCard));
                     }
                 })
                 .UseLazyLoadingProxies()

@@ -2302,7 +2302,7 @@ public partial class ServerParameterizationTest
                     {
                         if (allowedTypes is not null)
                         {
-                            o.AllowTypes(allowedTypes);
+                            o.AddAllowedTypes(allowedTypes);
                         }
                     })
                 .Options))
@@ -2411,7 +2411,7 @@ public partial class ServerParameterizationTest
 
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>()
-                .UseInfoCarrier(store, options => options.UseRegisteredAnonymousShapes(anonymousShapes)).Options))
+                .UseInfoCarrier(store, options => options.AddAnonymousShapes(anonymousShapes)).Options))
         {
             await run(client);
         }

@@ -580,6 +580,23 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       Undeclared shapes retain version 10.2 planning throughout the rewrite pipeline, including
       existing exact type grants. Shared configuration and version 11 tightening remain separate.
 
+## Phase SDC: shared deployment contract ([#221](https://github.com/azabluda/InfoCarrier.Core/issues/221))
+
+- [x] **SDC1. Add the version 10.3 shared deployment contract.** The owner approved one reusable
+      configuration delegate for anonymous structures, extra named types, custom value mappers and
+      arbitrary SQL permission. The [design](shared-deployment-contract-design.md) preserves every
+      version 10 public API and keeps role-specific settings outside the contract. The approved
+      [implementation plan](shared-deployment-contract-implementation.md) covers public validation,
+      client mapper isolation, server translation, the registration matrix, documentation and gates.
+      Native verification reported `Failed: 0, Passed: 29681, Skipped: 234, Total: 29915` for the
+      functional suite and `Failed: 0, Passed: 235, Skipped: 0, Total: 235` for the document-store
+      suite. The transport suite reported `Failed: 0, Passed: 144, Skipped: 0, Total: 144`. The
+      release solution build had zero errors and four network-dependent `NU1900` warnings. Package
+      validation produced the Core, ASP.NET Core, and abstractions packages. IDE0290 verification
+      reported no changes. The trimming gate reported `OK (107 <= 107)`. All three sample builds
+      had zero errors. Documentation reported zero broken links, zero files over budget, and a
+      successful site build.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

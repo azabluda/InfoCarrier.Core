@@ -1,7 +1,7 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Five registrations and one endpoint make it an
-InfoCarrier server.
+The server is an ordinary EF Core application. Add its base registrations, shared facts, and one
+endpoint.
 
 ```csharp
 using InfoCarrier.Core;
@@ -13,11 +13,18 @@ builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>()
 builder.Services
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrierStandardValueMappers();
+    .AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
 
 WebApplication app = builder.Build();
 
 app.MapInfoCarrier();
+
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+        => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+}
 ```
 
 | Registration | What it is for |
@@ -26,7 +33,28 @@ app.MapInfoCarrier();
 | `AddScoped<DbContext>` | The server resolves the context per request as the base type, so the base type has to resolve. Without this line every request fails with a service-resolution error. |
 | `IInfoCarrierSerializer` | The same format the client uses. Both ends must agree. |
 | `IInfoCarrierServer` | `InProcessInfoCarrierServer` executes a request against a `DbContext` from this service provider. *In-process* means the same process as the database connection; it is the normal implementation, not a test double. |
-| `AddInfoCarrierStandardValueMappers()` | The mappers for BCL types the wire cannot walk, `IPAddress` and `Uri`. The client gets these automatically; a server builds its own service collection, so it has to ask. See [Value mappers](value-mappers.md). |
+| `AddInfoCarrier(...)` | Applies shared deployment facts and adds the standard value mappers. See [Value mappers](value-mappers.md). |
+
+Use the same method in the client callback. It covers shapes, named types, mappers, and arbitrary
+SQL. These settings cannot add provider support. The server controls admission.
+
+`AddInfoCarrier` adds shared facts and standard mappers. It does not add the context, serializer,
+server implementation, or endpoint.
+
+## Migrating existing configuration
+
+Version 10.3 warns about five planned version 11 removals:
+
+| Existing method | Replacement |
+|---|---|
+| `InfoCarrierDbContextOptionsBuilder.AllowTypes(...)` | `InfoCarrierDeploymentBuilder.AddAllowedTypes(...)` |
+| `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()` | `InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true)` |
+| `AddInfoCarrierAllowedTypes(...)` | `AddAllowedTypes(...)` inside `AddInfoCarrier(...)` |
+| `AddInfoCarrierArbitrarySqlExecution()` | `AllowArbitrarySqlExecution(true)` inside `AddInfoCarrier(...)` |
+| `AddInfoCarrierStandardValueMappers()` | `AddInfoCarrier(...)` |
+
+Version 10 continues to support these methods. The unreleased `UseRegisteredAnonymousShapes` and
+prototype `AddInfoCarrierAnonymousShapes` methods were removed. Use shared `AddAnonymousShapes`.
 
 ## The endpoint
 
@@ -69,36 +97,40 @@ catches whatever the gateway lets through.
 
 ## Granting what the model does not imply
 
-Two more registrations widen what a client may send. Both deny by default, and both are the
+Two deployment settings widen what a client may send. Both deny by default, and both are the
 server's decision alone.
 
 ```csharp
-builder.Services.AddInfoCarrierAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-builder.Services.AddInfoCarrierArbitrarySqlExecution();
+builder.Services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+
+public static class ShopDeployment
+{
+    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
+        this InfoCarrierDeploymentBuilder builder)
+        => builder
+            .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
+            .AllowArbitrarySqlExecution(true);
+}
 ```
 
-The first admits CLR types a payload may name beyond the ones your model implies. The usual reason
-is the `EF.Functions` family your provider declares, which your server can name with `typeof` and
-the client's package cannot. Register the same types on the client. Read [Security](../security.md)
-before you admit anything else.
+The first admits CLR types beyond those implied by your model. The usual reason is your provider's
+`EF.Functions` family. Read [Security](../security.md) before adding other types.
 
-The second lets a client send `FromSql` and `Database.SqlQuery<T>`. Read the name literally: one
-command text runs every statement in it, and such a query does not go through `OnModelCreating`, so
-your query filters are not in it. What limits the caller is the rights of the database account your
-connection string uses.
+The second admits `FromSql` and `Database.SqlQuery<T>`. One command text can run multiple
+statements. Query filters do not apply. The database account's rights limit the caller.
 
 ## Registering anonymous projections
 
-Register anonymous data structures on the server using prototype objects:
+Register anonymous data structures in the shared deployment method using prototype objects:
 
 ```csharp
-builder.Services.AddInfoCarrierAnonymousShapes(
-    new { Name = "", Age = 0 },
-    new { Country = "", City = "" },
-    new { CustomerId = 0, Year = 0 });
-
 // Named records use the existing type permission registration.
-builder.Services.AddInfoCarrierAllowedTypes(typeof(CustomerSummary));
+builder
+    .AddAnonymousShapes(
+        new { Name = "", Age = 0 },
+        new { Country = "", City = "" },
+        new { CustomerId = 0, Year = 0 })
+    .AddAllowedTypes(typeof(CustomerSummary));
 ```
 
 Prototype values are ignored. Names, property order, and property types must match the client's
@@ -112,19 +144,17 @@ descriptors have at most 1,024 nodes and nesting depth 16. Each exchange admits 
 identities. Rank-one non-vector arrays containing anonymous elements are unsupported.
 
 The provider builds the immutable catalog using the registered server `DbContext` model.
-`MapInfoCarrier()` constructs it during endpoint setup; an in-process server constructs it when
+`MapInfoCarrier()` constructs it during endpoint setup. An in-process server constructs it when
 created. Registered structures reuse fixed generated types across exchanges. Keep registrations in
-trusted startup code. Advanced hosts can build `AnonymousShapeCatalog.Create(model, types)` directly
-and supply one complete catalog per model instance. Use either prototypes or an explicit catalog;
-mixing these registration methods depends on call order.
+trusted startup code.
 
 An unregistered shape reaching server execution is rejected. There is no automatic client-evaluation
 fallback. Existing client projection reassembly still applies where the query planner chooses it.
 Different original anonymous identities for the same registered structure cannot share one exchange;
 the server rejects this case to preserve equality behavior and unambiguous response restoration.
 
-Shape registration does not grant permission to its component types. Register custom components
-and named records on both client and server using the existing type permission APIs.
+Shape registration does not grant permission to its component types. Add custom components and
+named records to the shared deployment method.
 Records do not require anonymous-shape registration.
 See [Security](../security.md) and the
 [catalog contract](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/plans/v10/anonymous-shape-catalog.md)

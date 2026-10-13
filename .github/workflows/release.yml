@@ -17,12 +17,9 @@
 # THE VERSION IS THE TAG. MinVer derives it (Directory.Build.props), which is why this workflow no
 # longer compares the two and why `fetch-depth: 0` below is load-bearing rather than tidy.
 #
-# ORDER MATTERS: InfoCarrier.Core first, then InfoCarrier.Core.AspNetCore, which declares a
-# dependency on it at the same version — nuget.org rejects a package whose dependency does not
-# resolve. (Before M8-22 the order was the other way round, because Abstractions was its own
-# package; it is now merged into InfoCarrier.Core. InfoCarrier.Core.Relational was a third package
-# until 2026-09-03 and never shipped a stable version; D3's supersession folded it into
-# InfoCarrier.Core, where it lives under `src/InfoCarrier.Core/Relational/`.)
+# ORDER MATTERS: InfoCarrier.Core.Abstractions first, then InfoCarrier.Core, then
+# InfoCarrier.Core.AspNetCore. Each later package depends on an earlier package at the same
+# version, and nuget.org rejects a package whose dependency does not resolve.
 name: Release
 
 on:
@@ -108,14 +105,14 @@ jobs:
       # not exclude — so `pkg` held two lines and every tagged release would have failed here.
       # Confirmed by packing both products and running the step's own shell against them.
       #
-      # What replaced it is a check the old one could not make: that both expected files exist,
+      # What replaced it is a check the old one could not make: that all expected files exist,
       # under the exact names the push step will use.
       - name: Verify the packages
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version="${GITHUB_REF_NAME#v}"
           missing=0
-          for id in InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
+          for id in InfoCarrier.Core.Abstractions InfoCarrier.Core InfoCarrier.Core.AspNetCore; do
             for ext in nupkg snupkg; do
               file="artifacts/pack/$id.$version.$ext"
               if [ -f "$file" ]; then
@@ -173,9 +170,10 @@ jobs:
             reviewer**. Nothing reaches nuget.org until somebody approves it, because a pushed
             version can be unlisted but never withdrawn.
 
-            Approve it and it pushes both packages, `InfoCarrier.Core` first:
-            `InfoCarrier.Core.AspNetCore` declares a dependency on it at the same version, and
-            nuget.org rejects a package whose dependency does not resolve.
+            Approve it and it pushes all three packages in dependency order:
+            `InfoCarrier.Core.Abstractions`, `InfoCarrier.Core`, then
+            `InfoCarrier.Core.AspNetCore`. Nuget.org rejects a package whose dependency does not
+            resolve.
 
             Publishing uses **Trusted Publishing**: the job exchanges a GitHub OIDC token for an
             API key valid for one hour. No publishing secret is stored in this repository.
@@ -207,8 +205,8 @@ jobs:
   #        Environment      : nuget-org        (optional, and worth setting: it pins the policy
   #                                             to the approval-gated job rather than to any job
   #                                             in this workflow)
-  #      The policy applies to every package owned by that account, so neither package has to
-  #      exist on nuget.org first — which matters here, because neither does.
+  #      The policy applies to every package owned by that account, so none of these packages has to
+  #      exist on nuget.org first — which matters here, because none does.
   #
   # A NEW POLICY ON A PRIVATE REPOSITORY IS "PENDING" FOR 7 DAYS and goes inactive if nothing is
   # published in that window; the first successful publish makes it permanent. This repository is
@@ -263,13 +261,19 @@ jobs:
         with:
           user: azabluda
 
-      # ORDER MATTERS, and it is why this is two steps rather than a glob over the folder.
-      # InfoCarrier.Core.AspNetCore declares a dependency on InfoCarrier.Core at the same
-      # version, and nuget.org rejects a package whose dependency does not resolve.
+      # ORDER MATTERS, and it is why this is three steps rather than a glob over the folder.
+      # InfoCarrier.Core depends on InfoCarrier.Core.Abstractions. InfoCarrier.Core.AspNetCore
+      # depends on InfoCarrier.Core. Nuget.org rejects a package whose dependency does not resolve.
       #
       # EXACT FILENAMES, not globs: `InfoCarrier.Core.*.nupkg` also matches
       # InfoCarrier.Core.AspNetCore. A stale filter of exactly that shape is what broke the old
       # version gate, so the lesson is spent here rather than learned twice.
+      - name: Push InfoCarrier.Core.Abstractions
+        run: >
+          dotnet nuget push "artifacts/pack/InfoCarrier.Core.Abstractions.${GITHUB_REF_NAME#v}.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+
       - name: Push InfoCarrier.Core
         run: >
           dotnet nuget push "artifacts/pack/InfoCarrier.Core.${GITHUB_REF_NAME#v}.nupkg"
@@ -283,8 +287,7 @@ jobs:
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
 
       # THERE IS NO SEPARATE SYMBOLS STEP, and there used to be. `dotnet nuget push` uploads the
-      # matching `.snupkg` by itself when it sits beside the `.nupkg`, which both pushes above do
-      # -- the run log shows four uploads from two commands:
+      # matching `.snupkg` by itself when it sits beside the `.nupkg`, which all three pushes do.
       #
       #     Pushing InfoCarrier.Core.10.0.0-preview.1.nupkg  ... Your package was pushed.
       #     Pushing InfoCarrier.Core.10.0.0-preview.1.snupkg ... Your package was pushed.

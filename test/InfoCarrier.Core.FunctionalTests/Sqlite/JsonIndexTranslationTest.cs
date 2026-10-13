@@ -42,7 +42,7 @@ public class JsonIndexTranslationTest
         });
         using DbContext server = store.CreateDbContext();
         await using JsonContext client = new(new DbContextOptionsBuilder<JsonContext>().UseInfoCarrier(store,
-            options => options.AllowTypes(registered ? [typeof(JsonIndexTranslationTest)] : [])).Options);
+            options => options.AddAllowedTypes(registered ? [typeof(JsonIndexTranslationTest)] : [])).Options);
 
         async Task<string[]> Execute(DbContext context)
         {

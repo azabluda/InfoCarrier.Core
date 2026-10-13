@@ -31,21 +31,82 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers anonymous data structures from trusted prototypes. Only property names,
-    ///     order, and types are used; prototype values are ignored. Nested shapes are included.
-    ///     Calls compose, and component-type permissions still require their existing registration.
-    ///     The catalog is built with the server context's model before accepting requests.
+    ///     Adds standard server deployment conventions without application-specific facts.
     /// </summary>
-    /// <param name="services">The server application service collection.</param>
-    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
-    /// <returns>The same collection.</returns>
-    public static IServiceCollection AddInfoCarrierAnonymousShapes(
-        this IServiceCollection services, params object[] shapes)
+    /// <param name="services">The server application's service collection.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrier(this IServiceCollection services)
+        => services.AddInfoCarrier(static _ => { });
+
+    /// <summary>
+    ///     Applies deployment facts that the application configures identically on its server
+    ///     and clients.
+    /// </summary>
+    /// <remarks>
+    ///     This server registration is the admission boundary. Matching client configuration
+    ///     guides planning and sending, but does not grant server permission.
+    /// </remarks>
+    /// <param name="services">The server application's service collection.</param>
+    /// <param name="configure">The application-owned shared configuration method.</param>
+    /// <returns>The same collection, so calls chain.</returns>
+    public static IServiceCollection AddInfoCarrier(
+        this IServiceCollection services,
+        Action<InfoCarrierDeploymentBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
-        Type[] types = AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
+        ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddSingleton(new AnonymousShapeRegistration(types));
+        var builder = new InfoCarrierDeploymentBuilder();
+        configure(builder);
+        InfoCarrierDeploymentSnapshot snapshot = builder.CreateSnapshot();
+
+        AddInfoCarrierAnonymousShapeTypes(services, snapshot.AnonymousShapeTypes);
+        if (snapshot.AllowedTypes.Count > 0)
+        {
+            AddAllowedTypes(services, snapshot.AllowedTypes);
+        }
+        MoveStandardValueMappersAfter(services, snapshot.ValueMappers);
+        AddStandardValueMappers(services);
+        if (snapshot.AllowArbitrarySqlExecution)
+        {
+            AddArbitrarySqlExecution(services);
+        }
+
+        return services;
+    }
+
+    private static void MoveStandardValueMappersAfter(
+        IServiceCollection services,
+        IEnumerable<ValueMapping.IInfoCarrierValueMapper> mappers)
+    {
+        ServiceDescriptor[] standardDescriptors = services
+            .Where(static descriptor => descriptor.ServiceType == typeof(ValueMapping.IInfoCarrierValueMapper)
+                && descriptor.ImplementationType is Type implementation
+                && (implementation == typeof(ValueMapping.IPAddressValueMapper)
+                    || implementation == typeof(ValueMapping.UriValueMapper)))
+            .ToArray();
+        foreach (ServiceDescriptor descriptor in standardDescriptors)
+        {
+            services.Remove(descriptor);
+        }
+
+        foreach (ValueMapping.IInfoCarrierValueMapper mapper in mappers)
+        {
+            services.AddSingleton<ValueMapping.IInfoCarrierValueMapper>(mapper);
+        }
+    }
+
+    private static IServiceCollection AddInfoCarrierAnonymousShapeTypes(
+        IServiceCollection services,
+        IEnumerable<Type> types)
+    {
+        Type[] snapshot = [.. types];
+        if (snapshot.Length == 0)
+        {
+            return services;
+        }
+
+        services.AddSingleton(new AnonymousShapeRegistration(snapshot));
         services.TryAddSingleton(provider =>
         {
             using IServiceScope scope = provider.CreateScope();
@@ -71,23 +132,6 @@ public static class InfoCarrierServiceCollectionExtensions
         }
 
         return provider;
-    }
-
-    /// <summary>
-    ///     Registers an immutable, already generated anonymous-shape catalog for the in-process
-    ///     server. Build it from trusted application types and the actual server model before
-    ///     accepting requests. This registration does not grant component-type permissions.
-    /// </summary>
-    /// <param name="services">The server application service collection.</param>
-    /// <param name="catalog">The complete trusted catalog.</param>
-    /// <returns>The same collection.</returns>
-    public static IServiceCollection AddInfoCarrierAnonymousShapes(
-        this IServiceCollection services, AnonymousShapeCatalog catalog)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(catalog);
-        services.AddSingleton(catalog);
-        return services;
     }
 
     /// <summary>
@@ -148,7 +192,7 @@ public static class InfoCarrierServiceCollectionExtensions
         // the visible behaviour is unchanged — but every one of these is `Scoped`, and an
         // `IEnumerable<T>` resolve would yield the service twice, which is exactly how the
         // value-mapper chain of ADR-012 is consumed.
-        services.AddInfoCarrierStandardValueMappers();
+        AddStandardValueMappers(services);
 
         // The one question this provider asks about how the backing store lays out a nested
         // structure (M9 J5, `docs/architecture.md` §6a D3). `InfoCarrierConventionSetBuilder` and
@@ -246,12 +290,22 @@ public static class InfoCarrierServiceCollectionExtensions
     /// <param name="services">The server's service collection.</param>
     /// <param name="types">The types to admit.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AddAllowedTypes through AddInfoCarrier instead.",
+        DiagnosticId = "ICC1003",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierAllowedTypes(this IServiceCollection services, params Type[] types)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(types);
 
-        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(types));
+        return AddAllowedTypes(services, types);
+    }
+
+    private static IServiceCollection AddAllowedTypes(IServiceCollection services, IEnumerable<Type> types)
+    {
+        Type[] snapshot = [.. types];
+        services.AddSingleton<Expressions.IInfoCarrierAllowedTypes>(new AllowedTypes(snapshot));
 
         return services;
     }
@@ -287,19 +341,26 @@ public static class InfoCarrierServiceCollectionExtensions
     ///     </para>
     ///     <para>
     ///         The server half of the seam whose client half is
-    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />.
     ///         <b>Only this half is a security boundary</b>, and it is default-deny: a server that
     ///         does not call this refuses a raw-SQL payload however the client is configured.
     ///     </para>
     /// </remarks>
     /// <param name="services">The server's service collection.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true) through AddInfoCarrier instead.",
+        DiagnosticId = "ICC1004",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        return AddArbitrarySqlExecution(services);
+    }
 
+    private static IServiceCollection AddArbitrarySqlExecution(IServiceCollection services)
+    {
         services.TryAddSingleton<IInfoCarrierArbitrarySqlExecution, ArbitrarySqlExecution>();
-
         return services;
     }
 
@@ -498,10 +559,18 @@ public static class InfoCarrierServiceCollectionExtensions
     /// </remarks>
     /// <param name="services">The collection to register in.</param>
     /// <returns>The same collection, so calls chain.</returns>
+    [Obsolete(
+        "Use AddInfoCarrier instead. Standard value mappers are added automatically.",
+        DiagnosticId = "ICC1005",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierStandardValueMappers(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        return AddStandardValueMappers(services);
+    }
 
+    private static IServiceCollection AddStandardValueMappers(IServiceCollection services)
+    {
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ValueMapping.IInfoCarrierValueMapper, ValueMapping.IPAddressValueMapper>());
         services.TryAddEnumerable(

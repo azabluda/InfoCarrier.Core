@@ -29,7 +29,7 @@ namespace InfoCarrier.Core.Expressions;
 ///         it registered
 ///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />,
 ///         and a client sends one only if it called
-///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Both
+///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />. Both
 ///         default to refusing. Read <c>docs/security-review.md</c> section 5a.
 ///     </para>
 /// </remarks>

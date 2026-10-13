@@ -76,13 +76,14 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     {
         bool arbitrarySql = backend.ArbitrarySqlExecution;
         Type[] allowedTypes = backend.AllowedTypes;
+        object[] anonymousShapes = backend.AnonymousShapes;
 
         // The raw-SQL grant and the projection types are INDEPENDENT declarations, and reading the
         // first as a precondition of the second was the shape this method had until
         // `SqlQueryTestBase` was adopted. A fixture may declare a DTO and grant no SQL.
         bool relationalStore = backend.ServerStoreIsRelational;
 
-        if (!arbitrarySql && allowedTypes.Length == 0 && relationalStore)
+        if (!arbitrarySql && allowedTypes.Length == 0 && anonymousShapes.Length == 0 && relationalStore)
         {
             return null;
         }
@@ -100,22 +101,30 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
             if (arbitrarySql)
             {
-                o.AllowArbitrarySqlExecution();
+                AllowArbitrarySql(o);
             }
 
             // The client half of the same pair. Both halves or neither, as ADR-012 requires: a type
             // admitted on the client alone produces a query the server refuses to read.
             if (parameterType is not null)
             {
-                o.AllowTypes(parameterType);
+                o.AddAllowedTypes(parameterType);
             }
 
             if (allowedTypes.Length > 0)
             {
-                o.AllowTypes(allowedTypes);
+                o.AddAllowedTypes(allowedTypes);
+            }
+
+            if (anonymousShapes.Length > 0)
+            {
+                o.AddAnonymousShapes(anonymousShapes);
             }
         };
     }
+
+    private static void AllowArbitrarySql(InfoCarrierDeploymentBuilder builder)
+        => builder.AllowArbitrarySqlExecution(true);
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

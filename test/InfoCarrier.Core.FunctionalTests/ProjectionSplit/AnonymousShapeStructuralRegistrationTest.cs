@@ -30,8 +30,8 @@ public class AnonymousShapeStructuralRegistrationTest
         services.AddDbContext<PrototypeContext>(options => options.UseInMemoryDatabase("prototype-registration"));
         services.AddScoped<DbContext>(p => p.GetRequiredService<PrototypeContext>());
         object[] first = [new { StructuralConfigured = 1 }];
-        services.AddInfoCarrierAnonymousShapes(first);
-        services.AddInfoCarrierAnonymousShapes(new { StructuralSecond = "" });
+        services.AddInfoCarrier(builder => builder.AddAnonymousShapes(first));
+        services.AddInfoCarrier(builder => builder.AddAnonymousShapes(new { StructuralSecond = "" }));
         first[0] = new { NotConfigured = 2 };
         using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
         using IServiceScope scope = provider.CreateScope();
@@ -50,8 +50,10 @@ public class AnonymousShapeStructuralRegistrationTest
     public void Prototype_registration_rejects_named_records_and_null_prototypes()
     {
         var services = new ServiceCollection();
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierAnonymousShapes(new NamedRecord(1)));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierAnonymousShapes(new object[] { null! }));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+            builder => builder.AddAnonymousShapes(new NamedRecord(1))));
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+            builder => builder.AddAnonymousShapes(new object[] { null! })));
     }
 
     [Fact]

@@ -32,7 +32,7 @@ namespace InfoCarrier.Core.Metadata;
 ///     </para>
 ///     <para>
 ///         <b>It does not decide whether raw SQL is permitted.</b> That is
-///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" /> on the
+///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" /> on the
 ///         client and <see cref="IInfoCarrierArbitrarySqlExecution" /> on the server, and both
 ///         still default to refusing. This seam only knows the shape.
 ///     </para>

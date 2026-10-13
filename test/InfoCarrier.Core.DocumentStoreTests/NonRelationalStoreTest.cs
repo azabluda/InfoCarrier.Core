@@ -70,8 +70,6 @@ public class NonRelationalStoreTest(DocumentStoreFixture fixture) : IClassFixtur
     {
         var options = new DbContextOptionsBuilder<ShopClientContext>(nonRelational
             ? fixture.NonRelationalClientOptions : fixture.ClientOptions);
-        new InfoCarrierDbContextOptionsBuilder(options)
-            .UseRegisteredAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() });
         await using ShopClientContext document = new(options.Options);
         var query = document.Customers
             .Select(c => new { c.Name, c.Lines })

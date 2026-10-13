@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Shared deployment configuration contracts for InfoCarrier.Core client and server applications.</Description>
+    <RootNamespace>InfoCarrier.Core</RootNamespace>
+    <AssemblyName>InfoCarrier.Core.Abstractions</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <!-- This package has no published baseline until its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\docs\assets\icon.png" Pack="true" PackagePath="icon.png" Visible="false" />
+  </ItemGroup>
+
+</Project>

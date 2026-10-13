@@ -168,7 +168,7 @@ public sealed class QuerySplitter
     /// </param>
     /// <param name="arbitrarySqlAllowed">
     ///     Whether this client may send a query carrying raw SQL (#60), from
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />. Default
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />. Default
     ///     <c>false</c>, which is the refusal every caller had before it existed.
     /// </param>
     /// <param name="relationalRoots">

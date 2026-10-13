@@ -16,33 +16,18 @@ namespace InfoCarrier.Core;
 /// </remarks>
 /// <param name="optionsBuilder">The builder being configured.</param>
 public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsBuilder)
+    : InfoCarrierDeploymentBuilder
 {
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
 
     /// <summary>
-    ///     States which anonymous structures this client expects the server to have registered.
+    ///     Sets whether this client may send arbitrary SQL for server execution.
     /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         This setting controls client query planning. The server still requires its own
-    ///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierAnonymousShapes(Microsoft.Extensions.DependencyInjection.IServiceCollection, object[])" />
-    ///         registration, which is the admission boundary.
-    ///     </para>
-    ///     <para>
-    ///         Calls compose. Prototype values are ignored, nested anonymous structures are
-    ///         included, and named types must use <see cref="AllowTypes" /> instead.
-    ///     </para>
-    /// </remarks>
-    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
+    /// <param name="allowed">Whether to permit arbitrary SQL execution.</param>
     /// <returns>The same builder, so calls chain.</returns>
-    public virtual InfoCarrierDbContextOptionsBuilder UseRegisteredAnonymousShapes(params object[] shapes)
+    public override InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution(bool allowed)
     {
-        Type[] types = Expressions.AnonymousShapeSet.ValidatePrototypes(shapes, nameof(shapes));
-        InfoCarrierOptionsExtension extension =
-            (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())
-                .WithRegisteredAnonymousShapes(types);
-
-        ((IDbContextOptionsBuilderInfrastructure)_optionsBuilder).AddOrUpdateExtension(extension);
+        base.AllowArbitrarySqlExecution(allowed);
         return this;
     }
 
@@ -80,6 +65,10 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     /// </remarks>
     /// <param name="types">The types to admit.</param>
     /// <returns>The same builder, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AddAllowedTypes instead.",
+        DiagnosticId = "ICC1001",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public virtual InfoCarrierDbContextOptionsBuilder AllowTypes(params Type[] types)
     {
         ArgumentNullException.ThrowIfNull(types);
@@ -119,6 +108,10 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     ///     </para>
     /// </remarks>
     /// <returns>The same builder, so calls chain.</returns>
+    [Obsolete(
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true) instead.",
+        DiagnosticId = "ICC1002",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
     {
         InfoCarrierOptionsExtension extension =

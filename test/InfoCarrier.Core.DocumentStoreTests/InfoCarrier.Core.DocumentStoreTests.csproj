@@ -77,6 +77,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\InfoCarrier.Core.Abstractions\InfoCarrier.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <!--
       THE SECOND CONSUMER OF THE SHARED HARNESS, AND THE REASON IT IS A PROJECT AGAIN. It is built

@@ -356,10 +356,12 @@ These are numbered on their own, because they are the same for both.
    `<tag>.superseded-<date>.md` first, because GitHub keeps no history of one. Skipping this is
    invisible from the repository, which is how the published `v10.0.0-preview.1` body drifted from
    its copy here.
-5. **Raise `PackageValidationBaselineVersion` to the version just published**, on every branch that
-   will build against it: `main` and the line the tag is on. This comes after the publish and not
-   before it: validation downloads the baseline package, so it cannot name one that is not on
-   nuget.org yet.
+5. For each package published for the first time, remove its project-level
+   `EnablePackageValidation=false` override. Then **raise `PackageValidationBaselineVersion` to the
+   version just published**, on every branch that will build against it: `main` and the line the tag
+   is on. This comes after the publish and not before it: validation downloads the baseline package,
+   so it cannot name one that is not on nuget.org yet. Run `dotnet pack` again and confirm package
+   validation succeeds.
 6. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
    **This is part of the release, not tidying afterwards.** Until it lands, `main` builds a
    version that NuGet orders BELOW the one you just shipped; the table above measures it.

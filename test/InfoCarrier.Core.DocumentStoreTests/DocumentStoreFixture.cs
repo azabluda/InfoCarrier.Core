@@ -148,15 +148,19 @@ public class DocumentStoreFixture : IAsyncLifetime
         // was inside the spec project and out of reach. It is a project now, and one transport
         // means a wire-format defect surfaces the same way on every tier.
         var transport = new InProcessInfoCarrierTransport(envelopeServer.DispatchAsync, serializer);
+        var client = new TransportInfoCarrierClient(transport, serializer);
+
+        static void ConfigureDeployment(InfoCarrierDeploymentBuilder builder)
+            => builder.AddAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() });
 
         ClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
-            .UseInfoCarrier(new TransportInfoCarrierClient(transport, serializer))
+            .UseInfoCarrier(client, ConfigureDeployment)
             .Options;
 
         NonRelationalClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
             .UseInfoCarrier(
-                new TransportInfoCarrierClient(transport, serializer),
-                o => o.UseNonRelationalServerStore())
+                client,
+                o => ConfigureDeployment(o.UseNonRelationalServerStore()))
             .Options;
     }
 

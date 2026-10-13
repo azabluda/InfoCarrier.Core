@@ -100,17 +100,6 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     {
         private ITestStoreFactory? _testStoreFactory;
 
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-        {
-            if (!DirectClient.IsEnabled)
-            {
-                new InfoCarrierDbContextOptionsBuilder(builder).UseRegisteredAnonymousShapes(
-                    new { Id = 0, Name = "", Layouts = new[] { new { H = 0, W = 0 } }.ToList() });
-            }
-
-            return base.AddOptions(builder);
-        }
-
         protected override string StoreName
             => "CustomConvertersInfoCarrierTest";
 
@@ -125,7 +114,11 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
                 // this client, which answers a query EF refuses. The model does not imply the type,
                 // by the owner's decision of 2026-09-22 (`security-review.md` §2b), so the fixture
                 // names it as an application would.
-                allowedTypes: [typeof(Layout)]);
+                allowedTypes: [typeof(Layout)],
+                anonymousShapes:
+                [
+                    new { Id = 0, Name = "", Layouts = new[] { new { H = 0, W = 0 } }.ToList() }
+                ]);
 
         public override bool StrictEquality => false;
 
