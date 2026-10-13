@@ -160,11 +160,7 @@ public class DocumentStoreFixture : IAsyncLifetime
         NonRelationalClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
             .UseInfoCarrier(
                 client,
-                o =>
-                {
-                    o.UseNonRelationalServerStore();
-                    ConfigureDeployment(o);
-                })
+                o => ConfigureDeployment(o.UseNonRelationalServerStore()))
             .Options;
     }
 
