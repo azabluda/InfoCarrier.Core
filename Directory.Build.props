@@ -215,7 +215,7 @@
       BRANCH.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.2.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>10.3.0</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>

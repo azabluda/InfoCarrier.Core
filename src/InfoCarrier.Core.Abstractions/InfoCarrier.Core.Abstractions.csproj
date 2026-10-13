@@ -5,8 +5,6 @@
     <RootNamespace>InfoCarrier.Core</RootNamespace>
     <AssemblyName>InfoCarrier.Core.Abstractions</AssemblyName>
     <IsPackable>true</IsPackable>
-    <!-- This package has no published baseline until its first release. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
