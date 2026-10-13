@@ -193,8 +193,7 @@ public class SqliteSmokeTest
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
             services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
 
-        await using SqliteSmokeContext client = CreateClient(
-            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
+        await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
 
         // The store holds two blogs. THE `WHERE` IS THE POINT: before R75 a `FromSqlRaw` carrying
         // one came back as the whole table, because the wire's query-root node had no field for
@@ -219,8 +218,7 @@ public class SqliteSmokeTest
         // that is the security boundary. The client now ships the query and the SERVER refuses to
         // run the string, which is what `docs/security-review.md` section 5a is about.
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
-        await using SqliteSmokeContext client = CreateClient(
-            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
+        await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
 
         // Raised on the SERVER and rehydrated here by `InfoCarrierFaultMapper`, which round-trips
         // an `InvalidOperationException` as itself -- so the exception TYPE says nothing about
@@ -237,8 +235,7 @@ public class SqliteSmokeTest
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
             services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
 
-        await using SqliteSmokeContext client = CreateClient(
-            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
+        await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
 
         // An ordinary query keeps `{0}` bound as a DbParameter on the server. A quote in the
         // value guards against interpolating it into SQL text. Compiled constants have their
@@ -270,8 +267,7 @@ public class SqliteSmokeTest
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
             services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true), collectionMode);
-        await using SqliteSmokeContext client = CreateClient(
-            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
+        await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
         using DbContext server = store.CreateDbContext();
 
         // Compile separately for each provider: EF compiled delegates belong to one model.
@@ -314,8 +310,7 @@ public class SqliteSmokeTest
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
             services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true));
-        await using SqliteSmokeContext client = CreateClient(
-            store, o => ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true);
+        await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
         using DbContext server = store.CreateDbContext();
 
         Task<int> Execute(DbContext context)
@@ -965,4 +960,7 @@ public class SqliteSmokeTest
         Assert.Equal("Zurich", address.City);
         Assert.Equal("Bahnhofstrasse 1", address["Line"]);
     }
+
+    private static void AllowArbitrarySql(InfoCarrierDeploymentBuilder builder)
+        => builder.AllowArbitrarySqlExecution = true;
 }

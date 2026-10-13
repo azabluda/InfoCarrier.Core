@@ -101,7 +101,7 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
             if (arbitrarySql)
             {
-                ((InfoCarrierDeploymentBuilder)o).AllowArbitrarySqlExecution = true;
+                AllowArbitrarySql(o);
             }
 
             // The client half of the same pair. Both halves or neither, as ADR-012 requires: a type
@@ -122,6 +122,9 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
             }
         };
     }
+
+    private static void AllowArbitrarySql(InfoCarrierDeploymentBuilder builder)
+        => builder.AllowArbitrarySqlExecution = true;
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

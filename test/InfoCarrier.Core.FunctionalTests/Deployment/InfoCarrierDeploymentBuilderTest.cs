@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.ValueMapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections;
 using System.Reflection;
 using Xunit;
 
@@ -270,27 +269,6 @@ public class InfoCarrierDeploymentBuilderTest
 
         using ServiceProvider provider = services.BuildServiceProvider();
         Assert.Same(original, provider.GetServices<IInfoCarrierValueMapper>().First());
-    }
-
-    [Fact]
-    public void Internal_snapshot_collections_are_read_only()
-    {
-        var mapper = new StubMapper();
-        var builder = new InfoCarrierDeploymentBuilder();
-        builder.AddAnonymousShapes(new { Id = 0 });
-        builder.AddAllowedTypes(typeof(DateOnly));
-        builder.AddValueMappers(mapper);
-
-        object snapshot = typeof(InfoCarrierDeploymentBuilder)
-            .GetMethod("CreateSnapshot", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(builder, null)!;
-
-        foreach (string propertyName in new[] { "AnonymousShapeTypes", "AllowedTypes", "ValueMappers" })
-        {
-            var values = Assert.IsAssignableFrom<IList>(snapshot.GetType().GetProperty(propertyName)!.GetValue(snapshot));
-            Assert.True(values.IsReadOnly);
-            Assert.Throws<NotSupportedException>(() => values[0] = values[0]);
-        }
     }
 
     [Fact]

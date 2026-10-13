@@ -150,16 +150,21 @@ public class DocumentStoreFixture : IAsyncLifetime
         var transport = new InProcessInfoCarrierTransport(envelopeServer.DispatchAsync, serializer);
         var client = new TransportInfoCarrierClient(transport, serializer);
 
+        static void ConfigureDeployment(InfoCarrierDeploymentBuilder builder)
+            => builder.AddAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() });
+
         ClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
-            .UseInfoCarrier(client, o => o.AddAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() }))
+            .UseInfoCarrier(client, ConfigureDeployment)
             .Options;
 
         NonRelationalClientOptions = new DbContextOptionsBuilder<ShopClientContext>()
             .UseInfoCarrier(
                 client,
-                o => o
-                    .UseNonRelationalServerStore()
-                    .AddAnonymousShapes(new { Name = "", Lines = new List<OrderLine>() }))
+                o =>
+                {
+                    o.UseNonRelationalServerStore();
+                    ConfigureDeployment(o);
+                })
             .Options;
     }
 

@@ -24,7 +24,7 @@ builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindConte
 builder.Services
     .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
     .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrier(infoCarrier => infoCarrier.ConfigureInfoCarrier());
+    .AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
 
 WebApplication app = builder.Build();
 

@@ -165,5 +165,8 @@ public struct SharedTestStoreProperties
     /// </remarks>
     public Type[]? AllowedTypes;
 
+    /// <summary>
+    ///     Anonymous prototypes registered on both client and server for this fixture.
+    /// </summary>
     public object[]? AnonymousShapes;
 }

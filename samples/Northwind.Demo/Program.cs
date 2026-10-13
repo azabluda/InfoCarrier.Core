@@ -22,7 +22,7 @@ var client = new TransportInfoCarrierClient(
     loggerFactory.CreateLogger<TransportInfoCarrierClient>());
 
 DbContextOptions<NorthwindContext> options = new DbContextOptionsBuilder<NorthwindContext>()
-    .UseInfoCarrier(client, infoCarrier => infoCarrier.ConfigureInfoCarrier())
+    .UseInfoCarrier(client, builder => builder.ConfigureInfoCarrier())
     .UseLoggerFactory(loggerFactory)
     .UseLazyLoadingProxies()
     .Options;
