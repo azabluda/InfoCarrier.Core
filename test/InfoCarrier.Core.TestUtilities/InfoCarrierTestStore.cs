@@ -124,7 +124,7 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     }
 
     private static void AllowArbitrarySql(InfoCarrierDeploymentBuilder builder)
-        => builder.AllowArbitrarySqlExecution = true;
+        => builder.AllowArbitrarySqlExecution(true);
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)

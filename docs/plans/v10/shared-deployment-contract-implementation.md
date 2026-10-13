@@ -60,10 +60,10 @@ completed successfully. Build & Test also completed successfully.
 **Interfaces:**
 
 - Produce: public `InfoCarrier.Core.InfoCarrierDeploymentBuilder`.
-- Produce: `void AddAnonymousShapes(params object[] shapes)`.
-- Produce: `void AddAllowedTypes(params Type[] types)`.
-- Produce: `void AddValueMappers(params IInfoCarrierValueMapper[] mappers)`.
-- Produce: `bool AllowArbitrarySqlExecution { get; set; }`.
+- Produce: fluent `InfoCarrierDeploymentBuilder AddAnonymousShapes(params object[] shapes)`.
+- Produce: fluent `InfoCarrierDeploymentBuilder AddAllowedTypes(params Type[] types)`.
+- Produce: fluent `InfoCarrierDeploymentBuilder AddValueMappers(params IInfoCarrierValueMapper[] mappers)`.
+- Produce: fluent `InfoCarrierDeploymentBuilder AllowArbitrarySqlExecution(bool allowed)`.
 - Produce internally: immutable ordered snapshots for Core and one shared anonymous-prototype validator.
 - Preserve: `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` with its existing two methods.
 

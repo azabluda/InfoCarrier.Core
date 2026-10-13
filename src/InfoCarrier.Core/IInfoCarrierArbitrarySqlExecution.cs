@@ -25,7 +25,7 @@ namespace InfoCarrier.Core;
 ///     </para>
 ///     <para>
 ///         <b>The server half is the security boundary; the client half
-///         (<see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />) is
+///         (<see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />) is
 ///         not.</b> Same division as
 ///         <see cref="Expressions.IInfoCarrierAllowedTypes" />: the client's option governs code
 ///         the application already controls, and widening it can only produce a query this server

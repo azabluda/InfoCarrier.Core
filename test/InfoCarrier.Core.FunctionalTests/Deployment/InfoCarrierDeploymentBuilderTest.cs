@@ -35,6 +35,40 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
+    public void Shared_configuration_is_fluent_and_boolean_permissions_can_be_reset()
+    {
+        var builder = new InfoCarrierDeploymentBuilder();
+        var mapper = new StubMapper();
+
+        InfoCarrierDeploymentBuilder result = builder
+            .AddAnonymousShapes(new { Id = 0 })
+            .AddAllowedTypes(typeof(DateOnly))
+            .AddValueMappers(mapper)
+            .AllowArbitrarySqlExecution(true)
+            .AllowArbitrarySqlExecution(false);
+        var services = new ServiceCollection();
+        services.AddInfoCarrier(configure => configure
+            .AllowArbitrarySqlExecution(true)
+            .AllowArbitrarySqlExecution(false));
+
+        Assert.Same(builder, result);
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Assert.Null(provider.GetService<IInfoCarrierArbitrarySqlExecution>());
+    }
+
+    [Fact]
+    public void Client_configuration_exposes_the_fluent_boolean_permission()
+    {
+        var options = new DbContextOptionsBuilder();
+
+        options.UseInfoCarrier(
+            StubClient.Instance,
+            builder => builder.AllowArbitrarySqlExecution(true));
+
+        Assert.True(options.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed);
+    }
+
+    [Fact]
     public void Abstractions_assembly_exposes_only_the_two_approved_contracts()
         => Assert.Equal(
             [
@@ -143,8 +177,8 @@ public class InfoCarrierDeploymentBuilderTest
 
         services.AddInfoCarrier(builder =>
         {
-            builder.AddAllowedTypes(typeof(DateOnly));
-            builder.AllowArbitrarySqlExecution = true;
+            builder.AddAllowedTypes(typeof(DateOnly))
+                .AllowArbitrarySqlExecution(true);
         });
 
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -277,15 +311,15 @@ public class InfoCarrierDeploymentBuilderTest
         const string url = "https://github.com/azabluda/InfoCarrier.Core/issues/221";
         (MethodInfo Method, string DiagnosticId, string Replacement)[] expected =
         [
-            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowTypes)),
+            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowTypes), 1),
                 "ICC1001", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
-            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution)),
+            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution), 0),
                 "ICC1002", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierAllowedTypes)),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierAllowedTypes), 2),
                 "ICC1003", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution)),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution), 1),
                 "ICC1004", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierStandardValueMappers)),
+            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierStandardValueMappers), 1),
                 "ICC1005", "AddInfoCarrier")
         ];
 
@@ -331,10 +365,10 @@ public class InfoCarrierDeploymentBuilderTest
         return options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
     }
 
-    private static MethodInfo Method(Type type, string name)
+    private static MethodInfo Method(Type type, string name, int parameterCount)
         => Assert.Single(
             type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public),
-            method => method.Name == name);
+            method => method.Name == name && method.GetParameters().Length == parameterCount);
 
     private sealed record NamedRecord(int Value);
 
@@ -409,9 +443,7 @@ internal static class InfoCarrierDeploymentBuilderTestExtensions
 {
     public static InfoCarrierDeploymentBuilder ConfigureInfoCarrierForTest(
         this InfoCarrierDeploymentBuilder builder)
-    {
-        builder.AddAllowedTypes(typeof(DateOnly));
-        builder.AllowArbitrarySqlExecution = true;
-        return builder;
-    }
+        => builder
+            .AddAllowedTypes(typeof(DateOnly))
+            .AllowArbitrarySqlExecution(true);
 }

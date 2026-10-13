@@ -86,7 +86,7 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     /// <summary>
     ///     Whether this client may send a query carrying raw SQL (#60). <c>false</c> unless the
     ///     application called
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />.
     /// </summary>
     public virtual bool ArbitrarySqlExecutionAllowed { get; private set; }
 

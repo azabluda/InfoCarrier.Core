@@ -23,10 +23,7 @@ public static class ShopDeployment
 {
     public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
         this InfoCarrierDeploymentBuilder builder)
-    {
-        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-        return builder;
-    }
+        => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```
 
@@ -51,9 +48,9 @@ Version 10.3 warns about five planned version 11 removals:
 | Existing method | Replacement |
 |---|---|
 | `InfoCarrierDbContextOptionsBuilder.AllowTypes(...)` | `InfoCarrierDeploymentBuilder.AddAllowedTypes(...)` |
-| `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()` | `InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution = true` |
+| `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()` | `InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true)` |
 | `AddInfoCarrierAllowedTypes(...)` | `AddAllowedTypes(...)` inside `AddInfoCarrier(...)` |
-| `AddInfoCarrierArbitrarySqlExecution()` | `AllowArbitrarySqlExecution = true` inside `AddInfoCarrier(...)` |
+| `AddInfoCarrierArbitrarySqlExecution()` | `AllowArbitrarySqlExecution(true)` inside `AddInfoCarrier(...)` |
 | `AddInfoCarrierStandardValueMappers()` | `AddInfoCarrier(...)` |
 
 Version 10 continues to support these methods. The unreleased `UseRegisteredAnonymousShapes` and
@@ -110,11 +107,9 @@ public static class ShopDeployment
 {
     public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
         this InfoCarrierDeploymentBuilder builder)
-    {
-        builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-        builder.AllowArbitrarySqlExecution = true;
-        return builder;
-    }
+        => builder
+            .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
+            .AllowArbitrarySqlExecution(true);
 }
 ```
 
@@ -129,13 +124,13 @@ statements. Query filters do not apply. The database account's rights limit the 
 Register anonymous data structures in the shared deployment method using prototype objects:
 
 ```csharp
-builder.AddAnonymousShapes(
-    new { Name = "", Age = 0 },
-    new { Country = "", City = "" },
-    new { CustomerId = 0, Year = 0 });
-
 // Named records use the existing type permission registration.
-builder.AddAllowedTypes(typeof(CustomerSummary));
+builder
+    .AddAnonymousShapes(
+        new { Name = "", Age = 0 },
+        new { Country = "", City = "" },
+        new { CustomerId = 0, Year = 0 })
+    .AddAllowedTypes(typeof(CustomerSummary));
 ```
 
 Prototype values are ignored. Names, property order, and property types must match the client's

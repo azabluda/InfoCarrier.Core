@@ -341,7 +341,7 @@ public static class InfoCarrierServiceCollectionExtensions
     ///     </para>
     ///     <para>
     ///         The server half of the seam whose client half is
-    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />.
+    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />.
     ///         <b>Only this half is a security boundary</b>, and it is default-deny: a server that
     ///         does not call this refuses a raw-SQL payload however the client is configured.
     ///     </para>
@@ -349,7 +349,7 @@ public static class InfoCarrierServiceCollectionExtensions
     /// <param name="services">The server's service collection.</param>
     /// <returns>The same collection, so calls chain.</returns>
     [Obsolete(
-        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution through AddInfoCarrier instead.",
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true) through AddInfoCarrier instead.",
         DiagnosticId = "ICC1004",
         UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
     public static IServiceCollection AddInfoCarrierArbitrarySqlExecution(this IServiceCollection services)

@@ -31,7 +31,7 @@ namespace InfoCarrier.Core.Query;
 /// <param name="allowlist">The types the server will accept. Must match the server's.</param>
 /// <param name="arbitrarySqlAllowed">
 ///     Whether this client may send a query carrying raw SQL (#60) - set from
-///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution" />, and
+///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />, and
 ///     <c>false</c> by default. It changes exactly one verdict, in
 ///     <see cref="IsSerializableKind" />: whether EF's relational raw-SQL query root has a wire
 ///     representation. <b>It is not a security boundary</b> - the server's own

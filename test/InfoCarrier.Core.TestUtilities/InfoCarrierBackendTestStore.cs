@@ -51,7 +51,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // both directions.
         if (testStoreProperties.ArbitrarySqlExecution)
         {
-            services = services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution = true);
+            services = services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true));
 
             // THERE IS NO PER-STORE SERVER SEAM EITHER, deleted 2026-09-09 with its sibling.
             // `AddStoreSpecificServices` existed so the SQLite store could register

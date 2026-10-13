@@ -24,7 +24,7 @@ optionsBuilder.UseInfoCarrier(client, o => o
 | Setting | What it says |
 |---|---|
 | `AddAllowedTypes(...)` | These Common Language Runtime types may appear beyond those implied by the model. Register them on both sides. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). |
-| `AllowArbitrarySqlExecution = true` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server must grant it too. Only the server's setting is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
+| `AllowArbitrarySqlExecution(true)` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server must grant it too. Only the server's setting is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
 | `UseNonRelationalServerStore()` | The server's store is not a relational database, so three relational query rules do not apply, and a change to part of a document sends the whole document. **On a document store the server needs [its own registration](server.md#saying-the-store-is-a-document-store) as well**, and that one is what keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
 
 Leave all three alone unless one of those sentences is true of your deployment.
@@ -40,13 +40,11 @@ public static class ShopDeployment
 {
     public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
         this InfoCarrierDeploymentBuilder builder)
-    {
-        builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-        builder.AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions));
-        builder.AddValueMappers(new MoneyValueMapper());
-        builder.AllowArbitrarySqlExecution = true;
-        return builder;
-    }
+        => builder
+            .AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null })
+            .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
+            .AddValueMappers(new MoneyValueMapper())
+            .AllowArbitrarySqlExecution(true);
 }
 ```
 

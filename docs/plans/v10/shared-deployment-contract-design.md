@@ -43,10 +43,10 @@ forwarding behavior.
 ```csharp
 public class InfoCarrierDeploymentBuilder
 {
-    public void AddAnonymousShapes(params object[] shapes);
-    public void AddAllowedTypes(params Type[] types);
-    public void AddValueMappers(params IInfoCarrierValueMapper[] mappers);
-    public bool AllowArbitrarySqlExecution { get; set; }
+    public InfoCarrierDeploymentBuilder AddAnonymousShapes(params object[] shapes);
+    public InfoCarrierDeploymentBuilder AddAllowedTypes(params Type[] types);
+    public InfoCarrierDeploymentBuilder AddValueMappers(params IInfoCarrierValueMapper[] mappers);
+    public InfoCarrierDeploymentBuilder AllowArbitrarySqlExecution(bool allowed);
 }
 ```
 
@@ -113,13 +113,11 @@ Applications define a non-generic extension method on the shared builder:
 ```csharp
 public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
     this InfoCarrierDeploymentBuilder builder)
-{
-    builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
-    builder.AddAllowedTypes(typeof(ApplicationDbFunctions));
-    builder.AddValueMappers(new MoneyValueMapper());
-    builder.AllowArbitrarySqlExecution = true;
-    return builder;
-}
+    => builder
+        .AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null })
+        .AddAllowedTypes(typeof(ApplicationDbFunctions))
+        .AddValueMappers(new MoneyValueMapper())
+        .AllowArbitrarySqlExecution(true);
 ```
 
 Client-specific calls precede the shared extension because it returns the base builder:

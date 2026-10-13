@@ -21,6 +21,17 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
 
     /// <summary>
+    ///     Sets whether this client may send arbitrary SQL for server execution.
+    /// </summary>
+    /// <param name="allowed">Whether to permit arbitrary SQL execution.</param>
+    /// <returns>The same builder, so calls chain.</returns>
+    public override InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution(bool allowed)
+    {
+        base.AllowArbitrarySqlExecution(allowed);
+        return this;
+    }
+
+    /// <summary>
     ///     Permits a wire payload to name these CLR types, in addition to the ones the model
     ///     already implies (ADR-008 constraint 2).
     /// </summary>
@@ -98,10 +109,10 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     /// </remarks>
     /// <returns>The same builder, so calls chain.</returns>
     [Obsolete(
-        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution instead.",
+        "Use InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true) instead.",
         DiagnosticId = "ICC1002",
         UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/221")]
-    public new virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
+    public virtual InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution()
     {
         InfoCarrierOptionsExtension extension =
             (_optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>() ?? new InfoCarrierOptionsExtension())

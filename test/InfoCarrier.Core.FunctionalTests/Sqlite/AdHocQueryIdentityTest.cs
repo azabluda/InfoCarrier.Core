@@ -102,5 +102,5 @@ public class AdHocQueryIdentityTest
     }
 
     private static void AllowArbitrarySql(InfoCarrierDeploymentBuilder builder)
-        => builder.AllowArbitrarySqlExecution = true;
+        => builder.AllowArbitrarySqlExecution(true);
 }

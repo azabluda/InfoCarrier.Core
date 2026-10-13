@@ -117,10 +117,7 @@ public static class ShopDeployment
 {
     public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
         this InfoCarrierDeploymentBuilder builder)
-    {
-        builder.AddValueMappers(new MoneyValueMapper());
-        return builder;
-    }
+        => builder.AddValueMappers(new MoneyValueMapper());
 }
 ```
 

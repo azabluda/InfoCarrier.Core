@@ -13,24 +13,36 @@ public class InfoCarrierDeploymentBuilder
     private readonly List<Type> _anonymousShapeTypes = [];
     private readonly List<Type> _allowedTypes = [];
     private readonly List<IInfoCarrierValueMapper> _valueMappers = [];
+    private bool _allowArbitrarySqlExecution;
 
     /// <summary>
-    ///     Gets or sets whether this deployment permits arbitrary SQL execution.
+    ///     Sets whether this deployment permits arbitrary SQL execution.
     /// </summary>
-    public bool AllowArbitrarySqlExecution { get; set; }
+    /// <param name="allowed">Whether to permit arbitrary SQL execution.</param>
+    /// <returns>The same builder, so calls chain.</returns>
+    public virtual InfoCarrierDeploymentBuilder AllowArbitrarySqlExecution(bool allowed)
+    {
+        _allowArbitrarySqlExecution = allowed;
+        return this;
+    }
 
     /// <summary>
     ///     Adds anonymous structures that the application declares on both deployment roles.
     /// </summary>
     /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
-    public void AddAnonymousShapes(params object[] shapes)
-        => _anonymousShapeTypes.AddRange(ValidateAnonymousPrototypes(shapes, nameof(shapes)));
+    /// <returns>The same builder, so calls chain.</returns>
+    public InfoCarrierDeploymentBuilder AddAnonymousShapes(params object[] shapes)
+    {
+        _anonymousShapeTypes.AddRange(ValidateAnonymousPrototypes(shapes, nameof(shapes)));
+        return this;
+    }
 
     /// <summary>
     ///     Adds named types that wire payloads may name beyond the types implied by the model.
     /// </summary>
     /// <param name="types">The types to admit.</param>
-    public void AddAllowedTypes(params Type[] types)
+    /// <returns>The same builder, so calls chain.</returns>
+    public InfoCarrierDeploymentBuilder AddAllowedTypes(params Type[] types)
     {
         ArgumentNullException.ThrowIfNull(types);
         if (types.Any(static type => type is null))
@@ -39,13 +51,15 @@ public class InfoCarrierDeploymentBuilder
         }
 
         _allowedTypes.AddRange(types);
+        return this;
     }
 
     /// <summary>
     ///     Adds custom value mappers in first-claim-wins order.
     /// </summary>
     /// <param name="mappers">The mapper instances to use on this deployment role.</param>
-    public void AddValueMappers(params IInfoCarrierValueMapper[] mappers)
+    /// <returns>The same builder, so calls chain.</returns>
+    public InfoCarrierDeploymentBuilder AddValueMappers(params IInfoCarrierValueMapper[] mappers)
     {
         ArgumentNullException.ThrowIfNull(mappers);
         if (mappers.Any(static mapper => mapper is null))
@@ -54,6 +68,7 @@ public class InfoCarrierDeploymentBuilder
         }
 
         _valueMappers.AddRange(mappers);
+        return this;
     }
 
     internal InfoCarrierDeploymentSnapshot CreateSnapshot()
@@ -61,7 +76,7 @@ public class InfoCarrierDeploymentBuilder
             Array.AsReadOnly(_anonymousShapeTypes.ToArray()),
             Array.AsReadOnly(_allowedTypes.ToArray()),
             Array.AsReadOnly(_valueMappers.ToArray()),
-            AllowArbitrarySqlExecution);
+            _allowArbitrarySqlExecution);
 
     internal static Type[] ValidateAnonymousPrototypes(object[] shapes, string parameterName)
     {
