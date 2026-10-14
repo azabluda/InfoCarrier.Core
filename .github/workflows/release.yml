@@ -57,7 +57,7 @@ jobs:
         run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Build
-        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
 
       # The same gates build.yml runs, because a release must clear at least what a push clears.
       # The spec suite is green since 2026-09-15, so its own exit code decides; there is no ratchet

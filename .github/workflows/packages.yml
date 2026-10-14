@@ -82,7 +82,7 @@ jobs:
       - name: Build
         env:
           CI: true
-        run: dotnet build InfoCarrier.Core.slnx --no-restore --configuration Release
+        run: dotnet build InfoCarrier.Core.slnx --no-restore --configuration Release -p:TreatWarningsAsErrors=true
 
       - name: Pack
         run: >
