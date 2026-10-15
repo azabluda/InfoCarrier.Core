@@ -80,6 +80,10 @@ public static class InfoCarrierLoggerExtensions
     /// </remarks>
     /// <param name="diagnostics">The query logger.</param>
     /// <param name="serverQueryCount">How many queries the server runs for this execution.</param>
+    [Obsolete(
+        "Use the QuerySplit overload with the client remainder and type allowlist instead.",
+        DiagnosticId = "ICC1006",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/234")]
     public static void QuerySplit(
         this IDiagnosticsLogger<DbLoggerCategory.Query> diagnostics,
         int serverQueryCount)
@@ -128,6 +132,10 @@ public static class InfoCarrierLoggerExtensions
     /// <param name="diagnostics">The query logger.</param>
     /// <param name="serverQueryCount">How many queries the server runs for this execution.</param>
     /// <param name="clientRemainder">The part of the query this client runs.</param>
+    [Obsolete(
+        "Use the QuerySplit overload with the client remainder and type allowlist instead.",
+        DiagnosticId = "ICC1007",
+        UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/234")]
     public static void QuerySplit(
         this IDiagnosticsLogger<DbLoggerCategory.Query> diagnostics,
         int serverQueryCount,
