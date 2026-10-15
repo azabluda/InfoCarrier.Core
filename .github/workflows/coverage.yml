@@ -1,0 +1,97 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  SOLUTION: InfoCarrier.Core.slnx
+
+jobs:
+  coverage:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore ${{ env.SOLUTION }}
+          dotnet tool restore
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
+
+      - name: Test with coverage
+        run: >
+          dotnet test ${{ env.SOLUTION }} --no-build --configuration Release
+          --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings
+          --results-directory artifacts/coverage/raw
+
+      - name: Merge and render coverage
+        run: |
+          mkdir -p artifacts/coverage/report
+          dotnet coverage merge \
+            "artifacts/coverage/raw/**/coverage.cobertura.xml" \
+            --output artifacts/coverage/report/merged.cobertura.xml \
+            --output-format cobertura
+          dotnet reportgenerator \
+            "-reports:artifacts/coverage/report/merged.cobertura.xml" \
+            "-targetdir:artifacts/coverage/report" \
+            "-reporttypes:Html;MarkdownSummaryGithub"
+
+      - name: Publish summary
+        run: cat artifacts/coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: artifacts/coverage/report
+
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request'
+        uses: uhafner/quality-monitor@0100da6973a1498aad89af676852a8c788d397f8  # v4.15.0
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          comments-strategy: UPDATE
+          enable-delta: false
+          skip-annotations: true
+          title-metric: line
+          config: >
+            {
+              "coverage": [
+                {
+                  "name": "InfoCarrier.Core",
+                  "tools": [
+                    {
+                      "id": "cobertura",
+                      "metric": "line",
+                      "sourcePath": ".",
+                      "pattern": "**/merged.cobertura.xml"
+                    },
+                    {
+                      "id": "cobertura",
+                      "metric": "branch",
+                      "sourcePath": ".",
+                      "pattern": "**/merged.cobertura.xml"
+                    }
+                  ]
+                }
+              ]
+            }
