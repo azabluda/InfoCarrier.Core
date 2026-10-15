@@ -3,8 +3,11 @@
 using System.Reflection;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -61,7 +64,38 @@ public class ModelBuilding101InfoCarrierTest : ModelBuilding101TestBase
 
 /// <inheritdoc cref="LoggingInfoCarrierTest" />
 public class InfoCarrierServiceCollectionExtensionsTest()
-    : EntityFrameworkServiceCollectionExtensionsTestBase(InfoCarrierTestHelpers.Instance);
+    : EntityFrameworkServiceCollectionExtensionsTestBase(InfoCarrierTestHelpers.Instance)
+{
+    /// <inheritdoc />
+    /// <remarks>
+    ///     InfoCarrier bypasses EF Core's translating query pipeline at <c>IDatabase</c>. The two
+    ///     factory services used only by that pipeline are intentionally absent.
+    /// </remarks>
+    [InfoCarrierDesign(
+        6,
+        Justification = "InfoCarrier captures the expression at IDatabase. The later EF Core query translation "
+            + "pipeline is therefore inapplicable.")]
+    [ConditionalFact]
+    public override void Required_services_are_registered_with_expected_lifetimes()
+    {
+        Type[] inapplicableServices =
+        [
+            typeof(IQueryableMethodTranslatingExpressionVisitorFactory),
+            typeof(IShapedQueryCompilingExpressionVisitorFactory),
+        ];
+#pragma warning disable EF1001 // The inherited conformance test validates this internal EF Core service map.
+        Dictionary<Type, ServiceCharacteristics> requiredServices = EntityFrameworkServicesBuilder.CoreServices
+            .Where(service => !inapplicableServices.Contains(service.Key))
+            .ToDictionary(service => service.Key, service => service.Value);
+#pragma warning restore EF1001
+
+        LifetimeTest(requiredServices);
+
+        var services = new ServiceCollection();
+        services.AddEntityFrameworkInfoCarrier();
+        Assert.DoesNotContain(services, descriptor => inapplicableServices.Contains(descriptor.ServiceType));
+    }
+}
 
 /// <summary>
 ///     <c>ApiConsistencyTestBase</c> — the one base in C0's table with <b>no tier at all</b>.

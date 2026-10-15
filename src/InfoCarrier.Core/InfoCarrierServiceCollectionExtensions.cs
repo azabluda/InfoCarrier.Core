@@ -168,15 +168,10 @@ public static class InfoCarrierServiceCollectionExtensions
             // `InfoCarrierModelValidator`.
             .TryAdd<IModelValidator, InfoCarrierModelValidator>()
 
-            // Required of every provider by `EntityFrameworkServicesBuilder.CoreServices`, and
-            // deliberately unimplementable here — see `InfoCarrierQueryPipelineFactories`. Both
-            // throw with the reason. Registering them replaces EF's generic "no service has been
-            // registered" with a sentence that explains ADR-006, and nothing in this provider
-            // resolves either one.
-            .TryAdd<IQueryableMethodTranslatingExpressionVisitorFactory,
-                InfoCarrierQueryableMethodTranslatingExpressionVisitorFactory>()
-            .TryAdd<IShapedQueryCompilingExpressionVisitorFactory,
-                InfoCarrierShapedQueryCompilingExpressionVisitorFactory>()
+            // Deliberately no IQueryableMethodTranslatingExpressionVisitorFactory or
+            // IShapedQueryCompilingExpressionVisitorFactory. EF Core uses them only after its
+            // standard IDatabase creates a QueryCompilationContext. InfoCarrier's IDatabase
+            // captures the expression earlier and sends it to the server (ADR-006).
             .TryAddCoreServices();
 
         // Expression serialization pipeline (DI-resolved, no statics).
