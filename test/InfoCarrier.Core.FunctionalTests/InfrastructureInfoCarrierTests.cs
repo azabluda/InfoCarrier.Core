@@ -78,14 +78,16 @@ public class InfoCarrierServiceCollectionExtensionsTest()
     [ConditionalFact]
     public override void Required_services_are_registered_with_expected_lifetimes()
     {
-        Type[] inapplicableServices =
-        [
-            typeof(IQueryableMethodTranslatingExpressionVisitorFactory),
-            typeof(IShapedQueryCompilingExpressionVisitorFactory),
-        ];
+        Dictionary<Type, string> inapplicableServices = new()
+        {
+            [typeof(IQueryableMethodTranslatingExpressionVisitorFactory)] =
+                "InfoCarrier captures the expression at IDatabase before EF Core query translation.",
+            [typeof(IShapedQueryCompilingExpressionVisitorFactory)] =
+                "InfoCarrier receives materialized server results without EF Core shaped-query compilation.",
+        };
 #pragma warning disable EF1001 // The inherited conformance test validates this internal EF Core service map.
         Dictionary<Type, ServiceCharacteristics> requiredServices = EntityFrameworkServicesBuilder.CoreServices
-            .Where(service => !inapplicableServices.Contains(service.Key))
+            .Where(service => !inapplicableServices.ContainsKey(service.Key))
             .ToDictionary(service => service.Key, service => service.Value);
 #pragma warning restore EF1001
 
@@ -93,7 +95,12 @@ public class InfoCarrierServiceCollectionExtensionsTest()
 
         var services = new ServiceCollection();
         services.AddEntityFrameworkInfoCarrier();
-        Assert.DoesNotContain(services, descriptor => inapplicableServices.Contains(descriptor.ServiceType));
+        foreach ((Type serviceType, string reason) in inapplicableServices)
+        {
+            Assert.False(
+                services.Any(descriptor => descriptor.ServiceType == serviceType),
+                $"{serviceType} is inapplicable: {reason}");
+        }
     }
 }
 
