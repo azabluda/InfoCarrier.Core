@@ -604,6 +604,12 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       `AllowArbitrarySqlExecution` matches the shared Boolean overload. Keep both obsolete members
       until version 11.
 
+- [x] **COV2. Protect the published query-split logging overloads.** Mark the two older overloads
+      obsolete and verify their distinct observable messages in one compatibility test. The active
+      preparation-failure `Information` classification already has direct coverage from Phase CL.
+      Keep both overloads until version 11 ([#234](https://github.com/azabluda/InfoCarrier.Core/issues/234),
+      [#235](https://github.com/azabluda/InfoCarrier.Core/issues/235)).
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
