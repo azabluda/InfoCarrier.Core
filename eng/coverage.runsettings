@@ -6,7 +6,6 @@
         <Configuration>
           <Format>cobertura</Format>
           <Include>[InfoCarrier.Core]*,[InfoCarrier.Core.Abstractions]*,[InfoCarrier.Core.AspNetCore]*</Include>
-          <Exclude>[InfoCarrier.Core.TestUtilities]*,[Northwind.*]*</Exclude>
           <ExcludeByFile>**/obj/**</ExcludeByFile>
         </Configuration>
       </DataCollector>
