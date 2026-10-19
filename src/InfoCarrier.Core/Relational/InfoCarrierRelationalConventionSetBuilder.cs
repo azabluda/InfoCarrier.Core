@@ -6,6 +6,7 @@
 // See docs/versioning.md, "Where a breaking change goes".
 #pragma warning disable CS0618 // Type or member is obsolete.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
@@ -180,8 +181,14 @@ public class InfoCarrierRelationalConventionSetBuilder(
     /// <remarks>
     ///     The other half of the same stub, and the more obvious one: every member writes SQL for a
     ///     command this client will never issue. The server does the writing, against its own
-    ///     provider.
+    ///     provider. EF's generic relational conventions accept the whole dependency object but do
+    ///     not read its <c>UpdateSqlGenerator</c>. The concrete consumer in EF 10 is the
+    ///     provider-specific <c>SqlServerValueGenerationStrategyConvention</c>, which asks its SQL
+    ///     Server generator for a sequence expression. This client deliberately installs no
+    ///     provider-specific convention because the backing provider belongs to the server.
     /// </remarks>
+    [ExcludeFromCodeCoverage(
+        Justification = "Structural adapter for provider-specific conventions that the InfoCarrier client never installs.")]
     private sealed class NoUpdateSqlGenerator : IUpdateSqlGenerator
     {
         public void AppendBatchHeader(StringBuilder commandStringBuilder)
