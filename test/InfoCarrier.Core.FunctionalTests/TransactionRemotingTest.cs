@@ -123,6 +123,32 @@ public class TransactionRemotingTest
         Assert.Contains("already open", exception.Message);
     }
 
+    /// <summary>
+    ///     Preserves the portable contract from
+    ///     <c>TransactionTestBase.UseTransaction_throws_if_mismatched_connection</c>.
+    /// </summary>
+    /// <remarks>
+    ///     The relational base is ignored because its other tests require a client connection.
+    ///     This assertion needs only the public transaction boundary, so it is adapted here
+    ///     instead of being lost with the inapplicable base.
+    /// </remarks>
+    [Fact]
+    public void A_transaction_from_another_provider_is_refused()
+    {
+        using var foreignContext = new SmokeContext(
+            new DbContextOptionsBuilder<SmokeContext>().UseSqlite("Data Source=:memory:").Options);
+        foreignContext.Database.OpenConnection();
+        using IDbContextTransaction foreignTransaction = foreignContext.Database.BeginTransaction();
+
+        using var context = new SmokeContext(Options(new RecordingClient()));
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(
+            () => context.Database.UseInfoCarrierTransaction(foreignTransaction));
+
+        Assert.Equal("transaction", exception.ParamName);
+        Assert.StartsWith("Expected an InfoCarrierTransaction;", exception.Message);
+    }
+
     [Fact]
     public async Task Savepoints_are_addressed_by_the_transaction_token_and_a_name()
     {

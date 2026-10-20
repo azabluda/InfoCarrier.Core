@@ -181,6 +181,9 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
         // GetDbConnection(), GetDbTransaction(), UseTransaction(DbTransaction) and a
         // (RelationalTestStore)Fixture.TestStore cast run through all 44 of its tests. The client
         // has no database and no connection. Same reason as TransactionInterceptionTestBase above.
+        // Its one portable boundary contract, refusing a mismatched transaction, is adapted as
+        // TransactionRemotingTest.A_transaction_from_another_provider_is_refused. Ignoring the
+        // inapplicable base therefore does not discard that coverage.
         typeof(TransactionTestBase<>),
 
         // Declares `protected abstract string DummyConnectionString` and
