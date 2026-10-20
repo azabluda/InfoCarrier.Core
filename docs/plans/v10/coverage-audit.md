@@ -42,7 +42,7 @@ This audit therefore uses the stable line records and does not interpret that br
 | `InfoCarrierShapedQueryCompilingExpressionVisitorFactory` | 0 of 4 | Obsolete version 10 compatibility name | Remove in version 11. Exclude its inherited deliberate throw from coverage. |
 | `InfoCarrierDatabaseCreator` | 2 of 10 | Required service with unsupported placeholder behavior | Keep the service in version 10. Do not freeze all ten current results in tests. Review the behavior separately. |
 | `InfoCarrierDbContextOptionsBuilder` | 9 of 20 | Shipped compatibility entry points | Keep until version 11. Add direct behavior tests for the two obsolete methods. |
-| `InfoCarrierRelationalConventionSetBuilder` | 46.4% rollup | Active model builder plus an unreachable fail-fast stub | Keep. No coverage-only test or exclusion. |
+| `InfoCarrierRelationalConventionSetBuilder` | 46.4% rollup | Active model builder plus an unreachable fail-fast stub | Keep. Exclude only the nested structural adapter. |
 | `InfoCarrierDatabaseFacadeExtensions` | 6 of 10 | Covered transaction feature plus one uncovered misuse guard | Keep. Existing positive tests cover the requirement. Do not add a message test for coverage. |
 | `InfoCarrierLoggerExtensions` | 71.2% | Active diagnostics plus two superseded public overloads | Deprecate the superseded overloads for version 11. Test their compatibility behavior until removal. Test the active Information classification. |
 | `InfoCarrierLoggingDefinitions` | 73.9% | Active definition cache plus one definition used only by a superseded overload | Deprecate the old definition with its caller. Keep and test the active Information cache arm. |
@@ -234,7 +234,29 @@ generator would add a client command pipeline that InfoCarrier must not have.
 The throwing stub is therefore a fail-fast structural adapter. If a future Entity Framework Core
 version starts using it during model construction, the existing specification suite will fail at
 the newly invalid boundary. Calling every stub method directly today would prove only that `throw`
-throws. Keep it untested and do not exclude it from the report.
+throws.
+
+#### Amendment 2026-10-20: the command-side consumer is provider-specific
+
+The original assessment established that the selected conventions did not call the stub, but it
+did not identify which convention needed the dependency. The constructor parameter was added to
+EF Core for provider-specific sequence value generation. In EF Core 10,
+`SqlServerValueGenerationStrategyConvention` reads
+`RelationalConventionSetBuilderDependencies.UpdateSqlGenerator` to obtain SQL Server's sequence
+expression. The generic relational conventions selected by InfoCarrier do not read that member.
+
+That distinction makes the boundary exact. InfoCarrier reads its `RelationalDependencies`
+property and passes the complete object to generic relational conventions. Those conventions use
+the metadata dependency where needed. InfoCarrier never installs a provider-specific convention,
+because the client cannot know which provider backs the server. Therefore, no supported
+InfoCarrier path can call this particular generator.
+
+The two original reasons against direct tests still hold: the adapter has no supported behavior,
+and invoking its methods would test only that `throw` throws. The earlier reason for leaving its
+lines visible does not hold after identifying the concrete consumer. The uncovered methods are not
+an unresolved architecture warning; they are the deliberately absent SQL Server command path.
+`NoUpdateSqlGenerator` is now excluded from coverage, while the active outer builder remains
+measured.
 
 ### Database facade extension
 
