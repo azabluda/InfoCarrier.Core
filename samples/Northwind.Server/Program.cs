@@ -44,6 +44,15 @@ app.UseStaticFiles();
 
 app.MapInfoCarrier();
 
+app.MapGet("/streaming-research-data", async context =>
+{
+    context.Response.ContentType = "application/json";
+    await context.Response.WriteAsync("[1", context.RequestAborted);
+    await context.Response.Body.FlushAsync(context.RequestAborted);
+    await Task.Delay(TimeSpan.FromSeconds(2), context.RequestAborted);
+    await context.Response.WriteAsync(",2]", context.RequestAborted);
+});
+
 app.MapFallbackToFile("index.html");
 
 app.Run();
