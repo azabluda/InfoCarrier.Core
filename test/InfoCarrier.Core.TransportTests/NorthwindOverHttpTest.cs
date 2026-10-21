@@ -359,16 +359,26 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         // must be decoded before the search means anything.
         string[] seededOrderDates = ["2026-01-05", "2026-02-11", "2026-02-18", "2026-03-02", "2026-03-20"];
         var serializer = new SystemTextJsonInfoCarrierSerializer();
-        string allRowData = string.Concat(
-            recorder.ResponseBodies
-                .Select(bytes => serializer.Deserialize<InfoCarrierEnvelope>(bytes))
-                .Where(envelope => envelope is not null)
-                .Select(envelope => serializer.Deserialize<QueryDataResult>(envelope!.Payload))
-                .Where(result => result is not null)
-                .Select(result => System.Text.Encoding.UTF8.GetString(result!.SerializedResults)));
+        string allRowData = string.Concat(recorder.ResponseBodies.Select(ResponseRows));
         foreach (string orderDate in seededOrderDates)
         {
             Assert.DoesNotContain(orderDate, allRowData);
+        }
+
+        string ResponseRows(byte[] bytes)
+        {
+            if (bytes.Length > 0 && bytes[0] == (byte)'[')
+            {
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+
+            InfoCarrierEnvelope? envelope = serializer.Deserialize<InfoCarrierEnvelope>(bytes);
+            QueryDataResult? result = envelope is null
+                ? null
+                : serializer.Deserialize<QueryDataResult>(envelope.Payload);
+            return result is null
+                ? string.Empty
+                : System.Text.Encoding.UTF8.GetString(result.SerializedResults);
         }
     }
 

@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Runtime.CompilerServices;
+using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using InfoCarrier.Core.Common;
@@ -26,11 +27,11 @@ public static class QueryStreamFrameCodec
         IAsyncEnumerable<QueryStreamFrame> frames,
         CancellationToken cancellationToken = default)
     {
-        using var writer = new Utf8JsonWriter(destination);
-        writer.WriteStartArray();
+        await destination.WriteAsync("["u8.ToArray(), cancellationToken).ConfigureAwait(false);
 
         bool started = false;
         bool terminated = false;
+        var buffer = new ArrayBufferWriter<byte>();
         await foreach (QueryStreamFrame frame in frames.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
             if (terminated)
@@ -43,10 +44,21 @@ public static class QueryStreamFrameCodec
                 throw new InvalidOperationException("A query stream must start with a start frame.");
             }
 
-            Write(writer, frame);
+            buffer.Clear();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                Write(writer, frame);
+            }
+
+            if (started)
+            {
+                await destination.WriteAsync(","u8.ToArray(), cancellationToken).ConfigureAwait(false);
+            }
+
+            await destination.WriteAsync(buffer.WrittenMemory, cancellationToken).ConfigureAwait(false);
             started = true;
             terminated = frame is QueryCompleteFrame or QueryFaultFrame;
-            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (!started)
@@ -59,8 +71,8 @@ public static class QueryStreamFrameCodec
             throw new InvalidOperationException("A query stream must end with a terminal frame.");
         }
 
-        writer.WriteEndArray();
-        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        await destination.WriteAsync("]"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+        await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

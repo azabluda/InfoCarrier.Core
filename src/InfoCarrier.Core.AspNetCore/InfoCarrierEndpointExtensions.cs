@@ -1,7 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text;
+using System.Text.Json;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -77,6 +80,23 @@ public static class InfoCarrierEndpointExtensions
             try
             {
                 IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
+
+                if (http.Request.Headers.TryGetValue("InfoCarrier-Operation", out var operationHeader)
+                    && Enum.TryParse(operationHeader, out InfoCarrierOperation streamOperation)
+                    && streamOperation == InfoCarrierOperation.Query)
+                {
+                    QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
+                            http.Request.Body, http.RequestAborted).ConfigureAwait(false)
+                        ?? throw new InvalidOperationException("The request body is not a query request.");
+                    IInfoCarrierServer streamServer = http.RequestServices.GetRequiredService<IInfoCarrierServer>();
+                    http.Response.ContentType = "application/json";
+                    await QueryStreamFrameCodec.WriteAsync(
+                        http.Response.Body,
+                        BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted),
+                        http.RequestAborted).ConfigureAwait(false);
+                    return;
+                }
+
                 using var buffer = new MemoryStream();
                 await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
 
@@ -132,6 +152,56 @@ public static class InfoCarrierEndpointExtensions
                 throw;
             }
         });
+    }
+
+    private static async IAsyncEnumerable<QueryStreamFrame> BufferedFrames(
+        IInfoCarrierServer server,
+        QueryDataRequest request,
+        ILogger logger,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        QueryDataResult? result = null;
+        InfoCarrierFault? fault = null;
+        try
+        {
+            result = await server.QueryDataAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            fault = InfoCarrierFaultMapper.Capture(exception);
+            bool missingShape = exception.Data[typeof(Expressions.AnonymousShapeCatalog)] is true;
+            Log(logger, LogLevel.Error, 35001,
+                missingShape
+                    ? "InfoCarrier Query failed during operation execution: an anonymous shape is not registered in the server's trusted catalog. Reason={Reason}; ExceptionType={ExceptionType}."
+                    : "InfoCarrier Query failed during operation execution. Reason={Reason}; ExceptionType={ExceptionType}.",
+                missingShape ? "AnonymousShapeNotRegistered" : "UnclassifiedFailure",
+                exception.GetType().FullName);
+        }
+
+        if (fault is not null)
+        {
+            yield return new QueryStartFrame(QueryStreamFrameCodec.Version, 0, false, null);
+            yield return new QueryFaultFrame(fault);
+            yield break;
+        }
+
+        yield return new QueryStartFrame(
+            QueryStreamFrameCodec.Version, 0, result!.IsEntityResult, result.ElementTypeName);
+
+        List<DynamicValueNode> rows = JsonSerializer.Deserialize(
+            result.SerializedResults, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
+        foreach (DynamicValueNode row in rows)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new QueryRowFrame(row);
+        }
+
+        foreach (ServerLogEvent log in result.ServerLog ?? [])
+        {
+            yield return new QueryLogFrame(log);
+        }
+
+        yield return new QueryCompleteFrame();
     }
 
     private static void Log(ILogger? logger, LogLevel level, int eventId, string message, params object?[] values)
