@@ -11,6 +11,27 @@ namespace InfoCarrier.Core;
 public interface IInfoCarrierSerializer
 {
     /// <summary>
+    ///     Serializes a value directly to a stream.
+    /// </summary>
+    async ValueTask SerializeAsync<T>(
+        Stream destination,
+        T value,
+        CancellationToken cancellationToken = default)
+        => await destination.WriteAsync(Serialize(value), cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    ///     Deserializes a value directly from a stream.
+    /// </summary>
+    async ValueTask<T?> DeserializeAsync<T>(
+        Stream source,
+        CancellationToken cancellationToken = default)
+    {
+        using var buffer = new MemoryStream();
+        await source.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return Deserialize<T>(buffer.ToArray());
+    }
+
+    /// <summary>
     ///     Serializes a value to a byte payload.
     /// </summary>
     /// <typeparam name="T">The type to serialize.</typeparam>

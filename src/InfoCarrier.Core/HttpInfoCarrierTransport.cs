@@ -1,5 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Net;
 using System.Net.Http.Headers;
 using InfoCarrier.Core.Common;
 
@@ -23,11 +24,58 @@ namespace InfoCarrier.Core;
 public sealed class HttpInfoCarrierTransport(
     HttpClient httpClient,
     IInfoCarrierSerializer serializer,
-    string requestUri = "infocarrier") : IInfoCarrierTransport
+    string requestUri = "infocarrier") : IInfoCarrierTransport, IInfoCarrierStreamTransport
 {
+    private static readonly HttpRequestOptionsKey<bool> BrowserResponseStreaming
+        = new("WebAssemblyEnableStreamingResponse");
     private readonly HttpClient _httpClient = httpClient;
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly string _requestUri = requestUri;
+
+    /// <inheritdoc />
+    async ValueTask<IInfoCarrierResponse> IInfoCarrierStreamTransport.SendAsync(
+        InfoCarrierOperation operation,
+        Func<Stream, CancellationToken, ValueTask> writeRequest,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(writeRequest);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, _requestUri)
+        {
+            Content = new StreamingContent(writeRequest),
+        };
+        request.Headers.Add("InfoCarrier-Operation", operation.ToString());
+        request.Options.Set(BrowserResponseStreaming, true);
+
+        HttpResponseMessage response = await _httpClient.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            try
+            {
+                string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                throw new InfoCarrierTransportException(
+                    $"The InfoCarrier server at '{_requestUri}' answered {(int)response.StatusCode} "
+                    + $"({response.ReasonPhrase}). Body: {detail}");
+            }
+            finally
+            {
+                response.Dispose();
+            }
+        }
+
+        try
+        {
+            Stream content = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return new HttpInfoCarrierResponse(response, content);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+    }
 
     /// <summary>
     ///     Posts one envelope and returns the one that comes back.
@@ -87,5 +135,39 @@ public sealed class HttpInfoCarrierTransport(
             ?? throw new InfoCarrierTransportException(
                 $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
                 + $"envelope ({responseBody.Length} bytes).");
+    }
+
+    private sealed class StreamingContent(
+        Func<Stream, CancellationToken, ValueTask> write) : HttpContent
+    {
+        protected override async Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext? context)
+            => await write(stream, CancellationToken.None).ConfigureAwait(false);
+
+        protected override async Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext? context,
+            CancellationToken cancellationToken)
+            => await write(stream, cancellationToken).ConfigureAwait(false);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    private sealed class HttpInfoCarrierResponse(
+        HttpResponseMessage response,
+        Stream content) : IInfoCarrierResponse
+    {
+        public Stream Content { get; } = content;
+
+        public async ValueTask DisposeAsync()
+        {
+            await Content.DisposeAsync().ConfigureAwait(false);
+            response.Dispose();
+        }
     }
 }
