@@ -90,9 +90,12 @@ public static class InfoCarrierEndpointExtensions
                         ?? throw new InvalidOperationException("The request body is not a query request.");
                     IInfoCarrierServer streamServer = http.RequestServices.GetRequiredService<IInfoCarrierServer>();
                     http.Response.ContentType = "application/json";
+                    IAsyncEnumerable<QueryStreamFrame> frames = streamServer is InProcessInfoCarrierServer inProcess
+                        ? inProcess.QueryFramesAsync(streamRequest, http.RequestAborted)
+                        : BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted);
                     await QueryStreamFrameCodec.WriteAsync(
                         http.Response.Body,
-                        BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted),
+                        FaultFrames(frames, logger, http.RequestAborted),
                         http.RequestAborted).ConfigureAwait(false);
                     return;
                 }
@@ -154,6 +157,48 @@ public static class InfoCarrierEndpointExtensions
         });
     }
 
+    private static async IAsyncEnumerable<QueryStreamFrame> FaultFrames(
+        IAsyncEnumerable<QueryStreamFrame> frames,
+        ILogger logger,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await using IAsyncEnumerator<QueryStreamFrame> enumerator = frames.GetAsyncEnumerator(cancellationToken);
+        bool started = false;
+        while (true)
+        {
+            QueryStreamFrame? frame = null;
+            InfoCarrierFault? fault = null;
+            try
+            {
+                if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                {
+                    yield break;
+                }
+
+                frame = enumerator.Current;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogQueryFailure(logger, exception);
+                fault = InfoCarrierFaultMapper.Capture(exception);
+            }
+
+            if (fault is not null)
+            {
+                if (!started)
+                {
+                    yield return new QueryStartFrame(QueryStreamFrameCodec.Version, 0, false, null);
+                }
+
+                yield return new QueryFaultFrame(fault);
+                yield break;
+            }
+
+            started = true;
+            yield return frame!;
+        }
+    }
+
     private static async IAsyncEnumerable<QueryStreamFrame> BufferedFrames(
         IInfoCarrierServer server,
         QueryDataRequest request,
@@ -169,13 +214,7 @@ public static class InfoCarrierEndpointExtensions
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             fault = InfoCarrierFaultMapper.Capture(exception);
-            bool missingShape = exception.Data[typeof(Expressions.AnonymousShapeCatalog)] is true;
-            Log(logger, LogLevel.Error, 35001,
-                missingShape
-                    ? "InfoCarrier Query failed during operation execution: an anonymous shape is not registered in the server's trusted catalog. Reason={Reason}; ExceptionType={ExceptionType}."
-                    : "InfoCarrier Query failed during operation execution. Reason={Reason}; ExceptionType={ExceptionType}.",
-                missingShape ? "AnonymousShapeNotRegistered" : "UnclassifiedFailure",
-                exception.GetType().FullName);
+            LogQueryFailure(logger, exception);
         }
 
         if (fault is not null)
@@ -202,6 +241,17 @@ public static class InfoCarrierEndpointExtensions
         }
 
         yield return new QueryCompleteFrame();
+    }
+
+    private static void LogQueryFailure(ILogger logger, Exception exception)
+    {
+        bool missingShape = exception.Data[typeof(Expressions.AnonymousShapeCatalog)] is true;
+        Log(logger, LogLevel.Error, 35001,
+            missingShape
+                ? "InfoCarrier Query failed during operation execution: an anonymous shape is not registered in the server's trusted catalog. Reason={Reason}; ExceptionType={ExceptionType}."
+                : "InfoCarrier Query failed during operation execution. Reason={Reason}; ExceptionType={ExceptionType}.",
+            missingShape ? "AnonymousShapeNotRegistered" : "UnclassifiedFailure",
+            exception.GetType().FullName);
     }
 
     private static void Log(ILogger? logger, LogLevel level, int eventId, string message, params object?[] values)

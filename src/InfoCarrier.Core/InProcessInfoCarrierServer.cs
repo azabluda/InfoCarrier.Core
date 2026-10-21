@@ -2,6 +2,8 @@
 
 using System.Collections.Concurrent;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Query;
+using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -246,6 +248,46 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
             return CollectedLog(capture, lease.Context) is { } log
                 ? result with { ServerLog = log }
                 : result;
+        }
+        finally
+        {
+            await lease.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Executes a query while retaining its context until frame enumeration ends.
+    /// </summary>
+    public async IAsyncEnumerable<QueryStreamFrame> QueryFramesAsync(
+        QueryDataRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        Lease lease = Acquire(request.TransactionId);
+        try
+        {
+            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
+                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
+            var executor = new ServerQueryExecutor(
+                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
+
+            using ServerLogCapture.Scope? capture = BeginLogCapture();
+            await foreach (QueryStreamFrame frame in executor.ExecuteStreamAsync(request, cancellationToken)
+                .WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                if (frame is not QueryCompleteFrame)
+                {
+                    yield return frame;
+                }
+            }
+
+            foreach (ServerLogEvent log in CollectedLog(capture, lease.Context) ?? [])
+            {
+                yield return new QueryLogFrame(log);
+            }
+
+            yield return new QueryCompleteFrame();
         }
         finally
         {
