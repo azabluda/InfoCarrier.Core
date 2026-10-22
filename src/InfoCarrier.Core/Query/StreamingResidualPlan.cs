@@ -197,3 +197,75 @@ internal readonly record struct StreamingResidualResult(
     internal static StreamingResidualResult Complete
         => new(StreamingResidualResultKind.Complete, null);
 }
+
+/// <summary>
+///     Describes a concatenation whose result slots can be drained in order.
+/// </summary>
+internal sealed class StreamingConcatPlan
+{
+    private StreamingConcatPlan(IReadOnlyList<int> slots)
+        => Slots = slots;
+
+    internal IReadOnlyList<int> Slots { get; }
+
+    internal static bool TryCreate(LambdaExpression residual, out StreamingConcatPlan? plan)
+    {
+        var slots = new List<int>();
+        if (!TryRead(residual.Body, residual.Parameters, slots)
+            || slots.Count != residual.Parameters.Count
+            || slots.Distinct().Count() != slots.Count)
+        {
+            plan = null;
+            return false;
+        }
+
+        plan = new StreamingConcatPlan(slots);
+        return true;
+    }
+
+    private static bool TryRead(
+        Expression expression,
+        IReadOnlyList<ParameterExpression> parameters,
+        List<int> slots)
+    {
+        if (expression is ParameterExpression parameter)
+        {
+            int slot = parameters.IndexOf(parameter);
+            if (slot < 0)
+            {
+                return false;
+            }
+
+            slots.Add(slot);
+            return true;
+        }
+
+        return expression is MethodCallExpression
+            {
+                Method.Name: nameof(Queryable.Concat),
+                Method.DeclaringType: { } declaring,
+                Arguments.Count: 2,
+            } call
+            && declaring == typeof(Queryable)
+            && TryRead(call.Arguments[0], parameters, slots)
+            && TryRead(call.Arguments[1], parameters, slots);
+    }
+}
+
+internal static class ParameterListExtensions
+{
+    internal static int IndexOf(
+        this IReadOnlyList<ParameterExpression> parameters,
+        ParameterExpression candidate)
+    {
+        for (int index = 0; index < parameters.Count; index++)
+        {
+            if (ReferenceEquals(parameters[index], candidate))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+}

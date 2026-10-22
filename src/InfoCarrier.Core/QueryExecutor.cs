@@ -298,6 +298,21 @@ internal sealed class QueryExecutor<TElement>
             yield break;
         }
 
+        if (!singleResult
+            && Query.StreamingConcatPlan.TryCreate(_split.Residual, out Query.StreamingConcatPlan? concat))
+        {
+            foreach (int slot in concat!.Slots)
+            {
+                await foreach (TElement element in ExecutePassThroughAsync(
+                    _split.ServerQueries[slot], cancellationToken).ConfigureAwait(false))
+                {
+                    yield return element;
+                }
+            }
+
+            yield break;
+        }
+
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
