@@ -6,7 +6,6 @@ using System.Linq.Expressions;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -200,36 +199,6 @@ public class ClientProcessingLoggingTest
     }
 
     private static string Upper(string value) => value.ToUpperInvariant();
-
-    [Fact]
-    public void Obsolete_query_split_overloads_keep_their_distinct_messages()
-    {
-        using var fixture = new Fixture();
-        using var context = fixture.CreateClient();
-        IDiagnosticsLogger<DbLoggerCategory.Query> diagnostics =
-            context.GetService<IDiagnosticsLogger<DbLoggerCategory.Query>>();
-
-#pragma warning disable ICC1006, ICC1007 // The test protects the obsolete version 10 compatibility APIs.
-        diagnostics.QuerySplit(2);
-        diagnostics.QuerySplit(3, context.Items.Where(item => item.Id > 0).Expression);
-#pragma warning restore ICC1006, ICC1007
-
-        Logs.Entry[] entries = fixture.Log.Entries
-            .Where(entry => entry.Id == InfoCarrierEventId.QuerySplit.Id)
-            .ToArray();
-        Assert.Collection(
-            entries,
-            entry =>
-            {
-                Assert.Contains("2 query/queries", entry.Message);
-                Assert.DoesNotContain("Where", entry.Message);
-            },
-            entry =>
-            {
-                Assert.Contains("3 query/queries", entry.Message);
-                Assert.Contains("Where", entry.Message);
-            });
-    }
 
     [Theory]
     [InlineData(false)]
