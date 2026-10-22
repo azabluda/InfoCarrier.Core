@@ -110,6 +110,34 @@ For a read-only screen, opt out with `AsNoTracking()`. It is worth more here tha
 application: it skips change-tracking state for rows you are only going to display, and it keeps a
 long-lived client context from accumulating entities it will never write.
 
+## Streaming results
+
+Asynchronous, non-tracking queries yield rows while the server is still reading the result. Use
+`AsAsyncEnumerable()` when the caller can process one row at a time:
+
+```csharp
+await foreach (Order order in context.Orders
+    .AsNoTracking()
+    .Where(order => order.Freight > 50m)
+    .AsAsyncEnumerable())
+{
+    Render(order);
+}
+```
+
+Stopping enumeration disposes the response, cancels the server producer, and releases its
+database context. `ToListAsync()` still receives the streamed rows, but the list itself is complete
+only after enumeration finishes.
+
+The client can apply `Where`, `Select`, `Skip`, `Take`, and `Distinct` incrementally after a query
+split. A concatenated query also preserves progressive delivery. Operations that need the complete
+input remain buffered.
+
+Tracked queries are buffered before client materialization. Entity identity and navigation fix-up
+can depend on later rows, so the client preserves the complete result graph before yielding it.
+Single-result operations are buffered for the same conservative boundary. Use `AsNoTracking()`
+for read-only queries that should stream.
+
 ## Paging
 
 Compose `Skip` and `Take` before materializing:

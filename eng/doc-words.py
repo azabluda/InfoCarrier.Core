@@ -19,7 +19,7 @@ import sys
 
 BUDGET = {
     "README.md": 450,
-    "src/InfoCarrier.Core/PACKAGE.md": 300,
+    "src/InfoCarrier.Core/PACKAGE.md": 350,
     "src/InfoCarrier.Core.AspNetCore/PACKAGE.md": 300,
 
     # api-surface.md points at things rather than teaching them, so it keeps the tighter figure
@@ -179,7 +179,7 @@ BUDGET = {
     # caller's own `HasDbFunction` mappings cross while a store's own family has to be named on
     # both halves. The first of those is a behaviour change from 10.0, so a reader who does not
     # find it here finds it as an exception. Read for padding first; the page is dense already.
-    "website/docs/guide/querying.md": 1200,
+    "website/docs/guide/querying.md": 1300,
 
     # 640 on 2026-09-09. The page teaches transactions and therefore owns the warning that a
     # server holds one open until the client ends it. #54 gave that warning a resolution, so the

@@ -54,6 +54,12 @@ so the `BaseAddress` above needs no path.
 
 Everything after that is ordinary EF Core. The server executes the database query. The client can
 rebuild an eligible final projection from returned values.
+
+Asynchronous, non-tracking queries stream rows as the server produces them. `Where`, `Select`,
+`Skip`, `Take`, and `Distinct` can also run incrementally after a query split. Tracked queries,
+single-result operations, and operators that need the complete input remain buffered. Disposing
+an asynchronous enumerator early cancels the response and releases the server query.
+
 `HttpInfoCarrierTransport` is in this package; to serve what it sends, add
 [InfoCarrier.Core.AspNetCore](https://www.nuget.org/packages/InfoCarrier.Core.AspNetCore) to your
 server.
