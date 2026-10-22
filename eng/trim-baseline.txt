@@ -334,5 +334,14 @@
 # Measured with SDK 10.0.401: ours 107, total 1140. Other assemblies differ from the older total;
 # the ratchet gates ours, not external diagnostics.
 
-ours=107
-total=1140
+# 2026-10-22, 107 -> 113 (#45: streamed query materialization).
+#
+# The client now keeps the generic entity materializer reachable through an asynchronous row
+# iterator. ILLink consequently reports six existing reflection requirements for that additional
+# reachable path. The path resolves entity and projection types supplied by the application model;
+# no static annotation can name those types. These diagnostics are reported rather than hidden.
+#
+# Measured with SDK 10.0.402: ours 113, total 1146.
+
+ours=113
+total=1146
