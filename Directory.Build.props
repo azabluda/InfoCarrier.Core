@@ -55,7 +55,7 @@
       from M8-22, so the glob also matched InfoCarrier.Core.AspNetCore and every tagged release
       would have failed on it. MinVer removes the disagreement instead of policing it.
 
-      To release:  git tag -a v10.0.1 -m "..."  &&  git push origin v10.0.1
+      To release:  git tag -a v11.0.0 -m "..."  &&  git push origin v11.0.0
       To see what a build will produce:  dotnet pack, and read the file name.
 
       NOT `dotnet msbuild -getProperty:Version`, which this said until 2026-08-25 and which
@@ -66,10 +66,11 @@
       An untagged commit builds as the next patch with a height — `10.0.1-alpha.0.7` — which is
       unique, ordered, and exactly what an internal CI feed wants.
 
-      `MinVerMinimumMajorMinor` is 10.0 because the MAJOR tracks Entity Framework Core's, which is
-      the convention every EF provider follows and the fastest way for a reader to know which EF a
-      package targets. It also keeps a repository with no release tag yet inside the 10.0 line
-      rather than starting at 0.0. It is a FLOOR, so 10.1 and above pass it unchanged.
+      `MinVerMinimumMajorMinor` is 11.0 because main is now the version 11 development line. The
+      version 10 maintenance boundary is `release/10.3` at commit 663170d5. Main can compile
+      against EF Core 10 during cleanup, but no stable version 11 package can ship before the
+      EF Core 11 adoption is complete. This property is a FLOOR, so later version 11 tags pass it
+      unchanged.
 
       THE MINOR IS OURS AND THE MAJOR IS EF CORE'S, amended 2026-09-09 by the owner. This comment
       said major.minor tracked EF Core until then, which left nowhere to put a release that adds
@@ -90,16 +91,16 @@
       A shallow clone has no tags, and the version silently becomes a default.
     -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
-    <MinVerMinimumMajorMinor>10.0</MinVerMinimumMajorMinor>
+    <MinVerMinimumMajorMinor>11.0</MinVerMinimumMajorMinor>
 
     <!--
       Pinned, and NOT derived from the package version. An AssemblyVersion that moves with every
       patch forces every consumer to rebuild or to carry a binding redirect, for a change that is
       by definition compatible. Major only, which is what EF Core and ASP.NET Core both do.
       FileVersion and InformationalVersion still carry the full version, and the latter carries the
-      commit SHA — `10.0.0-preview.1+901bc81…` — so a binary is still traceable to a source line.
+      commit SHA, so a binary is still traceable to a source line.
     -->
-    <AssemblyVersion>10.0.0.0</AssemblyVersion>
+    <AssemblyVersion>11.0.0.0</AssemblyVersion>
 
     <Authors>Alexander Zabluda</Authors>
     <Copyright>Copyright (c) Alexander Zabluda</Copyright>
@@ -183,7 +184,13 @@
       BRANCH.
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>10.3.0</PackageValidationBaselineVersion>
+    <!--
+      VERSION 11 RELEASE BLOCKER: main intentionally has no PackageValidationBaselineVersion while
+      approved version 11 breaks are removed. Keep package validation enabled for the checks within
+      each package. After version 11.0.0 is published and downloadable, restore this property with
+      value 11.0.0 immediately. The mandatory release checklist in docs/versioning.md repeats this
+      step. Do not publish a later package while the property is absent.
+    -->
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>

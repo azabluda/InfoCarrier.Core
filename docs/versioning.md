@@ -16,6 +16,30 @@ That tag produces `InfoCarrier.Core 10.1.0` and
 `InfoCarrier.Core.AspNetCore 10.1.0`, and nothing else has to be edited, remembered or
 kept in step.
 
+## Version 11 development line
+
+`release/10.3` preserves the final version 10-compatible state at commit `663170d5`. A customer
+fix for version 10 starts there and can become version 10.3.1. Nothing is published merely because
+the branch exists.
+
+`main` is the version 11 development line. Its MinVer floor and assembly major are 11, although it
+can compile against EF Core 10 while public API cleanup continues. A stable version 11 package
+cannot ship before EF Core 11 adoption is complete.
+
+During this transition, `main` deliberately omits `PackageValidationBaselineVersion`. Comparing
+every approved version 11 removal with version 10.3.0 would reject the work by design. Package
+validation remains enabled for consistency checks within each package.
+
+!!! danger "Restore baseline validation after publishing version 11.0.0"
+
+    As soon as version 11.0.0 is published and downloadable, restore
+    `<PackageValidationBaselineVersion>11.0.0</PackageValidationBaselineVersion>` on `main`.
+    Run `dotnet pack` again. Do not publish a later package while the property is absent.
+
+This release blocker is duplicated beside `EnablePackageValidation` in `Directory.Build.props`
+and in the release checklist below. The duplication is intentional because either location can
+be the one read during release work.
+
 ## Why not a property in `Directory.Build.props`
 
 It was one, until N8. The number lived in `VersionPrefix`/`VersionSuffix` **and** in the tag, which
@@ -357,11 +381,12 @@ These are numbered on their own, because they are the same for both.
    invisible from the repository, which is how the published `v10.0.0-preview.1` body drifted from
    its copy here.
 5. For each package published for the first time, remove its project-level
-   `EnablePackageValidation=false` override. Then **raise `PackageValidationBaselineVersion` to the
-   version just published**, on every branch that will build against it: `main` and the line the tag
-   is on. This comes after the publish and not before it: validation downloads the baseline package,
-   so it cannot name one that is not on nuget.org yet. Run `dotnet pack` again and confirm package
-   validation succeeds.
+   `EnablePackageValidation=false` override. Then **restore or raise
+   `PackageValidationBaselineVersion` to the version just published**, on every branch that will
+   build against it: `main` and the line the tag is on. For version 11.0.0, this means restoring
+   the property removed during version 11 development. This comes after publication because
+   validation must download the package. Run `dotnet pack` again and confirm package validation
+   succeeds. Do not publish a later package while the property is absent.
 6. If the fix was on a release line, merge it up: `git checkout main && git merge release/10.1`.
    **This is part of the release, not tidying afterwards.** Until it lands, `main` builds a
    version that NuGet orders BELOW the one you just shipped; the table above measures it.
