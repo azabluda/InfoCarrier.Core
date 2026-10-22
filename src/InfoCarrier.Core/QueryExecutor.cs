@@ -274,7 +274,10 @@ internal sealed class QueryExecutor<TElement>
     {
         CancellationToken cancellationToken = _queryContext.CancellationToken;
 
-        if (!singleResult && _split.IsPassThrough && _split.ServerQueries.Count == 1)
+        if (!singleResult
+            && _trackingBehavior != QueryTrackingBehavior.TrackAll
+            && _split.IsPassThrough
+            && _split.ServerQueries.Count == 1)
         {
             await foreach (TElement element in ExecutePassThroughAsync(
                 _split.ServerQueries[0], cancellationToken).ConfigureAwait(false))
@@ -286,6 +289,7 @@ internal sealed class QueryExecutor<TElement>
         }
 
         if (!singleResult
+            && _trackingBehavior != QueryTrackingBehavior.TrackAll
             && _split.ServerQueries.Count == 1
             && Query.StreamingResidualPlan.TryCreate(_split.Residual, out Query.StreamingResidualPlan? plan))
         {
@@ -299,6 +303,7 @@ internal sealed class QueryExecutor<TElement>
         }
 
         if (!singleResult
+            && _trackingBehavior != QueryTrackingBehavior.TrackAll
             && Query.StreamingConcatPlan.TryCreate(_split.Residual, out Query.StreamingConcatPlan? concat))
         {
             foreach (int slot in concat!.Slots)
