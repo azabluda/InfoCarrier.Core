@@ -1,7 +1,10 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Diagnostics;
+using System.Text.Json;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +25,45 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
 
+    /// <inheritdoc />
+    public async IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(
+        QueryDataRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (_transport is not IInfoCarrierStreamTransport streamTransport)
+        {
+            QueryDataResult buffered = await QueryDataAsync(request, clientContext, cancellationToken)
+                .ConfigureAwait(false);
+            yield return new QueryStartFrame(
+                QueryStreamFrameCodec.Version, 0, buffered.IsEntityResult, buffered.ElementTypeName);
+            List<DynamicValueNode> rows = BufferedQueryFrameAdapter.DeserializeRows(buffered.SerializedResults);
+            foreach (DynamicValueNode row in rows)
+            {
+                yield return new QueryRowFrame(row);
+            }
+
+            foreach (ServerLogEvent log in buffered.ServerLog ?? [])
+            {
+                yield return new QueryLogFrame(log);
+            }
+
+            yield return new QueryCompleteFrame();
+
+            yield break;
+        }
+
+        await using IInfoCarrierResponse response = await streamTransport.SendAsync(
+            InfoCarrierOperation.Query,
+            (destination, token) => _serializer.SerializeAsync(destination, request, token),
+            cancellationToken).ConfigureAwait(false);
+        await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
+            response.Content, cancellationToken).ConfigureAwait(false))
+        {
+            yield return frame;
+        }
+    }
+
     /// <summary>Creates a client with an explicitly supplied class logger.</summary>
     /// <param name="transport">The transport used for exchanges.</param>
     /// <param name="serializer">The payload serializer.</param>
@@ -38,8 +80,52 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         QueryDataRequest request,
         Microsoft.EntityFrameworkCore.DbContext clientContext,
         CancellationToken cancellationToken = default)
-        => await RoundTripAsync<QueryDataRequest, QueryDataResult>(
-            InfoCarrierOperation.Query, request, cancellationToken).ConfigureAwait(false);
+        => _transport is IInfoCarrierStreamTransport streamTransport
+            ? await StreamQueryAsync(streamTransport, request, cancellationToken).ConfigureAwait(false)
+            : await RoundTripAsync<QueryDataRequest, QueryDataResult>(
+                InfoCarrierOperation.Query, request, cancellationToken).ConfigureAwait(false);
+
+    private async Task<QueryDataResult> StreamQueryAsync(
+        IInfoCarrierStreamTransport transport,
+        QueryDataRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using IInfoCarrierResponse response = await transport.SendAsync(
+            InfoCarrierOperation.Query,
+            (destination, token) => _serializer.SerializeAsync(destination, request, token),
+            cancellationToken).ConfigureAwait(false);
+
+        QueryStartFrame? start = null;
+        var rows = new List<DynamicValueNode>();
+        var logs = new List<ServerLogEvent>();
+        await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
+            response.Content, cancellationToken).ConfigureAwait(false))
+        {
+            switch (frame)
+            {
+                case QueryStartFrame value:
+                    start = value;
+                    break;
+                case QueryRowFrame value:
+                    rows.Add(value.Value);
+                    break;
+                case QueryLogFrame value:
+                    logs.Add(value.Event);
+                    break;
+                case QueryFaultFrame value:
+                    throw InfoCarrierFaultMapper.Rehydrate(value.Fault);
+            }
+        }
+
+        return new QueryDataResult
+        {
+            SerializedResults = JsonSerializer.SerializeToUtf8Bytes(
+                rows, ExpressionJsonContext.Default.ListDynamicValueNode),
+            IsEntityResult = start?.IsEntityResult ?? false,
+            ElementTypeName = start?.ElementTypeName,
+            ServerLog = logs.Count == 0 ? null : logs,
+        };
+    }
 
     /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(

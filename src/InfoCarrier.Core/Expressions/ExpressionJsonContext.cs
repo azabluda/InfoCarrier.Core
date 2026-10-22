@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace InfoCarrier.Core.Expressions;
 
@@ -126,6 +127,7 @@ namespace InfoCarrier.Core.Expressions;
 // cover different paths: the seam covers property values, this covers key values, and a wrapped
 // `Uri` key needs both.
 [JsonSerializable(typeof(Uri))]
+[JsonSerializable(typeof(JsonElement))]
 public partial class ExpressionJsonContext : JsonSerializerContext
 {
 }

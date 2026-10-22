@@ -1,0 +1,55 @@
+@* Licensed under the MIT license. See license.txt file in the project root for license information. *@
+@page "/streaming-research"
+@inject HttpClient Client
+
+<PageTitle>Streaming research</PageTitle>
+
+<h1>Streaming research</h1>
+
+@if (_results is null)
+{
+    <p id="streaming-status">Running</p>
+}
+else
+{
+    <p id="streaming-status">Complete</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Completion</th>
+                <th>Streaming option</th>
+                <th>Stream type</th>
+                <th>Headers (ms)</th>
+                <th>First byte (ms)</th>
+                <th>First byte</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (BrowserStreamingProbe.Result result in _results)
+            {
+                <tr class="streaming-result">
+                    <td>@result.Completion</td>
+                    <td>@result.EnableStreaming</td>
+                    <td>@result.StreamType</td>
+                    <td>@result.HeadersMilliseconds.ToString("F0")</td>
+                    <td>@result.FirstByteMilliseconds.ToString("F0")</td>
+                    <td>@result.FirstByte</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<BrowserStreamingProbe.Result>? _results;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _results =
+        [
+            await BrowserStreamingProbe.Run(Client, HttpCompletionOption.ResponseHeadersRead, enableStreaming: true),
+            await BrowserStreamingProbe.Run(Client, HttpCompletionOption.ResponseHeadersRead, enableStreaming: false),
+            await BrowserStreamingProbe.Run(Client, HttpCompletionOption.ResponseContentRead, enableStreaming: true),
+        ];
+    }
+}

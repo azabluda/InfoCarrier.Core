@@ -4,6 +4,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
@@ -58,6 +59,8 @@ public class ServerQueryExecutor(
     bool arbitrarySqlAllowed = false,
     Metadata.IInfoCarrierRelationalQueryRoots? relationalQueryRoots = null)
 {
+    private static readonly MethodInfo StreamMethod = typeof(ServerQueryExecutor)
+        .GetMethod(nameof(StreamCore), BindingFlags.NonPublic | BindingFlags.Static)!;
     private readonly DbContext _context = context;
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
@@ -133,6 +136,60 @@ public class ServerQueryExecutor(
             // which would reset it to this line.
             ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw; // Unreachable; the compiler cannot see that Throw() does not return.
+        }
+    }
+
+    /// <summary>
+    ///     Executes a query and emits each provider row without building a result list.
+    /// </summary>
+    public virtual async IAsyncEnumerable<QueryStreamFrame> ExecuteStreamAsync(
+        QueryDataRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
+        if (_expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseServerContext(_context);
+        }
+
+        Expression query = Rebind(DeserializeNode(request.SerializedQuery));
+        query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
+        query = CollectionParameterMark.ToServerMode(query, _context);
+        ProjectionShape? shape = ProjectionShape.Of(query);
+        _context.ChangeTracker.QueryTrackingBehavior = TrackingBehaviorFor(request.TrackingBehavior, query, shape);
+
+        Type elementType = request.ReturnsSingleResult ? query.Type : GetElementType(query.Type);
+        bool isEntityResult = _context.Model.FindEntityType(elementType) is not null;
+        yield return new QueryStartFrame(
+            QueryStreamFrameCodec.Version, 0, isEntityResult, elementType.FullName);
+
+        if (request.ReturnsSingleResult)
+        {
+            object? value = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
+            yield return new QueryRowFrame(MapRows([value], elementType, shape).Single());
+        }
+        else
+        {
+            IQueryable queryable = BuildQueryable(query);
+            var rows = (IAsyncEnumerable<object?>)StreamMethod.MakeGenericMethod(elementType)
+                .Invoke(null, [queryable, cancellationToken])!;
+            await foreach (object? value in rows.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                yield return new QueryRowFrame(MapRows([value], elementType, shape).Single());
+            }
+        }
+
+        yield return new QueryCompleteFrame();
+    }
+
+    private static async IAsyncEnumerable<object?> StreamCore<T>(
+        IQueryable query,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (T value in ((IAsyncEnumerable<T>)query)
+            .WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            yield return value;
         }
     }
 
@@ -529,7 +586,9 @@ public class ServerQueryExecutor(
 
         return new QueryDataResult
         {
-            SerializedResults = SerializeResult(rows, elementType, shape),
+            SerializedResults = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                MapRows(rows, elementType, shape).ToList(),
+                ExpressionJsonContext.Default.ListDynamicValueNode),
             IsEntityResult = isEntityResult,
             ElementTypeName = elementType?.FullName,
         };
@@ -559,7 +618,10 @@ public class ServerQueryExecutor(
     ///     public-property walk, and lazy-loading proxies get walked as data
     ///     (ADR-008 constraints 1 and 5).
     /// </remarks>
-    private byte[] SerializeResult(List<object?> rows, Type? elementType, ProjectionShape? shape)
+    private IEnumerable<DynamicValueNode> MapRows(
+        IEnumerable<object?> rows,
+        Type? elementType,
+        ProjectionShape? shape)
     {
         var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
@@ -726,17 +788,13 @@ public class ServerQueryExecutor(
             => entityType.FindPrimaryKey() is not { } key
                 || key.Properties.All(p => p.IsShadowProperty() || p.GetGetter().GetClrValue(entity) is not null);
 
-        var nodes = new List<DynamicValueNode>();
         foreach (object? item in rows)
         {
-            nodes.Add(item is null
+            yield return item is null
                 ? mapper.ToDynamicValue(null, elementType ?? typeof(object))
                 : mapper.ToRowValue(
-                    item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape));
+                    item, item.GetType(), IsLoaded, IsTracked, ReadShadowValue, ReadJoinEntities, FindEntityType, shape);
         }
-
-        return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            nodes, ExpressionJsonContext.Default.ListDynamicValueNode);
     }
 
     /// <summary>

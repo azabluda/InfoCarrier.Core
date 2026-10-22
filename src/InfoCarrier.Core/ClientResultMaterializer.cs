@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
+using InfoCarrier.Core.Query;
+using System.Runtime.CompilerServices;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -119,6 +121,98 @@ public class ClientResultMaterializer(
         }
 
         return rows;
+    }
+
+    /// <summary>
+    ///     Materializes each row frame while retaining one wire-reference scope.
+    /// </summary>
+    public virtual async IAsyncEnumerable<TElement> MaterializeAsync<TElement>(
+        IAsyncEnumerable<QueryStreamFrame> frames,
+        Action<ServerLogEvent> replayLog,
+        Action<Exception> reportFailure,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var mapper = (DynamicValueMapper)_serializer.ValueMapper;
+        Func<DynamicValueNode, object?>? outer = mapper.EntityMaterializer;
+        mapper.EntityMaterializer = node => MaterializeEntity(node, mapper);
+
+        try
+        {
+            await foreach (QueryStreamFrame frame in frames.WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                switch (frame)
+                {
+                    case QueryRowFrame row:
+                        yield return MaterializeRow<TElement>(row, mapper, reportFailure);
+                        break;
+                    case QueryLogFrame log:
+                        replayLog(log.Event);
+                        break;
+                    case QueryFaultFrame fault:
+                        throw InfoCarrierFaultMapper.Rehydrate(fault.Fault);
+                }
+            }
+
+            try
+            {
+                FlushPendingJoinRows();
+            }
+            catch (Exception exception)
+            {
+                reportFailure(exception);
+                throw;
+            }
+        }
+        finally
+        {
+            mapper.EntityMaterializer = outer;
+        }
+    }
+
+    private TElement MaterializeRow<TElement>(
+        QueryRowFrame row,
+        DynamicValueMapper mapper,
+        Action<Exception> reportFailure)
+    {
+        try
+        {
+            object? value = mapper.FromDynamicValue(row.Value);
+            TElement element = value is null ? default! : (TElement)value;
+            AttachJoinRowsForRow(value);
+            return element;
+        }
+        catch (Exception exception)
+        {
+            reportFailure(exception);
+            throw;
+        }
+    }
+
+    private void AttachJoinRowsForRow(object? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        for (int i = _pendingJoinRows.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(_pendingJoinRows[i].Owner, row))
+            {
+                AttachIfDeferred(_pendingJoinRows[i].JoinEntity);
+                _pendingJoinRows.RemoveAt(i);
+            }
+        }
+    }
+
+    private void FlushPendingJoinRows()
+    {
+        foreach ((_, object joinEntity) in _pendingJoinRows)
+        {
+            AttachIfDeferred(joinEntity);
+        }
+
+        _pendingJoinRows.Clear();
     }
 
     /// <summary>

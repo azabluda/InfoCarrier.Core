@@ -86,6 +86,53 @@ public class HttpInfoCarrierTransportTest
         Assert.NotNull(exception.InnerException);
     }
 
+    [Fact]
+    public async Task Stream_exchange_writes_request_and_returns_response_without_buffering()
+    {
+        byte[] expected = [1, 2, 3];
+        byte[]? requestBody = null;
+        bool streamingEnabled = false;
+        var handler = new AsyncStubHandler(async (request, cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+            streamingEnabled = request.Options.TryGetValue(
+                new HttpRequestOptionsKey<bool>("WebAssemblyEnableStreamingResponse"), out bool enabled)
+                && enabled;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(expected),
+            };
+        });
+
+        var transport = (IInfoCarrierStreamTransport)new HttpInfoCarrierTransport(
+            new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
+
+        await using IInfoCarrierResponse response = await transport.SendAsync(
+            InfoCarrierOperation.Query,
+            async (destination, cancellationToken) =>
+                await destination.WriteAsync(expected, cancellationToken));
+
+        Assert.Equal(expected, requestBody);
+        Assert.True(streamingEnabled);
+        Assert.Equal(expected, await ReadAllAsync(response.Content));
+    }
+
+    [Fact]
+    public async Task Disposing_stream_response_disposes_its_content()
+    {
+        var content = new TrackingContent();
+        var handler = new AsyncStubHandler((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = content }));
+        var transport = (IInfoCarrierStreamTransport)new HttpInfoCarrierTransport(
+            new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
+
+        IInfoCarrierResponse response = await transport.SendAsync(
+            InfoCarrierOperation.Query, (_, _) => ValueTask.CompletedTask);
+        await response.DisposeAsync();
+
+        Assert.True(content.Disposed);
+    }
+
     private static HttpResponseMessage Respond(InfoCarrierEnvelope envelope)
         => new(HttpStatusCode.OK) { Content = new ByteArrayContent(Serializer.Serialize(envelope)) };
 
@@ -94,5 +141,36 @@ public class HttpInfoCarrierTransportTest
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(respond(request));
+    }
+
+    private static async Task<byte[]> ReadAllAsync(Stream source)
+    {
+        using var destination = new MemoryStream();
+        await source.CopyToAsync(destination);
+        return destination.ToArray();
+    }
+
+    private sealed class AsyncStubHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+            => respond(request, cancellationToken);
+    }
+
+    private sealed class TrackingContent : ByteArrayContent
+    {
+        public TrackingContent()
+            : base([])
+        {
+        }
+
+        public bool Disposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = disposing;
+            base.Dispose(disposing);
+        }
     }
 }
