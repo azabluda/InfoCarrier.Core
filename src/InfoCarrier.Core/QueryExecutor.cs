@@ -274,6 +274,17 @@ internal sealed class QueryExecutor<TElement>
     {
         CancellationToken cancellationToken = _queryContext.CancellationToken;
 
+        if (!singleResult && _split.IsPassThrough && _split.ServerQueries.Count == 1)
+        {
+            await foreach (TElement element in ExecutePassThroughAsync(
+                _split.ServerQueries[0], cancellationToken).ConfigureAwait(false))
+            {
+                yield return element;
+            }
+
+            yield break;
+        }
+
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
@@ -319,6 +330,62 @@ internal sealed class QueryExecutor<TElement>
         foreach (TElement element in Guarded(ApplyResidual(results, singleResult)))
         {
             yield return element;
+        }
+    }
+
+    private async IAsyncEnumerable<TElement> ExecutePassThroughAsync(
+        ServerQuery serverQuery,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        IAsyncEnumerable<Query.QueryStreamFrame> frames = _client.QueryDataStreamAsync(
+            BuildRequest(serverQuery, async: true), _queryContext.Context, cancellationToken);
+        IAsyncEnumerable<TElement> rows = _materializer.MaterializeAsync<TElement>(
+            frames,
+            log => ReplayServerLog([log]),
+            exception => LogFailure("result materialization", exception, cancellationToken),
+            cancellationToken);
+        await using IAsyncEnumerator<TElement> enumerator = rows.GetAsyncEnumerator(cancellationToken);
+
+        while (true)
+        {
+            bool moved;
+            try
+            {
+                using (CriticalSection())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    moved = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception exception)
+            {
+                Exception observed = exception;
+                if (exception is BufferedResultMaterializationException { InnerException: { } innerException })
+                {
+                    LogFailure("result materialization", innerException, cancellationToken);
+                    observed = innerException;
+                }
+
+                Type contextType = _queryContext.Context.GetType();
+                if (_queryContext.ExceptionDetector.IsCancellation(observed, cancellationToken))
+                {
+                    _queryContext.QueryLogger.QueryCanceled(contextType);
+                }
+                else
+                {
+                    _queryContext.QueryLogger.QueryIterationFailed(contextType, observed);
+                }
+
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(observed).Throw();
+                throw;
+            }
+
+            if (!moved)
+            {
+                yield break;
+            }
+
+            yield return enumerator.Current;
         }
     }
 

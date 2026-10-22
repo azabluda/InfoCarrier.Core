@@ -1,6 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core;
@@ -16,6 +18,31 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public interface IInfoCarrierClient
 {
+    /// <summary>
+    ///     Executes a query and returns its response frames as they arrive.
+    /// </summary>
+    async IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(
+        QueryDataRequest request,
+        DbContext clientContext,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        QueryDataResult result = await QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
+        yield return new QueryStartFrame(
+            QueryStreamFrameCodec.Version, 0, result.IsEntityResult, result.ElementTypeName);
+        List<DynamicValueNode> rows = BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults);
+        foreach (DynamicValueNode row in rows)
+        {
+            yield return new QueryRowFrame(row);
+        }
+
+        foreach (ServerLogEvent log in result.ServerLog ?? [])
+        {
+            yield return new QueryLogFrame(log);
+        }
+
+        yield return new QueryCompleteFrame();
+    }
+
     /// <summary>
     ///     Executes a query on the server and returns the materialized wire result.
     /// </summary>
@@ -92,3 +119,22 @@ public interface IInfoCarrierClient
     /// </summary>
     Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default);
 }
+
+internal static class BufferedQueryFrameAdapter
+{
+    internal static List<DynamicValueNode> DeserializeRows(byte[] payload)
+    {
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize(
+                payload, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
+        }
+        catch (Exception exception)
+        {
+            throw new BufferedResultMaterializationException(exception);
+        }
+    }
+}
+
+internal sealed class BufferedResultMaterializationException(Exception innerException)
+    : Exception("The buffered query result could not be materialized.", innerException);

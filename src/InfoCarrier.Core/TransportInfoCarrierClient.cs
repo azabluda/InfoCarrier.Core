@@ -25,6 +25,45 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
 
+    /// <inheritdoc />
+    public async IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(
+        QueryDataRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (_transport is not IInfoCarrierStreamTransport streamTransport)
+        {
+            QueryDataResult buffered = await QueryDataAsync(request, clientContext, cancellationToken)
+                .ConfigureAwait(false);
+            yield return new QueryStartFrame(
+                QueryStreamFrameCodec.Version, 0, buffered.IsEntityResult, buffered.ElementTypeName);
+            List<DynamicValueNode> rows = BufferedQueryFrameAdapter.DeserializeRows(buffered.SerializedResults);
+            foreach (DynamicValueNode row in rows)
+            {
+                yield return new QueryRowFrame(row);
+            }
+
+            foreach (ServerLogEvent log in buffered.ServerLog ?? [])
+            {
+                yield return new QueryLogFrame(log);
+            }
+
+            yield return new QueryCompleteFrame();
+
+            yield break;
+        }
+
+        await using IInfoCarrierResponse response = await streamTransport.SendAsync(
+            InfoCarrierOperation.Query,
+            (destination, token) => _serializer.SerializeAsync(destination, request, token),
+            cancellationToken).ConfigureAwait(false);
+        await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
+            response.Content, cancellationToken).ConfigureAwait(false))
+        {
+            yield return frame;
+        }
+    }
+
     /// <summary>Creates a client with an explicitly supplied class logger.</summary>
     /// <param name="transport">The transport used for exchanges.</param>
     /// <param name="serializer">The payload serializer.</param>
