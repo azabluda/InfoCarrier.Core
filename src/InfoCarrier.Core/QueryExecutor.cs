@@ -25,10 +25,15 @@ namespace InfoCarrier.Core;
 /// </summary>
 internal sealed class QueryExecutor<TElement>
 {
-    private static readonly System.Reflection.MethodInfo BufferFramesMethod
-        = typeof(QueryExecutor<TElement>).GetMethod(
-            nameof(BufferFramesAsync),
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly System.Reflection.MethodInfo MaterializeMethod
+        = typeof(ClientResultMaterializer).GetMethod(nameof(ClientResultMaterializer.Materialize))!;
+
+    private static readonly System.Reflection.MethodInfo ToListMethod
+        = typeof(Enumerable).GetMethod(nameof(Enumerable.ToList))!;
+
+    private static readonly System.Reflection.MethodInfo AsQueryableMethod
+        = typeof(Queryable).GetMethods()
+            .Single(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethodDefinition);
 
     private readonly QueryContext _queryContext;
     private readonly IInfoCarrierClient _client;
@@ -200,10 +205,16 @@ internal sealed class QueryExecutor<TElement>
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
-            object? result = BufferAsync(serverQuery, _queryContext.CancellationToken)
+            QueryDataResult result = _client
+                .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
-            results.Add(result);
+
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ReplayServerLog(result.ServerLog);
+            results.Add(Materialize(serverQuery, result));
         }
 
         return results;
@@ -305,7 +316,7 @@ internal sealed class QueryExecutor<TElement>
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
-            object? result;
+            QueryDataResult result;
             try
             {
                 using (CriticalSection())
@@ -314,7 +325,9 @@ internal sealed class QueryExecutor<TElement>
                     // already-cancelled token must surface as OperationCanceledException rather
                     // than a completed query.
                     cancellationToken.ThrowIfCancellationRequested();
-                    result = await BufferAsync(serverQuery, cancellationToken).ConfigureAwait(false);
+                    result = await _client
+                        .QueryDataAsync(BuildRequest(serverQuery, async: true), _queryContext.Context, cancellationToken)
+                        .ConfigureAwait(false);
                 }
             }
             catch (Exception exception)
@@ -335,7 +348,11 @@ internal sealed class QueryExecutor<TElement>
                 throw;
             }
 
-            results.Add(result);
+            // Anything the server logged while running this query, raised on the client's own
+            // logger under the server's category and event id. Empty unless the server has
+            // granted forwarding, which is off by default (`IInfoCarrierServerLogForwarding`).
+            ReplayServerLog(result.ServerLog);
+            results.Add(Materialize(serverQuery, result));
         }
 
         foreach (TElement element in Guarded(ApplyResidual(results, singleResult)))
@@ -398,46 +415,6 @@ internal sealed class QueryExecutor<TElement>
 
             yield return enumerator.Current;
         }
-    }
-
-    private Task<object?> BufferAsync(ServerQuery serverQuery, CancellationToken cancellationToken)
-        => (Task<object?>)Invoke(
-            BufferFramesMethod.MakeGenericMethod(serverQuery.ElementType),
-            this,
-            [serverQuery, cancellationToken])!;
-
-    private async Task<object?> BufferFramesAsync<TBoundary>(
-        ServerQuery serverQuery,
-        CancellationToken cancellationToken)
-    {
-        IAsyncEnumerable<Query.QueryStreamFrame> frames = _client.QueryDataStreamAsync(
-            BuildRequest(serverQuery, async: true), _queryContext.Context, cancellationToken);
-        IAsyncEnumerable<TBoundary> rows = _materializer.MaterializeAsync<TBoundary>(
-            frames,
-            log => ReplayServerLog([log]),
-            exception => LogFailure("result materialization", exception, cancellationToken),
-            cancellationToken);
-        var buffered = new List<TBoundary>();
-        try
-        {
-            await foreach (TBoundary row in rows.WithCancellation(cancellationToken).ConfigureAwait(false))
-            {
-                buffered.Add(row);
-            }
-        }
-        catch (BufferedResultMaterializationException exception) when (exception.InnerException is { } innerException)
-        {
-            LogFailure("result materialization", innerException, cancellationToken);
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(innerException).Throw();
-            throw;
-        }
-
-        if (serverQuery.ReturnsSingleResult)
-        {
-            return buffered.Cast<object?>().FirstOrDefault();
-        }
-
-        return buffered.AsQueryable();
     }
 
     private async IAsyncEnumerable<TElement> ExecuteStreamingResidualAsync(
@@ -554,6 +531,38 @@ internal sealed class QueryExecutor<TElement>
         catch (Exception exception)
         {
             LogFailure("request construction", exception, _queryContext.CancellationToken);
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Turns one server result into what the residual expects for that slot.
+    /// </summary>
+    /// <remarks>
+    ///     The boundary element type is not <typeparamref name="TElement" /> whenever a residual
+    ///     exists, so materialization goes through the runtime type. Rows are drained eagerly:
+    ///     the wire reference scope belongs to one round trip, and a lazily materialized sequence
+    ///     would decode against whichever scope the *next* request had reset.
+    /// </remarks>
+    private object? Materialize(ServerQuery serverQuery, QueryDataResult result)
+    {
+        try
+        {
+            ClientResultMaterializer materializer = _materializer;
+
+            object rows = Invoke(MaterializeMethod.MakeGenericMethod(serverQuery.ElementType), materializer, [result])!;
+            object list = Invoke(ToListMethod.MakeGenericMethod(serverQuery.ElementType), null, [rows])!;
+
+            if (serverQuery.ReturnsSingleResult)
+            {
+                return ((System.Collections.IEnumerable)list).Cast<object?>().FirstOrDefault();
+            }
+
+            return Invoke(AsQueryableMethod.MakeGenericMethod(serverQuery.ElementType), null, [list])!;
+        }
+        catch (Exception exception)
+        {
+            LogFailure("result materialization", exception, _queryContext.CancellationToken);
             throw;
         }
     }
