@@ -11,7 +11,6 @@ namespace InfoCarrier.Core;
 /// </summary>
 public class InfoCarrierLoggingDefinitions : LoggingDefinitions
 {
-    private EventDefinitionBase? _logQuerySplit;
     private EventDefinitionBase? _logQuerySplitClientOperators;
     private EventDefinitionBase? _logQuerySplitUnregisteredKeyTypes;
     private EventDefinitionBase? _clientQueryError;
@@ -55,46 +54,10 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
                 "InfoCarrier client {Operation} failed during {Phase}. Outcome={Outcome}; ExceptionType={ExceptionType}."));
 
     /// <summary>
-    ///     The definition for <see cref="InfoCarrierEventId.QuerySplit" />.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The parameter is the number of queries the server runs. It is the cheapest useful
-    ///         number: a split of one server query means the whole remainder is client work over
-    ///         one result set, which is the shape that fetches a table when the remainder holds
-    ///         the filter.
-    ///     </para>
-    ///     <para>
-    ///         Cached on this instance exactly as the definition above is, for the same reason.
-    ///     </para>
-    /// </remarks>
-    /// <param name="logger">The logger whose options supply the warnings configuration.</param>
-    public virtual EventDefinition<int> LogQuerySplit(IDiagnosticsLogger logger)
-        => (EventDefinition<int>)(_logQuerySplit ??= new EventDefinition<int>(
-            logger.Options,
-            InfoCarrierEventId.QuerySplit,
-            LogLevel.Information,
-            "InfoCarrierEventId.QuerySplit",
-            level => LoggerMessage.Define<int>(
-                level,
-                InfoCarrierEventId.QuerySplit,
-                "Part of the query cannot be sent to the server. The server runs {serverQueryCount} "
-                    + "query/queries and this client runs the rest over the rows returned. A filter "
-                    + "left on the client does not reduce what crosses the wire.")));
-
-    /// <summary>
     ///     The definition for <see cref="InfoCarrierEventId.QuerySplit" /> that also names what
     ///     the client kept.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         <b>The same event id, a second definition, and the reason is compatibility.</b>
-    ///         <see cref="LogQuerySplit" /> returns <see cref="EventDefinition{T}" /> and is
-    ///         public, so widening it to carry a second parameter would change a published
-    ///         signature. The id is what a caller passes to <c>ConfigureWarnings</c> and
-    ///         <c>LogTo</c>, and it is deliberately unchanged: this is the same event, said
-    ///         better.
-    ///     </para>
     ///     <para>
     ///         <b>The second parameter is the actionable half.</b> The first says how many queries
     ///         the server runs, which tells a reader that a split happened. It does not say
@@ -124,10 +87,10 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>A third definition for the same event, for the reason the second one gives.</b>
+    ///         <b>A second definition for the same event.</b>
     ///         <see cref="LogQuerySplitClientOperators" /> is public, so it cannot grow a
     ///         parameter. The id is unchanged, so <c>ConfigureWarnings</c> and <c>LogTo</c> treat
-    ///         all three as one event.
+    ///         both definitions as one event.
     ///     </para>
     ///     <para>
     ///         <b>Used only when there is a type to name.</b> A split with none logs through
