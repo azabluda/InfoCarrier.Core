@@ -2,6 +2,7 @@
 
 using System.Diagnostics.Metrics;
 using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -20,37 +21,52 @@ public class RoundTripMetricsTest
     private static readonly IInfoCarrierSerializer Serializer = new SystemTextJsonInfoCarrierSerializer();
 
     [Fact]
-    public async Task It_counts_one_round_trip_per_operation_and_names_which()
+    public async Task Every_operation_has_its_stable_metric_tag()
     {
         // THE QUESTION THIS ANSWERS IS "how many requests does this screen cost". Two readers of
         // the documentation asked it and neither could answer it from a running application.
         List<Recorded> recorded = await Measure(async client =>
         {
-            Assert.True(await client.SupportsSavepointsAsync("t1"));
-            Assert.True(await client.SupportsSavepointsAsync("t1"));
+            using var context = new DbContext(new DbContextOptionsBuilder().Options);
+
+            await client.QueryDataAsync(
+                new QueryDataRequest
+                {
+                    SerializedQuery = [],
+                    TrackingBehavior = QueryTrackingBehavior.NoTracking,
+                    IsAsync = true,
+                    ReturnsSingleResult = false,
+                },
+                context);
+            await client.SaveChangesAsync(new SaveChangesRequest { Entries = [] }, context);
+            await client.BeginTransactionAsync();
             await client.CommitTransactionAsync("t1");
+            await client.RollbackTransactionAsync("t1");
+            await client.CreateSavepointAsync("t1", "s1");
+            await client.RollbackToSavepointAsync("t1", "s1");
+            await client.ReleaseSavepointAsync("t1", "s1");
+            Assert.True(await client.SupportsSavepointsAsync("t1"));
         });
 
+        string[] expectedOperations = Enum.GetNames<InfoCarrierOperation>();
+
         Assert.Equal(
-            3,
+            expectedOperations.Length,
             recorded.Where(r => r.Instrument == InfoCarrierMetrics.RoundTripCountInstrumentName)
                 .Sum(r => (long)r.Value));
 
-        Assert.Equal(
-            2,
-            recorded.Count(r => r.Instrument == InfoCarrierMetrics.RoundTripCountInstrumentName
-                && r.Operation == nameof(InfoCarrierOperation.SupportsSavepoints)));
-
-        Assert.Single(
-            recorded,
-            r => r.Instrument == InfoCarrierMetrics.RoundTripCountInstrumentName
-                && r.Operation == nameof(InfoCarrierOperation.CommitTransaction));
+        Assert.All(
+            expectedOperations,
+            operation => Assert.Single(
+                recorded,
+                r => r.Instrument == InfoCarrierMetrics.RoundTripCountInstrumentName
+                    && r.Operation == operation));
 
         // The duration histogram sees every one of them, and no measurement is negative.
         List<Recorded> durations =
             [.. recorded.Where(r => r.Instrument == InfoCarrierMetrics.RoundTripDurationInstrumentName)];
 
-        Assert.Equal(3, durations.Count);
+        Assert.Equal(expectedOperations.Length, durations.Count);
         Assert.All(durations, d => Assert.True(d.Value >= 0));
 
         // Nothing failed, so nothing carries an error tag.
@@ -154,9 +170,17 @@ public class RoundTripMetricsTest
         {
             ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
             Operation = request.Operation,
-            Payload = request.Operation == InfoCarrierOperation.SupportsSavepoints
-                ? Serializer.Serialize(true)
-                : Serializer.Serialize<object?>(null),
+            Payload = request.Operation switch
+            {
+                InfoCarrierOperation.Query => Serializer.Serialize(
+                    new QueryDataResult { SerializedResults = [], IsEntityResult = false }),
+                InfoCarrierOperation.SaveChanges => Serializer.Serialize(
+                    new SaveChangesResult { Count = 0, GeneratedValues = [] }),
+                InfoCarrierOperation.BeginTransaction => Serializer.Serialize(
+                    new TransactionResult { TransactionId = "t1" }),
+                InfoCarrierOperation.SupportsSavepoints => Serializer.Serialize(true),
+                _ => Serializer.Serialize<object?>(null),
+            },
         };
 
     private sealed record Recorded(string Instrument, double Value, string? Operation, string? ErrorType)
