@@ -151,7 +151,6 @@ public static class InfoCarrierServiceCollectionExtensions
             .TryAdd<ITypeMappingSource, Relational.InfoCarrierRelationalTypeMappingSource>()
             .TryAdd<IValueGeneratorSelector, InfoCarrierValueGeneratorSelector>()
             .TryAdd<IDbContextTransactionManager, InfoCarrierTransactionManager>()
-            .TryAdd<IDatabaseCreator, InfoCarrierDatabaseCreator>()
 
             // `EF.Functions.Collate` and friends must survive parameter extraction rather than be
             // evaluated on the client, and EF's core filter does not know the relational host that

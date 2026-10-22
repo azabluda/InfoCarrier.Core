@@ -1,6 +1,7 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
@@ -41,10 +42,11 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         provider has one.
 ///     </para>
 ///     <para>
-///         <b>Two more carry a reason and EF's own body, since 2026-09-26.</b>
+///         <b>Two more carry a reason and EF's body without its schema check.</b>
 ///         <c>Throws_on_concurrent_query_list</c> and <c>_first</c> pass, and #167's slow run found
-///         that the store sees one statement fewer for each, because this client's
-///         <c>EnsureCreated</c> runs nothing. The reason says so, flagged <c>SqlDiffers</c>.
+///         that the store sees one statement fewer for each. The fixture already created the
+///         backend store, while the InfoCarrier client has no schema-management service. The
+///         reason says so, flagged <c>SqlDiffers</c>.
 ///     </para>
 ///     <para>
 ///         <b>Three more of EF's own arrive on 2026-09-28</b>, the
@@ -275,17 +277,17 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     /// <inheritdoc />
     /// <remarks>
     ///     <para>
-    ///         <b>The body is EF's; the statements the store sees are one fewer.</b> The base calls
+    ///         <b>The body is EF's except for its schema check.</b> The base calls
     ///         <c>Database.EnsureCreatedResilientlyAsync()</c> before it starts the two queries, and
     ///         EF's SQLite creator answers it with <c>SELECT COUNT(*) FROM "sqlite_master" …</c>. This
-    ///         client has no database: its <c>InfoCarrierDatabaseCreator</c> reports success and runs
-    ///         nothing, because schema operations are the server's, past the capture point, and a
-    ///         client that could create or delete the server's database is not something this
-    ///         provider offers. The queries the test is about run the same statement both ways.
+    ///         client has no database, while the fixture already created the backend database. The
+    ///         override therefore omits that unrelated client call. The queries the test is about run
+    ///         the same statement both ways.
     ///     </para>
     ///     <para>
     ///         Found by #167's slow run, 2026-09-26. A reason and not a fix, because the fix would be
-    ///         a remote schema operation.
+    ///         a remote schema operation. Version 11 removed the fictitious creator, so this override
+    ///         now states the same boundary in executable setup.
     ///     </para>
     /// </remarks>
     [InfoCarrierDesign(
@@ -293,8 +295,37 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
         Decisions.ClientServices,
         Justification = EnsureCreatedIsTheServers,
         Deviation = DeviationKind.SqlDiffers)]
-    public override Task Throws_on_concurrent_query_list(bool async)
-        => base.Throws_on_concurrent_query_list(async);
+    public override async Task Throws_on_concurrent_query_list(bool async)
+    {
+        using NorthwindContext context = CreateContext();
+        using var synchronizationEvent = new ManualResetEventSlim(false);
+        using var blockingSemaphore = new SemaphoreSlim(0);
+        Task blockingTask = Task.Run(async () =>
+        {
+            try
+            {
+                await context.Customers.Select(c => Process(c, synchronizationEvent, blockingSemaphore)).ToListAsync();
+            }
+            finally
+            {
+                synchronizationEvent.Set();
+            }
+        });
+
+        Task throwingTask = Task.Run(async () =>
+        {
+            synchronizationEvent.Wait(TimeSpan.FromMinutes(5));
+            Assert.Equal(
+                CoreStrings.ConcurrentMethodInvocation,
+                (async
+                    ? await Assert.ThrowsAsync<InvalidOperationException>(() => context.Customers.ToListAsync())
+                    : Assert.Throws<InvalidOperationException>(() => context.Customers.ToList())).Message);
+        });
+
+        await throwingTask;
+        blockingSemaphore.Release(1);
+        await blockingTask;
+    }
 
     /// <inheritdoc cref="Throws_on_concurrent_query_list" />
     [InfoCarrierDesign(
@@ -302,12 +333,49 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
         Decisions.ClientServices,
         Justification = EnsureCreatedIsTheServers,
         Deviation = DeviationKind.SqlDiffers)]
-    public override Task Throws_on_concurrent_query_first(bool async)
-        => base.Throws_on_concurrent_query_first(async);
+    public override async Task Throws_on_concurrent_query_first(bool async)
+    {
+        using NorthwindContext context = CreateContext();
+        using var synchronizationEvent = new ManualResetEventSlim(false);
+        using var blockingSemaphore = new SemaphoreSlim(0);
+        Task blockingTask = Task.Run(async () =>
+        {
+            try
+            {
+                await context.Customers.Select(c => Process(c, synchronizationEvent, blockingSemaphore)).ToListAsync();
+            }
+            finally
+            {
+                synchronizationEvent.Set();
+            }
+        });
+
+        Task throwingTask = Task.Run(async () =>
+        {
+            synchronizationEvent.Wait(TimeSpan.FromMinutes(5));
+            Assert.Equal(
+                CoreStrings.ConcurrentMethodInvocation,
+                (async
+                    ? await Assert.ThrowsAsync<InvalidOperationException>(() => context.Customers.FirstAsync())
+                    : Assert.Throws<InvalidOperationException>(() => context.Customers.First())).Message);
+        });
+
+        await throwingTask;
+        blockingSemaphore.Release(1);
+        await blockingTask;
+    }
 
     private const string EnsureCreatedIsTheServers =
-        "The client has no database, so EnsureCreated runs no statement here; the server's store checks for its "
-        + "tables where plain EF Core's client does.";
+        "The client has no database, so the fixture creates the backend store instead of calling client "
+        + "EnsureCreated; plain EF Core checks its local store here.";
+
+    private static Customer Process(Customer customer, ManualResetEventSlim synchronizationEvent, SemaphoreSlim semaphore)
+    {
+        synchronizationEvent.Set();
+        semaphore.Wait(TimeSpan.FromMinutes(5));
+        semaphore.Release(1);
+        return customer;
+    }
 
     private static async Task AssertApplyNotSupported(Func<Task> query)
         => Assert.Equal(
