@@ -474,6 +474,51 @@ public class InfoCarrierDeploymentBuilderTest
             string transactionId,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext)
+        {
+            throw new NotImplementedException();
+        }
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
 

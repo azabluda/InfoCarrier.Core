@@ -205,10 +205,9 @@ internal sealed class QueryExecutor<TElement>
         var results = new List<object?>(_split.ServerQueries.Count);
         foreach (ServerQuery serverQuery in _split.ServerQueries)
         {
-            QueryDataResult result = _client
-                .QueryDataAsync(BuildRequest(serverQuery, async: false), _queryContext.Context, _queryContext.CancellationToken)
-                .GetAwaiter()
-                .GetResult();
+            _queryContext.CancellationToken.ThrowIfCancellationRequested();
+            QueryDataResult result = _client.QueryData(
+                BuildRequest(serverQuery, async: false), _queryContext.Context);
 
             // Anything the server logged while running this query, raised on the client's own
             // logger under the server's category and event id. Empty unless the server has

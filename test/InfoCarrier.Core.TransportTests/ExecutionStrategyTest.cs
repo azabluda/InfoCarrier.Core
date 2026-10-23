@@ -36,6 +36,10 @@ public class ExecutionStrategyTest
 
     private sealed class UnreachableTransport : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+            => throw new InvalidOperationException(
+                "Creating an execution strategy must not reach the server.");
+
         public Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException(

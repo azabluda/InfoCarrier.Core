@@ -2,6 +2,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Northwind.Shared;
 using Northwind.Shared.Model;
 using Xunit;
@@ -10,6 +11,51 @@ namespace InfoCarrier.Core.TransportTests;
 
 public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
+    [Fact]
+    public void Synchronous_save_and_transaction_operations_cross_HTTP()
+    {
+        string name = $"sync-{Guid.NewGuid():N}";
+        using WebApplicationFactory<Program> hosted = NorthwindOverHttpTest.SynchronousHost(factory);
+        using HttpClient httpClient = hosted.CreateClient();
+        using NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(httpClient);
+        using IDbContextTransaction transaction = context.Database.BeginTransaction();
+
+        context.Products.Add(
+            new Product { Name = name, UnitPrice = 3.0m, UnitsInStock = 2, CategoryId = 1 });
+        Assert.Equal(1, context.SaveChanges());
+
+        Assert.True(transaction.SupportsSavepoints);
+        transaction.CreateSavepoint("after-insert");
+        context.Products.Add(
+            new Product { Name = name + "-discarded", UnitPrice = 4.0m, UnitsInStock = 3, CategoryId = 1 });
+        Assert.Equal(1, context.SaveChanges());
+        transaction.RollbackToSavepoint("after-insert");
+        transaction.ReleaseSavepoint("after-insert");
+        transaction.Commit();
+
+        using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(httpClient);
+        Assert.True(verify.Products.Any(product => product.Name == name));
+        Assert.False(verify.Products.Any(product => product.Name == name + "-discarded"));
+    }
+
+    [Fact]
+    public void Synchronous_transaction_disposal_rolls_back_over_HTTP()
+    {
+        string name = $"sync-dispose-{Guid.NewGuid():N}";
+        using WebApplicationFactory<Program> hosted = NorthwindOverHttpTest.SynchronousHost(factory);
+        using HttpClient httpClient = hosted.CreateClient();
+        using (NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(httpClient))
+        {
+            using IDbContextTransaction transaction = context.Database.BeginTransaction();
+            context.Products.Add(
+                new Product { Name = name, UnitPrice = 5.0m, UnitsInStock = 1, CategoryId = 1 });
+            Assert.Equal(1, context.SaveChanges());
+        }
+
+        using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(httpClient);
+        Assert.False(verify.Products.Any(product => product.Name == name));
+    }
+
     [Fact]
     public async Task Several_edits_cross_as_one_save()
     {

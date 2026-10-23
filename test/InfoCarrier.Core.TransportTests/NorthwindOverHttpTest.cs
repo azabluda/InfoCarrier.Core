@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using InfoCarrier.Core.Expressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -20,6 +21,45 @@ namespace InfoCarrier.Core.TransportTests;
 /// </summary>
 public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
+    [Fact]
+    public void A_console_style_synchronous_query_crosses_HTTP()
+    {
+        using WebApplicationFactory<Program> hosted = SynchronousHost(factory);
+        using HttpClient httpClient = hosted.CreateClient();
+        using NorthwindContext context = CreateClientContext(httpClient);
+
+        List<string> customers = context.Customers
+            .Where(customer => customer.Country == "Germany")
+            .OrderBy(customer => customer.Id)
+            .Select(customer => customer.Id)
+            .ToList();
+
+        Assert.Equal(
+            ["ALFKI", "BLAUS", "DRACD", "FRANK", "KOENE", "LEHMS", "OTTIK", "WANDK"],
+            customers);
+    }
+
+    internal static WebApplicationFactory<Program> SynchronousHost(NorthwindServerFactory factory)
+    {
+        WebApplicationFactory<Program> hosted = factory.WithWebHostBuilder(
+            builder => builder.ConfigureServices(
+                services => services.AddLogging(logging => logging.ClearProviders())));
+        hosted.UseKestrel(options => options.Listen(System.Net.IPAddress.Loopback, 0));
+        return hosted;
+    }
+
+    internal static NorthwindContext CreateClientContext(HttpClient httpClient)
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var client = new TransportInfoCarrierClient(
+            new HttpInfoCarrierTransport(httpClient, serializer), serializer);
+        return new NorthwindContext(
+            new DbContextOptionsBuilder<NorthwindContext>()
+                .UseInfoCarrier(client)
+                .UseLazyLoadingProxies()
+                .Options);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -410,7 +450,11 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     [Fact]
     public async Task Touching_a_navigation_lazy_loads_it_over_a_second_round_trip()
     {
-        using NorthwindContext context = CreateClientContext(factory, out RecordingHandler recorder);
+        using WebApplicationFactory<Program> hosted = SynchronousHost(factory);
+        using HttpClient endpoint = hosted.CreateClient();
+        using var recorder = new RecordingHandler { InnerHandler = new HttpClientHandler() };
+        using var httpClient = new HttpClient(recorder) { BaseAddress = endpoint.BaseAddress };
+        using NorthwindContext context = CreateClientContext(httpClient);
 
         Order order = await context.Orders.SingleAsync(o => o.Id == 1);
 

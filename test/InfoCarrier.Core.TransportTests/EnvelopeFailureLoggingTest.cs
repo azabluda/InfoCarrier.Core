@@ -157,6 +157,51 @@ public class EnvelopeFailureLoggingTest
         public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default) => throw failure ?? new NotSupportedException();
         public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default) => throw failure ?? new NotSupportedException();
         public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default) => throw failure ?? new NotSupportedException();
+
+        public QueryDataResult QueryData(QueryDataRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed class FailingSerializer(bool faultPlaceholder) : IInfoCarrierSerializer

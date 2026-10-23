@@ -53,6 +53,100 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         _logger = logger;
     }
 
+    /// <summary>Handles one request through the synchronous server contract.</summary>
+    public InfoCarrierEnvelope Dispatch(InfoCarrierEnvelope request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        string phase = "operation execution";
+        string operation = Enum.IsDefined(request.Operation) ? request.Operation.ToString() : "Unknown";
+        if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+        {
+            Log(LogLevel.Warning, 35002,
+                "InfoCarrier {Operation} was rejected because its protocol version is unsupported.", operation);
+            throw new NotSupportedException(
+                $"InfoCarrier protocol version {request.ProtocolVersion} is not supported by this "
+                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
+        }
+
+        try
+        {
+            return request.Operation switch
+            {
+                InfoCarrierOperation.Query
+                    => Respond(request, _server.QueryData(Payload<QueryDataRequest>(request))),
+                InfoCarrierOperation.SaveChanges
+                    => Respond(request, _server.SaveChanges(Payload<SaveChangesRequest>(request))),
+                InfoCarrierOperation.BeginTransaction
+                    => Respond(request, _server.BeginTransaction()),
+                InfoCarrierOperation.CommitTransaction
+                    => Acknowledge(request, () => _server.CommitTransaction(Payload<string>(request))),
+                InfoCarrierOperation.RollbackTransaction
+                    => Acknowledge(request, () => _server.RollbackTransaction(Payload<string>(request))),
+                InfoCarrierOperation.CreateSavepoint
+                    => Savepoint(request, _server.CreateSavepoint),
+                InfoCarrierOperation.RollbackToSavepoint
+                    => Savepoint(request, _server.RollbackToSavepoint),
+                InfoCarrierOperation.ReleaseSavepoint
+                    => Savepoint(request, _server.ReleaseSavepoint),
+                InfoCarrierOperation.SupportsSavepoints
+                    => Respond(request, _server.SupportsSavepoints(Payload<string>(request))),
+                _ => throw new NotSupportedException(
+                    $"InfoCarrier operation '{request.Operation}' is not supported by this server."),
+            };
+        }
+        catch (Exception exception)
+        {
+            string failedPhase = phase;
+            phase = "fault response serialization";
+            InfoCarrierEnvelope response = request with
+            {
+                Payload = _serializer.Serialize<object?>(null),
+                Fault = InfoCarrierFaultMapper.Capture(exception),
+            };
+            bool missingShape = exception.Data[typeof(Expressions.AnonymousShapeCatalog)] is true;
+            Log(exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException
+                    ? LogLevel.Information : LogLevel.Error,
+                35001,
+                "InfoCarrier {Operation} failed during {Phase}. Reason={Reason}; ExceptionType={ExceptionType}.",
+                operation, failedPhase,
+                missingShape ? "AnonymousShapeNotRegistered" : "UnclassifiedFailure",
+                exception.GetType().FullName);
+            return response;
+        }
+
+        T Payload<T>(InfoCarrierEnvelope envelope)
+        {
+            phase = "request payload deserialization";
+            T payload = _serializer.Deserialize<T>(envelope.Payload)
+                ?? throw new InvalidOperationException(
+                    $"The {envelope.Operation} envelope carried no {typeof(T).Name} payload.");
+            phase = "operation execution";
+            return payload;
+        }
+
+        InfoCarrierEnvelope Respond<TResult>(InfoCarrierEnvelope envelope, TResult result)
+        {
+            phase = "result serialization after operation completion";
+            return envelope with { Payload = _serializer.Serialize(result) };
+        }
+
+        InfoCarrierEnvelope Acknowledge(InfoCarrierEnvelope envelope, Action action)
+        {
+            action();
+            phase = "result serialization after operation completion";
+            return envelope with { Payload = _serializer.Serialize<object?>(null) };
+        }
+
+        InfoCarrierEnvelope Savepoint(
+            InfoCarrierEnvelope envelope,
+            Action<string, string> action)
+        {
+            SavepointRequest savepoint = Payload<SavepointRequest>(envelope);
+            return Acknowledge(
+                envelope, () => action(savepoint.TransactionId, savepoint.Name));
+        }
+    }
+
     /// <summary>
     ///     Handles one request envelope and produces the response envelope.
     /// </summary>

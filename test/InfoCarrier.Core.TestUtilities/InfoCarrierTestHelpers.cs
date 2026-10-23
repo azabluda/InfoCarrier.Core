@@ -51,6 +51,33 @@ public class InfoCarrierTestHelpers : TestHelpers
 
         public string ServerUrl => nameof(InfoCarrierTestHelpers);
 
+        public QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext)
+            => throw new NotSupportedException(Message);
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext)
+            => throw new NotSupportedException(Message);
+
+        public TransactionResult BeginTransaction()
+            => throw new NotSupportedException(Message);
+
+        public void CommitTransaction(string transactionId)
+            => throw new NotSupportedException(Message);
+
+        public void RollbackTransaction(string transactionId)
+            => throw new NotSupportedException(Message);
+
+        public void CreateSavepoint(string transactionId, string name)
+            => throw new NotSupportedException(Message);
+
+        public void RollbackToSavepoint(string transactionId, string name)
+            => throw new NotSupportedException(Message);
+
+        public void ReleaseSavepoint(string transactionId, string name)
+            => throw new NotSupportedException(Message);
+
+        public bool SupportsSavepoints(string transactionId)
+            => throw new NotSupportedException(Message);
+
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
             => throw new NotSupportedException(Message);
 

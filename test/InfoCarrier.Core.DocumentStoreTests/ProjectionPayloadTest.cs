@@ -125,6 +125,14 @@ public class ProjectionPayloadTest(DocumentStoreFixture fixture) : IClassFixture
         List<string> responses)
         : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        {
+            requests.Add(Encoding.UTF8.GetString(request.Payload));
+            InfoCarrierEnvelope response = server.Dispatch(request);
+            responses.Add(Encoding.UTF8.GetString(response.Payload));
+            return response;
+        }
+
         public async Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
         {

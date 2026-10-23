@@ -215,33 +215,65 @@ public class InfoCarrierDatabase(
     ///     <c>SaveChangesInterceptionTestBase</c> reached a store that checks concurrency).
     /// </remarks>
     public virtual int SaveChanges(IList<IUpdateEntry> entries)
-        => SaveAsync(entries, async: false, default).GetAwaiter().GetResult();
+    {
+        string phase = "change request construction";
+        try
+        {
+            (Common.SaveChangesRequest request, List<IUpdateEntry> sent,
+                Expressions.DynamicValueMapper mapper) = PrepareSave(entries);
+
+            phase = "exchange";
+            Common.SaveChangesResult result;
+            try
+            {
+                result = _client.SaveChanges(request, _currentContext.Context);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                IReadOnlyList<IUpdateEntry> conflicting =
+                    FailedByOrdinal(exception, sent) ?? Translate(exception.Entries, sent);
+                var raised = new DbUpdateConcurrencyException(
+                    exception.Message, exception, conflicting);
+                InterceptionResult logged = _updateLogger.OptimisticConcurrencyException(
+                    _currentContext.Context, conflicting, raised, null);
+                if (logged.IsSuppressed)
+                {
+                    return 0;
+                }
+
+                throw raised;
+            }
+            catch (DbUpdateException exception)
+            {
+                throw TranslateUpdateException(exception, sent);
+            }
+
+            phase = "server log replay";
+            ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
+            phase = "generated value application after response";
+            ApplyGeneratedValues(sent, result, mapper);
+            return result.Count;
+        }
+        catch (Exception exception) when (phase != "exchange")
+        {
+            LogFailure(phase, exception, default);
+            throw;
+        }
+    }
 
     /// <inheritdoc />
     public virtual Task<int> SaveChangesAsync(
         IList<IUpdateEntry> entries,
         CancellationToken cancellationToken = default)
-        => SaveAsync(entries, async: true, cancellationToken);
+        => SaveAsync(entries, cancellationToken);
 
-    private async Task<int> SaveAsync(IList<IUpdateEntry> entries, bool async, CancellationToken cancellationToken)
+    private async Task<int> SaveAsync(IList<IUpdateEntry> entries, CancellationToken cancellationToken)
     {
         string phase = "change request construction";
         try
         {
-            ArgumentNullException.ThrowIfNull(entries);
-
-            var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
-            mapper.ResetReferenceScope();
-
-            // Correlation ids are positions in *this* list, so the expansion has to be materialized
-            // once and reused when the generated values come back.
-            List<IUpdateEntry> sent = [.. Expand(entries)];
-
-            var request = new Common.SaveChangesRequest
-            {
-                Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
-                TransactionId = ServerTransactionId(_currentContext.Context),
-            };
+            (Common.SaveChangesRequest request, List<IUpdateEntry> sent,
+                Expressions.DynamicValueMapper mapper) = PrepareSave(entries);
 
 
             phase = "exchange";
@@ -277,11 +309,9 @@ public class InfoCarrierDatabase(
                 // event carried the server's, the inner one here (#167's slow run).
                 var raised = new DbUpdateConcurrencyException(exception.Message, exception, conflicting);
 
-                InterceptionResult logged = async
-                    ? await _updateLogger.OptimisticConcurrencyExceptionAsync(
-                            _currentContext.Context, conflicting, raised, null, cancellationToken)
-                        .ConfigureAwait(false)
-                    : _updateLogger.OptimisticConcurrencyException(_currentContext.Context, conflicting, raised, null);
+                InterceptionResult logged = await _updateLogger.OptimisticConcurrencyExceptionAsync(
+                        _currentContext.Context, conflicting, raised, null, cancellationToken)
+                    .ConfigureAwait(false);
 
                 if (logged.IsSuppressed)
                 {
@@ -306,10 +336,7 @@ public class InfoCarrierDatabase(
                 // tag is present `FailedByOrdinal` picks exactly those, and only where it is absent
                 // does the re-raise name the whole sent list — the honest answer when the server
                 // could not narrow it either.
-                throw new DbUpdateException(
-                    exception.Message,
-                    exception,
-                    FailedByOrdinal(exception, sent) ?? Translate([], sent));
+                throw TranslateUpdateException(exception, sent);
             }
 
             // EF raises its write-time warnings from the update pipeline, which runs on the SERVER, so
@@ -330,6 +357,30 @@ public class InfoCarrierDatabase(
             throw;
         }
     }
+
+    private (Common.SaveChangesRequest Request, List<IUpdateEntry> Sent,
+        Expressions.DynamicValueMapper Mapper) PrepareSave(IList<IUpdateEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        mapper.ResetReferenceScope();
+        List<IUpdateEntry> sent = [.. Expand(entries)];
+        var request = new Common.SaveChangesRequest
+        {
+            Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
+            TransactionId = ServerTransactionId(_currentContext.Context),
+        };
+        return (request, sent, mapper);
+    }
+
+    private static DbUpdateException TranslateUpdateException(
+        DbUpdateException exception,
+        List<IUpdateEntry> sent)
+        => new(
+            exception.Message,
+            exception,
+            FailedByOrdinal(exception, sent) ?? Translate([], sent));
 
     /// <summary>
     ///     The entries to send: what EF asked to save, plus the <em>deleted</em> half of any row

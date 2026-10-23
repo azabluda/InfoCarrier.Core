@@ -230,6 +230,38 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
     /// <inheritdoc />
+    public TransactionResult BeginTransaction()
+    {
+        IServiceScope scope = _serviceProvider.CreateScope();
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+            IDbContextTransaction transaction = context.Database.BeginTransaction();
+            return RegisterTransaction(scope, context, transaction);
+        }
+        catch
+        {
+            scope.Dispose();
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public QueryDataResult QueryData(QueryDataRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        using SyncLease lease = AcquireSync(request.TransactionId);
+        ServerQueryExecutor executor = CreateQueryExecutor(lease.Context);
+
+        using ServerLogCapture.Scope? capture = BeginLogCapture();
+        QueryDataResult result = executor.Execute(request);
+        return CollectedLog(capture, lease.Context) is { } log
+            ? result with { ServerLog = log }
+            : result;
+    }
+
+    /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -237,10 +269,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
-                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
-            var executor = new ServerQueryExecutor(
-                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
+            ServerQueryExecutor executor = CreateQueryExecutor(lease.Context);
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             QueryDataResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -295,6 +324,38 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         }
     }
 
+    private ServerQueryExecutor CreateQueryExecutor(DbContext context)
+    {
+        ExpressionSerializer serializer = CreateExpressionSerializer(context);
+        return new ServerQueryExecutor(context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
+    }
+
+    private ServerSaveChangesExecutor CreateSaveChangesExecutor(DbContext context)
+    {
+        ExpressionSerializer serializer = CreateExpressionSerializer(context);
+        return new ServerSaveChangesExecutor(
+            context, (Expressions.DynamicValueMapper)serializer.ValueMapper, ServerStoreIsDocument);
+    }
+
+    private ExpressionSerializer CreateExpressionSerializer(DbContext context)
+        => ExpressionSerializer.CreateForModel(
+            context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(context.Model));
+
+    /// <inheritdoc />
+    public SaveChangesResult SaveChanges(SaveChangesRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        using SyncLease lease = AcquireSync(request.TransactionId);
+        ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context);
+
+        using ServerLogCapture.Scope? capture = BeginLogCapture();
+        SaveChangesResult result = executor.Execute(request);
+        return CollectedLog(capture, lease.Context) is { } log
+            ? result with { ServerLog = log }
+            : result;
+    }
+
     /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)
     {
@@ -303,10 +364,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         Lease lease = Acquire(request.TransactionId);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
-                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
-            var executor = new ServerSaveChangesExecutor(
-                lease.Context, (Expressions.DynamicValueMapper)serializer.ValueMapper, ServerStoreIsDocument);
+            ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context);
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             SaveChangesResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -380,7 +438,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     /// </remarks>
     public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
-        AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
+        IServiceScope scope = _serviceProvider.CreateScope();
         try
         {
             var context = scope.ServiceProvider.GetRequiredService<DbContext>();
@@ -388,52 +446,72 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
                 .BeginTransactionAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            // THE WIRE FORMAT IS UNCHANGED, which is what separates this from #54's part 2. The
-            // token has always been an opaque string this server mints and the client echoes back
-            // verbatim, so what is INSIDE it is this server's business alone.
-            string token = $"{_instanceId}.{Guid.NewGuid():N}";
-            // WHO OPENED IT, read once and compared on every later request (#54, part 2). It is
-            // null when no identity is registered, and that null is never compared, because the
-            // comparison itself is skipped when the service is absent.
-            var open = new OpenTransaction(scope, context, transaction, CallerIdentity?.CurrentCallerId);
-            open.Touch(Clock);
-            _transactions[token] = open;
-
-            // BOTH SWEEPS, and this is the inline one. The timer below covers a server that goes
-            // quiet, which is the abandoned-client case exactly; this covers the case where the
-            // timer has not been armed yet and costs one pass over a dictionary that is normally
-            // empty.
-            ArmSweepTimer();
-            SweepIdle();
-
-            return new TransactionResult { TransactionId = token };
+            return RegisterTransaction(scope, context, transaction);
         }
         catch
         {
-            await scope.DisposeAsync().ConfigureAwait(false);
+            await DisposeScopeAsync(scope).ConfigureAwait(false);
             throw;
         }
     }
+
+    private TransactionResult RegisterTransaction(
+        IServiceScope scope,
+        DbContext context,
+        IDbContextTransaction transaction)
+    {
+        string token = $"{_instanceId}.{Guid.NewGuid():N}";
+        var open = new OpenTransaction(scope, context, transaction, CallerIdentity?.CurrentCallerId);
+        open.Touch(Clock);
+        _transactions[token] = open;
+        ArmSweepTimer();
+        SweepIdle();
+        return new TransactionResult { TransactionId = token };
+    }
+
+    /// <inheritdoc />
+    public void CommitTransaction(string transactionId)
+        => End(transactionId, commit: true);
 
     /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => EndAsync(transactionId, commit: true, cancellationToken);
 
     /// <inheritdoc />
+    public void RollbackTransaction(string transactionId)
+        => End(transactionId, commit: false);
+
+    /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => EndAsync(transactionId, commit: false, cancellationToken);
+
+    /// <inheritdoc />
+    public void CreateSavepoint(string transactionId, string name)
+        => Open(transactionId).Transaction.CreateSavepoint(name);
 
     /// <inheritdoc />
     public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => Open(transactionId).Transaction.CreateSavepointAsync(name, cancellationToken);
 
     /// <inheritdoc />
+    public void RollbackToSavepoint(string transactionId, string name)
+        => Open(transactionId).Transaction.RollbackToSavepoint(name);
+
+    /// <inheritdoc />
     public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => Open(transactionId).Transaction.RollbackToSavepointAsync(name, cancellationToken);
 
     /// <inheritdoc />
+    public void ReleaseSavepoint(string transactionId, string name)
+        => Open(transactionId).Transaction.ReleaseSavepoint(name);
+
+    /// <inheritdoc />
     public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => Open(transactionId).Transaction.ReleaseSavepointAsync(name, cancellationToken);
+
+    /// <inheritdoc />
+    public bool SupportsSavepoints(string transactionId)
+        => Open(transactionId).Transaction.SupportsSavepoints;
 
     /// <inheritdoc />
     public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
@@ -530,52 +608,8 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
     private async Task EndAsync(string transactionId, bool commit, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(transactionId);
-
-        // LOOK BEFORE REMOVING. `TryRemove` is what ends a transaction, so checking ownership
-        // after it would let a stranger's rejected commit take the entry with it and destroy the
-        // work anyway. A racing end between these two lines is harmless: `TryRemove` then fails
-        // and the not-open path below answers.
-        if (_transactions.TryGetValue(transactionId, out OpenTransaction? held))
-        {
-            RequireCaller(held, transactionId);
-        }
-
-        if (!_transactions.TryRemove(transactionId, out OpenTransaction? open))
-        {
-            // A ROLLBACK naming a token this server does not hold is not an error, and the reason
-            // is stronger than convention: `InfoCarrierTransaction.DisposeAsync` calls
-            // `RollbackAsync` UNCONDITIONALLY, including after a successful commit. So the
-            // implicit end of every `using` block is a rollback for a token this server has
-            // already removed. Refusing it would make every committed transaction throw on
-            // disposal.
-            //
-            // A COMMIT IS NOT THE SAME, AND TREATING IT THE SAME WAS A HAZARD (#54). Once a server
-            // can evict an abandoned transaction it has ALREADY ROLLED THAT WORK BACK, so a commit
-            // arriving afterwards is a client asking to commit writes that no longer exist.
-            // Returning quietly reports success for them:
-            //
-            //     Begin -> SaveChanges -> (idle past the timeout: evicted and rolled back)
-            //           -> Commit -> "succeeded", and nothing was written.
-            //
-            // The reasoning that first allowed the silence to stand claimed such a client would
-            // meet the refusal at its next request. IT DOES NOT: commit is the one operation that
-            // never looks the token up, and the work happened BEFORE the idle period rather than
-            // after it. A wrong answer is worse than an exception, so a commit throws.
-            if (commit)
-            {
-                throw new InvalidOperationException(
-                    NotOpenHere(
-                        transactionId,
-                        $"Transaction '{transactionId}' is not open on this server, so it cannot "
-                            + "be committed. It was already committed or rolled back, it was "
-                            + "never opened here, or this server rolled it back because no "
-                            + "request named it for longer than its configured idle timeout. Any "
-                            + "work done inside it has been discarded."));
-            }
-
-            return;
-        }
+        OpenTransaction? open = RemoveForEnd(transactionId, commit);
+        if (open is null) { return; }
 
         try
         {
@@ -591,7 +625,61 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         finally
         {
             await open.Transaction.DisposeAsync().ConfigureAwait(false);
-            await open.Scope.DisposeAsync().ConfigureAwait(false);
+            await DisposeScopeAsync(open.Scope).ConfigureAwait(false);
+        }
+    }
+
+    private OpenTransaction? RemoveForEnd(string transactionId, bool commit)
+    {
+        ArgumentNullException.ThrowIfNull(transactionId);
+        if (_transactions.TryGetValue(transactionId, out OpenTransaction? held))
+        {
+            RequireCaller(held, transactionId);
+        }
+
+        if (_transactions.TryRemove(transactionId, out OpenTransaction? open))
+        {
+            return open;
+        }
+
+        if (commit)
+        {
+            throw new InvalidOperationException(
+                NotOpenHere(
+                    transactionId,
+                    $"Transaction '{transactionId}' is not open on this server, so it cannot "
+                        + "be committed. It was already committed or rolled back, it was "
+                        + "never opened here, or this server rolled it back because no "
+                        + "request named it for longer than its configured idle timeout. Any "
+                        + "work done inside it has been discarded."));
+        }
+
+        return null;
+    }
+
+    private void End(string transactionId, bool commit)
+    {
+        OpenTransaction? open = RemoveForEnd(transactionId, commit);
+        if (open is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (commit)
+            {
+                open.Transaction.Commit();
+            }
+            else
+            {
+                open.Transaction.Rollback();
+            }
+        }
+        finally
+        {
+            open.Transaction.Dispose();
+            open.Scope.Dispose();
         }
     }
 
@@ -624,8 +712,21 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         return new Lease(open.Context, ownedScope: null);
     }
 
+    private SyncLease AcquireSync(string? transactionId)
+    {
+        if (transactionId is null)
+        {
+            IServiceScope scope = _serviceProvider.CreateScope();
+            return new SyncLease(scope.ServiceProvider.GetRequiredService<DbContext>(), scope);
+        }
+
+        OpenTransaction open = Open(transactionId);
+        open.Context.ChangeTracker.Clear();
+        return new SyncLease(open.Context, ownedScope: null);
+    }
+
     private sealed record OpenTransaction(
-        AsyncServiceScope Scope,
+        IServiceScope Scope,
         DbContext Context,
         IDbContextTransaction Transaction,
         string? Owner)
@@ -742,7 +843,7 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         try { await evicted.Transaction.DisposeAsync().ConfigureAwait(false); }
         catch (Exception) { Log(LogLevel.Error, 35022, "InfoCarrier transaction cleanup failed to dispose the transaction."); }
 
-        try { await evicted.Scope.DisposeAsync().ConfigureAwait(false); }
+        try { await DisposeScopeAsync(evicted.Scope).ConfigureAwait(false); }
         catch (Exception) { Log(LogLevel.Error, 35023, "InfoCarrier transaction cleanup failed to dispose its service scope."); }
     }
 
@@ -751,6 +852,17 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
         // Transaction tokens and exception messages can contain credentials or application data.
         try { _logger.Log(level, new EventId(eventId), message); }
         catch (Exception) { }
+    }
+
+    private static ValueTask DisposeScopeAsync(IServiceScope scope)
+    {
+        if (scope is IAsyncDisposable asyncDisposable)
+        {
+            return asyncDisposable.DisposeAsync();
+        }
+
+        scope.Dispose();
+        return ValueTask.CompletedTask;
     }
 
     /// <summary>
@@ -796,5 +908,13 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
 
         public ValueTask DisposeAsync()
             => ownedScope?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
+
+    private readonly struct SyncLease(DbContext context, IServiceScope? ownedScope) : IDisposable
+    {
+        public DbContext Context { get; } = context;
+
+        public void Dispose()
+            => ownedScope?.Dispose();
     }
 }

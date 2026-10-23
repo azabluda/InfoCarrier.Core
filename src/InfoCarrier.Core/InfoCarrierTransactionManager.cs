@@ -48,23 +48,23 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
 
     /// <inheritdoc />
     public virtual IDbContextTransaction BeginTransaction()
-        => BeginTransactionAsync().GetAwaiter().GetResult();
+    {
+        EnsureNoCurrentTransaction();
+        Common.TransactionResult result = _client.BeginTransaction();
+        _current = CreateTransaction(result.TransactionId);
+        return _current;
+    }
 
     /// <inheritdoc />
     public virtual async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
-        if (_current is not null)
-        {
-            throw new InvalidOperationException(
-                "A transaction is already open on this context. Commit or roll it back before "
-                    + "beginning another; nested transactions are expressed as savepoints.");
-        }
+        EnsureNoCurrentTransaction();
 
         Common.TransactionResult result = await _client
             .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        _current = new InfoCarrierTransaction(_client, result.TransactionId, () => _current = null);
+        _current = CreateTransaction(result.TransactionId);
         return _current;
     }
 
@@ -89,7 +89,7 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
 
     /// <inheritdoc />
     public virtual void CommitTransaction()
-        => CommitTransactionAsync().GetAwaiter().GetResult();
+        => Require().Commit();
 
     /// <inheritdoc />
     public virtual async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
@@ -99,7 +99,7 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
 
     /// <inheritdoc />
     public virtual void RollbackTransaction()
-        => RollbackTransactionAsync().GetAwaiter().GetResult();
+        => Require().Rollback();
 
     /// <inheritdoc />
     public virtual async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
@@ -113,9 +113,6 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
     ///     runs it in its own store transaction. Returning one here would wrap a round trip that
     ///     is already atomic.
     /// </remarks>
-    public virtual IDbContextTransaction? OnSaveChanges()
-        => null;
-
     /// <inheritdoc />
     /// <remarks>
     ///     Called when the context is being reset for reuse (pooling) or disposed. Anything still
@@ -123,7 +120,12 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
     ///     a context that is going away is never going to commit.
     /// </remarks>
     public virtual void ResetState()
-        => ResetStateAsync().GetAwaiter().GetResult();
+    {
+        if (_current is { } transaction)
+        {
+            transaction.Rollback();
+        }
+    }
 
     /// <inheritdoc />
     public virtual async Task ResetStateAsync(CancellationToken cancellationToken = default)
@@ -137,4 +139,17 @@ public class InfoCarrierTransactionManager(IDbContextOptions options) : IDbConte
     private InfoCarrierTransaction Require()
         => _current ?? throw new InvalidOperationException(
             "No transaction is open on this context.");
+
+    private void EnsureNoCurrentTransaction()
+    {
+        if (_current is not null)
+        {
+            throw new InvalidOperationException(
+                "A transaction is already open on this context. Commit or roll it back before "
+                    + "beginning another; nested transactions are expressed as savepoints.");
+        }
+    }
+
+    private InfoCarrierTransaction CreateTransaction(string transactionId)
+        => new(_client, transactionId, () => _current = null);
 }

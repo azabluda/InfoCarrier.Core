@@ -69,7 +69,19 @@ public class InfoCarrierTransaction(
 
     /// <inheritdoc />
     public virtual void Commit()
-        => CommitAsync().GetAwaiter().GetResult();
+    {
+        if (_finished)
+        {
+            return;
+        }
+
+        if (_owned)
+        {
+            _client.CommitTransaction(ServerTransactionId);
+        }
+
+        Finish();
+    }
 
     /// <inheritdoc />
     public virtual async Task CommitAsync(CancellationToken cancellationToken = default)
@@ -89,13 +101,24 @@ public class InfoCarrierTransaction(
             await _client.CommitTransactionAsync(ServerTransactionId, cancellationToken).ConfigureAwait(false);
         }
 
-        _finished = true;
-        _onFinished();
+        Finish();
     }
 
     /// <inheritdoc />
     public virtual void Rollback()
-        => RollbackAsync().GetAwaiter().GetResult();
+    {
+        if (_finished)
+        {
+            return;
+        }
+
+        if (_owned)
+        {
+            _client.RollbackTransaction(ServerTransactionId);
+        }
+
+        Finish();
+    }
 
     /// <inheritdoc />
     public virtual async Task RollbackAsync(CancellationToken cancellationToken = default)
@@ -111,8 +134,7 @@ public class InfoCarrierTransaction(
             await _client.RollbackTransactionAsync(ServerTransactionId, cancellationToken).ConfigureAwait(false);
         }
 
-        _finished = true;
-        _onFinished();
+        Finish();
     }
 
     /// <inheritdoc />
@@ -123,7 +145,7 @@ public class InfoCarrierTransaction(
     ///     <see cref="SupportsSavepoints" />.
     /// </remarks>
     public virtual void CreateSavepoint(string name)
-        => CreateSavepointAsync(name).GetAwaiter().GetResult();
+        => _client.CreateSavepoint(ServerTransactionId, name);
 
     /// <inheritdoc />
     public virtual Task CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
@@ -131,7 +153,7 @@ public class InfoCarrierTransaction(
 
     /// <inheritdoc />
     public virtual void RollbackToSavepoint(string name)
-        => RollbackToSavepointAsync(name).GetAwaiter().GetResult();
+        => _client.RollbackToSavepoint(ServerTransactionId, name);
 
     /// <inheritdoc />
     public virtual Task RollbackToSavepointAsync(string name, CancellationToken cancellationToken = default)
@@ -139,7 +161,7 @@ public class InfoCarrierTransaction(
 
     /// <inheritdoc />
     public virtual void ReleaseSavepoint(string name)
-        => ReleaseSavepointAsync(name).GetAwaiter().GetResult();
+        => _client.ReleaseSavepoint(ServerTransactionId, name);
 
     /// <inheritdoc />
     public virtual Task ReleaseSavepointAsync(string name, CancellationToken cancellationToken = default)
@@ -152,10 +174,7 @@ public class InfoCarrierTransaction(
     ///     operation.
     /// </remarks>
     public virtual bool SupportsSavepoints
-        => _supportsSavepoints ??= _client
-            .SupportsSavepointsAsync(ServerTransactionId)
-            .GetAwaiter()
-            .GetResult();
+        => _supportsSavepoints ??= _client.SupportsSavepoints(ServerTransactionId);
 
     /// <inheritdoc />
     public virtual void Dispose()
@@ -169,5 +188,11 @@ public class InfoCarrierTransaction(
     {
         GC.SuppressFinalize(this);
         await RollbackAsync().ConfigureAwait(false);
+    }
+
+    private void Finish()
+    {
+        _finished = true;
+        _onFinished();
     }
 }

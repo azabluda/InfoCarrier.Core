@@ -19,6 +19,21 @@ public class HttpInfoCarrierTransportTest
         };
 
     [Fact]
+    public void Synchronous_send_uses_only_the_synchronous_HTTP_pipeline()
+    {
+        InfoCarrierEnvelope expected = AnEnvelope() with { CorrelationId = "sync" };
+        var handler = new SyncOnlyHandler(_ => Respond(expected));
+        var transport = new HttpInfoCarrierTransport(
+            new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
+
+        InfoCarrierEnvelope actual = transport.Send(AnEnvelope());
+
+        Assert.Equal("sync", actual.CorrelationId);
+        Assert.Equal(1, handler.SyncCalls);
+        Assert.Equal(0, handler.AsyncCalls);
+    }
+
+    [Fact]
     public async Task It_posts_to_the_configured_relative_uri()
     {
         Uri? seen = null;
@@ -141,6 +156,29 @@ public class HttpInfoCarrierTransportTest
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(respond(request));
+    }
+
+    private sealed class SyncOnlyHandler(
+        Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        public int SyncCalls { get; private set; }
+        public int AsyncCalls { get; private set; }
+
+        protected override HttpResponseMessage Send(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            SyncCalls++;
+            return respond(request);
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            AsyncCalls++;
+            throw new InvalidOperationException("The asynchronous HTTP path was called.");
+        }
     }
 
     private static async Task<byte[]> ReadAllAsync(Stream source)

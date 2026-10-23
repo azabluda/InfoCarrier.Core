@@ -60,6 +60,10 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
         ((Func<DbContext, LambdaExpression, CancellationToken, Task>)LoadDocumentAsync<object>)
             .Method.GetGenericMethodDefinition();
 
+    private static readonly MethodInfo LoadDocumentSyncMethod =
+        ((Action<DbContext, LambdaExpression>)LoadDocument<object>)
+            .Method.GetGenericMethodDefinition();
+
     private readonly DbContext _context = context;
     private readonly DynamicValueMapper _mapper = mapper;
     private readonly bool _documentStore;
@@ -79,12 +83,71 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
         : this(context, mapper)
         => _documentStore = documentStore;
 
+    /// <summary>Applies the request through the store's synchronous pipeline.</summary>
+    public virtual SaveChangesResult Execute(SaveChangesRequest request)
+    {
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked
+            = Prepare(request);
+        if (_documentStore)
+        {
+            CompleteDocuments();
+        }
+
+        int count;
+        try
+        {
+            count = _context.SaveChanges();
+        }
+        catch (DbUpdateException exception)
+        {
+            TagFailedEntries(exception, tracked);
+            throw;
+        }
+
+        return Result(count, tracked);
+    }
+
     /// <summary>
     ///     Applies the request and returns the store-generated values.
     /// </summary>
     public virtual async Task<SaveChangesResult> ExecuteAsync(
         SaveChangesRequest request,
         CancellationToken cancellationToken = default)
+    {
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked = Prepare(request);
+
+        // Everything the client sent is now tracked. On a store with no partial write, that is not
+        // yet everything the write needs (#102).
+        if (_documentStore)
+        {
+            await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        int count;
+        try
+        {
+            count = await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException exception)
+        {
+            // Name the entries the store actually rejected, by their position in the batch the
+            // client sent (#70). `exception.Entries` are this server context's update entries;
+            // that context is disposed with the request scope, so they cannot cross the wire and
+            // the client would otherwise re-raise naming every entry it sent. The correlation id
+            // is the position, which is all the client needs to pick its own entry back out.
+            //
+            // Matched on the entity instance rather than the `EntityEntry` wrapper: EF rebuilds
+            // the wrappers for `DbUpdateException.Entries` from the update entries, so identity is
+            // on the object, not the wrapper. On `Data` because that survives both the in-process
+            // path (same object) and the wire, through `InfoCarrierFaultMapper`.
+            TagFailedEntries(exception, tracked);
+            throw;
+        }
+
+        return Result(count, tracked);
+    }
+
+    private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(SaveChangesRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -655,45 +718,28 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             tracked.Add((replay.Change.CorrelationId, entry, replay.EntityType, state));
         }
 
-        // Everything the client sent is now tracked. On a store with no partial write, that is not
-        // yet everything the write needs (#102).
-        if (_documentStore)
+        return tracked;
+    }
+
+    private static void TagFailedEntries(
+        DbUpdateException exception,
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked)
+    {
+        int[] failed = [.. exception.Entries
+            .Select(e => e.Entity)
+            .Select(entity => tracked.FirstOrDefault(t => ReferenceEquals(t.Entry.Entity, entity)))
+            .Where(t => t.Entry is not null)
+            .Select(t => t.CorrelationId)];
+        if (failed.Length > 0)
         {
-            await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
+            exception.Data[InfoCarrierFaultMapper.FailedCorrelationIdsKey] = failed;
         }
+    }
 
-        int count;
-        try
-        {
-            count = await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (DbUpdateException exception)
-        {
-            // Name the entries the store actually rejected, by their position in the batch the
-            // client sent (#70). `exception.Entries` are this server context's update entries;
-            // that context is disposed with the request scope, so they cannot cross the wire and
-            // the client would otherwise re-raise naming every entry it sent. The correlation id
-            // is the position, which is all the client needs to pick its own entry back out.
-            //
-            // Matched on the entity instance rather than the `EntityEntry` wrapper: EF rebuilds
-            // the wrappers for `DbUpdateException.Entries` from the update entries, so identity is
-            // on the object, not the wrapper. On `Data` because that survives both the in-process
-            // path (same object) and the wire, through `InfoCarrierFaultMapper`.
-            int[] failed = [.. exception.Entries
-                .Select(e => e.Entity)
-                .Select(entity => tracked.FirstOrDefault(t => ReferenceEquals(t.Entry.Entity, entity)))
-                .Where(t => t.Entry is not null)
-                .Select(t => t.CorrelationId)];
-
-            if (failed.Length > 0)
-            {
-                exception.Data[InfoCarrierFaultMapper.FailedCorrelationIdsKey] = failed;
-            }
-
-            throw;
-        }
-
-        return new SaveChangesResult
+    private SaveChangesResult Result(
+        int count,
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked)
+        => new()
         {
             Count = count,
             GeneratedValues = [.. tracked
@@ -701,7 +747,6 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
-    }
 
     /// <summary>
     ///     Supplies, from the store, whatever part of a document this change set never mentioned
@@ -745,7 +790,23 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
     ///         the client sent, which this does not touch.
     ///     </para>
     /// </remarks>
+    private void CompleteDocuments()
+    {
+        foreach ((IEntityType type, object?[] key) in IncompleteDocuments())
+        {
+            LoadDocument(type, key);
+        }
+    }
+
     private async Task CompleteDocumentsAsync(CancellationToken cancellationToken)
+    {
+        foreach ((IEntityType type, object?[] key) in IncompleteDocuments())
+        {
+            await LoadDocumentAsync(type, key, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private IEnumerable<(IEntityType Type, object?[] Key)> IncompleteDocuments()
     {
         var stateManager = _context.GetService<IStateManager>();
 
@@ -779,19 +840,15 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
 
         foreach (((IEntityType type, object?[] key), Document document) in documents)
         {
-            if (document.RootState is EntityState.Added or EntityState.Deleted or EntityState.Detached)
-            {
-                continue;
-            }
-
-            if (OwnedTypesUnder(type).All(document.Present.Contains))
+            if (document.RootState is EntityState.Added or EntityState.Deleted or EntityState.Detached
+                || OwnedTypesUnder(type).All(document.Present.Contains))
             {
                 // The change set names every part the model says this document can hold, so
                 // nothing can go missing by writing it as it stands.
                 continue;
             }
 
-            await LoadDocumentAsync(type, key, cancellationToken).ConfigureAwait(false);
+            yield return (type, key);
         }
     }
 
@@ -869,6 +926,69 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             .MakeGenericMethod(entityType.ClrType)
             .Invoke(null, [_context, Expression.Lambda(body!, parameter), cancellationToken])!;
     }
+
+    private void LoadDocument(IEntityType entityType, object?[] keyValues)
+    {
+        if (entityType.HasSharedClrType || Array.Exists(keyValues, v => v is null))
+        {
+            throw CannotCompleteDocument(entityType);
+        }
+
+        LambdaExpression predicate = DocumentPredicate(entityType, keyValues);
+        LoadDocumentSyncMethod.MakeGenericMethod(entityType.ClrType)
+            .Invoke(null, [_context, predicate]);
+    }
+
+    private static InvalidOperationException CannotCompleteDocument(IEntityType entityType)
+        => new(
+            $"The change set does not contain every owned type that '{entityType.DisplayName()}' "
+            + "holds in its document, and this server cannot read the stored document back to "
+            + "complete it: "
+            + (entityType.HasSharedClrType
+                ? "the entity type shares its CLR type and has no queryable set."
+                : "its key is not fully known.")
+            + " Writing it would lose the parts the change set did not name. Send the whole "
+            + "document from the client instead, with UseNonRelationalServerStore().");
+
+    private static LambdaExpression DocumentPredicate(IEntityType entityType, object?[] keyValues)
+    {
+        IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
+        ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
+        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
+        Expression? body = null;
+        for (int i = 0; i < keyProperties.Count; i++)
+        {
+            Expression member = keyProperties[i].PropertyInfo is { } clrProperty
+                ? Expression.Property(parameter, clrProperty)
+                : Expression.Call(
+                    EfPropertyMethod.MakeGenericMethod(keyProperties[i].ClrType),
+                    parameter,
+                    Expression.Constant(keyProperties[i].Name));
+            Expression comparison = Expression.Equal(
+                member,
+                Expression.Convert(
+                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
+            body = body is null ? comparison : Expression.AndAlso(body, comparison);
+        }
+
+        return Expression.Lambda(body!, parameter);
+    }
+
+    private static void LoadDocument<
+        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
+            System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicConstructors
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicProperties
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicFields
+            | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
+        DbContext context,
+        LambdaExpression predicate)
+        where TEntity : class
+        => _ = context.Set<TEntity>()
+            .Where((Expression<Func<TEntity, bool>>)predicate)
+            .FirstOrDefault();
 
     /// <remarks>
     ///     <para>

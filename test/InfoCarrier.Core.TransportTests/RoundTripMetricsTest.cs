@@ -210,6 +210,9 @@ public class RoundTripMetricsTest
     private sealed class StubTransport(Func<InfoCarrierEnvelope, InfoCarrierEnvelope> respond)
         : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+            => respond(request);
+
         public Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => Task.FromResult(respond(request));

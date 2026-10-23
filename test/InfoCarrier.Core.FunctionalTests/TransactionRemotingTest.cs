@@ -236,5 +236,48 @@ public class TransactionRemotingTest
 
         public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
+
+        public QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext)
+            => throw new InvalidOperationException("No query is expected in these tests.");
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext)
+        {
+            SaveTokens.Add(request.TransactionId);
+            return new SaveChangesResult { Count = request.Entries.Count, GeneratedValues = [] };
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            Begins++;
+            return new TransactionResult { TransactionId = $"server-token-{Begins}" };
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            Ends.Add($"commit:{transactionId}");
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            Ends.Add($"rollback:{transactionId}");
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            Savepoints.Add($"create:{transactionId}:{name}");
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            Savepoints.Add($"rollback:{transactionId}:{name}");
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            Savepoints.Add($"release:{transactionId}:{name}");
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+            => true;
     }
 }
