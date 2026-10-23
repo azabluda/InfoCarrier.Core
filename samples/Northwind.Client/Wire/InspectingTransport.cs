@@ -34,6 +34,30 @@ public sealed class InspectingTransport(
     private readonly WireLog _log = log;
 
     /// <inheritdoc />
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        int requestBytes = _serializer.Serialize(request).Length;
+        long started = Stopwatch.GetTimestamp();
+        try
+        {
+            InfoCarrierEnvelope response = _inner.Send(request);
+            _log.Record(
+                request,
+                response,
+                requestBytes,
+                _serializer.Serialize(response).Length,
+                Stopwatch.GetElapsedTime(started));
+            return response;
+        }
+        catch (Exception exception)
+        {
+            _log.RecordFailure(request, requestBytes, Stopwatch.GetElapsedTime(started), exception);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)

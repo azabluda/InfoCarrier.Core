@@ -13,11 +13,38 @@ namespace InfoCarrier.Core;
 ///     (v1's <c>InfoCarrierBackendTestStore</c> doubling as the client).
 /// </summary>
 /// <remarks>
-///     All operations are async-first (requirements §4.3). Sync overloads are provided
-///     for EF Core's sync code paths but never block on async internally.
+///     Every remote operation has independent synchronous and asynchronous paths. Synchronous
+///     members never wait on tasks, and asynchronous members never call synchronous remote work.
 /// </remarks>
 public interface IInfoCarrierClient
 {
+    /// <summary>Executes a buffered query synchronously.</summary>
+    QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext);
+
+    /// <summary>Persists change-tracker entries synchronously.</summary>
+    SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext);
+
+    /// <summary>Begins a server transaction synchronously.</summary>
+    TransactionResult BeginTransaction();
+
+    /// <summary>Commits a server transaction synchronously.</summary>
+    void CommitTransaction(string transactionId);
+
+    /// <summary>Rolls back a server transaction synchronously.</summary>
+    void RollbackTransaction(string transactionId);
+
+    /// <summary>Creates a savepoint synchronously.</summary>
+    void CreateSavepoint(string transactionId, string name);
+
+    /// <summary>Rolls back to a savepoint synchronously.</summary>
+    void RollbackToSavepoint(string transactionId, string name);
+
+    /// <summary>Releases a savepoint synchronously.</summary>
+    void ReleaseSavepoint(string transactionId, string name);
+
+    /// <summary>Gets synchronous savepoint capability information.</summary>
+    bool SupportsSavepoints(string transactionId);
+
     /// <summary>
     ///     Executes a query and returns its response frames as they arrive.
     /// </summary>

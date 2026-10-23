@@ -65,6 +65,38 @@ public class ServerQueryExecutor(
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
 
+    /// <summary>Executes a buffered query through the provider's synchronous pipeline.</summary>
+    public virtual QueryDataResult Execute(QueryDataRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        try
+        {
+            (Expression query, ProjectionShape? shape) = Prepare(request);
+            object? result;
+            if (request.ReturnsSingleResult)
+            {
+                result = QueryProvider.Execute(query);
+            }
+            else
+            {
+                var rows = new ArrayList();
+                foreach (object? row in BuildQueryable(query))
+                {
+                    rows.Add(row);
+                }
+
+                result = rows;
+            }
+
+            return MapResults(result, request.ReturnsSingleResult, shape);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
     /// <summary>
     ///     How to rebuild EF's relational raw-SQL query roots (#97).
     /// </summary>
@@ -85,38 +117,10 @@ public class ServerQueryExecutor(
     /// </summary>
     public virtual async Task<QueryDataResult> ExecuteAsync(QueryDataRequest request, CancellationToken cancellationToken)
     {
-        // Start of a message exchange: wire reference ids restart at 1.
-        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
-
-        // A payload may name the context as the receiver of a mapped instance function. This is the
-        // context that fills it, and only a server has one to offer.
-        if (_expressionSerializer is ExpressionSerializer serializer)
-        {
-            serializer.UseServerContext(_context);
-        }
-
+        ArgumentNullException.ThrowIfNull(request);
         try
         {
-            // Deserialize + rebind the tree against the server model.
-            ExpressionNode node = DeserializeNode(request.SerializedQuery);
-            Expression query = Rebind(node);
-
-            // The client stripped `AsSplitQuery`/`AsSingleQuery` before drawing the boundary and
-            // sent what it stripped beside the tree. Put it back, here, where a real relational
-            // provider can act on it.
-            query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
-
-            // A compiled query's collection parameter arrives marked with EF's default collection
-            // mode, because the client cannot know this server's. Name this server's instead.
-            query = CollectionParameterMark.ToServerMode(query, _context);
-
-            // The query is read for the entity types its rows carry: an owned or shared-type value
-            // projected directly has no other name (A56). Read before execution, because it also
-            // decides whether this query can be tracked at all.
-            ProjectionShape? shape = ProjectionShape.Of(query);
-
-            // Match the client's tracking behavior on the server context.
-            _context.ChangeTracker.QueryTrackingBehavior = TrackingBehaviorFor(request.TrackingBehavior, query, shape);
+            (Expression query, ProjectionShape? shape) = Prepare(request);
 
             // Execute against the server context.
             object? result = await ExecuteQueryAsync(query, request, cancellationToken).ConfigureAwait(false);
@@ -137,6 +141,23 @@ public class ServerQueryExecutor(
             ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw; // Unreachable; the compiler cannot see that Throw() does not return.
         }
+    }
+
+    private (Expression Query, ProjectionShape? Shape) Prepare(QueryDataRequest request)
+    {
+        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
+        if (_expressionSerializer is ExpressionSerializer serializer)
+        {
+            serializer.UseServerContext(_context);
+        }
+
+        Expression query = Rebind(DeserializeNode(request.SerializedQuery));
+        query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
+        query = CollectionParameterMark.ToServerMode(query, _context);
+        ProjectionShape? shape = ProjectionShape.Of(query);
+        _context.ChangeTracker.QueryTrackingBehavior = TrackingBehaviorFor(
+            request.TrackingBehavior, query, shape);
+        return (query, shape);
     }
 
     /// <summary>

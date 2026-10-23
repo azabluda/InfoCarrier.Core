@@ -49,6 +49,35 @@ public sealed class RecordingHandler : DelegatingHandler
         }
     }
 
+    protected override HttpResponseMessage Send(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref this.requestCount);
+        HttpResponseMessage response = base.Send(request, cancellationToken);
+
+        byte[] body = [];
+        if (response.Content is not null)
+        {
+            HttpContent content = response.Content;
+            using Stream source = content.ReadAsStream(cancellationToken);
+            using var buffer = new MemoryStream();
+            source.CopyTo(buffer);
+            body = buffer.ToArray();
+
+            var replacement = new ByteArrayContent(body);
+            foreach (KeyValuePair<string, IEnumerable<string>> header in content.Headers)
+            {
+                replacement.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            response.Content = replacement;
+            content.Dispose();
+        }
+
+        AddBody(body);
+        return response;
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -63,11 +92,16 @@ public sealed class RecordingHandler : DelegatingHandler
             ? []
             : await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 
+        AddBody(body);
+
+        return response;
+    }
+
+    private void AddBody(byte[] body)
+    {
         lock (this.responseBodies)
         {
             this.responseBodies.Add(body);
         }
-
-        return response;
     }
 }

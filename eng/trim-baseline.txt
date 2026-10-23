@@ -343,5 +343,14 @@
 #
 # Measured with SDK 10.0.402: ours 113, total 1146.
 
-ours=113
-total=1146
+# 2026-10-23, 113 -> 115 (#236: native synchronous transport operations).
+#
+# Synchronous HTTP calls now reach SystemTextJsonInfoCarrierSerializer.Serialize and Deserialize.
+# ILLink consequently reports the same two dynamic JSON requirements already reported for their
+# asynchronous counterparts. The wire accepts application model types, so static source-generated
+# JSON metadata cannot describe the complete runtime type set. These diagnostics remain visible.
+#
+# Measured with SDK 10.0.402: ours 115, total 1148.
+
+ours=115
+total=1148

@@ -191,6 +191,9 @@ public class ConcurrentContextTrackingTest
 
         private sealed class Transport(InfoCarrierEnvelopeServer server) : IInfoCarrierTransport
         {
+            public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+                => server.Dispatch(request);
+
             public Task<InfoCarrierEnvelope> SendAsync(
                 InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
                 => server.DispatchAsync(request, cancellationToken);

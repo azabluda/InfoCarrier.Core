@@ -150,6 +150,13 @@ public class ClientFailureLoggingTest
 
     private sealed class Transport(string phase, Exception failure) : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+            => phase == "transport exchange" ? throw failure : request with
+            {
+                Payload = new SystemTextJsonInfoCarrierSerializer().Serialize<object?>(null),
+                Fault = phase == "returned server fault" ? InfoCarrierFaultMapper.Capture(failure) : null,
+            };
+
         public Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => phase == "transport exchange" ? Task.FromException<InfoCarrierEnvelope>(failure) : Task.FromResult(request with
             {

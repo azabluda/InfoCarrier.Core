@@ -421,6 +421,12 @@ public class ClientProcessingLoggingTest
     internal sealed class LocalTransport(InfoCarrierEnvelopeServer dispatcher, Func<InfoCarrierEnvelope, InfoCarrierEnvelope> transform,
         Func<InfoCarrierEnvelope, InfoCarrierEnvelope>? prepare = null, Action<CancellationToken>? sending = null) : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        {
+            sending?.Invoke(default);
+            return transform(dispatcher.Dispatch(prepare?.Invoke(request) ?? request));
+        }
+
         public async Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
         {
             sending?.Invoke(cancellationToken);

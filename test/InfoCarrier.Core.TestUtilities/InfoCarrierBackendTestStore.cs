@@ -169,6 +169,8 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // halves of the envelope protocol were unexercised — the M5 exit criterion.
         _client = new TransportInfoCarrierClient(
             new EnvelopeTransport(
+                envelope => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
+                    .Dispatch(envelope),
                 (envelope, cancellationToken) => new InfoCarrierEnvelopeServer(CreateServer(), _serializer)
                     .DispatchAsync(envelope, cancellationToken)),
             _serializer);
@@ -218,8 +220,12 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     ///     </para>
     /// </remarks>
     private sealed class EnvelopeTransport(
+        Func<InfoCarrierEnvelope, InfoCarrierEnvelope> syncHandler,
         Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler) : IInfoCarrierTransport
     {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+            => syncHandler(request);
+
         public Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
             => handler(request, cancellationToken);
@@ -412,6 +418,14 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     }
 
     /// <inheritdoc />
+    public QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext)
+    {
+        NoteWireInDirectRun();
+        using var _ = WithClientContext(clientContext);
+        return _client.QueryData(request, clientContext);
+    }
+
+    /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(
         QueryDataRequest request,
         DbContext clientContext,
@@ -420,6 +434,14 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         NoteWireInDirectRun();
         using var _ = WithClientContext(clientContext);
         return await _client.QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext)
+    {
+        NoteWireInDirectRun();
+        using var _ = WithClientContext(clientContext);
+        return _client.SaveChanges(request, clientContext);
     }
 
     /// <inheritdoc />
@@ -463,6 +485,13 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     // operation discriminator for `ReleaseSavepoint` would have been invisible.
 
     /// <inheritdoc />
+    public TransactionResult BeginTransaction()
+    {
+        NoteWireInDirectRun();
+        return _client.BeginTransaction();
+    }
+
+    /// <inheritdoc />
     public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         NoteWireInDirectRun();
@@ -481,24 +510,48 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
     }
 
     /// <inheritdoc />
+    public void CommitTransaction(string transactionId)
+        => _client.CommitTransaction(transactionId);
+
+    /// <inheritdoc />
     public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => _client.CommitTransactionAsync(transactionId, cancellationToken);
+
+    /// <inheritdoc />
+    public void RollbackTransaction(string transactionId)
+        => _client.RollbackTransaction(transactionId);
 
     /// <inheritdoc />
     public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => _client.RollbackTransactionAsync(transactionId, cancellationToken);
 
     /// <inheritdoc />
+    public void CreateSavepoint(string transactionId, string name)
+        => _client.CreateSavepoint(transactionId, name);
+
+    /// <inheritdoc />
     public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => _client.CreateSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public void RollbackToSavepoint(string transactionId, string name)
+        => _client.RollbackToSavepoint(transactionId, name);
 
     /// <inheritdoc />
     public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => _client.RollbackToSavepointAsync(transactionId, name, cancellationToken);
 
     /// <inheritdoc />
+    public void ReleaseSavepoint(string transactionId, string name)
+        => _client.ReleaseSavepoint(transactionId, name);
+
+    /// <inheritdoc />
     public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => _client.ReleaseSavepointAsync(transactionId, name, cancellationToken);
+
+    /// <inheritdoc />
+    public bool SupportsSavepoints(string transactionId)
+        => _client.SupportsSavepoints(transactionId);
 
     /// <inheritdoc />
     public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)

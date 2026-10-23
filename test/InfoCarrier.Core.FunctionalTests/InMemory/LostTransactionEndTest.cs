@@ -179,6 +179,25 @@ public class LostTransactionEndTest
             _beforeTheServer = beforeTheServer;
         }
 
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        {
+            if (request.Operation != _operation)
+            {
+                return inner.Send(request);
+            }
+
+            _operation = null;
+
+            if (!_beforeTheServer)
+            {
+                inner.Send(request);
+            }
+
+            throw new InfoCarrierTransportException(
+                $"LosingTransport lost the {request.Operation} "
+                + (_beforeTheServer ? "request before the server saw it." : "answer after the server sent it."));
+        }
+
         public async Task<InfoCarrierEnvelope> SendAsync(
             InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
         {

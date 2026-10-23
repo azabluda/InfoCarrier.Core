@@ -76,6 +76,12 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     }
 
     /// <inheritdoc />
+    public QueryDataResult QueryData(
+        QueryDataRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext)
+        => RoundTrip<QueryDataRequest, QueryDataResult>(InfoCarrierOperation.Query, request);
+
+    /// <inheritdoc />
     public async Task<QueryDataResult> QueryDataAsync(
         QueryDataRequest request,
         Microsoft.EntityFrameworkCore.DbContext clientContext,
@@ -128,12 +134,22 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     }
 
     /// <inheritdoc />
+    public SaveChangesResult SaveChanges(
+        SaveChangesRequest request,
+        Microsoft.EntityFrameworkCore.DbContext clientContext)
+        => RoundTrip<SaveChangesRequest, SaveChangesResult>(InfoCarrierOperation.SaveChanges, request);
+
+    /// <inheritdoc />
     public async Task<SaveChangesResult> SaveChangesAsync(
         SaveChangesRequest request,
         Microsoft.EntityFrameworkCore.DbContext clientContext,
         CancellationToken cancellationToken = default)
         => await RoundTripAsync<SaveChangesRequest, SaveChangesResult>(
             InfoCarrierOperation.SaveChanges, request, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public TransactionResult BeginTransaction()
+        => RoundTrip<object?, TransactionResult>(InfoCarrierOperation.BeginTransaction, null);
 
     /// <inheritdoc />
     public async Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -147,14 +163,28 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             InfoCarrierOperation.BeginTransaction, null, cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public void CommitTransaction(string transactionId)
+        => RoundTrip<string, object>(InfoCarrierOperation.CommitTransaction, transactionId);
+
+    /// <inheritdoc />
     public async Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => await RoundTripAsync<string, object>(
             InfoCarrierOperation.CommitTransaction, transactionId, cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public void RollbackTransaction(string transactionId)
+        => RoundTrip<string, object>(InfoCarrierOperation.RollbackTransaction, transactionId);
+
+    /// <inheritdoc />
     public async Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
         => await RoundTripAsync<string, object>(
             InfoCarrierOperation.RollbackTransaction, transactionId, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public void CreateSavepoint(string transactionId, string name)
+        => RoundTrip<SavepointRequest, object>(
+            InfoCarrierOperation.CreateSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name });
 
     /// <inheritdoc />
     public async Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
@@ -164,11 +194,23 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public void RollbackToSavepoint(string transactionId, string name)
+        => RoundTrip<SavepointRequest, object>(
+            InfoCarrierOperation.RollbackToSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name });
+
+    /// <inheritdoc />
     public async Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
         => await RoundTripAsync<SavepointRequest, object>(
             InfoCarrierOperation.RollbackToSavepoint,
             new SavepointRequest { TransactionId = transactionId, Name = name },
             cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public void ReleaseSavepoint(string transactionId, string name)
+        => RoundTrip<SavepointRequest, object>(
+            InfoCarrierOperation.ReleaseSavepoint,
+            new SavepointRequest { TransactionId = transactionId, Name = name });
 
     /// <inheritdoc />
     public async Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
@@ -178,9 +220,38 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public bool SupportsSavepoints(string transactionId)
+        => RoundTrip<string, bool>(InfoCarrierOperation.SupportsSavepoints, transactionId);
+
+    /// <inheritdoc />
     public async Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
         => await RoundTripAsync<string, bool>(
             InfoCarrierOperation.SupportsSavepoints, transactionId, cancellationToken).ConfigureAwait(false);
+
+    private TResponse RoundTrip<TRequest, TResponse>(InfoCarrierOperation operation, TRequest request)
+    {
+        bool measured = InfoCarrierMetrics.Enabled;
+        long startedAt = measured ? Stopwatch.GetTimestamp() : 0L;
+        string? errorType = null;
+
+        try
+        {
+            return Send<TRequest, TResponse>(operation, request);
+        }
+        catch (Exception exception)
+        {
+            errorType = exception.GetType().FullName;
+            throw;
+        }
+        finally
+        {
+            if (measured && InfoCarrierMetrics.Enabled)
+            {
+                InfoCarrierMetrics.RoundTripCompleted(
+                    operation, Stopwatch.GetElapsedTime(startedAt), errorType);
+            }
+        }
+    }
 
     private async Task<TResponse> RoundTripAsync<TRequest, TResponse>(
         InfoCarrierOperation operation,
@@ -254,6 +325,39 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         catch (Exception exception)
         {
             LogFailure(operation, phase, exception, cancellationToken, returnedFault);
+            throw;
+        }
+    }
+
+    private TResponse Send<TRequest, TResponse>(InfoCarrierOperation operation, TRequest request)
+    {
+        string phase = "request payload serialization";
+        bool returnedFault = false;
+        try
+        {
+            var envelope = new InfoCarrierEnvelope
+            {
+                ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
+                Operation = operation,
+                Payload = _serializer.Serialize(request),
+            };
+
+            phase = "transport exchange";
+            InfoCarrierEnvelope response = _transport.Send(envelope);
+
+            if (response.Fault is { } fault)
+            {
+                phase = "returned server fault";
+                returnedFault = true;
+                throw InfoCarrierFaultMapper.Rehydrate(fault);
+            }
+
+            phase = "response payload deserialization";
+            return _serializer.Deserialize<TResponse>(response.Payload)!;
+        }
+        catch (Exception exception)
+        {
+            LogFailure(operation, phase, exception, default, returnedFault);
             throw;
         }
     }

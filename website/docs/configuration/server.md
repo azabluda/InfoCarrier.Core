@@ -56,6 +56,10 @@ Version 10.3 warns about five planned version 11 removals:
 Version 10 continues to support these methods. The unreleased `UseRegisteredAnonymousShapes` and
 prototype `AddInfoCarrierAnonymousShapes` methods were removed. Use shared `AddAnonymousShapes`.
 
+Version 11 requires synchronous operations on all three remote-operation interfaces. Implementations
+must keep synchronous and asynchronous input/output paths independent. The built-in HTTP transport
+uses `HttpClient.Send` and synchronous response reads.
+
 ## The endpoint
 
 ```csharp

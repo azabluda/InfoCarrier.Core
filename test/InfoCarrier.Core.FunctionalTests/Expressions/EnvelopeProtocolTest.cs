@@ -239,6 +239,51 @@ public class EnvelopeProtocolTest
         public Task ReleaseSavepointAsync(string t, string n, CancellationToken c = default) => throw failure;
 
         public Task<bool> SupportsSavepointsAsync(string t, CancellationToken c = default) => throw failure;
+
+        public QueryDataResult QueryData(QueryDataRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -378,6 +423,51 @@ public class EnvelopeProtocolTest
             Calls.Add($"SupportsSavepoints:{transactionId}");
             return Task.FromResult(true);
         }
+
+        public QueryDataResult QueryData(QueryDataRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>A server that must never be reached.</summary>
@@ -402,5 +492,50 @@ public class EnvelopeProtocolTest
         public Task ReleaseSavepointAsync(string t, string n, CancellationToken c = default) => No<object>();
 
         public Task<bool> SupportsSavepointsAsync(string t, CancellationToken c = default) => No<bool>();
+
+        public QueryDataResult QueryData(QueryDataRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public SaveChangesResult SaveChanges(SaveChangesRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TransactionResult BeginTransaction()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CommitTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackTransaction(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CreateSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RollbackToSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReleaseSavepoint(string transactionId, string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SupportsSavepoints(string transactionId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

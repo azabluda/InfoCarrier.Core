@@ -15,6 +15,33 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public interface IInfoCarrierServer
 {
+    /// <summary>Executes a buffered query synchronously.</summary>
+    QueryDataResult QueryData(QueryDataRequest request);
+
+    /// <summary>Persists change entries synchronously.</summary>
+    SaveChangesResult SaveChanges(SaveChangesRequest request);
+
+    /// <summary>Begins a transaction synchronously.</summary>
+    TransactionResult BeginTransaction();
+
+    /// <summary>Commits a transaction synchronously.</summary>
+    void CommitTransaction(string transactionId);
+
+    /// <summary>Rolls back a transaction synchronously.</summary>
+    void RollbackTransaction(string transactionId);
+
+    /// <summary>Creates a savepoint synchronously.</summary>
+    void CreateSavepoint(string transactionId, string name);
+
+    /// <summary>Rolls back to a savepoint synchronously.</summary>
+    void RollbackToSavepoint(string transactionId, string name);
+
+    /// <summary>Releases a savepoint synchronously.</summary>
+    void ReleaseSavepoint(string transactionId, string name);
+
+    /// <summary>Gets savepoint capability information synchronously.</summary>
+    bool SupportsSavepoints(string transactionId);
+
     /// <summary>
     ///     Executes a deserialized query against the server context and returns wire-format rows.
     /// </summary>

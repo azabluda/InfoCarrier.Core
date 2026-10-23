@@ -33,6 +33,43 @@ public sealed class HttpInfoCarrierTransport(
     private readonly string _requestUri = requestUri;
 
     /// <inheritdoc />
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        byte[] body = _serializer.Serialize(request);
+        using var message = new HttpRequestMessage(HttpMethod.Post, _requestUri)
+        {
+            Content = new ByteArrayContent(body),
+        };
+        message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+        using HttpResponseMessage response = _httpClient.Send(
+            message, HttpCompletionOption.ResponseContentRead, CancellationToken.None);
+        byte[] responseBody = ReadContent(response.Content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            string detail = System.Text.Encoding.UTF8.GetString(responseBody);
+            throw new InfoCarrierTransportException(
+                $"The InfoCarrier server at '{_requestUri}' answered {(int)response.StatusCode} "
+                + $"({response.ReasonPhrase}). Body: {detail}");
+        }
+
+        InfoCarrierEnvelope? envelope;
+        try
+        {
+            envelope = _serializer.Deserialize<InfoCarrierEnvelope>(responseBody);
+        }
+        catch (Exception ex)
+        {
+            throw InvalidEnvelope(responseBody.Length, ex);
+        }
+
+        return envelope ?? throw InvalidEnvelope(responseBody.Length);
+    }
+
+    /// <inheritdoc />
     async ValueTask<IInfoCarrierResponse> IInfoCarrierStreamTransport.SendAsync(
         InfoCarrierOperation operation,
         Func<Stream, CancellationToken, ValueTask> writeRequest,
@@ -135,6 +172,24 @@ public sealed class HttpInfoCarrierTransport(
             ?? throw new InfoCarrierTransportException(
                 $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
                 + $"envelope ({responseBody.Length} bytes).");
+    }
+
+    private static byte[] ReadContent(HttpContent content)
+    {
+        using Stream source = content.ReadAsStream();
+        using var destination = new MemoryStream();
+        source.CopyTo(destination);
+        return destination.ToArray();
+    }
+
+    private InfoCarrierTransportException InvalidEnvelope(int length, Exception? innerException = null)
+    {
+        string message =
+            $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
+            + $"envelope ({length} bytes).";
+        return innerException is null
+            ? new InfoCarrierTransportException(message)
+            : new InfoCarrierTransportException(message, innerException);
     }
 
     private sealed class StreamingContent(

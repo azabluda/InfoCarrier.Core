@@ -34,6 +34,26 @@ public sealed class InProcessInfoCarrierTransport(
 {
     private readonly Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> _handler = handler;
     private readonly IInfoCarrierSerializer _serializer = serializer;
+    private Func<InfoCarrierEnvelope, InfoCarrierEnvelope>? _syncHandler;
+
+    public InProcessInfoCarrierTransport(
+        Func<InfoCarrierEnvelope, InfoCarrierEnvelope> syncHandler,
+        Func<InfoCarrierEnvelope, CancellationToken, Task<InfoCarrierEnvelope>> handler,
+        IInfoCarrierSerializer serializer)
+        : this(handler, serializer)
+        => _syncHandler = syncHandler;
+
+    /// <inheritdoc />
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+    {
+        if (_syncHandler is null)
+        {
+            throw new NotSupportedException("This test transport was configured without a synchronous handler.");
+        }
+
+        InfoCarrierEnvelope simulatedRequest = Simulate(request);
+        return Simulate(_syncHandler(simulatedRequest));
+    }
 
     /// <inheritdoc />
     public async Task<InfoCarrierEnvelope> SendAsync(InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
@@ -50,5 +70,11 @@ public sealed class InProcessInfoCarrierTransport(
     {
         byte[] payload = await _serializer.SerializeAsync(value, cancellationToken).ConfigureAwait(false);
         return (await _serializer.DeserializeAsync<InfoCarrierEnvelope>(payload, cancellationToken).ConfigureAwait(false))!;
+    }
+
+    private InfoCarrierEnvelope Simulate(InfoCarrierEnvelope value)
+    {
+        byte[] payload = _serializer.Serialize(value);
+        return _serializer.Deserialize<InfoCarrierEnvelope>(payload)!;
     }
 }
