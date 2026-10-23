@@ -49,6 +49,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         configure?.Invoke(options);
         InfoCarrierServerRegistration registration = options.Build(typeof(TContext));
 
+        InfoCarrierServiceCollectionExtensions.AddInfoCarrier(services, registration.Deployment);
         services.RemoveAll<InfoCarrierServerRegistration>();
         services.AddSingleton(registration);
         services.RemoveAll<IInfoCarrierSerializer>();

@@ -59,13 +59,17 @@ public sealed class InProcessInfoCarrierServer(
             serviceProvider,
             logger,
             logCapture,
-            registration.LogForwardingMinimumLevel is { } level ? new ConfiguredLogForwarding(level) : null,
-            registration.IncludeSensitiveLogData ? new ConfiguredSensitiveLogForwarding() : null)
+            registration.LogForwardingMinimumLevel is { } level
+                ? new ConfiguredLogForwarding(level)
+                : serviceProvider.GetService<IInfoCarrierServerLogForwarding>(),
+            registration.IncludeSensitiveLogData
+                ? new ConfiguredSensitiveLogForwarding()
+                : serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>())
     {
         _registration = registration;
         TransactionTimeout = registration.TransactionIdleTimeout is { } timeout
             ? new ConfiguredTransactionTimeout(timeout)
-            : null;
+            : serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
     }
 
     /// <summary>
@@ -129,6 +133,7 @@ public sealed class InProcessInfoCarrierServer(
         => _registration is { } registration
             ? [
                 .. registration.Deployment.ValueMappers,
+                .. _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>(),
                 new ValueMapping.IPAddressValueMapper(),
                 new ValueMapping.UriValueMapper(),
             ]
@@ -144,21 +149,23 @@ public sealed class InProcessInfoCarrierServer(
     ///     default ADR-008 constraint 2 requires.
     /// </remarks>
     private IEnumerable<Type> AllowedTypes
-        => _registration?.Deployment.AllowedTypes
-            ?? _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types);
+        => [
+            .. _registration?.Deployment.AllowedTypes ?? [],
+            .. _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types),
+        ];
 
     private Expressions.AnonymousShapeCatalog? AnonymousCatalogFor(Microsoft.EntityFrameworkCore.Metadata.IModel model)
     {
-        if (_registration is { } registration)
-        {
-            return registration.Deployment.AnonymousShapeTypes.Count == 0
-                ? null
-                : Expressions.AnonymousShapeCatalog.Create(model, registration.Deployment.AnonymousShapeTypes);
-        }
-
         Expressions.AnonymousShapeCatalog[] catalogs = _serviceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
         Expressions.AnonymousShapeCatalog[] modelCatalogs = catalogs.Where(c => ReferenceEquals(c.Model, model)).ToArray();
-        return (modelCatalogs.Length > 0 ? modelCatalogs : catalogs.Where(c => c.Model is null)).SingleOrDefault();
+        Expressions.AnonymousShapeCatalog? registered =
+            (modelCatalogs.Length > 0 ? modelCatalogs : catalogs.Where(c => c.Model is null)).SingleOrDefault();
+        if (registered is not null)
+        {
+            return registered;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -171,8 +178,8 @@ public sealed class InProcessInfoCarrierServer(
     ///     <c>docs/security-review.md</c> section 5a.
     /// </remarks>
     private bool ArbitrarySqlAllowed
-        => _registration?.Deployment.AllowArbitrarySqlExecution
-            ?? _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
+        => _registration?.Deployment.AllowArbitrarySqlExecution == true
+            || _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
 
     /// <summary>
     ///     Whether this server's store writes an owned type inside its owner's record
@@ -185,8 +192,8 @@ public sealed class InProcessInfoCarrierServer(
     ///     erase the rest of it.
     /// </remarks>
     private bool ServerStoreIsDocument
-        => _registration?.StoresOwnedDataInsideOwner
-            ?? _serviceProvider.GetService<IInfoCarrierServerDocumentStore>() is not null;
+        => _registration?.StoresOwnedDataInsideOwner == true
+            || _serviceProvider.GetService<IInfoCarrierServerDocumentStore>() is not null;
 
     /// <summary>
     ///     How this server rebuilds EF's relational raw-SQL query roots
@@ -486,7 +493,7 @@ public sealed class InProcessInfoCarrierServer(
         IServiceScope scope = _serviceProvider.CreateScope();
         try
         {
-            var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+            DbContext context = ResolveContext(scope.ServiceProvider);
             IDbContextTransaction transaction = await context.Database
                 .BeginTransactionAsync(cancellationToken)
                 .ConfigureAwait(false);
