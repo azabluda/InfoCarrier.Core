@@ -293,8 +293,7 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     [InfoCarrierDesign(
         Decisions.Architecture,
         Decisions.ClientServices,
-        Justification = EnsureCreatedIsTheServers,
-        Deviation = DeviationKind.SqlDiffers)]
+        Justification = EnsureCreatedIsTheServers)]
     public override async Task Throws_on_concurrent_query_list(bool async)
     {
         using NorthwindContext context = CreateContext();
@@ -331,8 +330,7 @@ public class NorthwindMiscellaneousQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     [InfoCarrierDesign(
         Decisions.Architecture,
         Decisions.ClientServices,
-        Justification = EnsureCreatedIsTheServers,
-        Deviation = DeviationKind.SqlDiffers)]
+        Justification = EnsureCreatedIsTheServers)]
     public override async Task Throws_on_concurrent_query_first(bool async)
     {
         using NorthwindContext context = CreateContext();
