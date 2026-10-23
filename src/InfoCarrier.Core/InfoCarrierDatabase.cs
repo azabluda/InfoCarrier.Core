@@ -38,6 +38,7 @@ public class InfoCarrierDatabase(
     ICurrentDbContext currentContext,
     IDiagnosticsLogger<DbLoggerCategory.Update> updateLogger,
     IDiagnosticsLogger<DbLoggerCategory.Query> queryLogger,
+    ILoggerFactory loggerFactory,
     Metadata.IInfoCarrierDocumentMapping documentMapping) : IDatabase
 {
     private static readonly System.Reflection.MethodInfo ExecuteQueryMethod
@@ -68,6 +69,7 @@ public class InfoCarrierDatabase(
     private readonly ICurrentDbContext _currentContext = currentContext;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Update> _updateLogger = updateLogger;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Query> _queryLogger = queryLogger;
+    private readonly ServerLogReplay _serverLogReplay = new(loggerFactory);
 
     /// <summary>
     ///     The client used to ship operations to the server.
@@ -249,7 +251,7 @@ public class InfoCarrierDatabase(
             }
 
             phase = "server log replay";
-            ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
+            _serverLogReplay.Replay(result.ServerLog);
             phase = "generated value application after response";
             ApplyGeneratedValues(sent, result, mapper);
             return result.Count;
@@ -345,7 +347,7 @@ public class InfoCarrierDatabase(
             // client context is concerned, and a store's diagnostics belong in the context's log. The
             // server only sends any when it has granted forwarding, which is off by default.
             phase = "server log replay";
-            ServerLogReplay.Replay(result.ServerLog, _currentContext.Context);
+            _serverLogReplay.Replay(result.ServerLog);
 
             phase = "generated value application after response";
             ApplyGeneratedValues(sent, result, mapper);

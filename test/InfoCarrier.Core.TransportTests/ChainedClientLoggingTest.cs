@@ -12,6 +12,60 @@ namespace InfoCarrier.Core.TransportTests;
 
 public class ChainedClientLoggingTest
 {
+    [Fact]
+    public void Capture_instances_are_isolated_and_disposal_stops_collection()
+    {
+        using var first = new ServerLogCapture();
+        using var second = new ServerLogCapture();
+        ILogger firstLogger = first.CreateLogger("Store.First");
+        ILogger secondLogger = second.CreateLogger("Store.Second");
+
+        ServerLogCapture.Scope scope = first.Begin(LogLevel.Warning);
+        firstLogger.LogWarning(41, "first");
+        secondLogger.LogWarning(42, "second");
+        Assert.Equal("first", Assert.Single(scope.Events!).Message);
+
+        scope.Dispose();
+        firstLogger.LogWarning(43, "late");
+        Assert.Equal("first", Assert.Single(scope.Events!).Message);
+    }
+
+    [Fact]
+    public async Task Concurrent_capture_scopes_do_not_exchange_events()
+    {
+        using var capture = new ServerLogCapture();
+        ILogger logger = capture.CreateLogger("Store.Concurrent");
+        IReadOnlyList<ServerLogEvent>?[] results = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => Task.Run(() =>
+        {
+            using ServerLogCapture.Scope scope = capture.Begin(LogLevel.Warning);
+            logger.LogWarning(i, "event-{Index}", i);
+            return scope.Events;
+        })));
+
+        for (int i = 0; i < results.Length; i++)
+        {
+            ServerLogEvent item = Assert.Single(results[i]!);
+            Assert.Equal(i, item.EventId);
+            Assert.Equal($"event-{i}", item.Message);
+        }
+    }
+
+    [Fact]
+    public void Nested_capture_restores_the_owning_instance_scope()
+    {
+        using var capture = new ServerLogCapture();
+        ILogger logger = capture.CreateLogger("Store.Nested");
+        using ServerLogCapture.Scope outer = capture.Begin(LogLevel.Warning);
+        logger.LogWarning(1, "outer-before");
+        using (ServerLogCapture.Scope inner = capture.Begin(LogLevel.Warning))
+        {
+            logger.LogWarning(2, "inner");
+            Assert.Equal(2, Assert.Single(inner.Events!).EventId);
+        }
+        logger.LogWarning(3, "outer-after");
+        Assert.Equal([1, 3], outer.Events!.Select(e => e.EventId));
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, true, false)]
@@ -127,10 +181,11 @@ public class ChainedClientLoggingTest
         {
             Downstream = new(downstreamGrant, sensitive);
             ClientFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Debug).AddProvider(ClientLog));
+            var capture = new ServerLogCapture();
             MiddleFactory = LoggerFactory.Create(b =>
             {
                 b.SetMinimumLevel(LogLevel.Debug).AddProvider(MiddleLog);
-                if (middleGrant) { b.AddProvider(new ServerLogCapture()); }
+                if (middleGrant) { b.AddProvider(capture); }
             });
             var serializer = new SystemTextJsonInfoCarrierSerializer();
             Downstream.Transform = response =>
@@ -144,9 +199,17 @@ public class ChainedClientLoggingTest
             var services = new ServiceCollection()
                 .AddDbContext<Context>(b => b.UseInfoCarrier(middleClient).UseLoggerFactory(MiddleFactory))
                 .AddScoped<DbContext>(s => s.GetRequiredService<Context>());
-            if (middleGrant) { services.AddInfoCarrierServerLogForwarding(LogLevel.Debug); }
+            if (middleGrant)
+            {
+                services.AddSingleton(capture).AddInfoCarrierServerLogForwarding(LogLevel.Debug);
+            }
             _middle = services.BuildServiceProvider();
-            _server = new InProcessInfoCarrierServer(_middle, MiddleFactory.CreateLogger<InProcessInfoCarrierServer>());
+            _server = new InProcessInfoCarrierServer(
+                _middle,
+                MiddleFactory.CreateLogger<InProcessInfoCarrierServer>(),
+                _middle.GetService<ServerLogCapture>(),
+                _middle.GetService<IInfoCarrierServerLogForwarding>(),
+                _middle.GetService<IInfoCarrierSensitiveServerLogForwarding>());
             var dispatcher = new InfoCarrierEnvelopeServer(_server, serializer, MiddleFactory.CreateLogger<InfoCarrierEnvelopeServer>());
             _client = new TransportInfoCarrierClient(new ClientProcessingLoggingTest.LocalTransport(dispatcher, response =>
             {

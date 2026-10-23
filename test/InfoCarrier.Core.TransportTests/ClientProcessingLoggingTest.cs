@@ -375,15 +375,19 @@ public class ClientProcessingLoggingTest
 
         public Fixture(bool forwarding = false, bool sensitive = false)
         {
+            var capture = new ServerLogCapture();
             _factory = LoggerFactory.Create(b =>
             {
                 b.SetMinimumLevel(LogLevel.Debug).AddProvider(Log);
-                if (forwarding) { b.AddProvider(new ServerLogCapture()); }
+                if (forwarding) { b.AddProvider(capture); }
             });
             var services = new ServiceCollection()
                 .AddDbContext<Context>(b => b.UseSqlite($"Data Source={_path};Pooling=false").UseLoggerFactory(_factory).EnableSensitiveDataLogging(sensitive))
                 .AddScoped<DbContext>(s => s.GetRequiredService<Context>());
-            if (forwarding) { services.AddInfoCarrierServerLogForwarding(LogLevel.Debug); }
+            if (forwarding)
+            {
+                services.AddSingleton(capture).AddInfoCarrierServerLogForwarding(LogLevel.Debug);
+            }
             _services = services.BuildServiceProvider();
             using (IServiceScope scope = _services.CreateScope())
             {
@@ -393,7 +397,12 @@ public class ClientProcessingLoggingTest
                 db.SaveChanges();
             }
             var serializer = new SystemTextJsonInfoCarrierSerializer();
-            _server = new InProcessInfoCarrierServer(_services, _factory.CreateLogger<InProcessInfoCarrierServer>());
+            _server = new InProcessInfoCarrierServer(
+                _services,
+                _factory.CreateLogger<InProcessInfoCarrierServer>(),
+                _services.GetService<ServerLogCapture>(),
+                _services.GetService<IInfoCarrierServerLogForwarding>(),
+                _services.GetService<IInfoCarrierSensitiveServerLogForwarding>());
             var dispatcher = new InfoCarrierEnvelopeServer(_server, serializer, _factory.CreateLogger<InfoCarrierEnvelopeServer>());
             Transport = new LocalTransport(dispatcher, response => Transform(response), request => Prepare(request), token => Sending?.Invoke(token));
             Client = new TransportInfoCarrierClient(Transport, serializer,

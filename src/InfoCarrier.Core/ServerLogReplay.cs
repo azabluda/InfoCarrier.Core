@@ -1,8 +1,6 @@
 ﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
@@ -26,23 +24,24 @@ namespace InfoCarrier.Core;
 ///         configuration, which the factory honours.
 ///     </para>
 /// </remarks>
-internal static class ServerLogReplay
+internal sealed class ServerLogReplay(ILoggerFactory loggerFactory)
 {
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
+
     /// <summary>
-    ///     Re-raises <paramref name="events" /> on <paramref name="context" />'s logger. Does
-    ///     nothing when the server sent none, which is the default.
+    ///     Re-raises <paramref name="events" /> through the injected logger factory. Does nothing
+    ///     when the server sent none, which is the default.
     /// </summary>
-    public static void Replay(IReadOnlyList<ServerLogEvent>? events, DbContext context)
+    public void Replay(IReadOnlyList<ServerLogEvent>? events)
     {
         if (events is null or { Count: 0 })
         {
             return;
         }
 
-        var factory = context.GetService<ILoggerFactory>();
         foreach (ServerLogEvent forwarded in events)
         {
-            factory.CreateLogger(forwarded.Category).Log(
+            _loggerFactory.CreateLogger(forwarded.Category).Log(
                 (LogLevel)forwarded.Level,
                 new EventId(forwarded.EventId, forwarded.EventName),
                 forwarded.Message,
