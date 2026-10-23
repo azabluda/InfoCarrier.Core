@@ -27,20 +27,26 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
 /// </remarks>
-public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
+public sealed class InProcessInfoCarrierServer(
+    IServiceProvider serviceProvider,
+    ILogger<InProcessInfoCarrierServer> logger,
+    ServerLogCapture? logCapture = null,
+    IInfoCarrierServerLogForwarding? logForwarding = null,
+    IInfoCarrierSensitiveServerLogForwarding? sensitiveLogForwarding = null)
     : IInfoCarrierServer, IAsyncDisposable
 {
     private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
+    private readonly ILogger<InProcessInfoCarrierServer> _logger = logger;
+    private readonly ServerLogCapture? _logCapture = logCapture;
+    private readonly IInfoCarrierServerLogForwarding? _logForwarding = logForwarding;
+    private readonly bool _sensitiveLogForwardingAllowed = sensitiveLogForwarding is not null;
 
-    private readonly ILogger<InProcessInfoCarrierServer> _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance;
-
-    /// <summary>Creates a server with its host-owned class logger.</summary>
-    /// <param name="serviceProvider">The server service provider.</param>
-    /// <param name="logger">The logger, retained through server shutdown.</param>
-    public InProcessInfoCarrierServer(IServiceProvider serviceProvider, ILogger<InProcessInfoCarrierServer> logger)
-        : this(serviceProvider)
+    /// <summary>Creates a server without class logging or log forwarding.</summary>
+    public InProcessInfoCarrierServer(IServiceProvider serviceProvider)
+        : this(
+            serviceProvider,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance)
     {
-        _logger = logger;
     }
 
     /// <summary>
@@ -177,19 +183,19 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     level (<see cref="IInfoCarrierServerLogForwarding" />, R172).
     /// </summary>
     /// <remarks>
-    ///     From the root provider, like the four above, and absent unless the application
-    ///     registered it. <b>It discloses the server's own diagnostics</b> — see the interface for
-    ///     what that costs.
+    ///     Injected during server construction, and absent unless the application registered it.
+    ///     <b>It discloses the server's own diagnostics</b> — see the interface for that cost.
     /// </remarks>
     private IInfoCarrierServerLogForwarding? LogForwarding
-        => _serviceProvider.GetService<IInfoCarrierServerLogForwarding>();
+        => _logForwarding;
 
     /// <summary>
     ///     Whether this server may forward its log even when the context logs sensitive data
-    ///     (<see cref="IInfoCarrierSensitiveServerLogForwarding" />, R172).
+    ///     (<see cref="IInfoCarrierSensitiveServerLogForwarding" />, R172). The grant is injected
+    ///     during server construction.
     /// </summary>
     private bool SensitiveLogForwardingAllowed
-        => _serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>() is not null;
+        => _sensitiveLogForwardingAllowed;
 
     /// <summary>
     ///     How long a transaction may go untouched before this server rolls it back
@@ -384,7 +390,11 @@ public sealed class InProcessInfoCarrierServer(IServiceProvider serviceProvider)
     ///     granted log forwarding.
     /// </summary>
     private ServerLogCapture.Scope? BeginLogCapture()
-        => LogForwarding is { } forwarding ? ServerLogCapture.Begin(forwarding.MinimumLevel) : null;
+        => LogForwarding is { } forwarding
+            ? (_logCapture ?? throw new InvalidOperationException(
+                "Server log forwarding requires its registered capture provider."))
+                .Begin(forwarding.MinimumLevel)
+            : null;
 
     /// <summary>
     ///     What a finished request may send back, after the sensitive-logging gate.

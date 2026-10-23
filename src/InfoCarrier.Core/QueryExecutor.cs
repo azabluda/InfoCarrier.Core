@@ -1642,7 +1642,7 @@ internal sealed class QueryExecutor<TElement>
     }
     private void ReplayServerLog(IReadOnlyList<ServerLogEvent>? events)
     {
-        try { ServerLogReplay.Replay(events, _queryContext.Context); }
+        try { ((InfoCarrierQueryContext)_queryContext).ServerLogReplay.Replay(events); }
         catch (Exception exception)
         {
             LogFailure("server log replay", exception, _queryContext.CancellationToken);

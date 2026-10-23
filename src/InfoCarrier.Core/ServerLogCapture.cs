@@ -18,28 +18,28 @@ namespace InfoCarrier.Core;
 ///         still goes wherever it went before, and a copy lands in the sink when one is open.
 ///     </para>
 ///     <para>
-///         <b>The sink is <see cref="AsyncLocal{T}" /> and that is the whole of the request
-///         scoping.</b> A server serves many clients at once, so "the events of this request" has
-///         to follow the request's own async flow rather than a field. Outside a
+///         <b>Each provider owns an <see cref="AsyncLocal{T}" /> sink.</b> A server serves many
+///         clients at once, so "the events of this request" follows the request's own async flow.
+///         Separate provider instances cannot exchange events. Outside a
 ///         <see cref="Begin" /> scope the loggers collect nothing at all, which is what makes the
 ///         provider safe to leave registered on a server that has not granted forwarding.
 ///     </para>
 /// </remarks>
 public sealed class ServerLogCapture : ILoggerProvider
 {
-    private static readonly AsyncLocal<Sink?> Current = new();
+    private readonly AsyncLocal<Sink?> _current = new();
 
     /// <summary>
     ///     Opens a sink for the current async flow and returns the scope that closes it.
     /// </summary>
     /// <param name="minimumLevel">The lowest level to keep; anything below is dropped here.</param>
     /// <returns>The scope to dispose once the request has run.</returns>
-    public static Scope Begin(LogLevel minimumLevel)
-        => new(minimumLevel);
+    public Scope Begin(LogLevel minimumLevel)
+        => new(this, minimumLevel);
 
     /// <inheritdoc />
     public ILogger CreateLogger(string categoryName)
-        => new CaptureLogger(categoryName);
+        => new CaptureLogger(this, categoryName);
 
     /// <inheritdoc />
     public void Dispose()
@@ -51,14 +51,16 @@ public sealed class ServerLogCapture : ILoggerProvider
     /// </summary>
     public sealed class Scope : IDisposable
     {
+        private readonly ServerLogCapture _owner;
         private readonly Sink? _outer;
         private readonly Sink _sink;
 
-        internal Scope(LogLevel minimumLevel)
+        internal Scope(ServerLogCapture owner, LogLevel minimumLevel)
         {
+            _owner = owner;
             _sink = new Sink(minimumLevel);
-            _outer = Current.Value;
-            Current.Value = _sink;
+            _outer = owner._current.Value;
+            owner._current.Value = _sink;
         }
 
         /// <summary>
@@ -74,7 +76,7 @@ public sealed class ServerLogCapture : ILoggerProvider
 
         /// <inheritdoc />
         public void Dispose()
-            => Current.Value = _outer;
+            => _owner._current.Value = _outer;
     }
 
     private sealed class Sink(LogLevel minimumLevel)
@@ -142,7 +144,7 @@ public sealed class ServerLogCapture : ILoggerProvider
         Microsoft.EntityFrameworkCore.DbLoggerCategory.Infrastructure.Name,
     ];
 
-    private sealed class CaptureLogger(string category) : ILogger
+    private sealed class CaptureLogger(ServerLogCapture owner, string category) : ILogger
     {
         private readonly bool _forwarded = !NotForwarded.Any(
             excluded => category.StartsWith(excluded, StringComparison.Ordinal));
@@ -152,7 +154,7 @@ public sealed class ServerLogCapture : ILoggerProvider
             => null;
 
         public bool IsEnabled(LogLevel logLevel)
-            => _forwarded && Current.Value is { } sink && logLevel >= sink.MinimumLevel;
+            => _forwarded && owner._current.Value is { } sink && logLevel >= sink.MinimumLevel;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -166,7 +168,7 @@ public sealed class ServerLogCapture : ILoggerProvider
             // `IsEnabled` above is advisory: EF's own `IDiagnosticsLogger` decides enablement from
             // EF's options and its own definitions, not from a provider's answer, so the sink is
             // re-checked at the point of writing rather than trusted to have been asked.
-            if (!_forwarded || Current.Value is not { } sink || logLevel < sink.MinimumLevel)
+            if (!_forwarded || owner._current.Value is not { } sink || logLevel < sink.MinimumLevel)
             {
                 return;
             }
@@ -181,5 +183,15 @@ public sealed class ServerLogCapture : ILoggerProvider
                     Message = formatter(state, exception),
                 });
         }
+    }
+}
+
+internal sealed class ServerLogCaptureProvider(ServerLogCapture capture) : ILoggerProvider
+{
+    public ILogger CreateLogger(string categoryName)
+        => capture.CreateLogger(categoryName);
+
+    public void Dispose()
+    {
     }
 }

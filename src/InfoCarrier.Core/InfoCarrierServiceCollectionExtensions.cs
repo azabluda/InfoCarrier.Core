@@ -440,8 +440,9 @@ public static class InfoCarrierServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<IInfoCarrierServerLogForwarding>(new ServerLogForwarding(minimumLevel));
+        services.TryAddSingleton<ServerLogCapture>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<Microsoft.Extensions.Logging.ILoggerProvider, ServerLogCapture>());
+            ServiceDescriptor.Singleton<Microsoft.Extensions.Logging.ILoggerProvider, ServerLogCaptureProvider>());
 
         return services;
     }
