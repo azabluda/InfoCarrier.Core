@@ -5,6 +5,7 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -80,6 +81,8 @@ public class InfoCarrierServiceCollectionExtensionsTest()
     {
         Dictionary<Type, string> inapplicableServices = new()
         {
+            [typeof(IDatabaseCreator)] =
+                "The InfoCarrier client has no database whose schema it could create or inspect.",
             [typeof(IQueryableMethodTranslatingExpressionVisitorFactory)] =
                 "InfoCarrier captures the expression at IDatabase before EF Core query translation.",
             [typeof(IShapedQueryCompilingExpressionVisitorFactory)] =
@@ -102,6 +105,69 @@ public class InfoCarrierServiceCollectionExtensionsTest()
                 $"{serviceType} is inapplicable: {reason}");
         }
     }
+
+    [Fact]
+    public void Supported_database_facade_dependencies_resolve_without_database_creator()
+    {
+        using ServiceProvider serviceProvider = CreateServiceProvider();
+        using var context = CreateContext(serviceProvider);
+
+        IDatabaseFacadeDependencies dependencies = context.GetService<IDatabaseFacadeDependencies>();
+
+        Assert.NotNull(dependencies.TransactionManager);
+        Assert.NotNull(dependencies.ExecutionStrategy);
+        Assert.NotNull(dependencies.ExecutionStrategyFactory);
+        Assert.NotEmpty(dependencies.DatabaseProviders);
+        Assert.NotNull(dependencies.CommandLogger);
+        Assert.NotNull(dependencies.ConcurrencyDetector);
+        Assert.NotNull(dependencies.CoreOptions);
+        Assert.NotNull(dependencies.QueryProvider);
+        Assert.NotNull(dependencies.AdHocMapper);
+        Assert.NotNull(dependencies.TypeMappingSource);
+    }
+
+    [Fact]
+    public async Task Schema_apis_explain_that_the_client_has_no_database()
+    {
+        using ServiceProvider serviceProvider = CreateServiceProvider();
+        using var context = CreateContext(serviceProvider);
+        const string expected = "The InfoCarrier client has no database of its own, so 'DatabaseCreator' "
+            + "has no value here. A caller reaching for it wants the SERVER's, which does not cross the wire.";
+
+        Assert.Equal(expected, Assert.Throws<InvalidOperationException>(() => context.Database.EnsureCreated()).Message);
+        Assert.Equal(expected, Assert.Throws<InvalidOperationException>(() => context.Database.EnsureDeleted()).Message);
+        Assert.Equal(expected, Assert.Throws<InvalidOperationException>(() => context.Database.CanConnect()).Message);
+        Assert.Equal(
+            expected,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureCreatedAsync())).Message);
+        Assert.Equal(
+            expected,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureDeletedAsync())).Message);
+        Assert.Equal(
+            expected,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.CanConnectAsync())).Message);
+    }
+
+    [Fact]
+    public void Database_creator_cannot_be_resolved_directly()
+    {
+        using ServiceProvider serviceProvider = CreateServiceProvider();
+        using var context = CreateContext(serviceProvider);
+
+        Assert.Throws<InvalidOperationException>(() => context.GetService<IDatabaseCreator>());
+    }
+
+    private static ServiceProvider CreateServiceProvider()
+        => new ServiceCollection()
+            .AddEntityFrameworkInfoCarrier()
+            .BuildServiceProvider(validateScopes: true);
+
+    private static DbContext CreateContext(IServiceProvider serviceProvider)
+        => new(
+            InfoCarrierTestHelpers.Instance
+                .UseProviderOptions(new DbContextOptionsBuilder())
+                .UseInternalServiceProvider(serviceProvider)
+                .Options);
 }
 
 /// <summary>

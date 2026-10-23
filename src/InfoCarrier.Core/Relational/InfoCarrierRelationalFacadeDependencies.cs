@@ -46,7 +46,6 @@ namespace InfoCarrier.Core.Relational;
 /// </remarks>
 public sealed class InfoCarrierRelationalFacadeDependencies(
     IDbContextTransactionManager transactionManager,
-    IDatabaseCreator databaseCreator,
     IExecutionStrategy executionStrategy,
     IExecutionStrategyFactory executionStrategyFactory,
     IEnumerable<IDatabaseProvider> databaseProviders,
@@ -61,7 +60,8 @@ public sealed class InfoCarrierRelationalFacadeDependencies(
     public IDbContextTransactionManager TransactionManager { get; } = transactionManager;
 
     /// <inheritdoc />
-    public IDatabaseCreator DatabaseCreator { get; } = databaseCreator;
+    public IDatabaseCreator DatabaseCreator
+        => throw new InvalidOperationException(NoDatabase(nameof(DatabaseCreator)));
 
     /// <inheritdoc />
     public IExecutionStrategy ExecutionStrategy { get; } = executionStrategy;

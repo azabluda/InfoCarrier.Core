@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -21,10 +22,9 @@ namespace InfoCarrier.Core.FunctionalTests.InMemory;
 ///         carry the same `HasData` seed, which is the thing that matters.
 ///     </para>
 ///     <para>
-///         Which is also why the client's <c>EnsureCreated</c> being a no-op is not a problem:
-///         <c>InfoCarrierDatabaseCreator</c> reports success because the client has no store, and
-///         the rows the test then queries for come from the <em>backend's</em> database, created
-///         from the same seeded model.
+///         The client has no schema-management service. This override cleans the backend through
+///         the test store, which recreates and seeds its InMemory database. The rows the test then
+///         queries come from that backend database.
 ///     </para>
 ///     <para>
 ///         <b>It stays on Tier A, measured on 2026-09-27</b>, when the other Tier A bases that could
@@ -49,6 +49,26 @@ public class SeedingInfoCarrierTest : SeedingTestBase
     /// <inheritdoc />
     protected override SeedingContext CreateContextWithEmptyDatabase(string testId)
         => new SeedingInfoCarrierContext(testId, ((IInfoCarrierClientTestStore)TestStore).Backend);
+
+    /// <inheritdoc />
+    [InfoCarrierDesign(
+        Decisions.Architecture,
+        Decisions.ClientServices,
+        Justification = "The client has no database creator, so the test store recreates and seeds the backend directly.")]
+    public override async Task Seeding_does_not_leave_context_contaminated(bool async)
+    {
+        using SeedingContext context = CreateContextWithEmptyDatabase(async ? "1A" : "1S");
+        await TestStore.CleanAsync(context);
+
+        Assert.Empty(context.ChangeTracker.Entries());
+
+        List<Seed> seeds = context.Set<Seed>().OrderBy(e => e.Id).ToList();
+        Assert.Equal(2, seeds.Count);
+        Assert.Equal(321, seeds[0].Id);
+        Assert.Equal("Apple", seeds[0].Species);
+        Assert.Equal(322, seeds[1].Id);
+        Assert.Equal("Orange", seeds[1].Species);
+    }
 
     private class SeedingInfoCarrierContext(string testId, IInfoCarrierClient client) : SeedingContext(testId)
     {
