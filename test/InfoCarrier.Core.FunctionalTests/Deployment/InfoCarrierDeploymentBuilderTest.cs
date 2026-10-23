@@ -69,46 +69,6 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
-    public void Obsolete_AllowTypes_matches_shared_builder()
-    {
-        var compatibilityOptions = new DbContextOptionsBuilder();
-        var sharedOptions = new DbContextOptionsBuilder();
-
-#pragma warning disable ICC1001 // The test protects the obsolete version 10 compatibility API.
-        compatibilityOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowTypes(typeof(DateOnly)));
-#pragma warning restore ICC1001
-        sharedOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AddAllowedTypes(typeof(DateOnly)));
-
-        Assert.Equal(
-            sharedOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.AllowedTypes,
-            compatibilityOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.AllowedTypes);
-    }
-
-    [Fact]
-    public void Obsolete_parameterless_AllowArbitrarySqlExecution_matches_shared_builder()
-    {
-        var compatibilityOptions = new DbContextOptionsBuilder();
-        var sharedOptions = new DbContextOptionsBuilder();
-
-#pragma warning disable ICC1002 // The test protects the obsolete version 10 compatibility API.
-        compatibilityOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowArbitrarySqlExecution());
-#pragma warning restore ICC1002
-        sharedOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowArbitrarySqlExecution(true));
-
-        Assert.Equal(
-            sharedOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed,
-            compatibilityOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed);
-    }
-
-    [Fact]
     public void Abstractions_assembly_exposes_only_the_two_approved_contracts()
         => Assert.Equal(
             [
@@ -148,7 +108,11 @@ public class InfoCarrierDeploymentBuilderTest
 
         options.UseInfoCarrier(
             StubClient.Instance,
-            builder => builder.UseNonRelationalServerStore().ConfigureInfoCarrierForTest());
+            builder =>
+            {
+                builder.ServerUsesRelationalQueryRules = false;
+                builder.ConfigureInfoCarrierForTest();
+            });
 
         InfoCarrierOptionsExtension extension = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
         Assert.False(extension.ServerStoreIsRelational);

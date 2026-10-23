@@ -28,21 +28,17 @@ builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(builde
 
 builder.Services.AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>();
 
-builder.Services.AddSingleton<IInfoCarrierClient>(services =>
-{
-    var serializer = services.GetRequiredService<IInfoCarrierSerializer>();
-
-    IInfoCarrierTransport transport = new HttpInfoCarrierTransport(
-        services.GetRequiredService<HttpClient>(), serializer);
-
-    // The inspector rides on the seam rather than inside the transport, which is what keeps
-    // HttpInfoCarrierTransport free of sample types and therefore promotable by a file move.
-    transport = new InspectingTransport(transport, serializer, services.GetRequiredService<WireLog>());
-
-    return new TransportInfoCarrierClient(transport, serializer,
-        services.GetRequiredService<ILogger<TransportInfoCarrierClient>>());
-});
-
+builder.Services.AddSingleton<IInfoCarrierClient>(services => InfoCarrierClient.Configure(
+    new TransportInfoCarrierClient(
+        new InspectingTransport(
+            new HttpInfoCarrierTransport(
+                services.GetRequiredService<HttpClient>(),
+                services.GetRequiredService<IInfoCarrierSerializer>()),
+            services.GetRequiredService<IInfoCarrierSerializer>(),
+            services.GetRequiredService<WireLog>()),
+        services.GetRequiredService<IInfoCarrierSerializer>(),
+        services.GetRequiredService<ILogger<TransportInfoCarrierClient>>()),
+    options => options.ConfigureInfoCarrier()));
 // A factory, not a context: each page owns its own unit of work, which is exactly what the Order
 // page is there to show. A DbContext held for the lifetime of the app would accumulate tracked
 // entities across pages and make "one SaveChanges for several edits" mean nothing.
@@ -60,9 +56,7 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services =>
 // it is about this call, and hiding it project-wide would also hide the next one.
 #pragma warning disable IL2026 // UseInfoCarrier is [RequiresUnreferencedCode]; see above.
 builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
-    .UseInfoCarrier(
-        services.GetRequiredService<IInfoCarrierClient>(),
-        builder => builder.ConfigureInfoCarrier())
+    .UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>())
 
     // NOTE THE ABSENCE: there is no UseLazyLoadingProxies() here, and the server does call it.
     //

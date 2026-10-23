@@ -505,7 +505,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         return new NorthwindContext(
             new DbContextOptionsBuilder<NorthwindContext>()
-                .UseInfoCarrier(client, options =>
+                .UseInfoCarrier(InfoCarrierClient.Configure(client, options =>
                 {
                     if (deployment is not null)
                     {
@@ -526,7 +526,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
                     {
                         options.AddAllowedTypes(typeof(OrderCard));
                     }
-                })
+                }))
                 .UseLazyLoadingProxies()
                 .Options);
     }

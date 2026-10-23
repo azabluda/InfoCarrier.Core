@@ -7,7 +7,7 @@ namespace InfoCarrier.Core;
 
 /// <summary>
 ///     InfoCarrier-specific options, configured through
-///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier(DbContextOptionsBuilder, IInfoCarrierClient, Action{InfoCarrierDbContextOptionsBuilder})" />.
+///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier(DbContextOptionsBuilder, IInfoCarrierClient, Action{InfoCarrierClientOptions})" />.
 /// </summary>
 /// <remarks>
 ///     The shape every EF Core provider uses for its own options —

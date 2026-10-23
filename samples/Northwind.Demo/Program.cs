@@ -17,12 +17,14 @@ using var httpClient = new HttpClient(counter) { BaseAddress = baseAddress };
 
 // This is the whole client wiring, and it is the point of the sample: an HttpClient, the
 // transport, and `UseInfoCarrier`. Nothing below configures a database, because there is none.
-var client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(httpClient, serializer), serializer,
-    loggerFactory.CreateLogger<TransportInfoCarrierClient>());
+var client = InfoCarrierClient.Configure(
+    new TransportInfoCarrierClient(
+        new HttpInfoCarrierTransport(httpClient, serializer), serializer,
+        loggerFactory.CreateLogger<TransportInfoCarrierClient>()),
+    options => options.ConfigureInfoCarrier());
 
 DbContextOptions<NorthwindContext> options = new DbContextOptionsBuilder<NorthwindContext>()
-    .UseInfoCarrier(client, builder => builder.ConfigureInfoCarrier())
+    .UseInfoCarrier(client)
     .UseLoggerFactory(loggerFactory)
     .UseLazyLoadingProxies()
     .Options;
