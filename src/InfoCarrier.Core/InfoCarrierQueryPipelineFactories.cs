@@ -37,23 +37,3 @@ public class InfoCarrierQueryableMethodTranslatingExpressionVisitorFactory
             + "IDatabase.CompileQuery and sends it to the server, whose own provider translates it "
             + "(ADR-006). There is no client-side translating visitor to create.");
 }
-
-/// <summary>
-///     Retains a version 10 public type that InfoCarrier never used or registered in its query flow.
-/// </summary>
-[ExcludeFromCodeCoverage(Justification = "Obsolete compatibility stub that only throws.")]
-[Obsolete(
-    "InfoCarrier does not use EF Core's shaped query pipeline. "
-    + "This compatibility type will be removed in version 11.",
-    DiagnosticId = "ICC1007",
-    UrlFormat = "https://github.com/azabluda/InfoCarrier.Core/issues/226")]
-public class InfoCarrierShapedQueryCompilingExpressionVisitorFactory
-    : IShapedQueryCompilingExpressionVisitorFactory
-{
-    /// <inheritdoc />
-    public virtual ShapedQueryCompilingExpressionVisitor Create(QueryCompilationContext queryCompilationContext)
-        => throw new NotSupportedException(
-            "InfoCarrier does not compile shaped queries. Results arrive already materialized "
-            + "from the server and are rebuilt by ClientResultMaterializer (ADR-006). There is no "
-            + "client-side shaper to create.");
-}
