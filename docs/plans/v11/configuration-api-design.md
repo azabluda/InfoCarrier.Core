@@ -63,7 +63,7 @@ The client-only non-relational planning switch and the server-only document repa
 facts. A single `StoreKind` would hide the distinction that Entity Framework InMemory needs only the
 first behavior. Version 11 gives the two facts clear role-option names but does not merge them.
 
-### The first public role APIs are unnamed and internally named
+### The first public role APIs use default registration descriptors
 
 The server entry point is `AddInfoCarrierServer<TContext>`. It registers the default serializer and
 the default in-process server. Its one callback configures the server options and inherited shared
@@ -73,11 +73,12 @@ The client entry point is `AddInfoCarrierClient`. It registers one HTTP client, 
 serializer, and `IInfoCarrierClient`. Its one callback configures the client options and inherited
 shared deployment facts. `UseInfoCarrier` only attaches the configured client to Entity Framework.
 
-Both entry points use one reserved internal default name. Options, serializers, transports, clients,
-servers, context factories, and behavior carriers use that name as their key. A later overload can
-accept an application name without replacing the storage or activation model.
+Each entry point creates one immutable registration descriptor with an opaque internal identity.
+The descriptor owns its options snapshot and factories. Services within one role are created from
+that descriptor rather than assembled through a common string key.
 
-The reserved name is internal. The initial public API does not expose names, generic endpoint
+The default registration uses the framework's default options name. A later public name maps to one
+opaque identity and one descriptor. The initial public API does not expose names, generic endpoint
 mapping, or multiple-server selection.
 
 ### Server construction uses the host container
@@ -130,7 +131,55 @@ first query.
 
 Positive byte limits and transaction timeouts remain required. The endpoint must be absolute.
 Sensitive forwarding requires a forwarding level. Repeated unnamed registrations compose the
-default-name configuration in call order without adding duplicate default services.
+default options in call order without adding duplicate default services.
+
+### Names, identities, and resolution have separate jobs
+
+A public name identifies application configuration. An opaque identity distinguishes registrations
+inside InfoCarrier. A registration descriptor activates one complete role. These are separate
+concepts and must not share one raw string key throughout the service graph.
+
+Named options compose role configuration. Named HTTP clients configure handlers and connection
+lifetime. InfoCarrier prefixes their internal HTTP names, so they cannot collide with application
+HTTP clients. Keyed dependency injection is permitted at a final resolution boundary, but it is not
+the storage model for role policy.
+
+The server builder is also a registration handle. A later endpoint overload can accept that handle
+directly, which prevents a spelling mismatch between registration and mapping. A name-based overload
+remains useful when registration and endpoint mapping live in separate modules.
+
+### The common case pays no naming cost
+
+One client and one server use only the unnamed overloads. The application does not see a name,
+identity, registry, descriptor, factory, or keyed service:
+
+```csharp
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.ConfigureApplication());
+
+app.MapInfoCarrier("api/data");
+```
+
+```csharp
+builder.Services.AddInfoCarrierClient(options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/api/data");
+    options.ConfigureApplication();
+});
+
+builder.Services.AddDbContextFactory<ShopContext>((services, options) =>
+    options.UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>()));
+```
+
+The returned builders expose existing optional composition, such as an HTTP message handler or
+caller identity. Ignoring the return value is the normal path.
+
+The Entity Framework provider attachment remains necessary. The descriptor model adds no syntax to
+that existing line.
+
+Only an application with several clients or endpoints supplies a name or retains a registration
+handle. The internal descriptor architecture must not add another callback, generic argument, or
+resolution call to the unnamed syntax.
 
 ## Bounded public shape
 
@@ -163,8 +212,9 @@ public static InfoCarrierServerBuilder AddInfoCarrierServer<TContext>(
 ```
 
 `InfoCarrierServerBuilder` is the composition point for caller identity and future protocol-specific
-registrations. It carries the internal default key. It does not expose that key before issue #105.
-An overload may omit the callback when defaults are sufficient.
+registrations. It carries the opaque registration identity and can become an endpoint handle in
+issue #105. It does not expose a name before that issue. An overload may omit the callback when
+defaults are sufficient.
 
 The two store booleans above name independent behavior. Implementation review can select shorter
 names, but it must not collapse them into one enum.
@@ -184,19 +234,25 @@ external providers do not need it. Its removal is not required for the role APIs
 
 ## Compatibility boundary for issue #105
 
-The unnamed client already uses the reserved default key. The unnamed server does the same. Issue
-#105 adds overloads that substitute an application name for that key.
+The unnamed client and server each create one default descriptor. Issue #105 adds overloads that
+map an application name to another descriptor. It does not replace the activation model.
 
-Each keyed client owns its endpoint, serializer limits, shared deployment snapshot, query-rule
-behavior, and mapper instances. Each keyed server owns its context factory, serializer limits,
+Each client descriptor owns its endpoint, serializer limits, shared deployment snapshot, query-rule
+behavior, and mapper instances. Each server descriptor owns its context factory, serializer limits,
 shared deployment snapshot, document behavior, transaction settings, logging grants, and caller
 identity.
 
 Host infrastructure can remain shared when it contains no role policy. The logger provider and
-HTTP client factory are examples. Role policy cannot live in an unkeyed mutable singleton.
+HTTP client factory are examples. Role policy cannot live in an unkeyed mutable singleton or a loose
+collection of keyed services.
 
-`MapInfoCarrier` selects the reserved default server key. Issue #105 adds name-based endpoint
-selection. It can also add typed convenience overloads without changing server activation.
+`MapInfoCarrier` selects the default server descriptor. Issue #105 adds descriptor-handle and
+name-based endpoint selection. It can also add typed convenience overloads without changing server
+activation.
+
+A typed role marker is optional syntax over the same descriptor registry. It must not introduce a
+second registration system. A child service provider is not supported, because it would separate
+the endpoint from host logging, configuration, disposal, and scoped services.
 
 Client metrics and server metrics keep their current tags. Issue #105 adds client or endpoint
 identity tags when multiple registrations make those identities meaningful.
@@ -205,8 +261,8 @@ identity tags when multiple registrations make those identities meaningful.
 
 1. Role options can redeclare inherited shared deployment facts. Compile-time surface tests must
    reject those duplicate members.
-2. A role entry point can accidentally register policy as an unkeyed singleton. Registration tests
-   must prove every policy carrier uses the reserved default key.
+2. A role entry point can scatter policy across keyed services. Registration tests must prove one
+   descriptor owns every role-specific option and factory.
 3. Moving logging settings can weaken the two-grant sensitive-data rule. Focused transport tests
    must cover ordinary and sensitive contexts.
 4. Replacing marker interfaces can change optional-feature defaults. Each removal needs a before-
@@ -215,13 +271,15 @@ identity tags when multiple registrations make those identities meaningful.
    must check idempotence and ordering.
 6. Early validation can construct scoped services from the root provider. Endpoint validation must
    inspect registrations without resolving `TContext` from the root scope.
-7. A keyed server can still resolve the unkeyed `DbContext` by accident. Two-context registration
-   tests must prove each internal server factory resolves its declared context type.
+7. A server descriptor can still resolve the wrong `DbContext` by accident. Two-context registration
+   tests must prove each server factory resolves its declared context type.
+8. Public names can collide with application HTTP client names. Tests must prove InfoCarrier derives
+   private prefixed HTTP names from its opaque identities.
 
 ## Implementation order
 
-1. Add role options that derive from the shared builder. Produce immutable snapshots under the
-   reserved default key. Preserve the two independent store facts.
+1. Add role options that derive from the shared builder. Produce one immutable default descriptor
+   per role. Preserve the two independent store facts.
 2. Add the unnamed server entry point and endpoint registration validation. Resolve `TContext`
    without an unkeyed `DbContext` alias.
 3. Add the unnamed client entry point and direct factory. Make `UseInfoCarrier` attachment-only.
@@ -230,4 +288,4 @@ identity tags when multiple registrations make those identities meaningful.
 5. Update samples and configuration documentation after the APIs pass their focused tests.
 
 Each implementation pull request stays within one numbered step. Issue #105 starts only after the
-unnamed registrations and their internal key boundary are stable.
+unnamed descriptors and their activation boundary are stable.
