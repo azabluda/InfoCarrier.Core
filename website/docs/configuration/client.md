@@ -1,10 +1,17 @@
 # Configuring the client
 
-The whole client configuration is `UseInfoCarrier`, plus whichever of the three replaceable objects
-you want to change.
+Register the default HTTP client role once. `UseInfoCarrier` then attaches that client to each
+`DbContext`.
 
 ```csharp
-optionsBuilder.UseInfoCarrier(client);
+builder.Services.AddInfoCarrierClient(options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/infocarrier");
+    options.ConfigureInfoCarrier();
+});
+
+builder.Services.AddDbContextFactory<ShopContext>((services, options) =>
+    options.UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>()));
 ```
 
 Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual: logging,
@@ -16,16 +23,19 @@ The callback carries deployment facts and client-only store information. Put cli
 before the shared method:
 
 ```csharp
-optionsBuilder.UseInfoCarrier(client, o => o
-    .UseNonRelationalServerStore()
-    .ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierClient(options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/infocarrier");
+    options.ServerUsesRelationalQueryRules = false;
+    options.ConfigureInfoCarrier();
+});
 ```
 
 | Setting | What it says |
 |---|---|
 | `AddAllowedTypes(...)` | These Common Language Runtime types may appear beyond those implied by the model. Register them on both sides. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). |
 | `AllowArbitrarySqlExecution(true)` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server must grant it too. Only the server's setting is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
-| `UseNonRelationalServerStore()` | The server's store is not a relational database, so three relational query rules do not apply, and a change to part of a document sends the whole document. **On a document store the server needs [its own registration](server.md#saying-the-store-is-a-document-store) as well**, and that one is what keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
+| `ServerUsesRelationalQueryRules = false` | The server's store does not use relational query rules. A change to part of a document sends the whole document. **On a document store the server needs [its own setting](server.md#saying-the-store-is-a-document-store) as well**, and that setting keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
 
 Leave all three alone unless one of those sentences is true of your deployment.
 
@@ -34,7 +44,11 @@ Leave all three alone unless one of those sentences is true of your deployment.
 Put shared deployment facts in one application-owned method:
 
 ```csharp
-optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierClient(options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/infocarrier");
+    options.ConfigureInfoCarrier();
+});
 
 public static class ShopDeployment
 {
@@ -48,7 +62,7 @@ public static class ShopDeployment
 }
 ```
 
-Pass the method through `AddInfoCarrier` on the server. Matching settings guide planning, but
+Pass the method through `AddInfoCarrierServer` on the server. Matching settings guide planning, but
 cannot add provider support. The server controls admission. Refusals are not retried.
 
 Reference `InfoCarrier.Core.Abstractions` from this method's project. Prefer an existing shared
@@ -56,11 +70,21 @@ model project. A separate project keeps the model unaware of InfoCarrier. Small 
 link the source file. Abstractions has no Entity Framework Core dependency. A project can reference
 both InfoCarrier packages.
 
-Keep client-only settings outside this method. Existing low-level methods remain supported.
-See [Migrating existing configuration](server.md#migrating-existing-configuration) for version 11
-warnings and replacements.
+Keep client-only settings outside this method.
 
-## The three objects
+## Direct creation and replaceable parts
+
+Create the default client without dependency injection when the application owns an `HttpClient`:
+
+```csharp
+IInfoCarrierClient client = InfoCarrierClient.Create(httpClient, options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/infocarrier");
+    options.ConfigureInfoCarrier();
+});
+```
+
+The caller owns `httpClient`. Use the low-level types below for a custom transport or serializer.
 
 ```csharp
 var serializer = new SystemTextJsonInfoCarrierSerializer();
@@ -118,10 +142,11 @@ request it receives, the client caps the response it receives. Only the server's
 default-on, because that is the side reading bytes from an untrusted peer.
 
 ```csharp
-var serializer = new SystemTextJsonInfoCarrierSerializer(
-    new InfoCarrierPayloadLimits(
-        maxRequestBytes: 4 * 1024 * 1024,     // towards the server
-        maxResponseBytes: 16 * 1024 * 1024)); // back to the client
+builder.Services.AddInfoCarrierClient(options =>
+{
+    options.Endpoint = new Uri("https://api.example.com/infocarrier");
+    options.MaxResponseBytes = 16 * 1024 * 1024;
+});
 ```
 
 | | Default | Why |
@@ -132,8 +157,8 @@ var serializer = new SystemTextJsonInfoCarrierSerializer(
 Pass `null` to opt out of a limit. It is spelled as an explicit `null` rather than a very large
 number so that opting out is visible in your code.
 
-`MaxRequestBytes` set here caps nothing on the client, which never deserializes a request. It
-matters on the server, and the server builds its own serializer with its own limits. See
+The client role exposes only `MaxResponseBytes`, because it never deserializes a request. Configure
+`MaxRequestBytes` on the server role. See
 [Configuring the server](server.md#payload-limits).
 
 ## Synchronous calls

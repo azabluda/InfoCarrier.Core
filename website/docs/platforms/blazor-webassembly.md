@@ -88,19 +88,9 @@ context factory rather than a context, so each page owns its own unit of work.
 WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Same origin as the page: let your server host the client's files and there is no CORS.
-builder.Services.AddSingleton(_ => new HttpClient
+builder.Services.AddInfoCarrierClient(options =>
 {
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
-});
-
-builder.Services.AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>();
-
-builder.Services.AddSingleton<IInfoCarrierClient>(sp =>
-{
-    var serializer = sp.GetRequiredService<IInfoCarrierSerializer>();
-    return new TransportInfoCarrierClient(
-        new HttpInfoCarrierTransport(sp.GetRequiredService<HttpClient>(), serializer),
-        serializer);
+    options.Endpoint = new Uri(builder.HostEnvironment.BaseAddress + "infocarrier");
 });
 
 builder.Services.AddDbContextFactory<ShopContext>((sp, o) =>

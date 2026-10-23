@@ -112,7 +112,7 @@ These are not defects. They follow from where the client sits.
 |---|---|
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
-| The client never sees the server's provider, so it assumes a relational store and refuses three queries relational providers refuse. `UseInfoCarrier(client, o => o.UseNonRelationalServerStore())` says otherwise | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
+| The client never sees the server's provider, so it assumes a relational store and refuses three queries relational providers refuse. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
 | The server's provider writes the SQL, so how a query is translated is settled there, not on the client. `EF.Constant` and `EF.Parameter` are part of your query, so they cross the wire and the server honours them | |
 | `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](guide/querying.md#round-trips-and-result-size) |
 | Asynchronous non-tracking queries stream rows. Tracked queries, single-result operations, and operators needing complete input remain buffered. Page large buffered results. | [Querying](guide/querying.md#streaming-results) |

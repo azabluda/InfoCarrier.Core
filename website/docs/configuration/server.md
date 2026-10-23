@@ -1,6 +1,6 @@
 # Configuring the server
 
-The server is an ordinary EF Core application. Add its base registrations, shared facts, and one
+The server is an ordinary EF Core application. Register its context, its InfoCarrier role, and one
 endpoint.
 
 ```csharp
@@ -8,12 +8,8 @@ using InfoCarrier.Core;
 using InfoCarrier.Core.AspNetCore;
 
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>());
-
-builder.Services
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.ConfigureInfoCarrier());
 
 WebApplication app = builder.Build();
 
@@ -30,35 +26,21 @@ public static class ShopDeployment
 | Registration | What it is for |
 |---|---|
 | `AddDbContext<ShopContext>` | Your context on your real provider. InfoCarrier never sees the connection string. |
-| `AddScoped<DbContext>` | The server resolves the context per request as the base type, so the base type has to resolve. Without this line every request fails with a service-resolution error. |
-| `IInfoCarrierSerializer` | The same format the client uses. Both ends must agree. |
-| `IInfoCarrierServer` | `InProcessInfoCarrierServer` executes a request against a `DbContext` from this service provider. *In-process* means the same process as the database connection; it is the normal implementation, not a test double. |
-| `AddInfoCarrier(...)` | Applies shared deployment facts and adds the standard value mappers. See [Value mappers](value-mappers.md). |
+| `AddInfoCarrierServer<ShopContext>(...)` | Registers the default serializer and in-process server. It resolves `ShopContext` directly for each request. The callback applies server and shared deployment settings. |
 
 Use the same method in the client callback. It covers shapes, named types, mappers, and arbitrary
 SQL. These settings cannot add provider support. The server controls admission.
 
-`AddInfoCarrier` adds shared facts and standard mappers. It does not add the context, serializer,
-server implementation, or endpoint.
+The role registration adds the default serializer, server implementation, and standard value
+mappers. It does not add the context or endpoint.
 
-## Migrating existing configuration
+## Version 11 configuration
 
-Version 10.3 warns about five planned version 11 removals:
+Version 11 uses `AddInfoCarrierClient` and `AddInfoCarrierServer<TContext>` as its role entry
+points. Shared shapes, types, mappers, and arbitrary SQL permission belong in either role callback.
+The callbacks can call the same application-owned extension method.
 
-| Existing method | Replacement |
-|---|---|
-| `InfoCarrierDbContextOptionsBuilder.AllowTypes(...)` | `InfoCarrierDeploymentBuilder.AddAllowedTypes(...)` |
-| `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()` | `InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution(true)` |
-| `AddInfoCarrierAllowedTypes(...)` | `AddAllowedTypes(...)` inside `AddInfoCarrier(...)` |
-| `AddInfoCarrierArbitrarySqlExecution()` | `AllowArbitrarySqlExecution(true)` inside `AddInfoCarrier(...)` |
-| `AddInfoCarrierStandardValueMappers()` | `AddInfoCarrier(...)` |
-
-Version 10 continues to support these methods. The unreleased `UseRegisteredAnonymousShapes` and
-prototype `AddInfoCarrierAnonymousShapes` methods were removed. Use shared `AddAnonymousShapes`.
-
-Version 11 requires synchronous operations on all three remote-operation interfaces. Implementations
-must keep synchronous and asynchronous input/output paths independent. The built-in HTTP transport
-uses `HttpClient.Send` and synchronous response reads.
+Low-level server, serializer, transport, and envelope types remain available for custom hosting.
 
 ## The endpoint
 
@@ -90,9 +72,8 @@ A server deserializes what an untrusted peer sent it, so this is the direction t
 default is 64 MiB per request. Set your own if you know what your clients legitimately send:
 
 ```csharp
-builder.Services.AddSingleton<IInfoCarrierSerializer>(
-    _ => new SystemTextJsonInfoCarrierSerializer(
-        new InfoCarrierPayloadLimits(maxRequestBytes: 8 * 1024 * 1024)));
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.MaxRequestBytes = 8 * 1024 * 1024);
 ```
 
 A query tree is kilobytes, and a `SaveChanges` request is no bigger than the graph the client
@@ -105,7 +86,7 @@ Two deployment settings widen what a client may send. Both deny by default, and 
 server's decision alone.
 
 ```csharp
-builder.Services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureInfoCarrier());
 
 public static class ShopDeployment
 {
@@ -171,15 +152,17 @@ Forwarding is off until you grant it. Then they arrive in the client's own logge
 server's category and event id:
 
 ```csharp
-builder.Services.AddInfoCarrierServerLogForwarding();   // warnings and above, the default
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.LogForwarding.MinimumLevel = LogLevel.Warning);
 ```
 
-Pass a `LogLevel` to change it. At `Information` the SQL of every command the server runs goes too,
+Set `MinimumLevel` to another `LogLevel` to change it. At `Information`, every server SQL command
+goes too,
 which tells a client your schema.
 
-A server whose context enables sensitive data logging forwards nothing until you also call
-`AddInfoCarrierSensitiveServerLogForwarding()`. That setting changes what EF's messages say
-everywhere, so no rule can pick out the ones carrying values.
+A server whose context enables sensitive data logging forwards nothing unless
+`LogForwarding.IncludeSensitiveData` is also `true`. That setting changes what EF's messages say
+everywhere, so no rule can identify only messages carrying values.
 
 Model and context events never cross. Both halves build a model, and each logs its own.
 
@@ -200,7 +183,8 @@ A client that vanishes mid-transaction leaves the server holding a context and a
 own `DisposeAsync` cannot help, because the process is gone. Tell the server how long to wait.
 
 ```csharp
-builder.Services.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.TransactionIdleTimeout = TimeSpan.FromMinutes(10));
 ```
 
 **Off until you call this**, so upgrading changes nothing. Every request naming the token refreshes
@@ -238,15 +222,16 @@ document, so an address the change set never mentioned is written out of existen
 reports success and the next read fails on a field that is gone.
 
 ```csharp
-builder.Services.AddInfoCarrierServerDocumentStore();
+builder.Services.AddInfoCarrierServer<ShopContext>(options =>
+    options.StoresOwnedDataInsideOwner = true);
 ```
 
 The server then reads the stored document and puts back whatever the change set left out.
 **Off until you call this.** Do not call it for a relational store, where an owned type is columns
 of the owner's row or a row of its own, and neither can go missing.
 
-The client has a switch of its own, `UseNonRelationalServerStore()`, which sends the whole document
-and saves the server that read. **Set both, and rely on this one.** A client can only send what its
+The client has a switch of its own, `ServerUsesRelationalQueryRules = false`, which sends the whole
+document and saves the server that read. **Set both, and rely on this one.** A client can only send what its
 change tracker holds, so a stub it attached carries a bare root even with the switch on, and a
 deployment that never set the switch carries one always.
 

@@ -70,8 +70,12 @@ For backend behavior parity, put your helper on a shared type, make the method p
 the type on both ends:
 
 ```csharp
-services.AddInfoCarrierAllowedTypes(typeof(Formatting));                       // server
-optionsBuilder.UseInfoCarrier(client, o => o.AllowTypes(typeof(Formatting)));  // client
+services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(Formatting)));
+services.AddInfoCarrierClient(o =>
+{
+    o.Endpoint = new Uri("https://api.example.com/infocarrier");
+    o.AddAllowedTypes(typeof(Formatting));
+});
 ```
 
 The helper must exist on the server too. Registration lets the expression reach that server;
@@ -97,7 +101,11 @@ three queries that every relational provider refuses:
 If your server's store is not relational, say so once and the three go away:
 
 ```csharp
-optionsBuilder.UseInfoCarrier(client, o => o.UseNonRelationalServerStore());
+services.AddInfoCarrierClient(o =>
+{
+    o.Endpoint = new Uri("https://api.example.com/infocarrier");
+    o.ServerUsesRelationalQueryRules = false;
+});
 ```
 
 That tells the client something it cannot work out for itself. It does not make the query work
@@ -194,9 +202,9 @@ and `Model.GetRelationalModel()` answer, and tooling that reads them works again
 They read your own `[Table]` attributes and `DbSet` names, which both halves compile, so the two
 models agree. Nothing the client computes from them reaches the server.
 
-`FromSql` and `Database.SqlQuery<T>` work, but only where the server opts in. The server calls
-`services.AddInfoCarrierArbitrarySqlExecution()` and the client `o.AllowArbitrarySqlExecution()`.
-Without both, the query is refused like any untranslatable one.
+`FromSql` and `Database.SqlQuery<T>` work, but only where both roles opt in. Call
+`AllowArbitrarySqlExecution(true)` in both role callbacks. Without both settings, the query is
+refused like any untranslatable one.
 
 Grant it with care. One command text runs every statement in it, and an uncomposed `FromSql` reaches
 the database unchanged, so a caller who has the grant can run any SQL the database allows, with the
@@ -204,8 +212,7 @@ server's own rights. The server's query filters are not in such a query.
 
 `EF.Functions.Like`, `EF.Constant` and `EF.Parameter` cross the wire, and so do the functions you
 map yourself with `HasDbFunction`. A store's own family, such as `SqliteDbFunctionsExtensions`, is
-a type this package cannot name, so name it on both halves: `AddInfoCarrierAllowedTypes(...)` on
-the server, `o.AllowTypes(...)` on the client.
+a type this package cannot name, so call `AddAllowedTypes(...)` in both role callbacks.
 
 ## Keys of your own types
 
@@ -224,8 +231,12 @@ and that event names the type. See [Logging](../configuration/client.md#logging)
 both halves and the same query runs in the database:
 
 ```csharp
-services.AddInfoCarrierAllowedTypes(typeof(PeriodKey));                       // server
-optionsBuilder.UseInfoCarrier(client, o => o.AllowTypes(typeof(PeriodKey)));  // client
+services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(PeriodKey)));
+services.AddInfoCarrierClient(o =>
+{
+    o.Endpoint = new Uri("https://api.example.com/infocarrier");
+    o.AddAllowedTypes(typeof(PeriodKey));
+});
 ```
 
 An anonymous key such as `new { o.Year, o.Month }` needs no registration.
