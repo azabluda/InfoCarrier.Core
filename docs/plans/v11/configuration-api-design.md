@@ -49,36 +49,46 @@ separate role-specific registrations.
 
 ## Reconciled decisions
 
-### Shared facts stay on the shared builder
+### Each role owns one shared-builder snapshot
 
-The role options do not add `AllowedTypes`, `AllowArbitrarySqlExecution`, or `ValueMappers`.
-Duplicating those members would create two sources for shared facts. Applications continue to place
-one deployment delegate in code referenced by both roles.
+The client and server options derive from `InfoCarrierDeploymentBuilder`. Each role callback therefore
+configures shared and role-specific facts on one object. It produces one immutable snapshot owned by
+that role registration.
+
+`AllowedTypes`, `AllowArbitrarySqlExecution`, and `ValueMappers` are not redeclared on the role
+options. The inherited members remain their only source. Applications can continue to call one
+application-owned extension method from both role callbacks.
 
 The client-only non-relational planning switch and the server-only document repair remain separate
 facts. A single `StoreKind` would hide the distinction that Entity Framework InMemory needs only the
 first behavior. Version 11 gives the two facts clear role-option names but does not merge them.
 
-### The first role APIs are unnamed
+### The first public role APIs are unnamed and internally named
 
-The server entry point is `AddInfoCarrierServer<TContext>`. It registers the default serializer,
-the default in-process server, and the `DbContext` base mapping for `TContext`. It also applies the
-existing shared deployment delegate and the server role options.
+The server entry point is `AddInfoCarrierServer<TContext>`. It registers the default serializer and
+the default in-process server. Its one callback configures the server options and inherited shared
+deployment facts.
 
 The client entry point is `AddInfoCarrierClient`. It registers one HTTP client, transport,
-serializer, and `IInfoCarrierClient`. Its role options contain the endpoint, response limit, and
-server query-rule behavior. `UseInfoCarrier` remains the Entity Framework provider attachment and
-still receives the shared deployment delegate.
+serializer, and `IInfoCarrierClient`. Its one callback configures the client options and inherited
+shared deployment facts. `UseInfoCarrier` only attaches the configured client to Entity Framework.
 
-The unnamed registrations use internal keys that a later named overload can replace with an
-application name. The initial public API does not expose names, generic endpoint mapping, or
-multiple-server selection.
+Both entry points use one reserved internal default name. Options, serializers, transports, clients,
+servers, context factories, and behavior carriers use that name as their key. A later overload can
+accept an application name without replacing the storage or activation model.
+
+The reserved name is internal. The initial public API does not expose names, generic endpoint
+mapping, or multiple-server selection.
 
 ### Server construction uses the host container
 
-`AddInfoCarrierServer<TContext>` resolves `TContext` through the host service provider. It maps that
-instance to the non-generic `DbContext` expected by the current server implementation. The entry
-point does not create a child container.
+`AddInfoCarrierServer<TContext>` stores a context factory in the default server registration. The
+server resolves `TContext` from each request or transaction scope through that factory. It does not
+add an unkeyed non-generic `DbContext` alias and does not create a child container.
+
+The current non-generic server can receive an internal context resolver. An internal generic adapter
+is also acceptable. The public low-level `InProcessInfoCarrierServer` does not need a generic public
+replacement for this issue.
 
 The entry point composes the existing host-owned logging registrations. Server log capture is now
 an injected instance, and replay receives an injected logger factory. No process-wide logging state
@@ -100,8 +110,8 @@ The API validates invalid combinations and values. It does not warn about accept
 
 ### No agreement protocol belongs in this issue
 
-Version 10.3 already gives applications one shared configuration function. The server remains the
-admission authority when callers configure the two roles differently.
+Applications can use one shared configuration function for both role options. The server remains
+the admission authority when callers configure the two roles differently.
 
 Issue #104 does not add contract fingerprints, a connection handshake, response tokens, or retry
 behavior. Such a check would change the wire protocol and needs a separate protocol design.
@@ -119,22 +129,22 @@ later than service-provider validation or endpoint mapping. No invalid configura
 first query.
 
 Positive byte limits and transaction timeouts remain required. The endpoint must be absolute.
-Sensitive forwarding requires a forwarding level. Repeated unnamed registrations compose their
-configuration in call order without adding duplicate default services.
+Sensitive forwarding requires a forwarding level. Repeated unnamed registrations compose the
+default-name configuration in call order without adding duplicate default services.
 
 ## Bounded public shape
 
 The implementation may refine names after compile-time API tests. Its boundary is:
 
 ```csharp
-public sealed class InfoCarrierClientOptions
+public sealed class InfoCarrierClientOptions : InfoCarrierDeploymentBuilder
 {
     public Uri? Endpoint { get; set; }
     public bool ServerUsesRelationalQueryRules { get; set; }
     public int? MaxResponseBytes { get; set; }
 }
 
-public sealed class InfoCarrierServerOptions
+public sealed class InfoCarrierServerOptions : InfoCarrierDeploymentBuilder
 {
     public bool StoresOwnedDataInsideOwner { get; set; }
     public int? MaxRequestBytes { get; set; }
@@ -146,16 +156,15 @@ public static IHttpClientBuilder AddInfoCarrierClient(
     this IServiceCollection services,
     Action<InfoCarrierClientOptions> configure);
 
-public static IServiceCollection AddInfoCarrierServer<TContext>(
+public static InfoCarrierServerBuilder AddInfoCarrierServer<TContext>(
     this IServiceCollection services,
-    Action<InfoCarrierServerOptions> configure,
-    Action<InfoCarrierDeploymentBuilder> configureDeployment)
+    Action<InfoCarrierServerOptions> configure)
     where TContext : DbContext;
 ```
 
-The exact server return type can become an InfoCarrier server builder if caller-identity
-registration needs that composition point. It must not expose a server name before issue #105.
-An overload may omit either callback when defaults are sufficient.
+`InfoCarrierServerBuilder` is the composition point for caller identity and future protocol-specific
+registrations. It carries the internal default key. It does not expose that key before issue #105.
+An overload may omit the callback when defaults are sufficient.
 
 The two store booleans above name independent behavior. Implementation review can select shorter
 names, but it must not collapse them into one enum.
@@ -175,23 +184,29 @@ external providers do not need it. Its removal is not required for the role APIs
 
 ## Compatibility boundary for issue #105
 
-The unnamed client becomes the default named client later. The unnamed server becomes the default
-named server later. No version 11 implementation may use one unkeyed mutable singleton to hold role
-options for all future registrations.
+The unnamed client already uses the reserved default key. The unnamed server does the same. Issue
+#105 adds overloads that substitute an application name for that key.
 
-`AddInfoCarrierServer<TContext>` must resolve the context type without making the endpoint mapping
-generic. Issue #105 can add `MapInfoCarrier<TContext>` or name-based mapping after it selects the
-keying model. This issue does not choose between those designs.
+Each keyed client owns its endpoint, serializer limits, shared deployment snapshot, query-rule
+behavior, and mapper instances. Each keyed server owns its context factory, serializer limits,
+shared deployment snapshot, document behavior, transaction settings, logging grants, and caller
+identity.
+
+Host infrastructure can remain shared when it contains no role policy. The logger provider and
+HTTP client factory are examples. Role policy cannot live in an unkeyed mutable singleton.
+
+`MapInfoCarrier` selects the reserved default server key. Issue #105 adds name-based endpoint
+selection. It can also add typed convenience overloads without changing server activation.
 
 Client metrics and server metrics keep their current tags. Issue #105 adds client or endpoint
 identity tags when multiple registrations make those identities meaningful.
 
 ## Main risks
 
-1. The client options can accidentally become a second home for shared deployment facts. Compile-
-   time surface tests must reject those duplicate members.
-2. A server entry point can register current services as unkeyed singletons that cannot later be
-   named. Registration tests must prove an internal key boundary exists.
+1. Role options can redeclare inherited shared deployment facts. Compile-time surface tests must
+   reject those duplicate members.
+2. A role entry point can accidentally register policy as an unkeyed singleton. Registration tests
+   must prove every policy carrier uses the reserved default key.
 3. Moving logging settings can weaken the two-grant sensitive-data rule. Focused transport tests
    must cover ordinary and sensitive contexts.
 4. Replacing marker interfaces can change optional-feature defaults. Each removal needs a before-
@@ -200,13 +215,16 @@ identity tags when multiple registrations make those identities meaningful.
    must check idempotence and ordering.
 6. Early validation can construct scoped services from the root provider. Endpoint validation must
    inspect registrations without resolving `TContext` from the root scope.
+7. A keyed server can still resolve the unkeyed `DbContext` by accident. Two-context registration
+   tests must prove each internal server factory resolves its declared context type.
 
 ## Implementation order
 
-1. Add immutable unnamed role options and validation. Preserve the two independent store facts.
-2. Add the unnamed server entry point and endpoint registration validation. Keep the default
-   composition replaceable through the existing low-level interfaces.
-3. Add the unnamed client entry point and direct factory. Keep shared facts in `UseInfoCarrier`.
+1. Add role options that derive from the shared builder. Produce immutable snapshots under the
+   reserved default key. Preserve the two independent store facts.
+2. Add the unnamed server entry point and endpoint registration validation. Resolve `TContext`
+   without an unkeyed `DbContext` alias.
+3. Add the unnamed client entry point and direct factory. Make `UseInfoCarrier` attachment-only.
 4. Remove replaced methods, marker interfaces, and the mapper type forwarder during their owning
    role changes. Update repository callers in the same commits.
 5. Update samples and configuration documentation after the APIs pass their focused tests.
