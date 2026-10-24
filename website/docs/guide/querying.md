@@ -70,15 +70,14 @@ To let the server provider handle your helper, put it on a shared type and make 
 Add its type to your shared deployment configuration, then call that method on both ends:
 
 ```csharp
-services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureSharedContract());
+services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureSharedContract));
 services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureSharedContract());
+    .ConfigureShared(ShopDeployment.ConfigureSharedContract));
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureSharedContract<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureSharedContract(InfoCarrierDeploymentBuilder builder)
         => builder.AddAllowedTypes(typeof(Formatting));
 }
 ```
@@ -215,7 +214,7 @@ server's own rights. The server's query filters are not in such a query.
 
 `EF.Functions.Like`, `EF.Constant` and `EF.Parameter` cross the wire, and so do the functions you
 map yourself with `HasDbFunction`. A store's own family, such as `SqliteDbFunctionsExtensions`, is
-a type this package cannot name, so call `AddAllowedTypes(...)` in both role callbacks.
+a type this package cannot name, so add it through `AddAllowedTypes(...)` in your shared method.
 
 ## Keys of your own types
 
@@ -234,10 +233,16 @@ and that event names the type. See [Logging](../configuration/client.md#logging)
 both halves and the same query runs in the database:
 
 ```csharp
-services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(PeriodKey)));
+services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureSharedContract));
 services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
-    .AddAllowedTypes(typeof(PeriodKey)));
+    .ConfigureShared(ShopDeployment.ConfigureSharedContract));
+
+public static class ShopDeployment
+{
+    public static void ConfigureSharedContract(InfoCarrierDeploymentBuilder builder)
+        => builder.AddAllowedTypes(typeof(PeriodKey));
+}
 ```
 
 An anonymous key such as `new { o.Year, o.Month }` needs no registration.

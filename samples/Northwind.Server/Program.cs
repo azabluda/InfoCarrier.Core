@@ -18,7 +18,7 @@ builder.Services.AddDbContext<NorthwindContext>(
         .UseLazyLoadingProxies());
 
 builder.Services.AddInfoCarrierServer<NorthwindContext>(
-    options => options.ConfigureInfoCarrier());
+    options => options.ConfigureShared(NorthwindDeployment.ConfigureInfoCarrier));
 
 WebApplication app = builder.Build();
 

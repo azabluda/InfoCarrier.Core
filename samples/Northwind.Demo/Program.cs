@@ -21,7 +21,7 @@ var client = InfoCarrierClient.Configure(
     new TransportInfoCarrierClient(
         new HttpInfoCarrierTransport(httpClient, serializer), serializer,
         loggerFactory.CreateLogger<TransportInfoCarrierClient>()),
-    options => options.ConfigureInfoCarrier());
+    options => options.ConfigureShared(NorthwindDeployment.ConfigureInfoCarrier));
 
 DbContextOptions<NorthwindContext> options = new DbContextOptionsBuilder<NorthwindContext>()
     .UseInfoCarrier(client)

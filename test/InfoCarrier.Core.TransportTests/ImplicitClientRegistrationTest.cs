@@ -32,7 +32,7 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
         // Registering the client afterward must work: no client is resolved during registration.
         services.AddInfoCarrierClient(options => options
             .WithEndpoint("http://localhost/infocarrier")
-            .ConfigureInfoCarrier()
+            .ConfigureShared(NorthwindDeployment.ConfigureInfoCarrier)
             .AddAllowedTypes(typeof(DateOnly))
             .WithMaxResponseBytes(16 * 1024 * 1024))
             .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());

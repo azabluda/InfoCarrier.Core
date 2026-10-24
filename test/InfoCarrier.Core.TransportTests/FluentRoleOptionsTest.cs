@@ -12,7 +12,84 @@ namespace InfoCarrier.Core.TransportTests;
 public class FluentRoleOptionsTest
 {
     [Fact]
-    public void Shared_operations_and_generic_helpers_preserve_client_type_in_any_order()
+    public void ConfigureShared_runs_once_synchronously_on_the_same_builder_in_chain_order()
+    {
+        var original = new InfoCarrierServerOptions();
+        var first = new StubMapper();
+        var second = new StubMapper();
+        var calls = 0;
+
+        InfoCarrierServerOptions result = original
+            .WithLogForwarding(LogLevel.Warning)
+            .WithMaxRequestBytes(1024)
+            .AddValueMappers(first)
+            .AllowArbitrarySqlExecution(true)
+            .ConfigureShared(builder =>
+            {
+                Assert.Same(original, builder);
+                Assert.Equal(1024, original.MaxRequestBytes);
+                calls++;
+                builder.AddValueMappers(second).AllowArbitrarySqlExecution(false);
+                original.WithMaxRequestBytes(2048);
+            })
+            .WithMaxRequestBytes(4096);
+
+        Assert.Equal(1, calls);
+        Assert.Same(original, result);
+        InfoCarrierServerRegistration registration = result.Build(typeof(TestContext));
+        Assert.Equal(4096, registration.MaxRequestBytes);
+        Assert.False(registration.AllowsArbitrarySql);
+    }
+
+    [Fact]
+    public void ConfigureShared_rejects_null_arguments_without_invoking_the_callback()
+    {
+        InfoCarrierClientOptions missing = null!;
+        var calls = 0;
+        Assert.Throws<ArgumentNullException>(() => missing.ConfigureShared(_ => calls++));
+        Assert.Equal(0, calls);
+        Assert.Throws<ArgumentNullException>(() => new InfoCarrierServerOptions().ConfigureShared(null!));
+    }
+
+    [Fact]
+    public void ConfigureShared_propagates_the_original_callback_exception()
+    {
+        var expected = new InvalidOperationException("Shared configuration failed.");
+        var calls = 0;
+        var builder = new InfoCarrierDeploymentBuilder();
+
+        InvalidOperationException actual = Assert.Throws<InvalidOperationException>(() => builder.ConfigureShared(_ =>
+        {
+            calls++;
+            throw expected;
+        }));
+
+        Assert.Same(expected, actual);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public void Parameterized_ordinary_methods_compose_on_both_roles_without_changing_their_types()
+    {
+        InfoCarrierClientOptions client = new InfoCarrierClientOptions()
+            .WithEndpoint("https://example.test/data")
+            .ConfigureShared(b => FluentTestDeployment.Configure(b, allowSql: false))
+            .WithMaxResponseBytes(4096);
+        InfoCarrierServerOptions server = new InfoCarrierServerOptions()
+            .WithMaxRequestBytes(8192)
+            .ConfigureShared(b => FluentTestDeployment.Configure(b, allowSql: false))
+            .WithLogForwarding(LogLevel.Warning);
+
+        InfoCarrierClientRegistration clientRegistration = client.Build();
+        InfoCarrierServerRegistration serverRegistration = server.Build(typeof(TestContext));
+        Assert.Equal(4096, clientRegistration.MaxResponseBytes);
+        Assert.False(serverRegistration.AllowsArbitrarySql);
+        Assert.Contains(typeof(TimeOnly), serverRegistration.AllowedTypes);
+        Assert.Single(serverRegistration.AnonymousShapeTypes);
+    }
+
+    [Fact]
+    public void Shared_operations_and_configuration_preserve_client_type_in_any_order()
     {
         var original = new InfoCarrierClientOptions();
         InfoCarrierClientOptions result = original
@@ -20,7 +97,7 @@ public class FluentRoleOptionsTest
             .WithEndpoint("https://example.test/data")
             .AddValueMappers(new StubMapper())
             .WithMaxResponseBytes(4096)
-            .ConfigureFluentTestDeployment()
+            .ConfigureShared(FluentTestDeployment.Configure)
             .WithServerUsesRelationalQueryRules(false)
             .AllowArbitrarySqlExecution(false)
             .WithMaxResponseBytes(null);
@@ -33,7 +110,7 @@ public class FluentRoleOptionsTest
     }
 
     [Fact]
-    public void Shared_operations_and_generic_helpers_preserve_server_type_in_any_order()
+    public void Shared_operations_and_configuration_preserve_server_type_in_any_order()
     {
         var original = new InfoCarrierServerOptions();
         InfoCarrierServerOptions result = original
@@ -41,7 +118,7 @@ public class FluentRoleOptionsTest
             .WithMaxRequestBytes(8192)
             .AddValueMappers(new StubMapper())
             .WithStoresOwnedDataInsideOwner(true)
-            .ConfigureFluentTestDeployment()
+            .ConfigureShared(FluentTestDeployment.Configure)
             .WithLogForwarding(LogLevel.Warning)
             .WithTransactionIdleTimeout(TimeSpan.FromMinutes(10));
 
@@ -110,16 +187,22 @@ public class FluentRoleOptionsTest
         IInfoCarrierClient client = InfoCarrierClient.Create(http, o => mutable = o
             .WithEndpoint(new Uri("https://first.test/data"))
             .WithMaxResponseBytes(1024)
-            .WithServerUsesRelationalQueryRules(false));
+            .WithServerUsesRelationalQueryRules(false)
+            .ConfigureShared(FluentTestDeployment.Configure));
 
         mutable!.WithEndpoint("https://second.test/data")
             .WithMaxResponseBytes(null)
-            .WithServerUsesRelationalQueryRules(true);
+            .WithServerUsesRelationalQueryRules(true)
+            .ConfigureShared(b => b.AddAllowedTypes(typeof(DateOnly)).AllowArbitrarySqlExecution(false));
 
         InfoCarrierClientRegistration registration = ((IInfoCarrierClientConfiguration)client).Registration!;
         Assert.Equal(new Uri("https://first.test/data"), registration.Endpoint);
         Assert.Equal(1024, registration.MaxResponseBytes);
         Assert.False(registration.ServerUsesRelationalQueryRules);
+        var contextOptions = new DbContextOptionsBuilder().UseInfoCarrier(client);
+        InfoCarrierOptionsExtension deployment = contextOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!;
+        Assert.DoesNotContain(typeof(DateOnly), deployment.AllowedTypes);
+        Assert.True(deployment.ArbitrarySqlExecutionAllowed);
     }
 
     [Fact]
@@ -167,13 +250,4 @@ public class FluentRoleOptionsTest
         public bool TryMapFromWire(object? wireValue, Type declaredType, out object? value)
         { value = null; return false; }
     }
-}
-
-internal static class FluentTestDeployment
-{
-    internal static TBuilder ConfigureFluentTestDeployment<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
-        => builder.AddAllowedTypes(typeof(TimeOnly))
-            .AllowArbitrarySqlExecution(true)
-            .AddAnonymousShapes(new { Id = 0 });
 }

@@ -9,7 +9,7 @@ using InfoCarrier.Core.AspNetCore;
 
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.ConfigureInfoCarrier());
+    options.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 WebApplication app = builder.Build();
 
@@ -17,8 +17,7 @@ app.MapInfoCarrier();
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
         => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```
@@ -86,12 +85,11 @@ Two deployment settings widen what a client may send. Both deny by default, and 
 server's decision alone.
 
 ```csharp
-builder.Services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
         => builder
             .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
             .AllowArbitrarySqlExecution(true);

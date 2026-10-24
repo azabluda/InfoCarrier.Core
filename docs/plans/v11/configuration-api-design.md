@@ -155,7 +155,7 @@ identity, registry, descriptor, factory, or keyed service:
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.ConfigureApplication());
+    options.ConfigureShared(ShopDeployment.ConfigureApplication));
 
 app.MapInfoCarrier("api/data");
 ```
@@ -163,7 +163,7 @@ app.MapInfoCarrier("api/data");
 ```csharp
 builder.Services.AddInfoCarrierClient(options => options
     .WithEndpoint("https://api.example.com/api/data")
-    .ConfigureApplication());
+    .ConfigureShared(ShopDeployment.ConfigureApplication));
 
 builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
@@ -197,13 +197,36 @@ resolution call to the unnamed syntax.
 
 ## Bounded public shape
 
-### Fluent configuration approved 2026-10-24
+### Shared configuration decision, revised 2026-10-24
 
 Role properties remain mutable for configuration binding. Role-specific `With` extensions write
 those properties and return the same options object. Shared operations are generic extensions
-constrained to `InfoCarrierDeploymentBuilder`, so they preserve the concrete role type. An
-application-owned shared helper uses the same generic constraint. Shared and role calls can then
-appear in any order without casts or duplicated role overloads.
+constrained to `InfoCarrierDeploymentBuilder`, so they preserve the concrete role type.
+
+The revised decision supersedes the earlier recommendation for application-owned generic helpers.
+Applications declare ordinary methods taking `InfoCarrierDeploymentBuilder` and returning `void`.
+The library-owned `ConfigureShared<TBuilder>(Action<InfoCarrierDeploymentBuilder>)` adapter invokes
+the method synchronously, exactly once, on the existing builder, then returns that exact builder.
+Shared and role calls can appear in any order without application-side generic adaptation.
+
+```csharp
+public static void ConfigureSharedContract(InfoCarrierDeploymentBuilder builder)
+    => builder.AddAllowedTypes(typeof(Formatting));
+
+services.AddInfoCarrierClient(o => o
+    .WithEndpoint(endpoint)
+    .ConfigureShared(ShopDeployment.ConfigureSharedContract)
+    .WithMaxResponseBytes(responseLimit));
+```
+
+Parameterized methods use `.ConfigureShared(b => ShopDeployment.ConfigureSharedContract(b, settings))`.
+Shared methods can compose other ordinary shared methods. No configuration classes, interfaces,
+discovery, or extra registration are required. Null receivers and callbacks fail immediately;
+callback exceptions propagate. Execution stays at the adapter's position inside the role callback.
+There is no queued phase, snapshot creation, or identity change inside the adapter. Existing
+ordering applies: scalar assignments retain their existing semantics, and later mapper additions
+do not generally override earlier matching mappers. Sharing a method does not prove agreement
+between separately deployed applications.
 
 `WithLogForwarding(LogLevel? minimumLevel, bool includeSensitiveData = false)` sets both forwarding
 properties. A null level disables forwarding. Every call requires a fresh explicit sensitive-data
@@ -212,7 +235,7 @@ forwarding without a level. No nested fluent builder or duplicate configuration 
 
 This syntax leaves the descriptor architecture unchanged. Named client and server overloads in
 [issue #105](https://github.com/azabluda/InfoCarrier.Core/issues/105) can use the same option types
-and shared helpers. Names select registrations; they do not become part of shared configuration.
+and ordinary shared methods. Names select registrations; they do not become part of shared configuration.
 
 The implementation may refine names after compile-time API tests. Its boundary is:
 

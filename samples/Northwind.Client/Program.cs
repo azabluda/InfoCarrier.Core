@@ -38,7 +38,7 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services => InfoCarrierClient.
             services.GetRequiredService<WireLog>()),
         services.GetRequiredService<IInfoCarrierSerializer>(),
         services.GetRequiredService<ILogger<TransportInfoCarrierClient>>()),
-    options => options.ConfigureInfoCarrier()));
+    options => options.ConfigureShared(NorthwindDeployment.ConfigureInfoCarrier)));
 // A factory, not a context: each page owns its own unit of work, which is exactly what the Order
 // page is there to show. A DbContext held for the lifetime of the app would accumulate tracked
 // entities across pages and make "one SaveChanges for several edits" mean nothing.

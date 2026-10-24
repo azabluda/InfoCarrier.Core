@@ -13,13 +13,10 @@ public class InfoCarrierRoleIsolationTest
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        InfoCarrierServerBuilder first = services.AddInfoCarrierServer<FirstContext>(options =>
-        {
-            options.AllowArbitrarySqlExecution(true);
-            options.AddAllowedTypes(typeof(DateOnly));
-            options.AddAnonymousShapes(new { First = 0 });
-        });
-        InfoCarrierServerBuilder second = services.AddInfoCarrierServer<SecondContext>(options =>
+        InfoCarrierServerBuilder first = services.AddInfoCarrierServer<FirstContext>(options => options
+            .ConfigureShared(FluentTestDeployment.Configure)
+            .AddAllowedTypes(typeof(DateOnly)));
+        InfoCarrierServerBuilder second = services.AddInfoCarrierServer<FirstContext>(options =>
             options.AddAnonymousShapes(new { Second = 0 }));
 
         using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
@@ -58,5 +55,4 @@ public class InfoCarrierRoleIsolationTest
     }
 
     private sealed class FirstContext : DbContext;
-    private sealed class SecondContext : DbContext;
 }

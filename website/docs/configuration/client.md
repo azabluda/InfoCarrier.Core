@@ -5,7 +5,7 @@ Register the default HTTP client. `UseInfoCarrier` attaches it to a `DbContext`.
 ```csharp
 builder.Services.AddInfoCarrierClient(options => options
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureInfoCarrier());
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
@@ -19,13 +19,12 @@ Other EF Core options work as usual: logging, `ConfigureWarnings`, tracking, and
 
 ## What the client is told about the server
 
-Fluent methods and properties configure options. Generic shared helpers preserve the role
-type throughout a chain:
+Fluent methods and properties configure options. `ConfigureShared` preserves the role type in a chain:
 
 ```csharp
 builder.Services.AddInfoCarrierClient(options => options
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureInfoCarrier()
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier)
     .WithServerUsesRelationalQueryRules(false));
 ```
 
@@ -44,12 +43,11 @@ Put shared deployment facts in one application-owned method:
 ```csharp
 builder.Services.AddInfoCarrierClient(options => options
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureInfoCarrier());
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
         => builder
             .AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null })
             .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
@@ -58,7 +56,12 @@ public static class ShopDeployment
 }
 ```
 
-Pass the method through `AddInfoCarrierServer` on the server. Matching settings guide planning, but
+Apply the same method through `ConfigureShared` on the server. It runs immediately at that position
+in the role callback. Shared methods can call other ordinary shared methods. Pass arguments with
+`.ConfigureShared(b => ShopDeployment.ConfigureInfoCarrier(b, settings))` when needed.
+
+Existing ordering rules apply. Later mapper additions do not override earlier matching mappers.
+Sharing a method does not prove agreement between separately deployed applications. Matching settings
 cannot add provider support. The server controls admission. Refusals are not retried.
 
 Reference `InfoCarrier.Core.Abstractions` from the shared project, or link this source file.
@@ -73,7 +76,7 @@ Create the default client without dependency injection when the application owns
 ```csharp
 IInfoCarrierClient client = InfoCarrierClient.Create(httpClient, options => options
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureInfoCarrier());
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 ```
 
 The caller owns `httpClient`. Use the low-level types below for a custom transport or serializer.

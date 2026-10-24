@@ -109,15 +109,14 @@ direction only. Put the mapper in the same application-owned deployment method:
 // Client role
 builder.Services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureInfoCarrier());
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 // Server role
-builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
         => builder.AddValueMappers(new MoneyValueMapper());
 }
 ```

@@ -19,7 +19,7 @@ your `DbContext`. For example:
 var http = new HttpClient();
 IInfoCarrierClient client = InfoCarrierClient.Create(http, options => options
     .WithEndpoint("https://your-app-server/infocarrier")
-    .ConfigureInfoCarrier());
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
     .UseInfoCarrier(client)
@@ -29,8 +29,7 @@ await using var context = new ShopContext(options);
 
 public static class ShopDeployment
 {
-    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
-        where TBuilder : InfoCarrierDeploymentBuilder
+    public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
         => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```
@@ -38,7 +37,7 @@ public static class ShopDeployment
 Use the same method when registering the server role:
 
 ```csharp
-services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureInfoCarrier());
+services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 ```
 
 Reference `InfoCarrier.Core.Abstractions` from the project containing the shared method. The method

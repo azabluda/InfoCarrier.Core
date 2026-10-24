@@ -7,6 +7,28 @@ namespace InfoCarrier.Core;
 /// <summary>Configures shared deployment facts while preserving the concrete builder type.</summary>
 public static class InfoCarrierDeploymentBuilderExtensions
 {
+    /// <summary>Applies an ordinary shared configuration method while preserving the concrete builder type.</summary>
+    /// <remarks>
+    /// The callback runs synchronously, exactly once, at this position in the configuration chain.
+    /// It receives this builder; snapshot creation and registration identity remain unchanged.
+    /// Existing ordering rules apply: mapper additions retain first-claim-wins order.
+    /// Sharing a method does not prove agreement between separately deployed applications.
+    /// </remarks>
+    /// <param name="builder">The existing builder to configure.</param>
+    /// <param name="configure">The shared configuration to apply. Exceptions propagate to the caller.</param>
+    /// <returns>The same concrete builder.</returns>
+    /// <exception cref="ArgumentNullException">The builder or callback is null.</exception>
+    public static TBuilder ConfigureShared<TBuilder>(
+        this TBuilder builder, Action<InfoCarrierDeploymentBuilder> configure)
+        where TBuilder : InfoCarrierDeploymentBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        configure(builder);
+        return builder;
+    }
+
     /// <summary>Sets whether this deployment permits arbitrary SQL execution.</summary>
     /// <returns>The same concrete builder.</returns>
     public static TBuilder AllowArbitrarySqlExecution<TBuilder>(this TBuilder builder, bool allowed)
