@@ -22,11 +22,10 @@ A mapper claims such a value and writes it as one wire primitive instead.
 application that stores one has chosen nothing unusual, so it should not have to discover this seam
 at all.
 
-They are registered automatically on both sides. The server registration happens when you apply
-shared deployment configuration:
+They are registered automatically on both roles:
 
 ```csharp
-builder.Services.AddInfoCarrier();
+builder.Services.AddInfoCarrierServer<ShopContext>();
 ```
 
 A geometry mapper is deliberately not in the box, because shipping one would put a NetTopologySuite
@@ -107,11 +106,15 @@ Register the mapper on both halves, or a value that crosses in both directions i
 direction only. Put the mapper in the same application-owned deployment method:
 
 ```csharp
-// Client
-optionsBuilder.UseInfoCarrier(client, o => o.ConfigureInfoCarrier());
+// Client role
+builder.Services.AddInfoCarrierClient(o =>
+{
+    o.Endpoint = new Uri("https://api.example.com/infocarrier");
+    o.ConfigureInfoCarrier();
+});
 
-// Server
-builder.Services.AddInfoCarrier(o => o.ConfigureInfoCarrier());
+// Server role
+builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureInfoCarrier());
 
 public static class ShopDeployment
 {
@@ -121,7 +124,7 @@ public static class ShopDeployment
 }
 ```
 
-The existing service-provider registration remains available for version 10 applications.
+Custom clients can apply the same callback through `InfoCarrierClient.Configure`.
 
 Your own mappers get first refusal, ahead of anything the library derives from the model, so
 registering one is never overridden.

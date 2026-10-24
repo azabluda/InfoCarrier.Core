@@ -76,10 +76,20 @@ public class SqliteSmokeTest
     /// </remarks>
     private static SqliteSmokeContext CreateClient(
         SqliteInfoCarrierBackendTestStore store,
-        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptions = null)
-        => new(new DbContextOptionsBuilder<SqliteSmokeContext>()
-            .UseInfoCarrier(store, infoCarrierOptions)
-            .Options);
+        Action<InfoCarrierClientOptions>? infoCarrierOptions = null)
+    {
+        var options = new DbContextOptionsBuilder<SqliteSmokeContext>();
+        if (infoCarrierOptions is null)
+        {
+            options.UseInfoCarrier(store);
+        }
+        else
+        {
+            options.UseInfoCarrier(store, infoCarrierOptions);
+        }
+
+        return new(options.Options);
+    }
 
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(
         Func<IServiceCollection, IServiceCollection>? onAddServices = null,

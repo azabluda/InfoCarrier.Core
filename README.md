@@ -42,11 +42,9 @@ both halves build the same model. On the client, point the context at a transpor
 
 ```csharp
 // A WPF, Blazor WebAssembly, MAUI or console app.
-var serializer = new SystemTextJsonInfoCarrierSerializer();
-using var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
-
-IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(http, serializer), serializer);
+using var http = new HttpClient();
+IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
+    options.Endpoint = new Uri("https://your-app-server/infocarrier"));
 
 var options = new DbContextOptionsBuilder<ShopContext>().UseInfoCarrier(client).Options;
 

@@ -356,7 +356,7 @@ public class InMemorySmokeTest
 
         await using var context = new SmokeContext(
             new DbContextOptionsBuilder<SmokeContext>()
-                .UseInfoCarrier(store, o => o.UseNonRelationalServerStore())
+                .UseInfoCarrier(store, o => o.ServerUsesRelationalQueryRules = false)
                 .Options);
 
         context.Blogs.AddRange(
@@ -390,7 +390,7 @@ public class InMemorySmokeTest
 
         await using var context = new SmokeContext(
             new DbContextOptionsBuilder<SmokeContext>()
-                .UseInfoCarrier(store, o => o.UseNonRelationalServerStore())
+                .UseInfoCarrier(store, o => o.ServerUsesRelationalQueryRules = false)
                 .Options);
 
         context.Blogs.Add(new Blog { Id = 1, Title = "alpha" });

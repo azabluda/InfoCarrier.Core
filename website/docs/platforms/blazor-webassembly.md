@@ -88,23 +88,12 @@ context factory rather than a context, so each page owns its own unit of work.
 WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Same origin as the page: let your server host the client's files and there is no CORS.
-builder.Services.AddSingleton(_ => new HttpClient
+builder.Services.AddInfoCarrierClient(options =>
 {
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
+    options.Endpoint = new Uri(builder.HostEnvironment.BaseAddress + "infocarrier");
 });
 
-builder.Services.AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>();
-
-builder.Services.AddSingleton<IInfoCarrierClient>(sp =>
-{
-    var serializer = sp.GetRequiredService<IInfoCarrierSerializer>();
-    return new TransportInfoCarrierClient(
-        new HttpInfoCarrierTransport(sp.GetRequiredService<HttpClient>(), serializer),
-        serializer);
-});
-
-builder.Services.AddDbContextFactory<ShopContext>((sp, o) =>
-    o.UseInfoCarrier(sp.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
 Serialization is source-generated, so it survives trimming where reflection-based JSON does not.

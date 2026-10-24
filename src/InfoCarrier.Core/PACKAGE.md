@@ -11,19 +11,20 @@ Both halves need .NET 10 and EF Core 10. Install with
 
 ## Usage
 
-Build a client over a transport, then call `UseInfoCarrier` to choose the InfoCarrier provider for
+Create the default HTTP client, then call `UseInfoCarrier` to choose the InfoCarrier provider for
 your `DbContext`. For example:
 
 ```csharp
 // A WPF, Blazor WebAssembly, MAUI or console app.
-var serializer = new SystemTextJsonInfoCarrierSerializer();
-var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
-
-IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(http, serializer), serializer);
+var http = new HttpClient();
+IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
+{
+    options.Endpoint = new Uri("https://your-app-server/infocarrier");
+    options.ConfigureInfoCarrier();
+});
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-    .UseInfoCarrier(client, remote => remote.ConfigureInfoCarrier())
+    .UseInfoCarrier(client)
     .Options;
 
 await using var context = new ShopContext(options);
@@ -36,10 +37,10 @@ public static class ShopDeployment
 }
 ```
 
-Use the same method on the server:
+Use the same method when registering the server role:
 
 ```csharp
-services.AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureInfoCarrier());
 ```
 
 Reference `InfoCarrier.Core.Abstractions` from the project containing the shared method. The method
@@ -49,8 +50,8 @@ database provider. The server remains the admission boundary. A refusal returns 
 evaluation retry.
 
 `client` is safe to share: it holds no mutable state, so one instance serves every `DbContext` in
-your application. `MapInfoCarrier()` and the transport both default to the route `infocarrier`,
-so the `BaseAddress` above needs no path.
+your application. `MapInfoCarrier()` defaults to the route `infocarrier`, which is included in the
+absolute client endpoint above.
 
 Everything after that is ordinary EF Core. The server executes the database query. The client can
 rebuild an eligible final projection from returned values.

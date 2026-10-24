@@ -19,11 +19,14 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="TransportInfoCarrierClient" /> class.
 /// </remarks>
-public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, IInfoCarrierSerializer serializer) : IInfoCarrierClient
+public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, IInfoCarrierSerializer serializer)
+    : IInfoCarrierClient, IInfoCarrierClientConfiguration
 {
     private readonly IInfoCarrierTransport _transport = transport;
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
+
+    InfoCarrierClientRegistration? IInfoCarrierClientConfiguration.Registration { get; set; }
 
     /// <inheritdoc />
     public async IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(
@@ -74,6 +77,14 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
+
+    internal TransportInfoCarrierClient(
+        IInfoCarrierTransport transport,
+        IInfoCarrierSerializer serializer,
+        ILogger<TransportInfoCarrierClient> logger,
+        InfoCarrierClientRegistration registration)
+        : this(transport, serializer, logger)
+        => ((IInfoCarrierClientConfiguration)this).Registration = registration;
 
     /// <inheritdoc />
     public QueryDataResult QueryData(

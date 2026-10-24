@@ -93,7 +93,8 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => _backend.IsDirect
             ? _backend.AddDirectClientOptions(builder)
-            : builder.UseInfoCarrier(_backend, InfoCarrierTestStore.ClientOptions(_backend));
+            : builder.UseInfoCarrier(
+                InfoCarrierClient.Configure(_backend, InfoCarrierTestStore.ClientOptions(_backend)));
 
     /// <inheritdoc />
     public override async Task CleanAsync(DbContext context)
