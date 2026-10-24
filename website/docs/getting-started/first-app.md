@@ -94,7 +94,7 @@ using Shop;
 
 using var http = new HttpClient();
 IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
-    options.Endpoint = new Uri("https://your-app-server/infocarrier"));
+    options.WithEndpoint("https://your-app-server/infocarrier"));
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
     .UseInfoCarrier(client)
@@ -114,9 +114,7 @@ In a dependency injection application, register the complete client role instead
 
 ```csharp
 builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://your-app-server/infocarrier");
-});
+    options.WithEndpoint("https://your-app-server/infocarrier"));
 
 builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```

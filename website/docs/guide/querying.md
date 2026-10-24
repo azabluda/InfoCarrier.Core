@@ -71,11 +71,9 @@ the type on both ends:
 
 ```csharp
 services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(Formatting)));
-services.AddInfoCarrierClient(o =>
-{
-    o.Endpoint = new Uri("https://api.example.com/infocarrier");
-    o.AddAllowedTypes(typeof(Formatting));
-});
+services.AddInfoCarrierClient(o => o
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .AddAllowedTypes(typeof(Formatting)));
 ```
 
 The helper must exist on the server too. Registration lets the expression reach that server;
@@ -101,11 +99,9 @@ three queries that every relational provider refuses:
 If your server's store is not relational, say so once and the three go away:
 
 ```csharp
-services.AddInfoCarrierClient(o =>
-{
-    o.Endpoint = new Uri("https://api.example.com/infocarrier");
-    o.ServerUsesRelationalQueryRules = false;
-});
+services.AddInfoCarrierClient(o => o
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .WithServerUsesRelationalQueryRules(false));
 ```
 
 That tells the client something it cannot work out for itself. It does not make the query work
@@ -232,11 +228,9 @@ both halves and the same query runs in the database:
 
 ```csharp
 services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(PeriodKey)));
-services.AddInfoCarrierClient(o =>
-{
-    o.Endpoint = new Uri("https://api.example.com/infocarrier");
-    o.AddAllowedTypes(typeof(PeriodKey));
-});
+services.AddInfoCarrierClient(o => o
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .AddAllowedTypes(typeof(PeriodKey)));
 ```
 
 An anonymous key such as `new { o.Year, o.Month }` needs no registration.

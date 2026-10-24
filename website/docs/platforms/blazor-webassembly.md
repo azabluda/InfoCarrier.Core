@@ -89,9 +89,7 @@ WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Same origin as the page: let your server host the client's files and there is no CORS.
 builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri(builder.HostEnvironment.BaseAddress + "infocarrier");
-});
+    options.WithEndpoint(builder.HostEnvironment.BaseAddress + "infocarrier"));
 
 builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```

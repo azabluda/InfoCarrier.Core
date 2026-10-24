@@ -30,11 +30,12 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
         }
 
         // Registering the client afterward must work: no client is resolved during registration.
-        services.AddInfoCarrierClient(options =>
-        {
-            options.Endpoint = new Uri("http://localhost/infocarrier");
-            options.ConfigureInfoCarrier();
-        }).ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
+        services.AddInfoCarrierClient(options => options
+            .WithEndpoint("http://localhost/infocarrier")
+            .ConfigureInfoCarrier()
+            .AddAllowedTypes(typeof(DateOnly))
+            .WithMaxResponseBytes(16 * 1024 * 1024))
+            .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
 
         await using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
         for (var lease = 0; lease < 2; lease++)

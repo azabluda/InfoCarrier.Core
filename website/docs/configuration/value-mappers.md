@@ -107,19 +107,17 @@ direction only. Put the mapper in the same application-owned deployment method:
 
 ```csharp
 // Client role
-builder.Services.AddInfoCarrierClient(o =>
-{
-    o.Endpoint = new Uri("https://api.example.com/infocarrier");
-    o.ConfigureInfoCarrier();
-});
+builder.Services.AddInfoCarrierClient(o => o
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .ConfigureInfoCarrier());
 
 // Server role
 builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureInfoCarrier());
 
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder.AddValueMappers(new MoneyValueMapper());
 }
 ```

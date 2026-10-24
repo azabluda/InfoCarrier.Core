@@ -3,7 +3,7 @@
 Shared deployment configuration contracts for InfoCarrier.Core applications.
 
 Use this package from application code referenced by both the client and server. It contains only
-`InfoCarrierDeploymentBuilder` and `IInfoCarrierValueMapper`. It has no Entity Framework Core
+`InfoCarrierDeploymentBuilder`, its shared fluent extensions, and `IInfoCarrierValueMapper`. It has no Entity Framework Core
 dependency.
 
 An existing shared model project is usually the simplest home for deployment configuration. You
@@ -13,8 +13,8 @@ InfoCarrier. A small application can also link one source file into both applica
 ```csharp
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```

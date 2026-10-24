@@ -56,8 +56,10 @@ unchanged.
 | `InfoCarrierServerOptions` | Request limit, transaction timeout, document storage, log forwarding, and shared deployment settings. |
 | `InfoCarrierLogForwardingOptions` | Minimum level and the separate sensitive-data grant. Available through `InfoCarrierServerOptions.LogForwarding`. |
 | `InfoCarrierDeploymentBuilder` | Configures shared shapes, types, mappers, and arbitrary SQL. In `InfoCarrier.Core.Abstractions`. |
+| `InfoCarrierDeploymentBuilderExtensions` | Generic shared methods preserve the concrete builder type throughout fluent chains. |
+| `InfoCarrierRoleOptionsExtensions` | `WithEndpoint`, `WithMaxResponseBytes`, `WithServerUsesRelationalQueryRules`, `WithMaxRequestBytes`, `WithTransactionIdleTimeout`, `WithStoresOwnedDataInsideOwner`, and `WithLogForwarding` configure the same mutable options properties. |
 | `InfoCarrierPayloadLimits` | `(int? maxRequestBytes = DefaultMaxRequestBytes, int? maxResponseBytes = null)`. `Default` is the static instance; `DefaultMaxRequestBytes` is 64 MiB. `null` opts out of a limit. |
-| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Low-level immutable structural catalog. Applications register prototypes through `InfoCarrierDeploymentBuilder.AddAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
+| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Low-level immutable structural catalog. Applications register prototypes through `AddAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
 
 ## Exceptions
 

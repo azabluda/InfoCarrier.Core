@@ -3,11 +3,9 @@
 Register the default HTTP client. `UseInfoCarrier` attaches it to a `DbContext`.
 
 ```csharp
-builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/infocarrier");
-    options.ConfigureInfoCarrier();
-});
+builder.Services.AddInfoCarrierClient(options => options
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .ConfigureInfoCarrier());
 
 builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
@@ -21,23 +19,21 @@ Other EF Core options work as usual: logging, `ConfigureWarnings`, tracking, and
 
 ## What the client is told about the server
 
-The callback carries deployment facts and client-only store information. Put client-only calls
-before the shared method:
+Fluent methods and properties configure options. Generic shared helpers preserve the role
+type throughout a chain:
 
 ```csharp
-builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/infocarrier");
-    options.ServerUsesRelationalQueryRules = false;
-    options.ConfigureInfoCarrier();
-});
+builder.Services.AddInfoCarrierClient(options => options
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .ConfigureInfoCarrier()
+    .WithServerUsesRelationalQueryRules(false));
 ```
 
 | Setting | What it says |
 |---|---|
 | `AddAllowedTypes(...)` | These Common Language Runtime types may appear beyond those implied by the model. Register them on both sides. See [Keys of your own types](../guide/querying.md#keys-of-your-own-types). |
 | `AllowArbitrarySqlExecution(true)` | This client will send `FromSql` and `Database.SqlQuery<T>`. The server must grant it too. Only the server's setting is a boundary. See [Querying](../guide/querying.md#what-is-not-part-of-the-surface). |
-| `ServerUsesRelationalQueryRules = false` | The server's store does not use relational query rules. A change to part of a document sends the whole document. **On a document store the server needs [its own setting](server.md#saying-the-store-is-a-document-store) as well**, and that setting keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
+| `WithServerUsesRelationalQueryRules(false)` | The server's store does not use relational query rules. A change to part of a document sends the whole document. **On a document store the server needs [its own setting](server.md#saying-the-store-is-a-document-store) as well**, and that setting keeps nested data. See [Querying](../guide/querying.md#rules-that-come-from-the-servers-store). |
 
 Leave all three alone unless one of those sentences is true of your deployment.
 
@@ -46,16 +42,14 @@ Leave all three alone unless one of those sentences is true of your deployment.
 Put shared deployment facts in one application-owned method:
 
 ```csharp
-builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/infocarrier");
-    options.ConfigureInfoCarrier();
-});
+builder.Services.AddInfoCarrierClient(options => options
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .ConfigureInfoCarrier());
 
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder
             .AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null })
             .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
@@ -77,11 +71,9 @@ Keep client-only settings outside this method.
 Create the default client without dependency injection when the application owns an `HttpClient`:
 
 ```csharp
-IInfoCarrierClient client = InfoCarrierClient.Create(httpClient, options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/infocarrier");
-    options.ConfigureInfoCarrier();
-});
+IInfoCarrierClient client = InfoCarrierClient.Create(httpClient, options => options
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .ConfigureInfoCarrier());
 ```
 
 The caller owns `httpClient`. Use the low-level types below for a custom transport or serializer.
@@ -142,11 +134,9 @@ request it receives, the client caps the response it receives. Only the server's
 default-on, because that is the side reading bytes from an untrusted peer.
 
 ```csharp
-builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/infocarrier");
-    options.MaxResponseBytes = 16 * 1024 * 1024;
-});
+builder.Services.AddInfoCarrierClient(options => options
+    .WithEndpoint("https://api.example.com/infocarrier")
+    .WithMaxResponseBytes(16 * 1024 * 1024));
 ```
 
 | | Default | Why |

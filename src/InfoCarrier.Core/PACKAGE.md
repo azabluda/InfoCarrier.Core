@@ -17,11 +17,9 @@ your `DbContext`. For example:
 ```csharp
 // A WPF, Blazor WebAssembly, MAUI or console app.
 var http = new HttpClient();
-IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
-{
-    options.Endpoint = new Uri("https://your-app-server/infocarrier");
-    options.ConfigureInfoCarrier();
-});
+IInfoCarrierClient client = InfoCarrierClient.Create(http, options => options
+    .WithEndpoint("https://your-app-server/infocarrier")
+    .ConfigureInfoCarrier());
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
     .UseInfoCarrier(client)
@@ -31,8 +29,8 @@ await using var context = new ShopContext(options);
 
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```

@@ -17,8 +17,8 @@ app.MapInfoCarrier();
 
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
 }
 ```
@@ -73,7 +73,7 @@ default is 64 MiB per request. Set your own if you know what your clients legiti
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.MaxRequestBytes = 8 * 1024 * 1024);
+    options.WithMaxRequestBytes(8 * 1024 * 1024));
 ```
 
 A query tree is kilobytes, and a `SaveChanges` request is no bigger than the graph the client
@@ -90,8 +90,8 @@ builder.Services.AddInfoCarrierServer<ShopContext>(options => options.ConfigureI
 
 public static class ShopDeployment
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrier(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrier<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder
             .AddAllowedTypes(typeof(SqlServerDbFunctionsExtensions))
             .AllowArbitrarySqlExecution(true);
@@ -153,10 +153,11 @@ server's category and event id:
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.LogForwarding.MinimumLevel = LogLevel.Warning);
+    options.WithLogForwarding(LogLevel.Warning));
 ```
 
-Set `MinimumLevel` to another `LogLevel` to change it. At `Information`, every server SQL command
+Pass another `LogLevel` to change it. Pass `null` to disable forwarding. Each call resets the
+sensitive-data grant unless `includeSensitiveData: true` is supplied. At `Information`, every server SQL command
 goes too,
 which tells a client your schema.
 
@@ -184,7 +185,7 @@ own `DisposeAsync` cannot help, because the process is gone. Tell the server how
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.TransactionIdleTimeout = TimeSpan.FromMinutes(10));
+    options.WithTransactionIdleTimeout(TimeSpan.FromMinutes(10)));
 ```
 
 **Off until you call this**, so upgrading changes nothing. Every request naming the token refreshes
@@ -227,7 +228,7 @@ reports success and the next read fails on a field that is gone.
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>(options =>
-    options.StoresOwnedDataInsideOwner = true);
+    options.WithStoresOwnedDataInsideOwner(true));
 ```
 
 The server then reads the stored document and puts back whatever the change set left out.

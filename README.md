@@ -44,7 +44,7 @@ both halves build the same model. On the client, point the context at a transpor
 // A WPF, Blazor WebAssembly, MAUI or console app.
 using var http = new HttpClient();
 IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
-    options.Endpoint = new Uri("https://your-app-server/infocarrier"));
+    options.WithEndpoint("https://your-app-server/infocarrier"));
 
 var options = new DbContextOptionsBuilder<ShopContext>().UseInfoCarrier(client).Options;
 

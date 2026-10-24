@@ -69,10 +69,11 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
-    public void Abstractions_assembly_exposes_only_the_two_approved_contracts()
+    public void Abstractions_assembly_exposes_only_the_shared_configuration_surface()
         => Assert.Equal(
             [
                 "InfoCarrier.Core.InfoCarrierDeploymentBuilder",
+                "InfoCarrier.Core.InfoCarrierDeploymentBuilderExtensions",
                 "InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper"
             ],
             typeof(InfoCarrierDeploymentBuilder).Assembly
@@ -488,8 +489,8 @@ public class InfoCarrierDeploymentBuilderTest
 
 internal static class InfoCarrierDeploymentBuilderTestExtensions
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrierForTest(
-        this InfoCarrierDeploymentBuilder builder)
+    public static TBuilder ConfigureInfoCarrierForTest<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
         => builder
             .AddAllowedTypes(typeof(DateOnly))
             .AllowArbitrarySqlExecution(true);

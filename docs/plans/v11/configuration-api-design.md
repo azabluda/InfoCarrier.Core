@@ -56,7 +56,7 @@ configures shared and role-specific facts on one object. It produces one immutab
 that role registration.
 
 `AllowedTypes`, `AllowArbitrarySqlExecution`, and `ValueMappers` are not redeclared on the role
-options. The inherited members remain their only source. Applications can continue to call one
+options. The base builder remains their only state owner. Applications can continue to call one
 application-owned extension method from both role callbacks.
 
 The client-only non-relational planning switch and the server-only document repair remain separate
@@ -161,11 +161,9 @@ app.MapInfoCarrier("api/data");
 ```
 
 ```csharp
-builder.Services.AddInfoCarrierClient(options =>
-{
-    options.Endpoint = new Uri("https://api.example.com/api/data");
-    options.ConfigureApplication();
-});
+builder.Services.AddInfoCarrierClient(options => options
+    .WithEndpoint("https://api.example.com/api/data")
+    .ConfigureApplication());
 
 builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
@@ -198,6 +196,23 @@ handle. The internal descriptor architecture must not add another callback, gene
 resolution call to the unnamed syntax.
 
 ## Bounded public shape
+
+### Fluent configuration approved 2026-10-24
+
+Role properties remain mutable for configuration binding. Role-specific `With` extensions write
+those properties and return the same options object. Shared operations are generic extensions
+constrained to `InfoCarrierDeploymentBuilder`, so they preserve the concrete role type. An
+application-owned shared helper uses the same generic constraint. Shared and role calls can then
+appear in any order without casts or duplicated role overloads.
+
+`WithLogForwarding(LogLevel? minimumLevel, bool includeSensitiveData = false)` sets both forwarding
+properties. A null level disables forwarding. Every call requires a fresh explicit sensitive-data
+grant; an omitted argument clears an earlier grant. Existing snapshot validation rejects sensitive
+forwarding without a level. No nested fluent builder or duplicate configuration state is added.
+
+This syntax leaves the descriptor architecture unchanged. Named client and server overloads in
+[issue #105](https://github.com/azabluda/InfoCarrier.Core/issues/105) can use the same option types
+and shared helpers. Names select registrations; they do not become part of shared configuration.
 
 The implementation may refine names after compile-time API tests. Its boundary is:
 
