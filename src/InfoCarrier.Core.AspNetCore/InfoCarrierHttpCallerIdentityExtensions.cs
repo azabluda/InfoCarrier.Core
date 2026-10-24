@@ -17,7 +17,10 @@ public static class InfoCarrierHttpCallerIdentityExtensions
         Func<HttpContext, string?> callerId)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddInfoCarrierHttpCallerIdentity(callerId);
+        ArgumentNullException.ThrowIfNull(callerId);
+        builder.Services.AddHttpContextAccessor();
+        builder.ConfigureCallerIdentity(sp => new HttpCallerIdentity(
+            sp.GetRequiredService<IHttpContextAccessor>(), callerId));
         return builder;
     }
 
@@ -55,8 +58,8 @@ public static class InfoCarrierHttpCallerIdentityExtensions
     ///     </para>
     ///     <example>
     ///         <code>
-    ///         builder.Services.AddInfoCarrierHttpCallerIdentity(
-    ///             http => http.User.FindFirst("sub")?.Value);
+    ///         builder.Services.AddInfoCarrierServer&lt;ShopContext&gt;()
+    ///             .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
     ///
     ///         app.MapInfoCarrier().RequireAuthorization("DataAccess");
     ///         </code>

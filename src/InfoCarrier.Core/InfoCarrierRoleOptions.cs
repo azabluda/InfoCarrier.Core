@@ -27,7 +27,8 @@ public sealed class InfoCarrierClientOptions : InfoCarrierDeploymentBuilder
         }
 
         Positive(MaxResponseBytes, nameof(MaxResponseBytes));
-        return new(Endpoint, ServerUsesRelationalQueryRules, MaxResponseBytes, CreateSnapshot());
+        return new(new InfoCarrierRegistrationIdentity(), Endpoint, ServerUsesRelationalQueryRules,
+            MaxResponseBytes, CreateSnapshot());
     }
 
     internal static void Positive(int? value, string name)
@@ -71,6 +72,7 @@ public sealed class InfoCarrierServerOptions : InfoCarrierDeploymentBuilder
         }
 
         return new(
+            new InfoCarrierRegistrationIdentity(),
             contextType,
             StoresOwnedDataInsideOwner,
             MaxRequestBytes,
@@ -92,20 +94,30 @@ public sealed class InfoCarrierLogForwardingOptions
 }
 
 internal sealed record InfoCarrierClientRegistration(
+    InfoCarrierRegistrationIdentity Identity,
     Uri? Endpoint,
     bool ServerUsesRelationalQueryRules,
     int? MaxResponseBytes,
     InfoCarrierDeploymentSnapshot Deployment);
 
 internal sealed record InfoCarrierServerRegistration(
+    InfoCarrierRegistrationIdentity Identity,
     Type ContextType,
     bool StoresOwnedDataInsideOwner,
     int? MaxRequestBytes,
     TimeSpan? TransactionIdleTimeout,
     LogLevel? LogForwardingMinimumLevel,
     bool IncludeSensitiveLogData,
-    InfoCarrierDeploymentSnapshot Deployment)
+    InfoCarrierDeploymentSnapshot Deployment,
+    Func<IServiceProvider, IInfoCarrierServerCallerIdentity>? CallerIdentityFactory = null)
 {
+    internal bool AllowsArbitrarySql => Deployment.AllowArbitrarySqlExecution;
+    internal IReadOnlyList<Type> AllowedTypes => Deployment.AllowedTypes;
+    internal IReadOnlyList<Type> AnonymousShapeTypes => Deployment.AnonymousShapeTypes;
+
     internal DbContext ResolveContext(IServiceProvider provider)
         => (DbContext)provider.GetRequiredService(ContextType);
 }
+
+/// <summary>Opaque identity for one complete role registration.</summary>
+internal sealed class InfoCarrierRegistrationIdentity;

@@ -3,12 +3,40 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
 
 /// <summary>Extension methods for attaching an InfoCarrier client to a context.</summary>
 public static class InfoCarrierDbContextOptionsBuilderExtensions
 {
+    /// <summary>Attaches the default client registered with <c>AddInfoCarrierClient</c>.</summary>
+    /// <remarks>
+    ///     Standard Entity Framework context registrations supply the application service provider.
+    ///     For manually constructed options, supply a client explicitly or call
+    ///     <see cref="DbContextOptionsBuilder.UseApplicationServiceProvider" /> first.
+    /// </remarks>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder UseInfoCarrier(this DbContextOptionsBuilder optionsBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(optionsBuilder);
+
+        IServiceProvider provider = optionsBuilder.Options.FindExtension<CoreOptionsExtension>()
+            ?.ApplicationServiceProvider
+            ?? throw new InvalidOperationException(
+                "UseInfoCarrier() requires an application service provider. Use a standard Entity Framework "
+                + "context registration, call UseApplicationServiceProvider, or pass a client explicitly.");
+        IInfoCarrierClient client = provider.GetService<IInfoCarrierClient>()
+            ?? throw new InvalidOperationException(
+                "No default InfoCarrier client is registered. Call AddInfoCarrierClient "
+                + "before resolving context options, or pass a client explicitly.");
+
+        return UseInfoCarrier(optionsBuilder, client);
+    }
+
     /// <summary>Configures the context to use the supplied InfoCarrier client.</summary>
     [RequiresUnreferencedCode(
         "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
@@ -48,6 +76,16 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         IInfoCarrierClient client,
         Action<InfoCarrierClientOptions> configure)
         => UseInfoCarrier(optionsBuilder, InfoCarrierClient.Configure(client, configure));
+
+    /// <summary>Attaches the default registered InfoCarrier client to the typed context.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder)
+        where TContext : DbContext
+        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder);
 
     /// <summary>Configures the typed context to use the supplied InfoCarrier client.</summary>
     [RequiresUnreferencedCode(

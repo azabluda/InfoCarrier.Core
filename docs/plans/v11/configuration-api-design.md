@@ -3,7 +3,7 @@
 Date: 2026-10-23  
 Issue: [#104](https://github.com/azabluda/InfoCarrier.Core/issues/104)  
 Release: 11.0  
-Status: reconciled design, before implementation
+Status: implemented in pull request #253; parameterless attachment approved 2026-10-24
 
 ## Purpose
 
@@ -167,8 +167,7 @@ builder.Services.AddInfoCarrierClient(options =>
     options.ConfigureApplication();
 });
 
-builder.Services.AddDbContextFactory<ShopContext>((services, options) =>
-    options.UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
 
 The returned builders expose existing optional composition, such as an HTTP message handler or
@@ -176,6 +175,23 @@ caller identity. Ignoring the return value is the normal path.
 
 The Entity Framework provider attachment remains necessary. The descriptor model adds no syntax to
 that existing line.
+
+The parameterless attachment was approved on 2026-10-24 after comparison with Npgsql and an executable
+prototype. It resolves the default client from the application provider already attached to the
+current options builder, then delegates to `UseInfoCarrier(client)`. Resolution occurs before Entity
+Framework builds internal services, preserving deployment snapshots and mapper identity. Standard
+context, factory, pool, and pooled-factory registrations supply that provider automatically.
+
+Client registration remains independent of context registration. Do not use `ConfigureDbContext<T>`
+to attach a client to every registration of one context type. An application can use the same type
+with independent remote InfoCarrier and local SQLite options. Custom factories either supply the
+application provider before attachment or pass the client explicitly. Entity Framework's ordinary
+`AddDbContextFactory` has no name parameter; keyed custom factories need independent options.
+
+Issue #105 can add `UseInfoCarrier(clientName: "orders")` over the descriptor registry. The default
+overload must not select an arbitrary named client. A missing provider or client fails during
+options configuration with an actionable message; this does not imply eager activation by
+`BuildServiceProvider(ValidateOnBuild = true)`.
 
 Only an application with several clients or endpoints supplies a name or retains a registration
 handle. The internal descriptor architecture must not add another callback, generic argument, or
@@ -289,3 +305,33 @@ identity tags when multiple registrations make those identities meaningful.
 
 Each implementation pull request stays within one numbered step. Issue #105 starts only after the
 unnamed descriptors and their activation boundary are stable.
+
+## Compatibility review after implementation (2026-10-24)
+
+The review below distinguishes the implemented foundation from the public multi-registration work
+reserved for [issue #105](https://github.com/azabluda/InfoCarrier.Core/issues/105).
+
+| Requirement | Foundation in this change | Remaining issue #105 work |
+|---|---|---|
+| Ordinary registration stays concise | `AddInfoCarrierClient` plus registration-local `UseInfoCarrier()` | Add named attachment without changing the default overload |
+| One context type can serve different destinations | Independent options and keyed custom factories work; no client attachment by context-type-wide configuration | Exercise two named clients of the same context type under concurrent reads and writes |
+| Role identity is independent of context type | Client and server descriptors carry opaque identities; server builders retain their descriptor identity | Map public names and handles to those identities |
+| Client policy remains isolated | Client descriptors own deployment snapshots, payload limits, store rules, and mapper instances | Named activation and separate private HTTP client configurations |
+| Server admission remains isolated | Server descriptors retain distinct grants, anonymous shapes, and mapper policy | Activate and map several descriptors, including two policies over one context type |
+| Context construction uses the host | Default server resolves its declared context from a host scope | Extend descriptor resolution for named or custom context factories when type alone is insufficient |
+| Caller identity belongs to an endpoint | `AddHttpCallerIdentity` configures its server builder; the accessor remains shared | Endpoint mapping must activate the selected descriptor's policy |
+| Runtime policy remains stable | Runtime descriptor store copies the registration catalog | Maintain that snapshot boundary during named registration and handle selection |
+| Limits, timeouts, and log grants remain per role | Descriptor activation supplies limits, timeouts, and forwarding policy | Select the corresponding serializer and server together for each endpoint |
+| Transactions remain endpoint-owned | Each server instance retains its own transaction registry and minting identity | Test token rejection across two mapped endpoints |
+| Shared cache reuse preserves correctness | Parameterless attachment delegates to the existing configured-client path before internal service construction | Verify serializer, mapper, and compiled-query behavior across named clients with actual stored-data assertions |
+| Endpoint selection is explicit when needed | Public mapping still selects the default role | Add handle/name selection, unambiguous typed convenience, and startup ambiguity errors |
+| Metrics distinguish roles | Existing meter behavior is unchanged | Add client and endpoint tags |
+
+`ImplicitClientRegistrationTest` exercises the four standard context registration methods through
+HTTP, including pooled reuse. Its same-context test saves and reads remote data through custom
+value mappers and independently saves and reads local SQLite data. `InfoCarrierRoleIsolationTest`
+checks descriptor policy separation and runtime-store immutability. `HttpCallerIdentityTest` checks
+that retained server builders configure separate caller policies.
+
+This is an additive foundation for issue #105. It does not expose named clients, named servers,
+multiple-endpoint mapping, or new metric tags in the issue #104 public surface.

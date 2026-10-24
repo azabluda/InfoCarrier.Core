@@ -12,7 +12,6 @@ using InfoCarrier.Core.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using InfoCarrier.Core.Expressions;
 using Xunit;
 
@@ -26,7 +25,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         var logs = new FailureLogs();
         await using var host = factory.WithWebHostBuilder(b => b
             .ConfigureLogging(l => l.AddProvider(logs))
-            .ConfigureServices(s => s.RemoveAll<AnonymousShapeCatalog>()));
+            .ConfigureServices(s => s.AddInfoCarrierServer<Northwind.Shared.NorthwindContext>()));
         using var context = NorthwindOverHttpTest.CreateClientContext(
             host, registerShape: true, out _);
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync());

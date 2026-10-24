@@ -3,6 +3,7 @@
 using System.Security.Claims;
 using InfoCarrier.Core.AspNetCore;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -28,6 +29,30 @@ namespace InfoCarrier.Core.TransportTests;
 /// </remarks>
 public class HttpCallerIdentityTest
 {
+    [Fact]
+    public void Server_builders_retain_separate_caller_identity_policies()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        InfoCarrierServerBuilder first = services.AddInfoCarrierServer<FirstContext>();
+        InfoCarrierServerBuilder second = services.AddInfoCarrierServer<SecondContext>();
+
+        first.AddHttpCallerIdentity(_ => "first");
+        second.AddHttpCallerIdentity(_ => "second");
+
+        using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
+        provider.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext();
+        var registrations = provider.GetRequiredService<InfoCarrierServerRegistrationStore>();
+        IInfoCarrierServerCallerIdentity firstIdentity =
+            registrations.Get(first.Identity).CallerIdentityFactory!(provider);
+        IInfoCarrierServerCallerIdentity secondIdentity =
+            registrations.Get(second.Identity).CallerIdentityFactory!(provider);
+
+        Assert.NotSame(first.Identity, second.Identity);
+        Assert.Equal("first", firstIdentity.CurrentCallerId);
+        Assert.Equal("second", secondIdentity.CurrentCallerId);
+    }
+
     [Fact]
     public void It_reads_the_caller_out_of_the_request_in_flight()
     {
@@ -105,4 +130,7 @@ public class HttpCallerIdentityTest
             User = new ClaimsPrincipal(
                 new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, callerId)], "test")),
         };
+
+    private sealed class FirstContext : DbContext;
+    private sealed class SecondContext : DbContext;
 }

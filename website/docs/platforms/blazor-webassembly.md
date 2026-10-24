@@ -93,8 +93,7 @@ builder.Services.AddInfoCarrierClient(options =>
     options.Endpoint = new Uri(builder.HostEnvironment.BaseAddress + "infocarrier");
 });
 
-builder.Services.AddDbContextFactory<ShopContext>((sp, o) =>
-    o.UseInfoCarrier(sp.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
 Serialization is source-generated, so it survives trimming where reflection-based JSON does not.

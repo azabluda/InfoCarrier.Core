@@ -118,8 +118,7 @@ builder.Services.AddInfoCarrierClient(options =>
     options.Endpoint = new Uri("https://your-app-server/infocarrier");
 });
 
-builder.Services.AddDbContextFactory<ShopContext>((sp, o) =>
-    o.UseInfoCarrier(sp.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
 !!! tip "A factory, not a context"

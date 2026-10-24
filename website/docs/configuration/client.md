@@ -1,7 +1,6 @@
 # Configuring the client
 
-Register the default HTTP client role once. `UseInfoCarrier` then attaches that client to each
-`DbContext`.
+Register the default HTTP client. `UseInfoCarrier` attaches it to a `DbContext`.
 
 ```csharp
 builder.Services.AddInfoCarrierClient(options =>
@@ -10,12 +9,15 @@ builder.Services.AddInfoCarrierClient(options =>
     options.ConfigureInfoCarrier();
 });
 
-builder.Services.AddDbContextFactory<ShopContext>((services, options) =>
-    options.UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(options => options.UseInfoCarrier());
 ```
 
-Everything else on `DbContextOptionsBuilder` is EF Core's and works as usual: logging,
-`EnableSensitiveDataLogging`, `ConfigureWarnings`, query-tracking behaviour, proxies.
+`UseInfoCarrier()` resolves the default client. Standard context and pooling registrations also work.
+For manual options, pass `UseInfoCarrier(client)` or call `UseApplicationServiceProvider(provider)` first.
+Client registration does not register a context. Independent options can use one context type with
+InfoCarrier or SQLite.
+
+Other EF Core options work as usual: logging, `ConfigureWarnings`, tracking, and proxies.
 
 ## What the client is told about the server
 
@@ -65,10 +67,8 @@ public static class ShopDeployment
 Pass the method through `AddInfoCarrierServer` on the server. Matching settings guide planning, but
 cannot add provider support. The server controls admission. Refusals are not retried.
 
-Reference `InfoCarrier.Core.Abstractions` from this method's project. Prefer an existing shared
-model project. A separate project keeps the model unaware of InfoCarrier. Small repositories can
-link the source file. Abstractions has no Entity Framework Core dependency. A project can reference
-both InfoCarrier packages.
+Reference `InfoCarrier.Core.Abstractions` from the shared project, or link this source file.
+Abstractions has no Entity Framework Core dependency.
 
 Keep client-only settings outside this method.
 
@@ -205,8 +205,9 @@ measured while nothing is listening.
 
 ## The internal service provider
 
-Build EF's internal service provider yourself for two things: to register a
-[value mapper](value-mappers.md) on the client, and to replace a provider service.
+Register application [value mappers](value-mappers.md) with `AddValueMappers` in the client role
+callback. Build EF's internal service provider yourself only when replacing a provider service or
+assembling a custom provider configuration.
 
 ```csharp
 ServiceProvider providerServices = new ServiceCollection()

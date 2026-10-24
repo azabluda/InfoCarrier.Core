@@ -201,7 +201,8 @@ inside that transaction, not merely end it. Tell the server who a caller is, and
 opened by somebody else.
 
 ```csharp
-builder.Services.AddInfoCarrierHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
+builder.Services.AddInfoCarrierServer<ShopContext>()
+    .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
 ```
 
 **Off until you call this, and it is a second lock rather than the first.** Without
@@ -213,6 +214,9 @@ value changes mid-transaction loses its own work. You pick it: a subject id, a l
 tenant claim behave differently under a token refresh.
 
 Nothing changes on the wire, so an existing client needs no rebuild.
+
+The caller rule belongs to this server registration. A host with several endpoints can give each
+endpoint a different rule. The HTTP context accessor remains shared host infrastructure.
 
 ## Saying the store is a document store
 

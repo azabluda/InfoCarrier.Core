@@ -55,8 +55,8 @@ builder.Services.AddSingleton<IInfoCarrierClient>(services => InfoCarrierClient.
 // own Razor output, nothing here can fix them, and they are not about this call. This one is ours,
 // it is about this call, and hiding it project-wide would also hide the next one.
 #pragma warning disable IL2026 // UseInfoCarrier is [RequiresUnreferencedCode]; see above.
-builder.Services.AddDbContextFactory<NorthwindContext>((services, options) => options
-    .UseInfoCarrier(services.GetRequiredService<IInfoCarrierClient>())
+builder.Services.AddDbContextFactory<NorthwindContext>(options => options
+    .UseInfoCarrier()
 
     // NOTE THE ABSENCE: there is no UseLazyLoadingProxies() here, and the server does call it.
     //

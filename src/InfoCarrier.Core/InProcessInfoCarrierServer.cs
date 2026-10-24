@@ -37,6 +37,7 @@ public sealed class InProcessInfoCarrierServer(
 {
     private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
     private InfoCarrierServerRegistration? _registration;
+    private Expressions.AnonymousShapeCatalog? _registrationAnonymousCatalog;
     private readonly ILogger<InProcessInfoCarrierServer> _logger = logger;
     private readonly ServerLogCapture? _logCapture = logCapture;
     private readonly IInfoCarrierServerLogForwarding? _logForwarding = logForwarding;
@@ -67,6 +68,22 @@ public sealed class InProcessInfoCarrierServer(
                 : serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>())
     {
         _registration = registration;
+        Type[] anonymousShapes =
+        [
+            .. registration.Deployment.AnonymousShapeTypes,
+            .. serviceProvider
+                .GetServices<InfoCarrierServiceCollectionExtensions.AnonymousShapeRegistration>()
+                .SelectMany(shape => shape.Types),
+        ];
+        if (anonymousShapes.Length > 0)
+        {
+            using IServiceScope scope = serviceProvider.CreateScope();
+            DbContext context = registration.ResolveContext(scope.ServiceProvider);
+            _registrationAnonymousCatalog = Expressions.AnonymousShapeCatalog.Create(
+                context.Model, anonymousShapes);
+        }
+        CallerIdentity = registration.CallerIdentityFactory?.Invoke(serviceProvider)
+            ?? serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
         TransactionTimeout = registration.TransactionIdleTimeout is { } timeout
             ? new ConfiguredTransactionTimeout(timeout)
             : serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
@@ -156,6 +173,11 @@ public sealed class InProcessInfoCarrierServer(
 
     private Expressions.AnonymousShapeCatalog? AnonymousCatalogFor(Microsoft.EntityFrameworkCore.Metadata.IModel model)
     {
+        if (_registrationAnonymousCatalog is { } registrationCatalog)
+        {
+            return registrationCatalog;
+        }
+
         Expressions.AnonymousShapeCatalog[] catalogs = _serviceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
         Expressions.AnonymousShapeCatalog[] modelCatalogs = catalogs.Where(c => ReferenceEquals(c.Model, model)).ToArray();
         Expressions.AnonymousShapeCatalog? registered =
@@ -248,8 +270,8 @@ public sealed class InProcessInfoCarrierServer(
     ///     registered it. <b>Absent means never evict</b>, which is how every version up to
     ///     10.1.0 behaved and is what makes this opt-in.
     /// </remarks>
-    private IInfoCarrierServerCallerIdentity? CallerIdentity
-        => _serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
+    private IInfoCarrierServerCallerIdentity? CallerIdentity { get; }
+        = serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
 
     /// <summary>
     ///     How long a transaction may go untouched before this server rolls it back
