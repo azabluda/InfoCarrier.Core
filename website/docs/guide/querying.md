@@ -66,14 +66,21 @@ See [Limitations](../limitations.md).
 
 ### Helpers of your own
 
-For backend behavior parity, put your helper on a shared type, make the method public, and register
-the type on both ends:
+To let the server provider handle your helper, put it on a shared type and make the method public.
+Add its type to your shared deployment configuration, then call that method on both ends:
 
 ```csharp
-services.AddInfoCarrierServer<ShopContext>(o => o.AddAllowedTypes(typeof(Formatting)));
+services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureSharedContract());
 services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
-    .AddAllowedTypes(typeof(Formatting)));
+    .ConfigureSharedContract());
+
+public static class ShopDeployment
+{
+    public static TBuilder ConfigureSharedContract<TBuilder>(this TBuilder builder)
+        where TBuilder : InfoCarrierDeploymentBuilder
+        => builder.AddAllowedTypes(typeof(Formatting));
+}
 ```
 
 The helper must exist on the server too. Registration lets the expression reach that server;
