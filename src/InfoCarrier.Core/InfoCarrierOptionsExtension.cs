@@ -36,7 +36,7 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     /// <summary>
     ///     The CLR types this client may name in a query beyond the ones its model implies
     ///     (ADR-008 constraint 2). Empty unless the application registered some — see
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />.
+    ///     <see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" />.
     /// </summary>
     public virtual IReadOnlyList<Type> AllowedTypes { get; private set; } = [];
 
@@ -86,7 +86,7 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     /// <summary>
     ///     Whether this client may send a query carrying raw SQL (#60). <c>false</c> unless the
     ///     application called
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />.
+    ///     <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />.
     /// </summary>
     public virtual bool ArbitrarySqlExecutionAllowed { get; private set; }
 
@@ -103,7 +103,7 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
 
     /// <summary>
     ///     Whether the server's backing store is relational. <c>true</c> unless the application
-    ///     called <see cref="InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore" />.
+    ///     called <see cref="InfoCarrierClientOptions.ServerUsesRelationalQueryRules" />.
     /// </summary>
     /// <remarks>
     ///     <para>

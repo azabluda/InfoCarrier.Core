@@ -339,12 +339,10 @@ public class TransactionTimeoutTest
             .AddScoped<DbContext>(sp => sp.GetRequiredService<TimeoutContext>())
             .AddSingleton(clock);
 
-        if (idleTimeout is { } timeout)
-        {
-            services.AddInfoCarrierServerTransactionTimeout(timeout);
-        }
-
-        return new InProcessInfoCarrierServer(services.BuildServiceProvider(validateScopes: true));
+        return new InProcessInfoCarrierServer(
+            services.BuildServiceProvider(validateScopes: true),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance,
+            options: new InfoCarrierServerOptions().WithTransactionIdleTimeout(idleTimeout));
     }
 
     /// <summary>

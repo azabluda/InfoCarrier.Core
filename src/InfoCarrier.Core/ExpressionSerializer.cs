@@ -155,7 +155,7 @@ public class ExpressionSerializer(
     /// <param name="model">The server's EF model.</param>
     /// <param name="allowedTypes">
     ///     Extra types a payload may name on this server
-    ///     (<see cref="IInfoCarrierAllowedTypes" />). <b>This is the security boundary</b>: the
+    ///     (<see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" />). <b>This is the security boundary</b>: the
     ///     client's matching list only decides what it sends. See <c>docs/security-review.md</c>
     ///     section 2.
     /// </param>

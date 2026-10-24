@@ -28,9 +28,9 @@ namespace InfoCarrier.Core.Expressions;
 ///         <b>This node is a grant, not a translation</b>, and the grant is the same one its
 ///         sibling carries: a payload holding one asks the server to run a string it did not
 ///         write. A server rebuilds this node only if it registered
-///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />,
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />,
 ///         and a client sends one only if it called
-///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />. Both
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />. Both
 ///         default to refusing. Read <c>docs/security-review.md</c> section 5a.
 ///     </para>
 /// </remarks>

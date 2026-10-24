@@ -31,7 +31,7 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 
 | Type | What it is |
 |---|---|
-| `InProcessInfoCarrierServer` | `IInfoCarrierServer` over a `DbContext` resolved from an `IServiceProvider`. Constructor: `(IServiceProvider serviceProvider)`. |
+| `InProcessInfoCarrierServer` | `IInfoCarrierServer` over a `DbContext` resolved from an `IServiceProvider`. Direct constructor: `(IServiceProvider serviceProvider, InfoCarrierServerOptions? options = null)`. Settings are snapshotted. |
 | `InfoCarrierEnvelopeServer` | Version check, dispatch, and turning a failure into a fault. Constructor: `(IInfoCarrierServer server, IInfoCarrierSerializer serializer)`; one method, `DispatchAsync`. Use it if you write a transport. |
 
 ## Interfaces you may implement

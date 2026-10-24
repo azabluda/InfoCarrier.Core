@@ -62,7 +62,7 @@ public class OwnedNavigationsInfoCarrierFixture : OwnedNavigationsFixtureBase
             MongoInfoCarrierTier.Instance,
             typeof(PoolableDbContext),
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-            onAddServices: services => services.AddInfoCarrierServerDocumentStore());
+            configureServer: options => options.WithStoresOwnedDataInsideOwner(true));
 
     // NO OnModelCreating AND NO AddOptions OVERRIDE, AND BOTH EXISTED UNTIL 2026-09-14. One
     // ignored RootReferencingEntity and the other suppressed the MappedEntityTypeIgnoredWarning

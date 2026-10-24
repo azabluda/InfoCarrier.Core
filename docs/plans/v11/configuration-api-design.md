@@ -3,7 +3,7 @@
 Date: 2026-10-23  
 Issue: [#104](https://github.com/azabluda/InfoCarrier.Core/issues/104)  
 Release: 11.0  
-Status: implemented in pull request #253; parameterless attachment approved 2026-10-24
+Status: unnamed configuration implemented in [pull request #253](https://github.com/azabluda/InfoCarrier.Core/pull/253); legacy cleanup reconciled 2026-10-24
 
 ## Purpose
 
@@ -25,27 +25,23 @@ must leave additive paths for that work.
 - custom value mappers;
 - arbitrary SQL permission.
 
-The client applies those facts through the existing `UseInfoCarrier` callback. The server applies
-them through `AddInfoCarrier`. Standard value mappers are automatic on both roles. Application
-mapper instances participate in the Entity Framework service-provider identity, so different
-mapper configurations do not share one internal provider.
+The client applies those facts through `AddInfoCarrierClient`, `InfoCarrierClient.Create`, or
+`InfoCarrierClient.Configure`. The server applies them through `AddInfoCarrierServer<TContext>`.
+Both callbacks use ordinary shared methods through `ConfigureShared`. Standard value mappers are
+automatic. Application mapper instances participate in Entity Framework service-provider identity,
+so different mapper configurations do not share one internal provider.
 
-Five obsolete methods duplicate the shared builder and can be removed directly:
+### Legacy cleanup, 2026-10-24
 
-- `InfoCarrierDbContextOptionsBuilder.AllowTypes`;
-- `InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()`;
-- `AddInfoCarrierAllowedTypes`;
-- `AddInfoCarrierArbitrarySqlExecution`;
-- `AddInfoCarrierStandardValueMappers`.
+The cleanup removes `InfoCarrierDbContextOptionsBuilder`, the old `AddInfoCarrier` overloads,
+the separate configuration registration helpers, and configuration-only marker interfaces.
+It also removes the `IInfoCarrierValueMapper` type forwarder. Version 11 prereleases do not
+preserve version 10 source or binary compatibility.
 
-The `IInfoCarrierValueMapper` type forwarder from `InfoCarrier.Core` can also be removed directly.
-Version 11 prereleases do not preserve version 10 source or binary compatibility.
-
-Role-specific configuration remains scattered. The server still needs explicit registrations for
-the non-generic `DbContext`, `IInfoCarrierSerializer`, and `IInfoCarrierServer`. Payload limits remain
-serializer constructor arguments. The endpoint remains a transport constructor argument and a
-`MapInfoCarrier` route. Store behavior, transaction timeout, caller identity, and log forwarding use
-separate role-specific registrations.
+Server settings are read from immutable registration snapshots rather than host-wide markers.
+Direct low-level construction accepts `InfoCarrierServerOptions` and snapshots those settings.
+The caller-identity interface remains a transport behavior seam. The separate obsolete
+document-mapping behavior seam is outside this configuration cleanup.
 
 ## Reconciled decisions
 
@@ -56,8 +52,8 @@ configures shared and role-specific facts on one object. It produces one immutab
 that role registration.
 
 `AllowedTypes`, `AllowArbitrarySqlExecution`, and `ValueMappers` are not redeclared on the role
-options. The base builder remains their only state owner. Applications can continue to call one
-application-owned extension method from both role callbacks.
+options. The base builder remains their only state owner. Applications apply one
+ordinary shared method through `ConfigureShared` in both role callbacks.
 
 The client-only non-relational planning switch and the server-only document repair remain separate
 facts. A single `StoreKind` would hide the distinction that Entity Framework InMemory needs only the
@@ -77,7 +73,7 @@ Each entry point creates one immutable registration descriptor with an opaque in
 The descriptor owns its options snapshot and factories. Services within one role are created from
 that descriptor rather than assembled through a common string key.
 
-The default registration uses the framework's default options name. A later public name maps to one
+The unnamed registration selects a default descriptor. A later public name maps to one
 opaque identity and one descriptor. The initial public API does not expose names, generic endpoint
 mapping, or multiple-server selection.
 
@@ -130,8 +126,10 @@ later than service-provider validation or endpoint mapping. No invalid configura
 first query.
 
 Positive byte limits and transaction timeouts remain required. The endpoint must be absolute.
-Sensitive forwarding requires a forwarding level. Repeated unnamed registrations compose the
-default options in call order without adding duplicate default services.
+Sensitive forwarding requires a forwarding level. Each registration callback configures fresh options.
+A later unnamed client replaces the default. Server descriptors are retained, with the latest selected
+as default. Repeated registration does not merge settings into one options object; named composition
+and duplicate-name rules remain decisions for issue #105.
 
 ### Names, identities, and resolution have separate jobs
 
@@ -139,8 +137,8 @@ A public name identifies application configuration. An opaque identity distingui
 inside InfoCarrier. A registration descriptor activates one complete role. These are separate
 concepts and must not share one raw string key throughout the service graph.
 
-Named options compose role configuration. Named HTTP clients configure handlers and connection
-lifetime. InfoCarrier prefixes their internal HTTP names, so they cannot collide with application
+For issue #105, named options may compose configuration while named HTTP clients configure handlers
+and connection lifetime. These mechanisms are not yet implemented for multiple InfoCarrier clients. InfoCarrier prefixes their internal HTTP names, so they cannot collide with application
 HTTP clients. Keyed dependency injection is permitted at a final resolution boundary, but it is not
 the storage model for role policy.
 
@@ -275,10 +273,9 @@ names, but it must not collapse them into one enum.
 
 ## Removals and retained extension points
 
-Remove the five obsolete methods and the mapper type forwarder as part of the role API change.
-No migration interval or compatibility shim is required on the version 11 prerelease line.
-
-Remove configuration-only marker interfaces after their consumers read immutable role options.
+The legacy methods, configuration builder, mapper type forwarder, and configuration-only marker
+interfaces are removed. Their consumers now read snapshotted server settings. No compatibility shim
+or migration interval is required on the version 11 prerelease line.
 Retain `IInfoCarrierServerCallerIdentity`, because a non-HTTP transport supplies behavior through
 that interface. Retain `IInfoCarrierClient`, `IInfoCarrierServer`, `IInfoCarrierSerializer`, and
 `IInfoCarrierTransport` as composition seams.
@@ -341,8 +338,8 @@ identity tags when multiple registrations make those identities meaningful.
    role changes. Update repository callers in the same commits.
 5. Update samples and configuration documentation after the APIs pass their focused tests.
 
-Each implementation pull request stays within one numbered step. Issue #105 starts only after the
-unnamed descriptors and their activation boundary are stable.
+The steps above describe the unnamed foundation and its legacy cleanup. Issue #105 extends that
+foundation after its descriptors and activation boundary are stable.
 
 ## Compatibility review after implementation (2026-10-24)
 

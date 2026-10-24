@@ -386,7 +386,7 @@ public class ClientProcessingLoggingTest
                 .AddScoped<DbContext>(s => s.GetRequiredService<Context>());
             if (forwarding)
             {
-                services.AddSingleton(capture).AddInfoCarrierServerLogForwarding(LogLevel.Debug);
+                services.AddSingleton(capture);
             }
             _services = services.BuildServiceProvider();
             using (IServiceScope scope = _services.CreateScope())
@@ -401,8 +401,7 @@ public class ClientProcessingLoggingTest
                 _services,
                 _factory.CreateLogger<InProcessInfoCarrierServer>(),
                 _services.GetService<ServerLogCapture>(),
-                _services.GetService<IInfoCarrierServerLogForwarding>(),
-                _services.GetService<IInfoCarrierSensitiveServerLogForwarding>());
+                new InfoCarrierServerOptions().WithLogForwarding(forwarding ? LogLevel.Debug : null));
             var dispatcher = new InfoCarrierEnvelopeServer(_server, serializer, _factory.CreateLogger<InfoCarrierEnvelopeServer>());
             Transport = new LocalTransport(dispatcher, response => Transform(response), request => Prepare(request), token => Sending?.Invoke(token));
             Client = new TransportInfoCarrierClient(Transport, serializer,

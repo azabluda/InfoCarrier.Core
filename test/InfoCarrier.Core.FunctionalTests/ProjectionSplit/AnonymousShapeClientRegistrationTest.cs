@@ -11,23 +11,21 @@ public class AnonymousShapeClientRegistrationTest
     [Fact]
     public void Client_shape_registration_rejects_named_and_null_prototypes()
     {
-        var options = new DbContextOptionsBuilder();
-        var builder = new InfoCarrierDbContextOptionsBuilder(options);
+        var builder = new InfoCarrierClientOptions();
         var services = new ServiceCollection();
 
         Assert.Throws<ArgumentException>(() => builder.AddAnonymousShapes(new NamedRecord(1)));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierServer<DbContext>(
             deployment => deployment.AddAnonymousShapes(new NamedRecord(1))));
         Assert.Throws<ArgumentException>(() => builder.AddAnonymousShapes(new object[] { null! }));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierServer<DbContext>(
             deployment => deployment.AddAnonymousShapes(new object[] { null! })));
     }
 
     [Fact]
     public void Client_shared_registration_keeps_existing_anonymous_validation()
     {
-        var options = new DbContextOptionsBuilder();
-        var client = new InfoCarrierDbContextOptionsBuilder(options);
+        var client = new InfoCarrierClientOptions();
 
         Assert.Throws<ArgumentException>(() => client.AddAnonymousShapes(new NamedRecord(1)));
         Assert.Throws<ArgumentException>(() => client.AddAnonymousShapes(new object[] { null! }));

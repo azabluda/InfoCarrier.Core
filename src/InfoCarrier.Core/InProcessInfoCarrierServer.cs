@@ -27,27 +27,29 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="InProcessInfoCarrierServer" /> class.
 /// </remarks>
+/// <param name="serviceProvider">The host provider used to create request scopes and resolve contexts.</param>
+/// <param name="logger">The logger for server lifecycle and failure events.</param>
+/// <param name="logCapture">The host-owned capture provider used when forwarding is enabled.</param>
+/// <param name="options">Settings copied into an immutable snapshot during direct construction.</param>
 public sealed class InProcessInfoCarrierServer(
     IServiceProvider serviceProvider,
     ILogger<InProcessInfoCarrierServer> logger,
     ServerLogCapture? logCapture = null,
-    IInfoCarrierServerLogForwarding? logForwarding = null,
-    IInfoCarrierSensitiveServerLogForwarding? sensitiveLogForwarding = null)
+    InfoCarrierServerOptions? options = null)
     : IInfoCarrierServer, IAsyncDisposable
 {
-    private readonly IServiceProvider _serviceProvider = InfoCarrierServiceCollectionExtensions.InitializeAnonymousShapes(serviceProvider);
-    private InfoCarrierServerRegistration? _registration;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private InfoCarrierServerRegistration? _registration = options?.Build(typeof(DbContext));
     private Expressions.AnonymousShapeCatalog? _registrationAnonymousCatalog;
     private readonly ILogger<InProcessInfoCarrierServer> _logger = logger;
     private readonly ServerLogCapture? _logCapture = logCapture;
-    private readonly IInfoCarrierServerLogForwarding? _logForwarding = logForwarding;
-    private readonly bool _sensitiveLogForwardingAllowed = sensitiveLogForwarding is not null;
 
-    /// <summary>Creates a server without class logging or log forwarding.</summary>
-    public InProcessInfoCarrierServer(IServiceProvider serviceProvider)
+    /// <summary>Creates a server without class logging, snapshotting any supplied execution settings.</summary>
+    public InProcessInfoCarrierServer(IServiceProvider serviceProvider, InfoCarrierServerOptions? options = null)
         : this(
             serviceProvider,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance)
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance,
+            options: options)
     {
     }
 
@@ -59,21 +61,12 @@ public sealed class InProcessInfoCarrierServer(
         : this(
             serviceProvider,
             logger,
-            logCapture,
-            registration.LogForwardingMinimumLevel is { } level
-                ? new ConfiguredLogForwarding(level)
-                : serviceProvider.GetService<IInfoCarrierServerLogForwarding>(),
-            registration.IncludeSensitiveLogData
-                ? new ConfiguredSensitiveLogForwarding()
-                : serviceProvider.GetService<IInfoCarrierSensitiveServerLogForwarding>())
+            logCapture)
     {
         _registration = registration;
         Type[] anonymousShapes =
         [
             .. registration.Deployment.AnonymousShapeTypes,
-            .. serviceProvider
-                .GetServices<InfoCarrierServiceCollectionExtensions.AnonymousShapeRegistration>()
-                .SelectMany(shape => shape.Types),
         ];
         if (anonymousShapes.Length > 0)
         {
@@ -84,9 +77,6 @@ public sealed class InProcessInfoCarrierServer(
         }
         CallerIdentity = registration.CallerIdentityFactory?.Invoke(serviceProvider)
             ?? serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
-        TransactionTimeout = registration.TransactionIdleTimeout is { } timeout
-            ? new ConfiguredTransactionTimeout(timeout)
-            : serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
     }
 
     /// <summary>
@@ -142,33 +132,27 @@ public sealed class InProcessInfoCarrierServer(
     ///     (<see cref="ValueMapping.IInfoCarrierValueMapper" />).
     /// </summary>
     /// <remarks>
-    ///     Resolved from the root provider, not a request scope: a mapper converts between a CLR
-    ///     type and a wire primitive and has nothing to hold per request. Empty unless the
-    ///     application registered one, which is the no-op the seam guarantees.
+    ///     Registration-backed servers use their own mapper snapshot. Direct construction without
+    ///     options can resolve application mappers from the host. Standard mappers follow both paths.
     /// </remarks>
     private IEnumerable<ValueMapping.IInfoCarrierValueMapper> ValueMappers
         => _registration is { } registration
             ? [
                 .. registration.Deployment.ValueMappers,
-                .. _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>(),
                 new ValueMapping.IPAddressValueMapper(),
                 new ValueMapping.UriValueMapper(),
             ]
-            : _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>();
+            : [.. _serviceProvider.GetServices<ValueMapping.IInfoCarrierValueMapper>(),
+                new ValueMapping.IPAddressValueMapper(), new ValueMapping.UriValueMapper()];
 
     /// <summary>
     ///     The extra CLR types this server permits a payload to name
-    ///     (<see cref="Expressions.IInfoCarrierAllowedTypes" />).
+    ///     (<see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" />).
     /// </summary>
-    /// <remarks>
-    ///     From the root provider for the same reason the mappers are: a list of types has nothing
-    ///     to hold per request. Empty unless the application registered some, which is the closed
-    ///     default ADR-008 constraint 2 requires.
-    /// </remarks>
+    /// <remarks>Read from the immutable registration snapshot; empty by default.</remarks>
     private IEnumerable<Type> AllowedTypes
         => [
             .. _registration?.Deployment.AllowedTypes ?? [],
-            .. _serviceProvider.GetServices<Expressions.IInfoCarrierAllowedTypes>().SelectMany(a => a.Types),
         ];
 
     private Expressions.AnonymousShapeCatalog? AnonymousCatalogFor(Microsoft.EntityFrameworkCore.Metadata.IModel model)
@@ -176,6 +160,14 @@ public sealed class InProcessInfoCarrierServer(
         if (_registrationAnonymousCatalog is { } registrationCatalog)
         {
             return registrationCatalog;
+        }
+
+        if (_registration?.Deployment.AnonymousShapeTypes is { Count: > 0 } shapes)
+        {
+            lock (_lifecycle)
+            {
+                return _registrationAnonymousCatalog ??= Expressions.AnonymousShapeCatalog.Create(model, shapes);
+            }
         }
 
         Expressions.AnonymousShapeCatalog[] catalogs = _serviceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
@@ -192,30 +184,24 @@ public sealed class InProcessInfoCarrierServer(
 
     /// <summary>
     ///     Whether this server permits a payload to carry SQL it will execute
-    ///     (<see cref="IInfoCarrierArbitrarySqlExecution" />, #60).
+    ///     (<see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />, #60).
     /// </summary>
-    /// <remarks>
-    ///     From the root provider, like the two above, and absent unless the application
-    ///     registered it. <b>This is the security boundary for raw SQL</b> - see
-    ///     <c>docs/security-review.md</c> section 5a.
-    /// </remarks>
+    /// <remarks>The registration snapshot carries this server admission grant. It is false by default.</remarks>
     private bool ArbitrarySqlAllowed
-        => _registration?.Deployment.AllowArbitrarySqlExecution == true
-            || _serviceProvider.GetService<IInfoCarrierArbitrarySqlExecution>() is not null;
+        => _registration?.Deployment.AllowArbitrarySqlExecution == true;
 
     /// <summary>
     ///     Whether this server's store writes an owned type inside its owner's record
-    ///     (<see cref="IInfoCarrierServerDocumentStore" />, #102).
+    ///     (<see cref="InfoCarrierServerOptions.StoresOwnedDataInsideOwner" />, #102).
     /// </summary>
     /// <remarks>
-    ///     From the root provider, like the others, and absent unless the application registered
-    ///     it. When present, <see cref="ServerSaveChangesExecutor" /> reads back whatever part of a
+    ///     Captured in the registration snapshot. When enabled, <see cref="ServerSaveChangesExecutor" />
+    ///     reads back whatever part of a
     ///     document the change set did not mention, so a client that sent a bare root does not
     ///     erase the rest of it.
     /// </remarks>
     private bool ServerStoreIsDocument
-        => _registration?.StoresOwnedDataInsideOwner == true
-            || _serviceProvider.GetService<IInfoCarrierServerDocumentStore>() is not null;
+        => _registration?.StoresOwnedDataInsideOwner == true;
 
     /// <summary>
     ///     How this server rebuilds EF's relational raw-SQL query roots
@@ -244,41 +230,32 @@ public sealed class InProcessInfoCarrierServer(
 
     /// <summary>
     ///     Whether this server sends the log events it raises back to the client, and from which
-    ///     level (<see cref="IInfoCarrierServerLogForwarding" />, R172).
+    ///     level (<see cref="InfoCarrierServerOptions.LogForwarding" />, R172).
     /// </summary>
     /// <remarks>
-    ///     Injected during server construction, and absent unless the application registered it.
+    ///     Captured in the registration snapshot and disabled by default.
     ///     <b>It discloses the server's own diagnostics</b> — see the interface for that cost.
     /// </remarks>
-    private IInfoCarrierServerLogForwarding? LogForwarding
-        => _logForwarding;
+    private LogLevel? LogForwarding
+        => _registration?.LogForwardingMinimumLevel;
 
     /// <summary>
     ///     Whether this server may forward its log even when the context logs sensitive data
-    ///     (<see cref="IInfoCarrierSensitiveServerLogForwarding" />, R172). The grant is injected
-    ///     during server construction.
+    ///     (<see cref="InfoCarrierLogForwardingOptions.IncludeSensitiveData" />, R172). The grant is injected
+    ///     in the registration snapshot.
     /// </summary>
     private bool SensitiveLogForwardingAllowed
-        => _sensitiveLogForwardingAllowed;
+        => _registration?.IncludeSensitiveLogData == true;
 
-    /// <summary>
-    ///     How long a transaction may go untouched before this server rolls it back
-    ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
-    /// </summary>
-    /// <remarks>
-    ///     From the root provider, like the five above, and absent unless the application
-    ///     registered it. <b>Absent means never evict</b>, which is how every version up to
-    ///     10.1.0 behaved and is what makes this opt-in.
-    /// </remarks>
+    /// <summary>The transport behavior that identifies the caller of the current request.</summary>
     private IInfoCarrierServerCallerIdentity? CallerIdentity { get; }
         = serviceProvider.GetService<IInfoCarrierServerCallerIdentity>();
 
     /// <summary>
     ///     How long a transaction may go untouched before this server rolls it back
-    ///     (<see cref="IInfoCarrierServerTransactionTimeout" />, #54).
+    ///     (<see cref="InfoCarrierServerOptions.TransactionIdleTimeout" />, #54).
     /// </summary>
-    private IInfoCarrierServerTransactionTimeout? TransactionTimeout { get; }
-        = serviceProvider.GetService<IInfoCarrierServerTransactionTimeout>();
+    private TimeSpan? TransactionTimeout => _registration?.TransactionIdleTimeout;
 
     /// <summary>
     ///     The clock the idle timeout is measured against.
@@ -457,7 +434,7 @@ public sealed class InProcessInfoCarrierServer(
         => LogForwarding is { } forwarding
             ? (_logCapture ?? throw new InvalidOperationException(
                 "Server log forwarding requires its registered capture provider."))
-                .Begin(forwarding.MinimumLevel)
+                .Begin(forwarding)
             : null;
 
     /// <summary>
@@ -828,18 +805,6 @@ public sealed class InProcessInfoCarrierServer(
     private DbContext ResolveContext(IServiceProvider provider)
         => _registration?.ResolveContext(provider) ?? provider.GetRequiredService<DbContext>();
 
-    private sealed class ConfiguredLogForwarding(LogLevel minimumLevel) : IInfoCarrierServerLogForwarding
-    {
-        public LogLevel MinimumLevel { get; } = minimumLevel;
-    }
-
-    private sealed class ConfiguredSensitiveLogForwarding : IInfoCarrierSensitiveServerLogForwarding;
-
-    private sealed class ConfiguredTransactionTimeout(TimeSpan idleTimeout) : IInfoCarrierServerTransactionTimeout
-    {
-        public TimeSpan IdleTimeout { get; } = idleTimeout;
-    }
-
     /// <summary>
     ///     Starts the sweep timer, once, if a timeout is registered.
     /// </summary>
@@ -860,7 +825,7 @@ public sealed class InProcessInfoCarrierServer(
             // A QUARTER OF THE TIMEOUT, so the worst case a transaction outlives its deadline by is
             // a quarter of it rather than all of it. Cheap: the callback walks a dictionary that
             // holds one entry per open transaction, and a server with none does nothing.
-            TimeSpan period = timeout.IdleTimeout / 4;
+            TimeSpan period = timeout / 4;
 
             _sweepTimer = Clock.CreateTimer(_ => SweepIdle(), state: null, period, period);
         }
@@ -905,7 +870,7 @@ public sealed class InProcessInfoCarrierServer(
             lock (_lifecycle)
             {
                 if (_disposed) { return; }
-                if (!entry.Value.IsIdleFor(clock, timeout.IdleTimeout)
+                if (!entry.Value.IsIdleFor(clock, timeout)
                     || !_transactions.TryRemove(entry.Key, out OpenTransaction? evicted))
                 {
                     continue;

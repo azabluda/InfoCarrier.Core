@@ -77,7 +77,7 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
     /// <param name="documentStore">
     ///     <see langword="true" /> when this store writes an owned type inside its owner's record,
     ///     so that a change set which does not mention part of a document must be completed from
-    ///     the store before it is written (<see cref="IInfoCarrierServerDocumentStore" />, #102).
+    ///     the store before it is written (<see cref="InfoCarrierServerOptions.StoresOwnedDataInsideOwner" />, #102).
     /// </param>
     public ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper, bool documentStore)
         : this(context, mapper)

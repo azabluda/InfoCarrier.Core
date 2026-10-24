@@ -5,6 +5,7 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -45,13 +46,16 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             services = onAddServices(services);
         }
 
+        var serverOptions = new InfoCarrierServerOptions();
+        testStoreProperties.ConfigureServer?.Invoke(serverOptions);
+
         // The SERVER half of the raw-SQL seam (#60), and the half that is the security boundary.
         // Absent unless the fixture asked, which is what makes the default a refusal rather than a
         // hole -- `SqliteSmokeTest` builds its stores without going through a fixture and pins
         // both directions.
         if (testStoreProperties.ArbitrarySqlExecution)
         {
-            services = services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true));
+            serverOptions.AllowArbitrarySqlExecution(true);
 
             // THERE IS NO PER-STORE SERVER SEAM EITHER, deleted 2026-09-09 with its sibling.
             // `AddStoreSpecificServices` existed so the SQLite store could register
@@ -67,7 +71,7 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
             // ever wanted together.
             if (StoreParameterType is { } parameterType)
             {
-                services = services.AddInfoCarrier(builder => builder.AddAllowedTypes(parameterType));
+                serverOptions.AddAllowedTypes(parameterType);
             }
         }
 
@@ -78,7 +82,10 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // is the default and is what those tests read.
         if (testStoreProperties.ServerLogForwarding)
         {
-            services = services.AddInfoCarrierSensitiveServerLogForwarding();
+            serverOptions.WithLogForwarding(Microsoft.Extensions.Logging.LogLevel.Warning, includeSensitiveData: true);
+            var capture = new ServerLogCapture();
+            services.AddSingleton(capture);
+            services.AddLogging(logging => logging.AddProvider(capture));
         }
 
         // The SERVER half of the projection-DTO seam, and NOT inside the raw-SQL grant above: a
@@ -87,23 +94,18 @@ public abstract class InfoCarrierBackendTestStore : TestStore, IInfoCarrierClien
         // declaration and never inferred. See `SharedTestStoreProperties.AllowedTypes`.
         if (AllowedTypes.Length > 0)
         {
-            services = services.AddInfoCarrier(builder => builder.AddAllowedTypes(AllowedTypes));
+            serverOptions.AddAllowedTypes(AllowedTypes);
         }
 
         services = services
             .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-            .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
+            .AddSingleton<IInfoCarrierServer>(provider => new InProcessInfoCarrierServer(
+                provider,
+                provider.GetRequiredService<ILogger<InProcessInfoCarrierServer>>(),
+                provider.GetService<ServerLogCapture>(), serverOptions));
 
-            // The server half of ADR-012's seam. A value the wire cannot walk has to be mapped
-            // on *both* halves — the client's is registered in
-            // `InfoCarrierTestStoreFactory.AddProviderServices` — and a mapper registered on one
-            // side only fails asymmetrically, which is precisely the "computed twice by two
-            // providers" hazard the ADR states the contract in CLR-type terms to avoid.
-            .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>()
-
-            // The server half of ADR-012's standard mappers. The client gets them from
-            // `AddEntityFrameworkInfoCarrier`; a server builds its own collection, so it asks.
-            .AddInfoCarrier();
+        // Match the client's custom geometry mapper. Standard mappers follow automatically.
+        serverOptions.AddValueMappers(new InfoCarrierNetTopologySuiteValueMapper());
 
         // Only when the fixture has one. A `NonSharedModelTestBase` context usually declares its
         // whole model in its own `OnModelCreating`, and EF's own base registers a `TestModelSource`

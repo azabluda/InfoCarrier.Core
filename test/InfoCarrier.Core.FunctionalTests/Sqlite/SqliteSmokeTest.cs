@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
@@ -36,7 +35,7 @@ public class SqliteSmokeTest
     ///     </para>
     /// </remarks>
     private static SqliteInfoCarrierBackendTestStore CreateStore(
-        Func<IServiceCollection, IServiceCollection>? onAddServices = null,
+        Action<InfoCarrierServerOptions>? configureServer = null,
         ParameterTranslationMode? collectionMode = null)
         => new(
             Guid.NewGuid().ToString(),
@@ -48,7 +47,7 @@ public class SqliteSmokeTest
                 // The base store hands this straight to TestModelSource, which does not accept
                 // null; SmokeContext needs no customization beyond its own OnModelCreating.
                 OnModelCreating = (_, _) => { },
-                OnAddServices = services => onAddServices?.Invoke(services) ?? services,
+                ConfigureServer = configureServer,
                 OnAddOptions = builder =>
                 {
                     if (collectionMode is { } mode)
@@ -92,10 +91,10 @@ public class SqliteSmokeTest
     }
 
     private static async Task<SqliteInfoCarrierBackendTestStore> SeededStoreAsync(
-        Func<IServiceCollection, IServiceCollection>? onAddServices = null,
+        Action<InfoCarrierServerOptions>? configureServer = null,
         ParameterTranslationMode? collectionMode = null)
     {
-        SqliteInfoCarrierBackendTestStore store = CreateStore(onAddServices, collectionMode);
+        SqliteInfoCarrierBackendTestStore store = CreateStore(configureServer, collectionMode);
         await store.InitializeAsync(
             store.ServiceProvider,
             store.CreateDbContext,
@@ -141,8 +140,7 @@ public class SqliteSmokeTest
     public async Task A_provider_specific_EF_Functions_call_crosses_once_both_sides_admit_its_host()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrier(
-                builder => builder.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions))));
+            builder => builder.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
 
         await using SqliteSmokeContext client = CreateClient(
             store, o => o.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
@@ -201,7 +199,7 @@ public class SqliteSmokeTest
     public async Task A_FromSql_query_crosses_once_both_sides_grant_it()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true)));
+            builder => builder.AllowArbitrarySqlExecution(true));
 
         await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
 
@@ -243,7 +241,7 @@ public class SqliteSmokeTest
     public async Task FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true)));
+            builder => builder.AllowArbitrarySqlExecution(true));
 
         await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
 
@@ -276,7 +274,7 @@ public class SqliteSmokeTest
         bool async, string title, int expected, ParameterTranslationMode collectionMode)
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true)), collectionMode);
+            builder => builder.AllowArbitrarySqlExecution(true), collectionMode);
         await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
         using DbContext server = store.CreateDbContext();
 
@@ -319,7 +317,7 @@ public class SqliteSmokeTest
     public async Task An_ordinary_FromSqlRaw_argument_stays_bound(string title, int expected)
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
-            services => services.AddInfoCarrier(builder => builder.AllowArbitrarySqlExecution(true)));
+            builder => builder.AllowArbitrarySqlExecution(true));
         await using SqliteSmokeContext client = CreateClient(store, AllowArbitrarySql);
         using DbContext server = store.CreateDbContext();
 

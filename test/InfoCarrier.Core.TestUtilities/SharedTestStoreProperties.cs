@@ -25,6 +25,9 @@ public struct SharedTestStoreProperties
     /// </remarks>
     public Type ContextType;
 
+    /// <summary>Configures the server snapshot before construction.</summary>
+    public Action<InfoCarrierServerOptions>? ConfigureServer;
+
     /// <summary>
     ///     The fixture's model customization.
     /// </summary>

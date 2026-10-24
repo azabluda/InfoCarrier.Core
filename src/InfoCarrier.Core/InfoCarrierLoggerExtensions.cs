@@ -67,7 +67,7 @@ public static class InfoCarrierLoggerExtensions
     ///         <c>Join</c> keyed on a type the application declared stays on the client when that
     ///         type is not registered, and the server sends every row. The query succeeds, so
     ///         nothing else reports it, and the type's name is what
-    ///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> takes.
+    ///         <see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" /> takes.
     ///     </para>
     ///     <para>
     ///         The allowlist is the server's own list, which drew the boundary. Therefore, the
@@ -219,7 +219,7 @@ public class QuerySplitEventData(
     /// <summary>
     ///     The types that keys of the operators left on the client construct and that the server
     ///     was not told about. Registering one with
-    ///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" /> on the client and the
+    ///     <see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" /> on the client and the
     ///     server can send its operator to the server.
     /// </summary>
     /// <remarks>
