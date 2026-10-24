@@ -4,6 +4,8 @@ InfoCarrier.Core 10 is a rewrite. It shares its name and its idea with the 1.0 t
 almost nothing else: the expression serializer, the wire format, the client/server split and the
 security model are all new code.
 
+This guide targets the version 11 prerelease configuration API.
+
 Your `DbContext` and your entity classes are unchanged. Everything around them moves, and it will
 not compile until you have moved it. The three public interfaces kept their names and changed their
 shapes, so an old implementation fails to build rather than building and misbehaving.
@@ -33,12 +35,13 @@ and `SaveChanges` as a unit of work.
 <PackageReference Include="InfoCarrier.Core" Version="3.1.1" />
 
 <!-- after: the client and the shared model project -->
-<PackageReference Include="InfoCarrier.Core" Version="10.3.0" />
+<PackageReference Include="InfoCarrier.Core" Version="11.0.0-*" />
 
 <!-- after: the ASP.NET Core server, in addition to the above -->
-<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.3.0" />
+<PackageReference Include="InfoCarrier.Core.AspNetCore" Version="11.0.0-*" />
 ```
 
+Replace the floating versions with the same published prerelease version when pinning packages.
 `Remote.Linq` and `Aqua` are gone. What remains is `Microsoft.EntityFrameworkCore` and
 `Microsoft.EntityFrameworkCore.Relational`, neither of which brings a database driver. If you
 referenced `Remote.Linq` or `Aqua` directly, remove it.
@@ -52,24 +55,25 @@ optionsBuilder.UseInfoCarrierClient(new MyInfoCarrierClientImpl());
 
 // after
 using InfoCarrier.Core;
-optionsBuilder.UseInfoCarrier(client);
+services.AddInfoCarrierClient(o => o
+    .WithEndpoint("https://your-app-server/infocarrier"));
+services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
 ### 3. The transport you wrote is now optional
 
 `3.1` shipped no transport, so every application implemented `IInfoCarrierClient` itself: an
 `HttpClient`, hand-configured serializer settings, one route per operation, and a cache keyed on a
-transaction-id header to carry transactions between calls. All of that is now three objects.
+transaction-id header to carry transactions between calls. The default client registration replaces that plumbing.
 
 ```csharp
 using InfoCarrier.Core;
 
-var serializer = new SystemTextJsonInfoCarrierSerializer();
-using var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
-
-IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(http, serializer),
-    serializer);
+// Without dependency injection, create the same client directly.
+using var http = new HttpClient();
+IInfoCarrierClient client = InfoCarrierClient.Create(http, o => o
+    .WithEndpoint("https://your-app-server/infocarrier"));
+optionsBuilder.UseInfoCarrier(client);
 ```
 
 Delete your old client implementation. If you are not on HTTP, implement `IInfoCarrierTransport`
@@ -97,26 +101,22 @@ using InfoCarrier.Core;
 using InfoCarrier.Core.AspNetCore;
 
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>());
-
-builder.Services
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrierStandardValueMappers();
+builder.Services.AddInfoCarrierServer<ShopContext>();
 
 app.MapInfoCarrier();
 ```
 
-`AddInfoCarrierServer()` is gone: register `InProcessInfoCarrierServer` yourself, as above.
-`AddScoped<DbContext>` is the line people miss, because the server resolves your context by its base
-type. Full detail in [Configuring the server](../configuration/server.md).
+`AddInfoCarrierServer<ShopContext>` registers the serializer and server, then resolves your concrete
+context through the host container. Standard value mappers are automatic. For shared shapes, types,
+and custom mappers, pass the same application-owned configuration helper to both role callbacks.
+See [Configuring the server](../configuration/server.md).
 
 ### 5. The three interfaces changed shape
 
 Implement these only if you are doing something unusual. Most applications now use the shipped
 implementations and touch none of them.
 
-| Interface | `3.1.1` | `10.x` |
+| Interface | `3.1.1` | `11.x` |
 |---|---|---|
 | `IInfoCarrierClient` | `ServerUrl`, plus sync and async pairs of `QueryData`, `SaveChanges` and the three transaction commands | nine `…Async` methods, no sync half, savepoints included |
 | `IInfoCarrierServer` | `QueryData` / `SaveChanges` (+ async), each taking a `Func<DbContext>` | the same nine `…Async` operations as the client; the `DbContext` comes from your service provider |
@@ -132,7 +132,7 @@ See [Value mappers](../configuration/value-mappers.md).
 
 ## Namespaces, at a glance
 
-| `3.1.1` | `10.x` |
+| `3.1.1` | `11.x` |
 |---|---|
 | `InfoCarrier.Core.Client` | `InfoCarrier.Core` |
 | `InfoCarrier.Core.Server` | `InfoCarrier.Core` |
@@ -143,10 +143,9 @@ See [Value mappers](../configuration/value-mappers.md).
 ## A checklist
 
 1. Confirm the client can target `net10.0`.
-2. Pin `10.3.0` on both packages.
+2. Pin the same version 11 prerelease on both packages.
 3. Drop any direct `Remote.Linq` or `Aqua` reference.
-4. `UseInfoCarrierClient` becomes `UseInfoCarrier`, and build the client from the three shipped
-   objects.
+4. Register `AddInfoCarrierClient` and replace `UseInfoCarrierClient` with `UseInfoCarrier`.
 5. Delete your `IInfoCarrierClient` implementation, or reduce it to an `IInfoCarrierTransport`.
 6. Replace the server controller with `MapInfoCarrier()` and the registrations above.
 7. Port any value mapper to `TryMapToWire` and `TryMapFromWire`, deleting `IPAddress` and `Uri`
