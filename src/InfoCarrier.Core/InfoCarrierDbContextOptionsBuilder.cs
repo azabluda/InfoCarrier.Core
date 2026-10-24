@@ -7,7 +7,7 @@ namespace InfoCarrier.Core;
 
 /// <summary>
 ///     InfoCarrier-specific options, configured through
-///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier(DbContextOptionsBuilder, IInfoCarrierClient, Action{InfoCarrierDbContextOptionsBuilder})" />.
+///     <see cref="InfoCarrierDbContextOptionsBuilderExtensions.UseInfoCarrier(DbContextOptionsBuilder, IInfoCarrierClient, Action{InfoCarrierClientOptions})" />.
 /// </summary>
 /// <remarks>
 ///     The shape every EF Core provider uses for its own options —
@@ -19,17 +19,6 @@ public class InfoCarrierDbContextOptionsBuilder(DbContextOptionsBuilder optionsB
     : InfoCarrierDeploymentBuilder
 {
     private readonly DbContextOptionsBuilder _optionsBuilder = optionsBuilder;
-
-    /// <summary>
-    ///     Sets whether this client may send arbitrary SQL for server execution.
-    /// </summary>
-    /// <param name="allowed">Whether to permit arbitrary SQL execution.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public override InfoCarrierDbContextOptionsBuilder AllowArbitrarySqlExecution(bool allowed)
-    {
-        base.AllowArbitrarySqlExecution(allowed);
-        return this;
-    }
 
     /// <summary>
     ///     Permits a wire payload to name these CLR types, in addition to the ones the model

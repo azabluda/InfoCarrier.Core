@@ -29,34 +29,37 @@ same code, which is what makes the wire format meaningful. See
 
 ## Installing
 
+These examples target the version 11 prerelease API. Install matching prerelease packages on both ends.
+
 === "dotnet CLI"
 
     ```bash
     # In the client project, and in the server project too.
-    dotnet add package InfoCarrier.Core
+    dotnet add package InfoCarrier.Core --prerelease
 
     # In the server project only.
-    dotnet add package InfoCarrier.Core.AspNetCore
+    dotnet add package InfoCarrier.Core.AspNetCore --prerelease
     ```
 
 === "PackageReference"
 
     ```xml
     <ItemGroup>
-      <PackageReference Include="InfoCarrier.Core" Version="10.3.0" />
-      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="10.3.0" />
+      <PackageReference Include="InfoCarrier.Core" Version="11.0.0-*" />
+      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="11.0.0-*" />
     </ItemGroup>
     ```
 
 === "Package Manager"
 
     ```powershell
-    Install-Package InfoCarrier.Core
-    Install-Package InfoCarrier.Core.AspNetCore
+    Install-Package InfoCarrier.Core -IncludePrerelease
+    Install-Package InfoCarrier.Core.AspNetCore -IncludePrerelease
     ```
 
 With Central Package Management, pin the version in `Directory.Packages.props` and give both
 packages the same one.
+Replace floating versions with the selected published prerelease when pinning packages.
 
 If you are moving an application off `3.1.1`, read [Upgrading from 3.1](upgrading-from-3-1.md).
 Your model carries over; the wiring around it does not.

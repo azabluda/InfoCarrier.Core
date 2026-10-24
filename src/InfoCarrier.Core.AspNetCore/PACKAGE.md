@@ -14,12 +14,7 @@ call `MapInfoCarrier`. For example:
 
 ```csharp
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlite(connectionString));
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>());
-
-builder.Services
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrierStandardValueMappers();
+builder.Services.AddInfoCarrierServer<ShopContext>();
 
 var app = builder.Build();
 app.MapInfoCarrier();

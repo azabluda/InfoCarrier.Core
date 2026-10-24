@@ -186,6 +186,9 @@ page of a new version is a 404 until that version's line is published. `docs/ver
 the body after the site for this reason. This said the site publishes from `main` until 2026-09-28,
 which stopped being true on 2026-09-09.
 
+The client configuration page has a 1,000-word budget from 2026-10-24 to cover `ConfigureShared`
+execution, composition, ordering, and agreement limits.
+
 ## Before committing
 
 Run the file through the `humanizer` skill in file mode. Its patterns and this list overlap; the

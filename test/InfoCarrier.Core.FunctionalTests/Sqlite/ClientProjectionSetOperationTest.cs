@@ -130,9 +130,11 @@ public class ClientProjectionSetOperationTest
         });
         using DbContext server = store.CreateDbContext();
         await using SetContext client = new(new DbContextOptionsBuilder<SetContext>().UseInfoCarrier(store,
-            options => options
-                .UseNonRelationalServerStore()
-                .AddAllowedTypes(typeof(ClientProjectionSetOperationTest))).Options);
+            options =>
+            {
+                options.ServerUsesRelationalQueryRules = false;
+                options.AddAllowedTypes(typeof(ClientProjectionSetOperationTest));
+            }).Options);
 
         async Task Execute(DbContext context)
         {

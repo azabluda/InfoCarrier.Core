@@ -15,34 +15,13 @@ public class InfoCarrierDeploymentBuilder
     private readonly List<IInfoCarrierValueMapper> _valueMappers = [];
     private bool _allowArbitrarySqlExecution;
 
-    /// <summary>
-    ///     Sets whether this deployment permits arbitrary SQL execution.
-    /// </summary>
-    /// <param name="allowed">Whether to permit arbitrary SQL execution.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public virtual InfoCarrierDeploymentBuilder AllowArbitrarySqlExecution(bool allowed)
-    {
-        _allowArbitrarySqlExecution = allowed;
-        return this;
-    }
+    internal void SetArbitrarySqlExecution(bool allowed)
+        => _allowArbitrarySqlExecution = allowed;
 
-    /// <summary>
-    ///     Adds anonymous structures that the application declares on both deployment roles.
-    /// </summary>
-    /// <param name="shapes">Closed compiler-generated anonymous objects from trusted configuration.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public InfoCarrierDeploymentBuilder AddAnonymousShapes(params object[] shapes)
-    {
-        _anonymousShapeTypes.AddRange(ValidateAnonymousPrototypes(shapes, nameof(shapes)));
-        return this;
-    }
+    internal void AddAnonymousShapesCore(object[] shapes)
+        => _anonymousShapeTypes.AddRange(ValidateAnonymousPrototypes(shapes, nameof(shapes)));
 
-    /// <summary>
-    ///     Adds named types that wire payloads may name beyond the types implied by the model.
-    /// </summary>
-    /// <param name="types">The types to admit.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public InfoCarrierDeploymentBuilder AddAllowedTypes(params Type[] types)
+    internal void AddAllowedTypesCore(Type[] types)
     {
         ArgumentNullException.ThrowIfNull(types);
         if (types.Any(static type => type is null))
@@ -51,15 +30,9 @@ public class InfoCarrierDeploymentBuilder
         }
 
         _allowedTypes.AddRange(types);
-        return this;
     }
 
-    /// <summary>
-    ///     Adds custom value mappers in first-claim-wins order.
-    /// </summary>
-    /// <param name="mappers">The mapper instances to use on this deployment role.</param>
-    /// <returns>The same builder, so calls chain.</returns>
-    public InfoCarrierDeploymentBuilder AddValueMappers(params IInfoCarrierValueMapper[] mappers)
+    internal void AddValueMappersCore(IInfoCarrierValueMapper[] mappers)
     {
         ArgumentNullException.ThrowIfNull(mappers);
         if (mappers.Any(static mapper => mapper is null))
@@ -68,7 +41,6 @@ public class InfoCarrierDeploymentBuilder
         }
 
         _valueMappers.AddRange(mappers);
-        return this;
     }
 
     internal InfoCarrierDeploymentSnapshot CreateSnapshot()

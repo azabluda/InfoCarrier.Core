@@ -33,15 +33,14 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
             .ConfigureLogging(l => l.AddProvider(logs))
             .ConfigureServices(s =>
             {
-                s.AddSingleton<IInterceptor>(interceptor);
+                s.AddScoped<IInterceptor>(sp =>
+                {
+                    _ = sp.GetRequiredService<FailingScope>();
+                    return interceptor;
+                });
                 s.AddSingleton<TimeProvider>(clock);
                 if (idle) { s.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10)); }
                 s.AddScoped(_ => new FailingScope(() => Interlocked.Increment(ref scopesDisposed)));
-                s.AddScoped<DbContext>(sp =>
-                {
-                    _ = sp.GetRequiredService<FailingScope>();
-                    return sp.GetRequiredService<Northwind.Shared.NorthwindContext>();
-                });
             }));
         _ = host.CreateClient();
         var server = (InProcessInfoCarrierServer)host.Services.GetRequiredService<IInfoCarrierServer>();

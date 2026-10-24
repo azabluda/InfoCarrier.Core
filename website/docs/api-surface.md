@@ -9,17 +9,12 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 
 | Member | What it does |
 |---|---|
-| `DbContextOptionsBuilder.UseInfoCarrier(IInfoCarrierClient)` | Configures a context to remote its work through the given client. The whole client-side configuration. |
-| `UseInfoCarrier(IInfoCarrierClient, Action<InfoCarrierDbContextOptionsBuilder>)` | The same, with shared deployment facts and client-only store information. See [Configuring the client](configuration/client.md#what-the-client-is-told-about-the-server). |
-| `IServiceCollection.AddInfoCarrier()` | Adds standard server conventions with default deployment facts. |
-| `IServiceCollection.AddInfoCarrier(Action<InfoCarrierDeploymentBuilder>)` | Adds shared deployment facts and standard server conventions. |
-| `IServiceCollection.AddInfoCarrierAllowedTypes(params Type[])` | On the server. Admits CLR types a payload may name beyond the ones the model implies. |
-| `IServiceCollection.AddInfoCarrierArbitrarySqlExecution()` | On the server. Lets a client send `FromSql` and `Database.SqlQuery<T>`. |
-| `IServiceCollection.AddInfoCarrierServerTransactionTimeout(TimeSpan)` | On the server. Rolls back a transaction left idle that long. Off unless called. |
-| `IServiceCollection.AddInfoCarrierServerDocumentStore()` | On the server. Says the store writes an owned type inside its owner, so a change set that leaves part of a document out does not erase it. Off unless called. |
-| `IServiceCollection.AddInfoCarrierHttpCallerIdentity(Func<HttpContext, string?>)` | On the server, from `InfoCarrier.Core.AspNetCore`. Refuses a token opened by a different caller. Off unless called. |
-| `IServiceCollection.AddInfoCarrierServerLogForwarding(LogLevel)` | On the server. Sends the log events it raises back with the result. `AddInfoCarrierSensitiveServerLogForwarding` is the second grant a context with sensitive logging needs. |
-| `IServiceCollection.AddInfoCarrierStandardValueMappers()` | Version 10 compatibility API. `AddInfoCarrier` registers these mappers automatically. |
+| `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)` | Registers the default HTTP client role. Returns `IHttpClientBuilder` for handler configuration. |
+| `InfoCarrierClient.Create(HttpClient, Action<InfoCarrierClientOptions>)` | Creates the default HTTP client directly. The caller owns the supplied `HttpClient`. |
+| `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies role and shared deployment options to a custom client. |
+| `DbContextOptionsBuilder.UseInfoCarrier()` | Attaches the default registered client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |
+| `IServiceCollection.AddInfoCarrierServer<TContext>(Action<InfoCarrierServerOptions>?)` | Registers the default serializer and in-process server for `TContext`. |
+| `InfoCarrierServerBuilder.AddHttpCallerIdentity(Func<HttpContext, string?>)` | From `InfoCarrier.Core.AspNetCore`. Binds transactions from that server registration to their caller. Off unless called. |
 | `IServiceCollection.AddEntityFrameworkInfoCarrier()` | Registers the provider's EF services. Only needed when you build EF's internal service provider yourself. |
 | `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")` | The server endpoint. In `InfoCarrier.Core.AspNetCore`. Returns `IEndpointConventionBuilder`. |
 | `DatabaseFacade.UseInfoCarrierTransaction(IDbContextTransaction)` | Joins a transaction another context began. Non-owning. |
@@ -57,9 +52,15 @@ unchanged.
 
 | Type | Notes |
 |---|---|
+| `InfoCarrierClientOptions` | Endpoint, response limit, server query rules, and shared deployment settings. |
+| `InfoCarrierServerOptions` | Request limit, transaction timeout, document storage, log forwarding, and shared deployment settings. |
+| `InfoCarrierLogForwardingOptions` | Minimum level and the separate sensitive-data grant. Available through `InfoCarrierServerOptions.LogForwarding`. |
 | `InfoCarrierDeploymentBuilder` | Configures shared shapes, types, mappers, and arbitrary SQL. In `InfoCarrier.Core.Abstractions`. |
+| `InfoCarrierDeploymentBuilderExtensions` | Generic shared methods preserve the concrete builder type throughout fluent chains. |
+| `ConfigureShared(Action<InfoCarrierDeploymentBuilder>)` | Applies an ordinary shared method immediately at its position in the role callback, returning the same concrete builder. |
+| `InfoCarrierRoleOptionsExtensions` | `WithEndpoint`, `WithMaxResponseBytes`, `WithServerUsesRelationalQueryRules`, `WithMaxRequestBytes`, `WithTransactionIdleTimeout`, `WithStoresOwnedDataInsideOwner`, and `WithLogForwarding` configure the same mutable options properties. |
 | `InfoCarrierPayloadLimits` | `(int? maxRequestBytes = DefaultMaxRequestBytes, int? maxResponseBytes = null)`. `Default` is the static instance; `DefaultMaxRequestBytes` is 64 MiB. `null` opts out of a limit. |
-| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Low-level immutable structural catalog. Applications register prototypes through `InfoCarrierDeploymentBuilder.AddAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
+| `InfoCarrier.Core.Expressions.AnonymousShapeCatalog` | Low-level immutable structural catalog. Applications register prototypes through `AddAnonymousShapes`. See [server configuration](configuration/server.md#registering-anonymous-projections). |
 
 ## Exceptions
 

@@ -3,160 +3,122 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InfoCarrier.Core;
 
-/// <summary>
-///     Extension methods for configuring an InfoCarrier client context.
-/// </summary>
+/// <summary>Extension methods for attaching an InfoCarrier client to a context.</summary>
 public static class InfoCarrierDbContextOptionsBuilderExtensions
 {
-    /// <summary>
-    ///     Configures the context to use the InfoCarrier provider, remoting all database
-    ///     operations through the supplied <see cref="IInfoCarrierClient" />.
-    /// </summary>
-    /// <param name="optionsBuilder">The options builder.</param>
-    /// <param name="client">The client that ships operations to the server.</param>
-    /// <param name="infoCarrierOptionsAction">
-    ///     Configures deployment facts shared with the server and client-only store information.
-    ///     Omit this callback when the deployment uses the default conventions.
-    /// </param>
-    /// <returns>The same builder for chaining.</returns>
+    /// <summary>Attaches the default client registered with <c>AddInfoCarrierClient</c>.</summary>
+    /// <remarks>
+    ///     Standard Entity Framework context registrations supply the application service provider.
+    ///     For manually constructed options, supply a client explicitly or call
+    ///     <see cref="DbContextOptionsBuilder.UseApplicationServiceProvider" /> first.
+    /// </remarks>
     [RequiresUnreferencedCode(
-         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
-         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
-         + "client does run; test the paths your model actually uses. See "
-         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
      RequiresDynamicCode(
-         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
-         + "generic types over types the payload names, neither of which Native AOT can generate.")]
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder UseInfoCarrier(this DbContextOptionsBuilder optionsBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(optionsBuilder);
+
+        IServiceProvider provider = optionsBuilder.Options.FindExtension<CoreOptionsExtension>()
+            ?.ApplicationServiceProvider
+            ?? throw new InvalidOperationException(
+                "UseInfoCarrier() requires an application service provider. Use a standard Entity Framework "
+                + "context registration, call UseApplicationServiceProvider, or pass a client explicitly.");
+        IInfoCarrierClient client = provider.GetService<IInfoCarrierClient>()
+            ?? throw new InvalidOperationException(
+                "No default InfoCarrier client is registered. Call AddInfoCarrierClient "
+                + "before resolving context options, or pass a client explicitly.");
+
+        return UseInfoCarrier(optionsBuilder, client);
+    }
+
+    /// <summary>Configures the context to use the supplied InfoCarrier client.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
     public static DbContextOptionsBuilder UseInfoCarrier(
         this DbContextOptionsBuilder optionsBuilder,
-        IInfoCarrierClient client,
-        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptionsAction = null)
+        IInfoCarrierClient client)
     {
+        ArgumentNullException.ThrowIfNull(optionsBuilder);
+        ArgumentNullException.ThrowIfNull(client);
+
+        EnsureCoreOptionsFirst(optionsBuilder);
         InfoCarrierOptionsExtension extension = GetOrCreateExtension(optionsBuilder)
             .WithInfoCarrierClient(client);
 
-        // `EnsureCoreOptionsFirst` **before** `AddOrUpdateExtension`, which is the order every EF
-        // provider uses and is not arbitrary. `DbContextOptions.Extensions` yields extensions by
-        // *insertion ordinal*, and that order is what `BuildOptionsFragment` prints in the
-        // context-initialized log line. Configuring warnings is what first creates
-        // `CoreOptionsExtension`, so doing it first puts the core options ahead of the provider's
-        // — `"NoTracking using InfoCarrier"`, which is the shape `LoggingTestBase` composes its
-        // expectation in (`ExpectedMessage("NoTracking " + DefaultOptions)`) and the shape every
-        // other provider produces. Adding ours first printed `"using InfoCarrier NoTracking"`.
-        EnsureCoreOptionsFirst(optionsBuilder);
-        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
-
-        // After the extension is in, because `InfoCarrierDbContextOptionsBuilder` reads the
-        // current one back off the builder and adds to it. Running it first would have it clone an
-        // extension this method then overwrites.
-        if (infoCarrierOptionsAction is not null)
+        if (client is IInfoCarrierClientConfiguration { Registration: { } registration })
         {
-            var builder = new InfoCarrierDbContextOptionsBuilder(optionsBuilder);
-            infoCarrierOptionsAction(builder);
-
-            extension = GetOrCreateExtension(optionsBuilder).WithDeployment(builder.CreateSnapshot());
-            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
+            extension = extension.WithDeployment(registration.Deployment);
+            if (!registration.ServerUsesRelationalQueryRules)
+            {
+                extension = extension.WithNonRelationalServerStore();
+            }
         }
 
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(extension);
         return optionsBuilder;
     }
 
-    /// <summary>
-    ///     Configures the context to use the InfoCarrier provider (generic overload).
-    /// </summary>
+    /// <summary>Configures and attaches an existing transport-independent client.</summary>
     [RequiresUnreferencedCode(
-         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
-         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
-         + "client does run; test the paths your model actually uses. See "
-         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
      RequiresDynamicCode(
-         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
-         + "generic types over types the payload names, neither of which Native AOT can generate.")]
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder UseInfoCarrier(
+        this DbContextOptionsBuilder optionsBuilder,
+        IInfoCarrierClient client,
+        Action<InfoCarrierClientOptions> configure)
+        => UseInfoCarrier(optionsBuilder, InfoCarrierClient.Configure(client, configure));
+
+    /// <summary>Attaches the default registered InfoCarrier client to the typed context.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder)
+        where TContext : DbContext
+        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder);
+
+    /// <summary>Configures the typed context to use the supplied InfoCarrier client.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder,
+        IInfoCarrierClient client)
+        where TContext : DbContext
+        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder, client);
+
+    /// <summary>Configures and attaches an existing transport-independent client.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
     public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
         this DbContextOptionsBuilder<TContext> optionsBuilder,
         IInfoCarrierClient client,
-        Action<InfoCarrierDbContextOptionsBuilder>? infoCarrierOptionsAction = null)
+        Action<InfoCarrierClientOptions> configure)
         where TContext : DbContext
         => (DbContextOptionsBuilder<TContext>)UseInfoCarrier(
-            (DbContextOptionsBuilder)optionsBuilder, client, infoCarrierOptionsAction);
+            (DbContextOptionsBuilder)optionsBuilder, client, configure);
 
-    /// <summary>
-    ///     Adds <see cref="CoreOptionsExtension" /> to the builder before this provider's own
-    ///     extension goes in, so that EF's core options keep the lower insertion ordinal.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>The ordering is the entire purpose and it is observable.</b>
-    ///         <c>DbContextOptions.Extensions</c> yields extensions by insertion ordinal, and that
-    ///         order is what the context-initialized log line prints. Core options first produces
-    ///         <c>"NoTracking using InfoCarrier"</c>, which is the shape <c>LoggingTestBase</c>
-    ///         composes its expectation in and the shape every other provider produces. Adding
-    ///         this provider's extension first printed <c>"using InfoCarrier NoTracking"</c>.
-    ///     </para>
-    /// </remarks>
     private static void EnsureCoreOptionsFirst(DbContextOptionsBuilder optionsBuilder)
     {
         CoreOptionsExtension coreOptionsExtension =
             optionsBuilder.Options.FindExtension<CoreOptionsExtension>() ?? new CoreOptionsExtension();
-
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(coreOptionsExtension);
     }
 
     private static InfoCarrierOptionsExtension GetOrCreateExtension(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.Options.FindExtension<InfoCarrierOptionsExtension>()
             ?? new InfoCarrierOptionsExtension();
-    /// <summary>
-    ///     Configures the context to query through the given InfoCarrier client.
-    /// </summary>
-    /// <remarks>
-    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
-    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
-    ///     compiler emits one member and the old arity disappears from the assembly, which
-    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
-    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
-    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
-    /// </remarks>
-    [RequiresUnreferencedCode(
-         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
-         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
-         + "client does run; test the paths your model actually uses. See "
-         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
-     RequiresDynamicCode(
-         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
-         + "generic types over types the payload names, neither of which Native AOT can generate.")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public static DbContextOptionsBuilder UseInfoCarrier(
-        this DbContextOptionsBuilder optionsBuilder,
-        IInfoCarrierClient client)
-        => UseInfoCarrier(optionsBuilder, client, infoCarrierOptionsAction: null);
-
-    /// <summary>
-    ///     Configures the typed context to query through the given InfoCarrier client.
-    /// </summary>
-    /// <remarks>
-    ///     See the overload above: a binary-compatibility shim for the 10.0.0 signature.
-    /// </remarks>
-    /// <typeparam name="TContext">The context type.</typeparam>
-    /// <param name="optionsBuilder">The builder being configured.</param>
-    /// <param name="client">The client this context queries through.</param>
-    /// <returns>The same builder, so calls can be chained.</returns>
-    [RequiresUnreferencedCode(
-         "InfoCarrier resolves types by the name carried on the wire, so the trimmer cannot know "
-         + "which members a model needs and cannot be told with [DynamicallyAccessedMembers]. A trimmed "
-         + "client does run; test the paths your model actually uses. See "
-         + "https://azabluda.github.io/InfoCarrier.Core/platforms/blazor-webassembly/#trimming"),
-     RequiresDynamicCode(
-         "InfoCarrier builds and compiles expression trees at run time from the payload, and closes "
-         + "generic types over types the payload names, neither of which Native AOT can generate.")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
-        this DbContextOptionsBuilder<TContext> optionsBuilder,
-        IInfoCarrierClient client)
-        where TContext : DbContext
-        => UseInfoCarrier(optionsBuilder, client, infoCarrierOptionsAction: null);
-
 }

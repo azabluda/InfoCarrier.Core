@@ -8,7 +8,6 @@ using Northwind.Shared;
 using Northwind.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using InfoCarrier.Core.Expressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -77,11 +76,10 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.RemoveAll<AnonymousShapeCatalog>();
-            if (serverShape)
+            services.AddInfoCarrierServer<NorthwindContext>(options =>
             {
-                services.AddInfoCarrier(Configure);
-            }
+                if (serverShape) { Configure(options); }
+            });
 
             services.AddSingleton<IInterceptor>(counter);
         }));
@@ -118,7 +116,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var counter = new CommandCounter();
         await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.RemoveAll<AnonymousShapeCatalog>();
+            services.AddInfoCarrierServer<NorthwindContext>();
             services.AddSingleton<IInterceptor>(counter);
         }));
         using HttpClient warmup = unconfigured.CreateClient();
@@ -155,11 +153,10 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var counter = new CommandCounter();
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.RemoveAll<AnonymousShapeCatalog>();
-            if (serverShape)
+            services.AddInfoCarrierServer<NorthwindContext>(options =>
             {
-                services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype));
-            }
+                if (serverShape) { options.AddAnonymousShapes(prototype); }
+            });
 
             services.AddSingleton<IInterceptor>(counter);
         }));
@@ -191,7 +188,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     public async Task A_projection_declared_on_neither_side_is_reconstructed_on_the_client()
     {
         await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
-            services => services.RemoveAll<AnonymousShapeCatalog>()));
+            services => services.AddInfoCarrierServer<NorthwindContext>()));
         using NorthwindContext context = CreateClientContext(unconfigured, registerShape: false, out RecordingHandler recorder);
 
         var rows = await context.Orders.OrderBy(o => o.Id)
@@ -208,7 +205,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var counter = new CommandCounter();
         await using var unconfigured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
-            services.RemoveAll<AnonymousShapeCatalog>();
+            services.AddInfoCarrierServer<NorthwindContext>();
             services.AddSingleton<IInterceptor>(counter);
         }));
         using HttpClient warmup = unconfigured.CreateClient();
@@ -256,7 +253,8 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     {
         var prototype = new { Id = 0, Customer = new { CustomerId = (string?)null } };
         await using var configured = factory.WithWebHostBuilder(builder => builder.ConfigureServices(
-            services => services.AddInfoCarrier(builder => builder.AddAnonymousShapes(prototype))));
+            services => services.AddInfoCarrierServer<NorthwindContext>(
+                options => options.AddAnonymousShapes(prototype))));
         using NorthwindContext context = CreateClientContext(
             configured,
             registerShape: false,
@@ -505,7 +503,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         return new NorthwindContext(
             new DbContextOptionsBuilder<NorthwindContext>()
-                .UseInfoCarrier(client, options =>
+                .UseInfoCarrier(InfoCarrierClient.Configure(client, options =>
                 {
                     if (deployment is not null)
                     {
@@ -526,7 +524,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
                     {
                         options.AddAllowedTypes(typeof(OrderCard));
                     }
-                })
+                }))
                 .UseLazyLoadingProxies()
                 .Options);
     }

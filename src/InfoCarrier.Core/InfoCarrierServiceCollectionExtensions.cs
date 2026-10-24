@@ -58,8 +58,13 @@ public static class InfoCarrierServiceCollectionExtensions
 
         var builder = new InfoCarrierDeploymentBuilder();
         configure(builder);
-        InfoCarrierDeploymentSnapshot snapshot = builder.CreateSnapshot();
+        return AddInfoCarrier(services, builder.CreateSnapshot());
+    }
 
+    internal static IServiceCollection AddInfoCarrier(
+        IServiceCollection services,
+        InfoCarrierDeploymentSnapshot snapshot)
+    {
         AddInfoCarrierAnonymousShapeTypes(services, snapshot.AnonymousShapeTypes);
         if (snapshot.AllowedTypes.Count > 0)
         {

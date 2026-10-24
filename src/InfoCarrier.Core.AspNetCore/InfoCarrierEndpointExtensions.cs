@@ -68,6 +68,10 @@ public static class InfoCarrierEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
+        // Validate the complete default role during endpoint setup, before requests arrive.
+        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierServer>();
+        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
+
         // Fail trusted catalog construction during endpoint setup, before requests arrive.
         _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
 

@@ -17,14 +17,8 @@ builder.Services.AddDbContext<NorthwindContext>(
         // about everything the wire names (A49, and D2 in architecture.md).
         .UseLazyLoadingProxies());
 
-// The server resolves its DbContext per request from this provider, so `DbContext` itself must
-// be resolvable — `InProcessInfoCarrierServer` asks for the base type, not for NorthwindContext.
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<NorthwindContext>());
-
-builder.Services
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrier(builder => builder.ConfigureInfoCarrier());
+builder.Services.AddInfoCarrierServer<NorthwindContext>(
+    options => options.ConfigureShared(NorthwindDeployment.ConfigureInfoCarrier));
 
 WebApplication app = builder.Build();
 

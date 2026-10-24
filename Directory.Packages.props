@@ -88,6 +88,7 @@
       this pin exists to prevent.
     -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
     <!--
       TRANSITIVE PIN THAT CLOSES NU1903 ADVISORIES. Not referenced directly by anything here and
       does not reach either shipped package (`dotnet list package` with the vulnerable switch

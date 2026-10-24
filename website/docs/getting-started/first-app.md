@@ -54,7 +54,7 @@ one context class serves both halves.
 
 ## 2. The server
 
-An ordinary ASP.NET Core application with an ordinary EF Core provider, plus five registrations and
+An ordinary ASP.NET Core application with an ordinary EF Core provider, one role registration, and
 one endpoint.
 
 ```csharp title="Shop.Server/Program.cs"
@@ -70,15 +70,7 @@ string connectionString = builder.Configuration.GetConnectionString("Shop")!;
 // Your real database. Nothing about this line is InfoCarrier's business.
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
 
-// The server resolves the context per request as `DbContext`, so the base type must resolve too.
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>());
-
-builder.Services
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    // `IPAddress` and `Uri` cannot be walked member by member. The client registers these
-    // for itself; a server builds its own service collection, so it has to ask.
-    .AddInfoCarrierStandardValueMappers();
+builder.Services.AddInfoCarrierServer<ShopContext>();
 
 WebApplication app = builder.Build();
 
@@ -88,9 +80,8 @@ app.MapInfoCarrier();
 app.Run();
 ```
 
-`InProcessInfoCarrierServer` executes a request against a real `DbContext`. The name says
-*in-process* because it runs the query in the same process as the database connection. It is the
-normal server-side implementation, not a test double.
+`AddInfoCarrierServer<ShopContext>` registers the default serializer and in-process server. It
+resolves `ShopContext` directly, so no base `DbContext` alias is required.
 
 ## 3. The client
 
@@ -101,19 +92,17 @@ using InfoCarrier.Core;
 using Microsoft.EntityFrameworkCore;
 using Shop;
 
-var serializer = new SystemTextJsonInfoCarrierSerializer();
-using var http = new HttpClient { BaseAddress = new Uri("https://your-app-server") };
-
-IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new HttpInfoCarrierTransport(http, serializer),
-    serializer);
+using var http = new HttpClient();
+IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
+    options.WithEndpoint("https://your-app-server/infocarrier"));
 
 DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
     .UseInfoCarrier(client)
     .Options;
 ```
 
-Three objects, each replaceable:
+`InfoCarrierClient.Create` assembles the default serializer, HTTP transport, and client. The caller
+owns the supplied `HttpClient`. These low-level parts remain replaceable:
 
 | | |
 |---|---|
@@ -121,22 +110,13 @@ Three objects, each replaceable:
 | `HttpInfoCarrierTransport` | posts the bytes and reads the answer. One method: see [Custom transports](../configuration/transports.md). |
 | `TransportInfoCarrierClient` | the client the provider talks to. |
 
-In a DI application, register them instead:
+In a dependency injection application, register the complete client role instead:
 
 ```csharp
-builder.Services.AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>();
-builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri("https://your-app-server") });
+builder.Services.AddInfoCarrierClient(options =>
+    options.WithEndpoint("https://your-app-server/infocarrier"));
 
-builder.Services.AddSingleton<IInfoCarrierClient>(sp =>
-{
-    var serializer = sp.GetRequiredService<IInfoCarrierSerializer>();
-    return new TransportInfoCarrierClient(
-        new HttpInfoCarrierTransport(sp.GetRequiredService<HttpClient>(), serializer),
-        serializer);
-});
-
-builder.Services.AddDbContextFactory<ShopContext>((sp, o) =>
-    o.UseInfoCarrier(sp.GetRequiredService<IInfoCarrierClient>()));
+builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
 !!! tip "A factory, not a context"
@@ -204,13 +184,11 @@ public sealed class LoopbackTransport(IInfoCarrierServer server, IInfoCarrierSer
 Wire it exactly as the HTTP one, with a server built over an in-memory or file-backed store:
 
 ```csharp
-ServiceProvider serverServices = new ServiceCollection()
-    .AddDbContext<ShopContext>(o => o.UseSqlite("Filename=test.db"))
-    .AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>())
-    .AddSingleton<IInfoCarrierSerializer, SystemTextJsonInfoCarrierSerializer>()
-    .AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>()
-    .AddInfoCarrierStandardValueMappers()
-    .BuildServiceProvider();
+var services = new ServiceCollection()
+    .AddLogging()
+    .AddDbContext<ShopContext>(o => o.UseSqlite("Filename=test.db"));
+services.AddInfoCarrierServer<ShopContext>();
+ServiceProvider serverServices = services.BuildServiceProvider();
 
 var serializer = new SystemTextJsonInfoCarrierSerializer();
 

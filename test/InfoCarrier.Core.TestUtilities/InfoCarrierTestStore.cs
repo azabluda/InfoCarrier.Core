@@ -66,13 +66,13 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => _backend.IsDirect
             ? _backend.AddDirectClientOptions(builder)
-            : builder.UseInfoCarrier(_backend, ClientOptions(_backend));
+            : builder.UseInfoCarrier(InfoCarrierClient.Configure(_backend, ClientOptions(_backend)));
 
     /// <summary>
     ///     The InfoCarrier client options a fixture's store implies. Shared with
     ///     <see cref="RelationalInfoCarrierTestStore" />, which needs the same answer.
     /// </summary>
-    public static Action<InfoCarrierDbContextOptionsBuilder>? ClientOptions(InfoCarrierBackendTestStore backend)
+    public static Action<InfoCarrierClientOptions> ClientOptions(InfoCarrierBackendTestStore backend)
     {
         bool arbitrarySql = backend.ArbitrarySqlExecution;
         Type[] allowedTypes = backend.AllowedTypes;
@@ -85,7 +85,7 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
 
         if (!arbitrarySql && allowedTypes.Length == 0 && anonymousShapes.Length == 0 && relationalStore)
         {
-            return null;
+            return _ => { };
         }
 
         Type? parameterType = arbitrarySql ? backend.StoreParameterType : null;
@@ -96,7 +96,7 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
             // because EF's InMemory provider answers queries every relational provider refuses.
             if (!relationalStore)
             {
-                o.UseNonRelationalServerStore();
+                o.ServerUsesRelationalQueryRules = false;
             }
 
             if (arbitrarySql)

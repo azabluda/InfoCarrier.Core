@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Northwind.Shared;
 
 namespace InfoCarrier.Core.TransportTests;
@@ -35,6 +36,7 @@ public sealed class NorthwindServerFactory : WebApplicationFactory<Program>
         // under, and it is the strictest setting: no exception page, so a real 400 has to come from
         // the endpoint itself, not from hosting middleware.
         builder.UseEnvironment("Production");
+        builder.ConfigureLogging(logging => logging.ClearProviders());
 
         builder.ConfigureServices(services =>
         {

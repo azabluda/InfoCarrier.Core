@@ -69,50 +69,11 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
-    public void Obsolete_AllowTypes_matches_shared_builder()
-    {
-        var compatibilityOptions = new DbContextOptionsBuilder();
-        var sharedOptions = new DbContextOptionsBuilder();
-
-#pragma warning disable ICC1001 // The test protects the obsolete version 10 compatibility API.
-        compatibilityOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowTypes(typeof(DateOnly)));
-#pragma warning restore ICC1001
-        sharedOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AddAllowedTypes(typeof(DateOnly)));
-
-        Assert.Equal(
-            sharedOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.AllowedTypes,
-            compatibilityOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.AllowedTypes);
-    }
-
-    [Fact]
-    public void Obsolete_parameterless_AllowArbitrarySqlExecution_matches_shared_builder()
-    {
-        var compatibilityOptions = new DbContextOptionsBuilder();
-        var sharedOptions = new DbContextOptionsBuilder();
-
-#pragma warning disable ICC1002 // The test protects the obsolete version 10 compatibility API.
-        compatibilityOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowArbitrarySqlExecution());
-#pragma warning restore ICC1002
-        sharedOptions.UseInfoCarrier(
-            StubClient.Instance,
-            builder => builder.AllowArbitrarySqlExecution(true));
-
-        Assert.Equal(
-            sharedOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed,
-            compatibilityOptions.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed);
-    }
-
-    [Fact]
-    public void Abstractions_assembly_exposes_only_the_two_approved_contracts()
+    public void Abstractions_assembly_exposes_only_the_shared_configuration_surface()
         => Assert.Equal(
             [
                 "InfoCarrier.Core.InfoCarrierDeploymentBuilder",
+                "InfoCarrier.Core.InfoCarrierDeploymentBuilderExtensions",
                 "InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper"
             ],
             typeof(InfoCarrierDeploymentBuilder).Assembly
@@ -130,11 +91,12 @@ public class InfoCarrierDeploymentBuilderTest
                     || reference.Name.StartsWith("Microsoft.Extensions", StringComparison.Ordinal)));
 
     [Fact]
-    public void Existing_UseInfoCarrier_callback_accepts_shared_extension()
+    public void Existing_UseInfoCarrier_callback_accepts_shared_configuration()
     {
         var options = new DbContextOptionsBuilder();
 
-        options.UseInfoCarrier(StubClient.Instance, builder => builder.ConfigureInfoCarrierForTest());
+        options.UseInfoCarrier(StubClient.Instance, builder => builder.ConfigureShared(
+            InfoCarrierDeploymentBuilderTestExtensions.ConfigureInfoCarrierForTest));
 
         InfoCarrierOptionsExtension extension = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
         Assert.Equal(typeof(DateOnly), Assert.Single(extension.AllowedTypes));
@@ -142,13 +104,17 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
-    public void Client_specific_calls_chain_before_shared_extension()
+    public void Client_specific_calls_compose_with_shared_configuration()
     {
         var options = new DbContextOptionsBuilder();
 
         options.UseInfoCarrier(
             StubClient.Instance,
-            builder => builder.UseNonRelationalServerStore().ConfigureInfoCarrierForTest());
+            builder =>
+            {
+                builder.ServerUsesRelationalQueryRules = false;
+                builder.ConfigureShared(InfoCarrierDeploymentBuilderTestExtensions.ConfigureInfoCarrierForTest);
+            });
 
         InfoCarrierOptionsExtension extension = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
         Assert.False(extension.ServerStoreIsRelational);
@@ -247,8 +213,8 @@ public class InfoCarrierDeploymentBuilderTest
         var second = new StubMapper();
         var services = new ServiceCollection();
 
-        services.AddInfoCarrier(builder => builder.AddValueMappers(first));
-        services.AddInfoCarrier(builder => builder.AddValueMappers(second));
+        services.AddInfoCarrier(builder => builder.ConfigureShared(b => b.AddValueMappers(first)));
+        services.AddInfoCarrier(builder => builder.ConfigureShared(b => b.AddValueMappers(second)));
 
         using ServiceProvider provider = services.BuildServiceProvider();
         IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
@@ -282,24 +248,23 @@ public class InfoCarrierDeploymentBuilderTest
     }
 
     [Fact]
-    public void One_application_extension_configures_both_roles_without_shared_state()
+    public void One_application_method_configures_both_roles_without_shared_state()
     {
         var created = new List<StubMapper>();
-        InfoCarrierDeploymentBuilder Configure(InfoCarrierDeploymentBuilder builder)
+        void Configure(InfoCarrierDeploymentBuilder builder)
         {
             var mapper = new StubMapper();
             created.Add(mapper);
             builder.AddValueMappers(mapper);
-            return builder;
         }
 
         var options = new DbContextOptionsBuilder();
-        options.UseInfoCarrier(StubClient.Instance, builder => Configure(builder));
+        options.UseInfoCarrier(StubClient.Instance, builder => builder.ConfigureShared(Configure));
         InfoCarrierOptionsExtension client = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
         var clientServices = new ServiceCollection();
         client.ApplyServices(clientServices);
         var services = new ServiceCollection();
-        services.AddInfoCarrier(builder => Configure(builder));
+        services.AddInfoCarrier(builder => builder.ConfigureShared(Configure));
 
         using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -524,8 +489,7 @@ public class InfoCarrierDeploymentBuilderTest
 
 internal static class InfoCarrierDeploymentBuilderTestExtensions
 {
-    public static InfoCarrierDeploymentBuilder ConfigureInfoCarrierForTest(
-        this InfoCarrierDeploymentBuilder builder)
+    public static void ConfigureInfoCarrierForTest(InfoCarrierDeploymentBuilder builder)
         => builder
             .AddAllowedTypes(typeof(DateOnly))
             .AllowArbitrarySqlExecution(true);

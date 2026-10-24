@@ -24,8 +24,8 @@ predicate there, whatever the incoming tree says. The client cannot reach it.
 
 **Raw SQL goes around both, so a multi-tenant server should not grant it.** A `FromSql` query does
 not pass through `OnModelCreating`, so no filter is in it, and an uncomposed one reaches the
-database unchanged. Your server grants this only by calling
-`AddInfoCarrierArbitrarySqlExecution()`, and it is off until you do. If you have a reason to grant
+database unchanged. Your server grants this only by setting
+`AllowArbitrarySqlExecution(true)` in its role callback. It is off until you do. If you grant
 it, the rights of the database account in your connection string are the control that is left.
 
 ## Writes
@@ -61,7 +61,7 @@ by an async-local, so it reaches the new scope and carries the authenticated pri
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddDbContext<ShopContext>((sp, o) => o.UseSqlServer(connectionString));
-builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopContext>());
+builder.Services.AddInfoCarrierServer<ShopContext>();
 ```
 
 ```csharp
@@ -87,7 +87,7 @@ captured once when the model is first built and then cached with it.
 3. A client sends `ExecuteDelete` over another tenant's rows. Nothing is deleted.
 4. Two tenants querying at once. Neither sees the other's rows, and the second tenant's query is
    filtered by its own tenant, not by the first one's.
-5. Your server does not call `AddInfoCarrierArbitrarySqlExecution()`. Grep for it.
+5. Your server role does not call `AllowArbitrarySqlExecution(true)`. Search for that call.
 
 The fourth catches both mistakes above: a filter reading the wrong tenant, or a model cached with
 the first tenant's value, looks correct until a second tenant arrives. A single-tenant run never

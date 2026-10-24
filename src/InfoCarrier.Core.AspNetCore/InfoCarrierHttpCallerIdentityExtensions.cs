@@ -11,6 +11,19 @@ namespace InfoCarrier.Core.AspNetCore;
 /// </summary>
 public static class InfoCarrierHttpCallerIdentityExtensions
 {
+    /// <summary>Binds transactions from this server role to the authenticated HTTP caller.</summary>
+    public static InfoCarrierServerBuilder AddHttpCallerIdentity(
+        this InfoCarrierServerBuilder builder,
+        Func<HttpContext, string?> callerId)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(callerId);
+        builder.Services.AddHttpContextAccessor();
+        builder.ConfigureCallerIdentity(sp => new HttpCallerIdentity(
+            sp.GetRequiredService<IHttpContextAccessor>(), callerId));
+        return builder;
+    }
+
     /// <summary>
     ///     Makes this <em>server</em> refuse a request that names a transaction opened by a
     ///     different caller.
@@ -45,8 +58,8 @@ public static class InfoCarrierHttpCallerIdentityExtensions
     ///     </para>
     ///     <example>
     ///         <code>
-    ///         builder.Services.AddInfoCarrierHttpCallerIdentity(
-    ///             http => http.User.FindFirst("sub")?.Value);
+    ///         builder.Services.AddInfoCarrierServer&lt;ShopContext&gt;()
+    ///             .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
     ///
     ///         app.MapInfoCarrier().RequireAuthorization("DataAccess");
     ///         </code>
