@@ -17,7 +17,7 @@ The historical configuration names below are superseded in version 11. Shared me
 server options. Only the server snapshot grants admission. `WithLogForwarding` configures the
 forwarding level and separate sensitive-data grant. These changes remove configuration markers;
 forwarding remains disabled until an explicit level is configured.
-they do not change the admission rules, disclosure risks, or the two-grant sensitive logging rule.
+Admission rules and disclosure risks are unchanged. Sensitive logging still requires both grants.
 See [server configuration](../website/docs/configuration/server.md) for current setup.
 
 ## 1. The path, in order
