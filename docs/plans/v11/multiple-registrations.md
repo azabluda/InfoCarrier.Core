@@ -2,7 +2,7 @@
 
 Date: 2026-10-25  
 Issue: [#105](https://github.com/azabluda/InfoCarrier.Core/issues/105)  
-Status: design reconciliation and bounded implementation plan; public additions below are proposals
+Status: selection rules approved by the owner on 2026-10-25; implementation in progress
 
 ## Delivery boundary
 
@@ -73,12 +73,12 @@ semantics. This issue does not promise transparent forwarding, arbitrary-length 
 identity propagation, token forwarding, or distributed transactions. Record any discovered relay
 limitations explicitly. Successful coexistence alone must not be described as transparent relay support.
 
-## Proposed selection contract
+## Approved selection contract
 
-Resolve these rules before introducing public overloads. The table proposes bounded defaults rather
-than treating historical sketches as approved implementation decisions.
+The owner approved these rules on 2026-10-25, explicitly confirming that default selection means
+the unnamed registration. Exact overload signatures still require compile-time checks during implementation.
 
-| Decision | Proposed behavior |
+| Decision | Approved behavior |
 |---|---|
 | Name comparison | Ordinal, case-sensitive; reject null, empty, or whitespace-only names on named overloads |
 | Duplicate names | Reject during registration within the same client or server catalog; no hidden composition |
@@ -96,6 +96,19 @@ than treating historical sketches as approved implementation decisions.
 The issue's earlier startup-ambiguity requirement needs this explicit reconciliation: selecting an
 explicit default is not ambiguous. Mapping by type with multiple matches is ambiguous and must fail
 during endpoint setup. Do not silently change the current latest-unnamed default rule.
+
+### Coexistence evidence, 2026-10-25
+
+`ClientServerCoexistenceTest` exercises the existing default APIs through real HTTP endpoint handlers.
+The middle host registers a local SQLite context and incoming server, plus an outgoing default client
+connected to a second host. The test runs in both registration orders. Incoming and outgoing operations
+use the same context type and query shape, insert and update concurrently, assert save counts and
+tracked entity state, and independently inspect both SQLite databases. Different incoming request
+and outgoing response limits remain on their respective descriptors. No production changes were needed.
+
+This proves basic default registration coexistence without a relay API. Mapper, caller identity,
+logging, transaction, and metric isolation still require the later acceptance checks. It does not
+claim transparent relay support or prove all named-registration paths.
 
 Proposed additions are named `AddInfoCarrierClient` and `UseInfoCarrier(clientName: ...)`, named
 `AddInfoCarrierServer<TContext>`, server-handle and server-name endpoint mapping, and unambiguous
@@ -123,6 +136,23 @@ limit, document behavior, transaction timeout, caller policy, and logging grants
 streaming endpoint paths must use that selected pair. Runtime catalogs must copy registration data.
 Shared HTTP context access, logger infrastructure, and HTTP client factories remain host-owned.
 
+### Initial ownership trace, 2026-10-25
+
+| Carrier | Verified source boundary | Multi-registration follow-up |
+|---|---|---|
+| Outgoing serializer and transport | `CreateClient` constructs both from the client descriptor, not the host's incoming serializer | Retain one activation per selected client identity |
+| Client mapper registration | `InfoCarrierOptionsExtension.ApplyServices` installs mapper instances into Entity Framework's internal provider | Preserve mapper-aware provider identity and test cache reuse with matching configurations |
+| Incoming mapper and admission policy | Registration-backed `InProcessInfoCarrierServer` reads its deployment snapshot | Keep every activated endpoint on its own descriptor |
+| Caller identity | `AddHttpCallerIdentity` stores a factory on the server builder; the factory uses the shared HTTP context accessor | Avoid a host-wide replacement policy; test different selectors on separate endpoints |
+| Server transactions | Each server instance owns its transaction registry; `DisposeAsync` stops its timer and discards open transactions | Ensure host disposal reaches every activated server exactly once |
+| Log capture | Server construction receives host-owned capture infrastructure; forwarding grants come from its registration | Test independent grants during concurrent incoming and outgoing operations |
+| Metrics | `RoundTripCompleted` currently accepts operation, duration, and error type only | Carry descriptor labels explicitly; do not read an ambient current registration |
+
+The existing server constructor may create a short scope to build an anonymous-shape catalog from
+the registered context's model. Do not confuse that existing startup behavior with permission to
+introduce child containers or new endpoint lifetime scopes. Custom context-factory ownership and
+named activation disposal still need explicit implementation review.
+
 No child service providers, endpoint containers, or hidden scopes are permitted. Preserve existing
 request and transaction scopes. Verify each host-owned resource is disposed exactly once and that
 explicitly supplied resources retain their documented ownership. Check active transaction cleanup.
@@ -142,6 +172,8 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
 - [x] P0: Reconcile the merged baseline, record simultaneous participation, and propose selection rules.
 - [ ] P1: Finalize selection signatures and failure rules with compile-time usage examples. Trace all
   policy carriers and ownership paths. Add focused default coexistence tests in both registration orders.
+  Selection rules are approved and default coexistence tests pass. Exact overload checks and the
+  complete ownership audit remain open; do not mark the whole step complete yet.
 - [ ] P2: Implement client catalogs, isolated HTTP configurations, and named attachment. Document named
   clients with standard context registrations and honest same-context custom-factory examples.
 - [ ] P3: Implement named server registration, descriptor activation, handle/name mapping, and typed
