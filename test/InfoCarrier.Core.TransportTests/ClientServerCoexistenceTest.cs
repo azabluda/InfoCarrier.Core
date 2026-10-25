@@ -39,7 +39,8 @@ public class ClientServerCoexistenceTest
             Assert.Equal(1024 * 1024,
                 middle.Services.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.MaxRequestBytes);
             Assert.Equal(2 * 1024 * 1024,
-                middle.Services.GetRequiredService<InfoCarrierClientRegistration>().MaxResponseBytes);
+                ((IInfoCarrierClientConfiguration)middle.Services.GetRequiredService<IInfoCarrierClient>())
+                    .Registration!.MaxResponseBytes);
         }
         finally
         {

@@ -37,9 +37,6 @@ internal sealed class AnonymousShapeSet
         return new AnonymousShapeSet(identities, registeredTypes);
     }
 
-    internal static Type[] ValidatePrototypes(object[] shapes, string parameterName)
-        => InfoCarrierDeploymentBuilder.ValidateAnonymousPrototypes(shapes, parameterName);
-
     private static void Add(Type type, ISet<string> identities, ICollection<Type> types)
     {
         if (AnonymousShapeTypes.IsOriginal(type))

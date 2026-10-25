@@ -294,12 +294,69 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   Final-source validation passed on 2026-10-25: the full specification comparison, full transport suite,
   slow SQLite and Firebird comparisons, Release rebuild, package validation, clean trimming, strict
   documentation, links, word budgets, file hygiene, and whitespace checks. Specification failure names
-  and reasons remain unchanged from P4. The source review found no additional replaced paths to remove.
+  and reasons remain unchanged from P4. The subsequent owner-requested audit is recorded below.
   The implementation and local acceptance matrix are complete. Keep the issue open and pull request
   draft for owner review and continuous integration; merging still requires explicit owner authorization.
 
 Each step is a new commit on the same branch. Update its checkbox with the work. Cleanup is limited
 to paths replaced by this feature; the legacy cleanup already merged is not another task.
+
+## Post-implementation obsolete-code audit, 2026-10-25
+
+Reviewed the pull request's runtime changes and adjacent configuration, activation, serializer,
+query, mapping, and lifecycle dependencies. Compiler unused-symbol results were candidate lists,
+checked against concrete and interface references, registration source, reflection, generated calls,
+and the supported low-level API. Dependency-injection scan misses were checked against the actual
+`EntityFrameworkServicesBuilder.TryAdd` chains and logger-provider registrations.
+
+Removed confirmed leftovers:
+
+- `InfoCarrierOptionsExtension.WithAllowedTypes`, `WithRegisteredAnonymousShapes`, and
+  `WithArbitrarySqlExecution`: unused mutation routes superseded by the deployment snapshot path.
+- `AnonymousShapeSet.ValidatePrototypes`: an unused forwarding adapter after validation moved to
+  `InfoCarrierDeploymentBuilder`.
+- The two-argument `ExpressionSerializer.CreateForModel` binary-compatibility shim: its documented
+  purpose was version 10 compatibility, which is not required for version 11. The optional-argument
+  factory and explicit catalog factory remain; two-argument source calls still bind normally.
+- The unkeyed `InfoCarrierClientRegistration` service registration: runtime default selection now
+  uses the catalog and keyed activation. Its only consumer was a test, now checking the actual
+  activated client's descriptor.
+
+Retained framework and supported entry points:
+
+- Entity Framework database/query-context/transaction services, pool reset methods, conventions,
+  and relational facade members are called through their framework interfaces.
+- Keyed activation disposal, measurement disposal, logging providers, mapper implementations,
+  serializer overloads, and synchronous client/server methods satisfy active lifecycle or interface contracts.
+- `ClientResultMaterializer.Materialize` and `ClientPropertyReader.Read` are emitted into expression
+  trees; `InfoCarrierTypeMapping.Default` is discovered by compiled-model generation.
+- Design-time services are discovered by `DesignTimeProviderServicesAttribute` and implement
+  `IDesignTimeServices`. The default server facade preserves the public default service contract
+  without owning its activation.
+- `ExpressionSerializer.UseAnonymousShapeCatalog`, the remaining model factories, and public
+  analysis properties remain useful custom-composition or inspection APIs. The absence of internal
+  callers does not establish that a supported public API is obsolete.
+- The obsolete-marked document-mapping interface still has active convention/database consumers;
+  its attribute does not make it dead code. Its replacement is outside this feature's cleanup.
+
+Corrected stale serializer comments about a universally shared internal provider, the old allowed-type
+API name, and host-wide mapper resolution. Mapper identity can partition providers; matching mapper
+instances can still share them. Server expression serializers receive the selected policy snapshot.
+This audit does not claim that every unrelated public API in the repository has external callers.
+
+Cleanup validation exposed a streamed-limit fixture teardown race: the client could finish while
+TestServer was still unwinding a request that held its SQLite file open. Host disposal did not join
+that handler. A deterministic probe holds a real SQLite connection in a request until explicitly
+released; the previous fixture reproduced the same file-lock failure. The fixture now stops the host,
+joins tracked request completions, then disposes host services and deletes the files. It uses no
+sleep, deletion retry, or swallowed file error. The new probe and limit/admission checks pass.
+
+Cleanup validation passed: normal functional 29,692/0/29,926 and document store 237/0/237
+(passed/failed/total), with unchanged specification failure names and reasons. Three consecutive
+identical transport runs each passed 276/0/276. Compiled-model checks passed 4/0/4. Release rebuild,
+package validation, clean trimming (115 InfoCarrier warnings), strict documentation, links, word
+budgets, file hygiene, and whitespace checks passed. Slow SQLite and Firebird results above belong
+to parent commit `0edd48f6`; they were not repeated for this deletion-only production cleanup.
 
 ## Validation and completion
 

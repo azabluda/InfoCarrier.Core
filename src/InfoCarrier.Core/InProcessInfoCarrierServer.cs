@@ -20,8 +20,8 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Query rebinding and execution run through <see cref="ServerQueryExecutor" />, and
 ///     SaveChanges replay through <see cref="ServerSaveChangesExecutor" />. The server resolves
-///     the context and serializer per request from DI (DI-first, requirements §4.2) — except
-///     inside a transaction, which pins one context across several requests; see
+///     contexts through host operation scopes and builds model-aware expression serializers with
+///     the selected registration's policy. A transaction pins one context across requests; see
 ///     <see cref="BeginTransactionAsync" />.
 /// </remarks>
 /// <remarks>

@@ -208,7 +208,8 @@ BUDGET = {
     # 1150 on 2026-10-25 for named selection, failure rules, and independent same-context factories.
     # 1200 on 2026-10-25 for whole-response streaming limits and partial enumeration.
     # 1250 on 2026-10-25 for registration labels and streamed measurement outcomes.
-    "website/docs/configuration/client.md": 1250,
+    # 1300 on 2026-10-25 for the legacy options-mutation migration note.
+    "website/docs/configuration/client.md": 1300,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

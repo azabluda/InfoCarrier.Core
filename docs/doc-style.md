@@ -196,6 +196,8 @@ Later that day, the client budget rose to 1,200 and the server budget to 1,850 f
 limits, partial enumeration, and per-registration enforcement.
 The metrics increment later that day raised the client budget to 1,250 and server budget to 1,950
 for registration labels, instrument names, and streamed measurement outcomes.
+The post-implementation cleanup raised the client budget to 1,300 for the removed low-level
+options mutation methods and their supported callback replacement.
 
 ## Before committing
 

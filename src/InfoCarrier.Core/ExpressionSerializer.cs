@@ -39,7 +39,7 @@ public class ExpressionSerializer(
     ///         <b>Same reason as <see cref="ToNode(Expression, Metadata.IInfoCarrierRelationalQueryRoots?)" />
     ///         above: this object does not know which context is asking.</b> It is registered
     ///         <c>Scoped</c>, its resolver's allowlist is derived from the model alone, and what
-    ///         the application declared with <c>AllowTypes</c> travels on the options. So the
+    ///         the application declared with <c>AddAllowedTypes</c> travels on the options. So the
     ///         value arrives per call, from the one place that reads it —
     ///         <c>QueryExecutor</c>, which hands the same list to the boundary analyzer.
     ///     </para>
@@ -64,10 +64,11 @@ public class ExpressionSerializer(
     /// <remarks>
     ///     <para>
     ///         <b>The seam arrives per call because this object does not know which context is
-    ///         asking.</b> It is registered <c>Scoped</c>, but every InfoCarrier client context in
-    ///         a process shares one internal service provider
-    ///         (<c>ExtensionInfo.GetServiceProviderHashCode()</c> is <c>0</c>), so a DI-injected
-    ///         answer would be one answer for all of them. <c>QueryExecutor</c> reads the seam once
+    ///         asking.</b> It is registered <c>Scoped</c>, but contexts with matching mapper
+    ///         instances can share an internal service provider. Updated 2026-10-25: the earlier
+    ///         claim that its hash is always zero no longer holds; mapper identity partitions
+    ///         providers, not client registration identity. A DI-injected answer can therefore
+    ///         still be shared by several clients. <c>QueryExecutor</c> reads the seam once
     ///         per execution and hands the same object to the boundary analyzer and to this method.
     ///         One reader, so the two cannot disagree.
     ///     </para>
@@ -163,8 +164,8 @@ public class ExpressionSerializer(
     ///     The server's <see cref="ValueMapping.IInfoCarrierValueMapper" /> chain. A value the
     ///     wire cannot walk has to be mapped on <em>both</em> halves, and the server's half is
     ///     not DI-resolved along with the rest of this pipeline, so it is passed in — see
-    ///     <see cref="InProcessInfoCarrierServer" />, which reads it from the service provider it
-    ///     was built with.
+    ///     <see cref="InProcessInfoCarrierServer" />, which supplies the selected registration's
+    ///     mapper snapshot, or host mappers for direct construction without options.
     /// </param>
     /// <remarks>
     ///     <b>It takes no relational seam, and that is not an omission.</b> This builds the
@@ -201,22 +202,4 @@ public class ExpressionSerializer(
         var forward = new ExpressionToNodeTranslator(typeMapper, valueMapper);
         return new ExpressionSerializer(forward, typeResolver, valueMapper);
     }
-    /// <summary>
-    ///     Creates a serializer for a model, admitting no types beyond the ones it implies.
-    /// </summary>
-    /// <remarks>
-    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
-    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
-    ///     compiler emits one member and the old arity disappears from the assembly, which
-    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
-    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
-    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
-    /// </remarks>
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public static ExpressionSerializer CreateForModel(
-        Microsoft.EntityFrameworkCore.Metadata.IModel model,
-        IEnumerable<ValueMapping.IInfoCarrierValueMapper>? valueMappers)
-        => CreateForModel(model, valueMappers, allowedTypes: null);
-
 }

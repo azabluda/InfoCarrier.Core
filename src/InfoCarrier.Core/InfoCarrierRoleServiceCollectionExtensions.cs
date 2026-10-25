@@ -61,8 +61,6 @@ public static class InfoCarrierRoleServiceCollectionExtensions
                 registration, provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>()));
         if (clientName is null)
         {
-            services.RemoveAll<InfoCarrierClientRegistration>();
-            services.AddSingleton(registration);
             services.RemoveAll<IInfoCarrierClient>();
             services.AddSingleton<IInfoCarrierClient>(provider => provider
                 .GetRequiredService<InfoCarrierClientRegistrationStore>().GetDefault(provider));

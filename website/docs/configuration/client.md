@@ -114,6 +114,10 @@ Abstractions has no Entity Framework Core dependency.
 
 Keep client-only settings outside this method.
 
+Version 11 removes `InfoCarrierOptionsExtension.WithAllowedTypes` and `WithArbitrarySqlExecution`.
+Configure deployment settings through client callbacks. For a custom client, use
+`UseInfoCarrier(client, configure)`.
+
 ## Direct creation and replaceable parts
 
 Create the default client without dependency injection when the application owns an `HttpClient`:

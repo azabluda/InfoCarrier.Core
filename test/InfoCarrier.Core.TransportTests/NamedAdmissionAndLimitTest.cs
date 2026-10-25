@@ -1,8 +1,11 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Collections.Concurrent;
 using InfoCarrier.Core.AspNetCore;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,6 +15,36 @@ namespace InfoCarrier.Core.TransportTests;
 
 public class NamedAdmissionAndLimitTest
 {
+    [Fact]
+    public async Task Host_waits_for_request_cleanup_before_deleting_its_database()
+    {
+        TimeSpan deadline = TimeSpan.FromSeconds(15);
+        var probe = new CleanupProbe();
+        var host = await Host.Start(false, probe);
+        using HttpClient http = host.App.GetTestClient();
+        using HttpResponseMessage response = await http.GetAsync("/cleanup-probe", HttpCompletionOption.ResponseHeadersRead);
+        await probe.Entered.Task.WaitAsync(deadline);
+        response.Dispose();
+        Task disposing = host.DisposeAsync().AsTask();
+        try
+        {
+            await host.DrainStarted.Task.WaitAsync(deadline);
+            Assert.False(disposing.IsCompleted, "Host disposal ended while a request still owned an open database connection.");
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await probe.Finished.Task.WaitAsync(deadline);
+            try { await disposing.WaitAsync(deadline); }
+            finally
+            {
+                // Also remove the file during a failed regression check, after the probe released it.
+                if (disposing.IsFaulted) { await host.DisposeAsync(); }
+            }
+        }
+        Assert.False(host.DatabaseExists);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -116,11 +149,20 @@ public class NamedAdmissionAndLimitTest
         public string Name { get; set; } = "";
     }
 
-    private sealed class Host(WebApplication app, string path) : IAsyncDisposable
+    private sealed class CleanupProbe
+    {
+        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class Host(WebApplication app, string path, ConcurrentBag<Task> requests) : IAsyncDisposable
     {
         internal WebApplication App { get; } = app;
+        internal TaskCompletionSource DrainStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal bool DatabaseExists => File.Exists(path);
 
-        internal static async Task<Host> Start(bool manyRows)
+        internal static async Task<Host> Start(bool manyRows, CleanupProbe? probe = null)
         {
             string path = Path.Combine(Path.GetTempPath(), $"icc-admission-{Guid.NewGuid():N}.db");
             WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -132,6 +174,30 @@ public class NamedAdmissionAndLimitTest
             builder.Services.AddInfoCarrierServer<Context>("denied");
             builder.Services.AddInfoCarrierServer<Context>("limited", o => o.WithMaxRequestBytes(1024));
             WebApplication app = builder.Build();
+            var requests = new ConcurrentBag<Task>();
+            app.Use(async (http, next) =>
+            {
+                var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                requests.Add(finished.Task);
+                try { await next(http); }
+                finally { finished.TrySetResult(); }
+            });
+            if (probe is not null)
+            {
+                app.MapGet("/cleanup-probe", async http =>
+                {
+                    try
+                    {
+                        await using var connection = new SqliteConnection($"Data Source={path};Pooling=false");
+                        await connection.OpenAsync();
+                        await http.Response.WriteAsync("started");
+                        await http.Response.Body.FlushAsync();
+                        probe.Entered.TrySetResult();
+                        await probe.Release.Task;
+                    }
+                    finally { probe.Finished.TrySetResult(); }
+                });
+            }
             foreach (string name in new[] { "allowed", "denied", "limited" })
             {
                 app.MapInfoCarrier("/" + name, serverName: name);
@@ -147,11 +213,16 @@ public class NamedAdmissionAndLimitTest
                 await context.SaveChangesAsync();
             }
             await app.StartAsync();
-            return new Host(app, path);
+            return new Host(app, path, requests);
         }
 
         public async ValueTask DisposeAsync()
         {
+            await App.StopAsync();
+            DrainStarted.TrySetResult();
+            // TestServer shutdown does not join handlers unwinding after response disposal.
+            // Keep host services and database files alive until those handlers release their scopes.
+            await Task.WhenAll(requests.ToArray()).WaitAsync(TimeSpan.FromSeconds(15));
             await App.DisposeAsync();
             File.Delete(path);
             File.Delete(path + "-wal");
