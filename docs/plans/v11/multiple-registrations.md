@@ -96,6 +96,94 @@ it must let an adapter integrate without abandoning registration selection and p
 This audit/plan iteration changes no public signatures or runtime behavior. Registration isolation
 is retained. The pull request and issue remain incomplete until this reconciliation is resolved.
 
+### Reference comparison and revised API proposal
+
+The first illustrative `WithSerializerFactory(sp => sp.GetRequiredService<OrdersSerializer>())`
+was an original sketch, not an established API copied from another library. Its signature did not
+distinguish borrowed services from newly created objects. Withdraw that sketch as the proposed
+contract. The following comparison uses released .NET 10 source rather than assuming similarity
+from fluent method names.
+
+| Reference implementation | What the implementation does | What InfoCarrier should adopt or avoid |
+|---|---|---|
+| [Microsoft HTTP builder extensions, .NET 10](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/Microsoft.Extensions.Http/src/DependencyInjection/HttpClientBuilderExtensions.cs) | Component methods append construction actions to options associated with the builder's name. Generic handler selection resolves a registered handler. Factory overloads document fresh instances and the handler provider's scope. | Associate selection with one registration and specify the provider and lifetime. Do not copy handler pooling or its private scope: InfoCarrier activations are long-lived and operation contexts retain host scopes. |
+| [HTTP factory, .NET 10](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/Microsoft.Extensions.Http/src/DefaultHttpClientFactory.cs) | Named handler pipelines have dedicated tracking and cleanup. A returned HTTP client does not own the pooled handler. | An interface or factory signature alone does not establish ownership. Preserve HTTP factory ownership instead of disposing a pooled handler through custom activation cleanup. |
+| [Entity Framework service replacement](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbcontextoptionsbuilder.replaceservice?view=efcore-10.0), [options implementation](https://github.com/dotnet/efcore/blob/v10.0.0/src/EFCore/Infrastructure/CoreOptionsExtension.cs), and [provider cache](https://github.com/dotnet/efcore/blob/v10.0.0/src/EFCore/Internal/ServiceProviderCache.cs) | Replacement records service/implementation types in options, retains service lifetime, and participates in internal-provider cache equivalence. EF builds its internal provider or requires replacements on an externally supplied provider. | Use EF's own replacement mechanism for supported EF-internal services. Do not build an internal provider per InfoCarrier endpoint or assume `ReplaceService` changes host transport services. Pipeline replacement must account for cache identity as well as construction. |
+| [Npgsql external data-source configuration](https://www.npgsql.org/efcore/) | Advanced callers can supply an externally configured data source. The documentation warns that varying opaque data-source configuration callbacks cannot reliably distinguish cached configurations. | Preserve explicit advanced composition and make identity relevant to caching. Do not treat an arbitrary factory delegate as proof that two pipelines can share a cache. |
+| [Microsoft dependency injection ownership guidance](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection-guidelines) | Container-created services are container-owned; consumers must not dispose injected dependencies. Externally supplied instances remain the caller's responsibility. | A service selected from the host is borrowed. New activation-owned components require a different, explicit construction contract. Registration does not transfer ownership of an externally supplied instance. |
+
+The recommendation is registration-specific component selection, with host dependency injection
+owning the usual custom implementations. This follows the named-builder selection pattern; it does
+not introduce another general dependency injection container or a universal replacement registry.
+
+Proposed declarations below are design examples, not compiling APIs in this branch:
+
+```csharp
+// The host creates and owns the custom serializer, including its injected dependencies.
+services.AddSingleton<OrdersSerializer>();
+
+services.AddInfoCarrierClient("orders", o => o
+    .WithEndpoint(ordersEndpoint))
+    .UseSerializer<OrdersSerializer>();
+
+services.AddInfoCarrierClient("catalog", o => o
+    .WithEndpoint(catalogEndpoint));
+
+services.AddInfoCarrierServer<OrdersContext>("orders")
+    .UseSerializer<OrdersSerializer>();
+```
+
+The last declaration belongs in the server application's startup. Separate hosts register their
+own serializer services. One host may use the same implementation for incoming and outgoing
+registrations only if that implementation supports concurrent use and both configurations agree.
+Serializer selection changes no endpoint identity or admission grant. Catalog keeps the default.
+
+Proposed public shape and limits:
+
+- Add `UseSerializer<TSerializer>()` to registration builders, constrained to
+  `IInfoCarrierSerializer`. It selects a concrete host service for that registration; it does not
+  silently create an unregistered implementation or use an unkeyed interface fallback. Missing
+  services fail at activation/mapping with the registration and requested type identified.
+- The selected serializer is borrowed for the activation lifetime and must be safe for concurrent
+  calls. Use singleton host registration in the maintained example. A scoped dependency is invalid
+  for this activation. Never make a private scope merely to make the resolution succeed.
+- Keep application factories in normal host registration, such as
+  `services.AddSingleton<OrdersSerializer>(sp => ...)`. The host owns the result. This removes the
+  need for a serializer factory API merely to support constructor dependencies or configuration.
+- If different instances of the same implementation type are needed, consider an explicit
+  `UseSerializerFromServices(sp => ...)` selector for host-managed keyed services. Its result is
+  always borrowed; returning `new` violates that contract. Add this overload only after its
+  real same-type/different-configuration use case and diagnostics are checked.
+- A transport factory needs the already selected serializer. An explicit operation such as
+  `CreateTransport((sp, serializer) => new CustomTransport(..., serializer))` would return a fresh,
+  activation-owned transport. This is deliberately different from service selection. It must not
+  return a host-owned object, and must not dispose the supplied borrowed serializer. The exact
+  callback context, resource graph, and method name remain subject to declaration checks.
+- Do not add a general `ReplaceService<TService,TImplementation>()` to the host-facing builder.
+  Supported component contracts need different context, cache, streaming, and ownership rules.
+  EF's method works inside EF's service model; it is not a ready-made host replacement mechanism.
+
+Client builder reconciliation is necessary: `AddInfoCarrierClient` currently returns
+`IHttpClientBuilder`, while the server already returns an InfoCarrier builder. The recommended
+direction is an InfoCarrier client registration builder exposing component selection plus an
+explicit HTTP-configuration callback that receives the existing private `IHttpClientBuilder`.
+The ordinary options callback remains unchanged. Existing chained HTTP configuration needs
+migration examples and compile checks; version 11 prerelease allows this return-type change, but
+it must be approved rather than hidden. Select custom transport before HTTP infrastructure is
+provisioned, and reject HTTP-only configuration when a custom transport is selected.
+
+Before implementation, compare this recommendation with the smaller alternative: keep the current
+HTTP return type and add a separate transport-independent registration overload. Evaluate both
+using ordinary startup, handler customization, custom serializer, custom transport, both ends, and
+same-type component instances. Select one API after those declarations expose the actual effort.
+Do not implement both alternatives merely to avoid making the decision.
+
+The expression pipeline remains a separate open contract. EF replacement does not satisfy the
+server's model-aware construction or save mapper requirements. Whole-client/server factories and
+decorators also remain open until their policy and streaming obligations are defined. This
+reference comparison settles neither by implication. No runtime changes or new ownership types
+are introduced in this plan iteration.
+
 ## Verified starting point
 
 On 2026-10-25, after `git fetch --prune`, local `main` and `origin/main` both resolve to
