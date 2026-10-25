@@ -206,8 +206,8 @@ services.AddInfoCarrierClient("catalog", o => o.WithEndpoint(catalogEndpoint));
 
 The builder records implementation types, not preconstructed instances or ambiguous ownership
 delegates. Default service metadata supplies lifetime and required constructor context. Unknown
-service contracts fail at configuration rather than becoming unused registrations. Repeated
-replacement of the same single-service contract selects the last implementation; multi-service
+service contracts need explicit validation rather than silently becoming unused registrations. Repeated
+replacement of the same service/original-implementation pair selects the last choice; multi-service
 chains such as value mappers retain their separate composition rules. Whole-service replacement
 is not decoration: a replacement cannot request its own contract and expect the previous service.
 
@@ -294,6 +294,43 @@ two-endpoint stored-data, limits, streaming, metrics, and disposal checks. Then 
 pipeline assumptions behind complete interfaces and verify the same replacement operation for
 query and save paths on both ends. Built-in default declarations must stay concise. No production
 API or behavior has changed during this investigation.
+
+### EF parity correction and upstream named-registration findings
+
+Owner review requires familiar Entity Framework replacement semantics. The earlier research checked
+context configuration and caching but missed the closely related upstream keyed-registration issue.
+That comparison should have preceded the original multi-registration design.
+
+[EF issue #32272](https://github.com/dotnet/efcore/issues/32272), opened by Npgsql/EF maintainer
+Shay Rojansky, proposes keyed registration for the same context type with different connection
+strings, including read-only/read-write and limited multitenancy scenarios. It remains open as
+checked on 2026-10-25. The [triage comment](https://github.com/dotnet/efcore/issues/32272#issuecomment-1816667616)
+limits the proposed work to `AddDbContext` and related registration APIs, with no current change
+needed in EF's internal provider. A later
+[maintainer comment](https://github.com/dotnet/efcore/issues/32272#issuecomment-2784678027)
+suggests explicitly registering the necessary services as a workaround. This is a relevant design
+discussion, not an implemented named-factory API or evidence for inventing EF syntax.
+
+Use EF's two `ReplaceService` forms: contract-wide replacement and replacement targeting one
+original implementation. Preserve the original descriptor's lifetime. Neither form accepts a
+lifetime argument or construction lambda. Match original descriptors rather than sequentially
+transforming a previously substituted type; a targeted original-implementation choice takes
+precedence over a contract-wide choice. Copy these semantics from the released
+[EF service-provider construction](https://github.com/dotnet/efcore/blob/v10.0.0/src/EFCore/Internal/ServiceProviderCache.cs#L83-L104),
+and test precedence and repeated calls before publishing the API. Unknown-service diagnostics
+and the supported contract inventory are explicit differences to resolve, not claims of exact parity.
+
+The named dependency graph is a separate problem: EF uses ordinary constructor injection within
+an options-selected internal provider. InfoCarrier's proposed single-host keyed graph requires
+inherited-key annotations for registration-local dependencies. That requirement is standard .NET
+behavior but differs from EF application constructors. Do not claim exact construction equivalence,
+or build a new resolver to hide it. Compare the complete advanced declarations and explain any
+remaining difference before settling the API.
+
+An initial implementation draft compiled and passed the existing transport suite (Passed: 276,
+Failed: 0, Total: 276), but those existing checks do not validate replacement behavior. The draft
+has been set aside in ignored `artifacts/issue-105-replacement-draft/`, outside production source,
+while these contracts are reconciled. No replacement implementation is committed or supported.
 
 ## Verified starting point
 
