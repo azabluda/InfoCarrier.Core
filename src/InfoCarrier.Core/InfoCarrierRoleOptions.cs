@@ -98,7 +98,10 @@ internal sealed record InfoCarrierClientRegistration(
     Uri? Endpoint,
     bool ServerUsesRelationalQueryRules,
     int? MaxResponseBytes,
-    InfoCarrierDeploymentSnapshot Deployment);
+    InfoCarrierDeploymentSnapshot Deployment)
+{
+    internal string HttpClientName { get; } = $"InfoCarrier.Core.Client.{Guid.NewGuid():N}";
+}
 
 internal sealed record InfoCarrierServerRegistration(
     InfoCarrierRegistrationIdentity Identity,

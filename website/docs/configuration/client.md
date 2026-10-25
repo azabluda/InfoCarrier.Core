@@ -17,6 +17,51 @@ InfoCarrier or SQLite.
 
 Other EF Core options work as usual: logging, `ConfigureWarnings`, tracking, and proxies.
 
+## Named clients
+
+Register a name when an application calls several servers:
+
+```csharp
+builder.Services.AddInfoCarrierClient("orders", options => options
+    .WithEndpoint("https://orders.example.com/infocarrier")
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+
+builder.Services.AddDbContextFactory<ShopContext>(options =>
+    options.UseInfoCarrier(clientName: "orders"));
+```
+
+Names are case-sensitive. Empty names and duplicate names fail during registration.
+A missing name fails when context options are resolved. It never falls back to the default.
+`UseInfoCarrier()` selects only the unnamed registration, even when exactly one named client exists.
+Named registration does not change that default. Repeating the unnamed registration replaces it.
+
+Each registration has its own transport and serializer configuration. Configure its returned
+`IHttpClientBuilder` to set headers or handlers. InfoCarrier keeps these configurations separate
+from application-owned HTTP clients with the same public name. The host disposes activated clients;
+the HTTP client factory owns pooled handlers.
+
+A client name does not name an Entity Framework context factory. For two destinations using the
+same context type, give each application factory independent options:
+
+```csharp
+builder.Services.AddKeyedSingleton<IDbContextFactory<ShopContext>>("orders", (sp, _) =>
+    new ShopContextFactory(new DbContextOptionsBuilder<ShopContext>()
+        .UseApplicationServiceProvider(sp).UseInfoCarrier("orders").Options));
+builder.Services.AddKeyedSingleton<IDbContextFactory<ShopContext>>("archive", (sp, _) =>
+    new ShopContextFactory(new DbContextOptionsBuilder<ShopContext>()
+        .UseApplicationServiceProvider(sp).UseInfoCarrier("archive").Options));
+
+public sealed class ShopContextFactory(DbContextOptions<ShopContext> options)
+    : IDbContextFactory<ShopContext>
+{
+    public ShopContext CreateDbContext() => new(options);
+}
+```
+
+Register both InfoCarrier clients first, including `archive` with its endpoint and shared settings.
+Resolve these application factories with `GetRequiredKeyedService<IDbContextFactory<ShopContext>>(name)`.
+Calling ordinary `AddDbContextFactory<ShopContext>` twice does not create named factories.
+
 ## What the client is told about the server
 
 Fluent methods and properties configure options. `ConfigureShared` preserves the role type in a chain:

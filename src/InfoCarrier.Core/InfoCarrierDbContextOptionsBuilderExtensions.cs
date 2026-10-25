@@ -37,6 +37,29 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         return UseInfoCarrier(optionsBuilder, client);
     }
 
+    /// <summary>Attaches the named client registered with <c>AddInfoCarrierClient</c>.</summary>
+    /// <remarks>Names are case-sensitive. A missing name never falls back to the default client.</remarks>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder UseInfoCarrier(
+        this DbContextOptionsBuilder optionsBuilder,
+        string clientName)
+    {
+        ArgumentNullException.ThrowIfNull(optionsBuilder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        IServiceProvider provider = optionsBuilder.Options.FindExtension<CoreOptionsExtension>()
+            ?.ApplicationServiceProvider
+            ?? throw new InvalidOperationException(
+                "Named UseInfoCarrier requires an application service provider. Use a standard Entity Framework "
+                + "context registration, call UseApplicationServiceProvider, or pass a client explicitly.");
+        InfoCarrierClientRegistrationStore store = provider.GetService<InfoCarrierClientRegistrationStore>()
+            ?? throw new InvalidOperationException(
+                $"No InfoCarrier client named '{clientName}' is registered. Call AddInfoCarrierClient with that name.");
+        return UseInfoCarrier(optionsBuilder, store.Get(provider, clientName));
+    }
+
     /// <summary>Configures the context to use the supplied InfoCarrier client.</summary>
     [RequiresUnreferencedCode(
         "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
@@ -86,6 +109,17 @@ public static class InfoCarrierDbContextOptionsBuilderExtensions
         this DbContextOptionsBuilder<TContext> optionsBuilder)
         where TContext : DbContext
         => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder);
+
+    /// <summary>Attaches the named registered InfoCarrier client to the typed context.</summary>
+    [RequiresUnreferencedCode(
+        "InfoCarrier resolves types by wire names. Test all trimmed model paths."),
+     RequiresDynamicCode(
+        "InfoCarrier builds and compiles expression trees at run time.")]
+    public static DbContextOptionsBuilder<TContext> UseInfoCarrier<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder,
+        string clientName)
+        where TContext : DbContext
+        => (DbContextOptionsBuilder<TContext>)UseInfoCarrier((DbContextOptionsBuilder)optionsBuilder, clientName);
 
     /// <summary>Configures the typed context to use the supplied InfoCarrier client.</summary>
     [RequiresUnreferencedCode(

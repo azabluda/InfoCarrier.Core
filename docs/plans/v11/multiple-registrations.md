@@ -110,10 +110,11 @@ This proves basic default registration coexistence without a relay API. Mapper, 
 logging, transaction, and metric isolation still require the later acceptance checks. It does not
 claim transparent relay support or prove all named-registration paths.
 
-Proposed additions are named `AddInfoCarrierClient` and `UseInfoCarrier(clientName: ...)`, named
-`AddInfoCarrierServer<TContext>`, server-handle and server-name endpoint mapping, and unambiguous
-typed mapping. Preserve the existing route-pattern overload. Select exact parameter order and names
-with compile-time examples so a route string cannot be mistaken for a registration name.
+Named `AddInfoCarrierClient` and `UseInfoCarrier(clientName: ...)` are implemented in P2, with
+typed and untyped attachment checks. Remaining additions are named `AddInfoCarrierServer<TContext>`,
+server-handle and server-name endpoint mapping, and unambiguous typed mapping. Preserve the existing
+route-pattern overload. Select exact parameter order and names with compile-time examples so a
+route string cannot be mistaken for a registration name.
 
 Do not add a client-handle API unless named selection and explicit `UseInfoCarrier(client)` prove
 insufficient. Do not add named Entity Framework factory syntax. Two uses of the same context type
@@ -174,8 +175,17 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   policy carriers and ownership paths. Add focused default coexistence tests in both registration orders.
   Selection rules are approved and default coexistence tests pass. Exact overload checks and the
   complete ownership audit remain open; do not mark the whole step complete yet.
-- [ ] P2: Implement client catalogs, isolated HTTP configurations, and named attachment. Document named
+- [x] P2: Implement client catalogs, isolated HTTP configurations, and named attachment. Document named
   clients with standard context registrations and honest same-context custom-factory examples.
+  Implemented named overloads are `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)`
+  and typed/untyped `UseInfoCarrier(string clientName)`. Named client tests compile these calls
+  through all four standard context registration methods and independent keyed application factories.
+  Client activations use opaque identity keys, snapshot name lookup, and unique private HTTP names.
+  The host disposes each activated HTTP wrapper; the factory retains pooled handler ownership.
+  Named checks, the full transport and specification suites, Release rebuild, package validation,
+  clean trimming, documentation, and file hygiene passed on 2026-10-25. Specification failure names
+  and reasons are unchanged from the coexistence measurement. Remaining mapper/cache, metric,
+  and combined named-client/server acceptance checks stay in P4 and P5.
 - [ ] P3: Implement named server registration, descriptor activation, handle/name mapping, and typed
   ambiguity checks. Include custom scoped context selection where necessary. Update endpoint guidance.
 - [ ] P4: Verify policy and cache isolation through concurrent stored-data tests. Cover shared context

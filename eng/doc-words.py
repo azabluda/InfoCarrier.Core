@@ -201,7 +201,8 @@ BUDGET = {
     # server needs its own is the exact mistake this change exists to catch, because a deployment
     # that reads only this page will believe it is covered and lose nested data anyway.
     # 1000 on 2026-10-24 for ConfigureShared execution, composition, ordering, and agreement limits.
-    "website/docs/configuration/client.md": 1000,
+    # 1150 on 2026-10-25 for named selection, failure rules, and independent same-context factories.
+    "website/docs/configuration/client.md": 1150,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

@@ -12,29 +12,63 @@ namespace InfoCarrier.Core;
 /// <summary>Registers complete InfoCarrier client and server roles.</summary>
 public static class InfoCarrierRoleServiceCollectionExtensions
 {
-    private const string DefaultHttpClientName = "InfoCarrier.Core.Client.Default";
-
     /// <summary>Registers the default HTTP client role.</summary>
     public static IHttpClientBuilder AddInfoCarrierClient(
         this IServiceCollection services,
+        Action<InfoCarrierClientOptions> configure)
+        => AddClient(services, null, configure);
+
+    /// <summary>Registers a named HTTP client without changing the unnamed default.</summary>
+    /// <remarks>Names are case-sensitive. Duplicate names are rejected.</remarks>
+    public static IHttpClientBuilder AddInfoCarrierClient(
+        this IServiceCollection services,
+        string clientName,
+        Action<InfoCarrierClientOptions> configure)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        return AddClient(services, clientName, configure);
+    }
+
+    private static IHttpClientBuilder AddClient(
+        IServiceCollection services,
+        string? clientName,
         Action<InfoCarrierClientOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
+        InfoCarrierClientRegistrationCatalog? catalog = services
+            .Where(service => service.ServiceType == typeof(InfoCarrierClientRegistrationCatalog))
+            .Select(service => service.ImplementationInstance)
+            .OfType<InfoCarrierClientRegistrationCatalog>().SingleOrDefault();
+        catalog?.ValidateName(clientName);
         var options = new InfoCarrierClientOptions();
         configure(options);
         InfoCarrierClientRegistration registration = options.Build();
+        if (catalog is null)
+        {
+            catalog = new InfoCarrierClientRegistrationCatalog();
+            services.AddSingleton(catalog);
+            services.AddSingleton(provider =>
+                provider.GetRequiredService<InfoCarrierClientRegistrationCatalog>().Snapshot());
+        }
+        catalog.Add(clientName, registration);
 
-        services.RemoveAll<InfoCarrierClientRegistration>();
-        services.AddSingleton(registration);
-        services.RemoveAll<IInfoCarrierClient>();
-        services.AddSingleton<IInfoCarrierClient>(provider => CreateClient(
-            provider.GetRequiredService<IHttpClientFactory>().CreateClient(DefaultHttpClientName),
-            provider.GetRequiredService<InfoCarrierClientRegistration>(),
-            provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>()));
+        // Key only the complete activation, never its serializer, mappers, or policy separately.
+        services.AddKeyedSingleton<InfoCarrierClientActivation>(registration.Identity, (provider, _) =>
+            new InfoCarrierClientActivation(
+                provider.GetRequiredService<IHttpClientFactory>().CreateClient(registration.HttpClientName),
+                registration, provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>()));
+        if (clientName is null)
+        {
+            services.RemoveAll<InfoCarrierClientRegistration>();
+            services.AddSingleton(registration);
+            services.RemoveAll<IInfoCarrierClient>();
+            services.AddSingleton<IInfoCarrierClient>(provider => provider
+                .GetRequiredService<InfoCarrierClientRegistrationStore>().GetDefault(provider));
+        }
 
-        return services.AddHttpClient(DefaultHttpClientName);
+        return services.AddHttpClient(registration.HttpClientName);
     }
 
     /// <summary>Registers the default server role for <typeparamref name="TContext" />.</summary>

@@ -188,6 +188,8 @@ which stopped being true on 2026-09-09.
 
 The client configuration page has a 1,000-word budget from 2026-10-24 to cover `ConfigureShared`
 execution, composition, ordering, and agreement limits.
+Raised to 1,150 on 2026-10-25 for named client selection, failure rules, transport ownership,
+and independent factories using the same context type.
 
 ## Before committing
 

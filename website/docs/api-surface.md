@@ -9,10 +9,10 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 
 | Member | What it does |
 |---|---|
-| `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)` | Registers the default HTTP client role. Returns `IHttpClientBuilder` for handler configuration. |
+| `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)`, `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)` | Registers the unnamed default or a named HTTP client. Returns `IHttpClientBuilder` for handler configuration. |
 | `InfoCarrierClient.Create(HttpClient, Action<InfoCarrierClientOptions>)` | Creates the default HTTP client directly. The caller owns the supplied `HttpClient`. |
 | `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies role and shared deployment options to a custom client. |
-| `DbContextOptionsBuilder.UseInfoCarrier()` | Attaches the default registered client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |
+| `DbContextOptionsBuilder.UseInfoCarrier()`, `UseInfoCarrier(string clientName)` | Attaches the unnamed default or named client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |
 | `IServiceCollection.AddInfoCarrierServer<TContext>(Action<InfoCarrierServerOptions>?)` | Registers the default serializer and in-process server for `TContext`. |
 | `InfoCarrierServerBuilder.AddHttpCallerIdentity(Func<HttpContext, string?>)` | From `InfoCarrier.Core.AspNetCore`. Binds transactions from that server registration to their caller. Off unless called. |
 | `IServiceCollection.AddEntityFrameworkInfoCarrier()` | Registers the provider's EF services. Only needed when you build EF's internal service provider yourself. |
