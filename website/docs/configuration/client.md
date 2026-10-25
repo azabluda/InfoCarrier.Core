@@ -237,10 +237,18 @@ meter named `InfoCarrier.Core`:
 dotnet-counters monitor --process-id <pid> --counters InfoCarrier.Core
 ```
 
-It publishes two instruments. `infocarrier.client.round_trips` counts every request that finished,
-successful or failed. `infocarrier.client.round_trip.duration` records how long each one took, in
-seconds. Both carry the operation as a tag, so you can tell a query from a save, and a request that
-failed also carries `error.type`.
+`infocarrier.client.round_trips` counts completed attempts, including failures before sending.
+`infocarrier.client.round_trip.duration` records seconds through response disposal. Streamed queries
+include enumeration time. Both carry `infocarrier.operation` and `infocarrier.outcome`: `success`,
+`error`, `cancelled`, or `incomplete` when enumeration stops before completion. Failures carry `error.type`.
+Fault tags describe a loaded reported type, or `InfoCarrierServerException` for unknown types.
+
+Registered clients carry `infocarrier.client.name` and `infocarrier.client.registration`. The name
+is empty for unnamed registrations. The number starts at one within each host and follows registration
+order, distinguishing repeated unnamed registrations from a named client called `default`.
+Directly constructed clients omit these labels. URLs, caller identities, and transaction tokens are
+not metric labels. A host serving incoming requests also publishes separate
+[server instruments](server.md#counting-server-requests).
 
 Any OpenTelemetry exporter reads the same meter with `AddMeter("InfoCarrier.Core")`. Nothing is
 measured while nothing is listening.

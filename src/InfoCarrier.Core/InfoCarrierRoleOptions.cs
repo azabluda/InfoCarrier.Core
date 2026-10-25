@@ -101,6 +101,7 @@ internal sealed record InfoCarrierClientRegistration(
     InfoCarrierDeploymentSnapshot Deployment)
 {
     internal string HttpClientName { get; } = $"InfoCarrier.Core.Client.{Guid.NewGuid():N}";
+    internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
 }
 
 internal sealed record InfoCarrierServerRegistration(
@@ -114,6 +115,7 @@ internal sealed record InfoCarrierServerRegistration(
     InfoCarrierDeploymentSnapshot Deployment,
     Func<IServiceProvider, IInfoCarrierServerCallerIdentity>? CallerIdentityFactory = null)
 {
+    internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
     internal bool AllowsArbitrarySql => Deployment.AllowArbitrarySqlExecution;
     internal IReadOnlyList<Type> AllowedTypes => Deployment.AllowedTypes;
     internal IReadOnlyList<Type> AnonymousShapeTypes => Deployment.AnonymousShapeTypes;
@@ -128,3 +130,6 @@ internal sealed record InfoCarrierServerRegistration(
 
 /// <summary>Opaque identity for one complete role registration.</summary>
 internal sealed class InfoCarrierRegistrationIdentity;
+
+// Diagnostic labels only. Service resolution still uses the opaque registration identity.
+internal sealed record InfoCarrierMetricIdentity(string Name, int Registration);

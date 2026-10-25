@@ -2,7 +2,7 @@
 
 Date: 2026-10-25  
 Issue: [#105](https://github.com/azabluda/InfoCarrier.Core/issues/105)  
-Status: selection rules approved by the owner on 2026-10-25; implementation in progress
+Status: implementation and local acceptance complete; awaiting owner review and continuous integration
 
 ## Delivery boundary
 
@@ -176,14 +176,19 @@ retain ordered mapper-instance identity. Server query and save executors build e
 from the selected server's mapper and admission snapshot. The new catalogs, activations, and default
 facade introduce no process-wide client/server mode or ambient registration selection. Host logging
 capture and HTTP context access remain shared infrastructure; caller selectors and forwarding grants
-remain in each server descriptor. Metrics still lack registration tags and remain P5 work.
+remain in each server descriptor. At P1, metrics still lacked registration tags; P5 completes them below.
 
 No child service providers, endpoint containers, or hidden scopes are permitted. Preserve existing
 request and transaction scopes. Verify each host-owned resource is disposed exactly once and that
 explicitly supplied resources retain their documented ownership. Check active transaction cleanup.
 
-Client and endpoint metrics need bounded registration identity labels. Propose `infocarrier.client.name`
-and `infocarrier.endpoint.name`, using configured labels and a stable default label. Never use raw
+Client and endpoint metrics use bounded registration identity labels: `infocarrier.client.name`
+and `infocarrier.endpoint.name`, using configured labels. P5 uses an empty name for unnamed registrations
+and adds `infocarrier.client.registration` / `infocarrier.endpoint.registration`, numbered from one
+within each host's corresponding catalog. This distinguishes retained unnamed handles and named
+registrations called `default` without reserving an application name. Direct clients and low-level
+mappings without registration descriptors omit these labels. The numbers describe configuration
+order; opaque service identities remain separate. Never use raw
 request paths, caller identities, transaction tokens, or full URLs as tag values. Check existing meter
 conventions before fixing names. Handles and typed mapping need stable labels without public names.
 
@@ -257,7 +262,7 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   The final P4 checks passed on 2026-10-25: full specification comparison, transport suite, Release
   rebuild, clean trimming, documentation checks, and file hygiene. Specification failure names and
   reasons remain unchanged from P4b. No public signatures changed in this increment.
-- [ ] P5: Add bounded metric tags and lifetime/disposal coverage. Run final validation and reconcile
+- [x] P5: Add bounded metric tags and lifetime/disposal coverage. Run final validation and reconcile
   documentation, obsolete code, issue acceptance, and the pull-request description.
   Review both buffered and streamed transport paths: named labels alone are insufficient if streamed
   operations bypass the existing round-trip instruments. Verify successful, failed, cancelled, and
@@ -265,6 +270,33 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   lookup through ambient state. Keep meter-listener tests isolated from parallel test traffic.
   Labels must also distinguish retained unnamed server registrations selected by handles, without
   colliding with valid public names such as `default`. Cardinality must follow configured registrations.
+  P5a implements the labels above and separate `infocarrier.server.requests` and
+  `infocarrier.server.request.duration` instruments. Client measurements cover buffered attempts and
+  streamed responses through response disposal. Each stream shares one measured reader between the
+  frame and aggregate APIs. An unstarted enumerator sends and measures nothing; early disposal records
+  `incomplete`. Failures and cancellation retain exception-type tags. Both instrument families carry
+  `infocarrier.outcome`, with bounded values `success`, `error`, `cancelled`, and `incomplete`.
+  Endpoint measurements cover envelope rejection, protocol/operation refusal, returned faults,
+  streamed faults, cancellation, and response writing. Unknown operation values use one `Unknown` tag.
+  Labels travel in immutable descriptors and captured endpoint selections, never ambient state.
+  `RegistrationMetricsTest` verifies same-host incoming/outgoing traffic in both registration orders,
+  named/default/retained-unnamed selection, stored saves, synchronous/asynchronous faults, malformed
+  and rejected requests, streamed failure boundaries, early disposal, and one matching counter/histogram
+  pair per attempt. Meter tests remain in the collection that excludes parallel test traffic.
+  The synchronized cancellation test also verifies one cancelled client/server pair and successful
+  measurements for the unaffected endpoint and the cancelled registration's next query.
+  Fault observation resolves only an already-loaded exception type, with a fixed fallback for unknown
+  names. It does not reconstruct exceptions or execute their constructors. A custom-constructor probe
+  failed with two calls before this correction and passes with one, the consumer's reconstruction.
+  The lifetime review confirms one keyed activation owns each server, the default facade is non-owning,
+  operation/transaction scopes own contexts, and server disposal closes outstanding transactions.
+  The client lifetime test now resolves every named/default wrapper across scopes and checks host disposal.
+  Final-source validation passed on 2026-10-25: the full specification comparison, full transport suite,
+  slow SQLite and Firebird comparisons, Release rebuild, package validation, clean trimming, strict
+  documentation, links, word budgets, file hygiene, and whitespace checks. Specification failure names
+  and reasons remain unchanged from P4. The source review found no additional replaced paths to remove.
+  The implementation and local acceptance matrix are complete. Keep the issue open and pull request
+  draft for owner review and continuous integration; merging still requires explicit owner authorization.
 
 Each step is a new commit on the same branch. Update its checkbox with the work. Cleanup is limited
 to paths replaced by this feature; the legacy cleanup already merged is not another task.

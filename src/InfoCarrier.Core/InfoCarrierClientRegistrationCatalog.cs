@@ -9,6 +9,7 @@ internal sealed class InfoCarrierClientRegistrationCatalog
 {
     private readonly Dictionary<string, InfoCarrierRegistrationIdentity> _names = new(StringComparer.Ordinal);
     private InfoCarrierRegistrationIdentity? _defaultIdentity;
+    private int _registrationCount;
 
     internal void ValidateName(string? name)
     {
@@ -18,11 +19,13 @@ internal sealed class InfoCarrierClientRegistrationCatalog
         }
     }
 
-    internal void Add(string? name, InfoCarrierClientRegistration registration)
+    internal InfoCarrierClientRegistration Add(string? name, InfoCarrierClientRegistration registration)
     {
         ValidateName(name);
+        registration = registration with { MetricIdentity = new(name ?? "", ++_registrationCount) };
         if (name is null) { _defaultIdentity = registration.Identity; }
         else { _names.Add(name, registration.Identity); }
+        return registration;
     }
 
     internal InfoCarrierClientRegistrationStore Snapshot() => new(_names, _defaultIdentity);

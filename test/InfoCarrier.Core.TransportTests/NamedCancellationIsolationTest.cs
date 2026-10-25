@@ -12,6 +12,7 @@ using Xunit;
 
 namespace InfoCarrier.Core.TransportTests;
 
+[Collection(nameof(RoundTripMetricsCollection))]
 public class NamedCancellationIsolationTest
 {
     [Fact]
@@ -40,6 +41,7 @@ public class NamedCancellationIsolationTest
                 await seed.SaveChangesAsync();
             }
             await app.StartAsync();
+            using var meter = new RegistrationMetricsTest.Recording();
             await using Context firstClient = Remote("first");
             await using Context secondClient = Remote("second");
             using var cancellation = new CancellationTokenSource();
@@ -59,6 +61,22 @@ public class NamedCancellationIsolationTest
                 Assert.Equal("stored", Assert.Single(await surviving.WaitAsync(deadline)).Name);
                 // A cancelled request must not poison the registration or its next operation.
                 Assert.Equal("stored", Assert.Single(await firstClient.Items.ToListAsync().WaitAsync(deadline)).Name);
+                await meter.WaitForPairs(3, 3);
+                meter.AssertPairs(3, 3);
+                foreach (string instrument in new[]
+                {
+                    InfoCarrierMetrics.RoundTripCountInstrumentName, InfoCarrierMetrics.ServerRequestCountInstrumentName,
+                })
+                {
+                    RegistrationMetricsTest.Reading cancelledReading = Assert.Single(meter.For(instrument),
+                        reading => Equals(reading.Tags[InfoCarrierMetrics.OutcomeTagName], "cancelled"));
+                    string nameTag = instrument == InfoCarrierMetrics.RoundTripCountInstrumentName
+                        ? InfoCarrierMetrics.ClientNameTagName : InfoCarrierMetrics.EndpointNameTagName;
+                    Assert.Equal("first", cancelledReading.Tags[nameTag]);
+                    Assert.Contains(InfoCarrierMetrics.ErrorTypeTagName, cancelledReading.Tags.Keys);
+                    Assert.Equal(2, meter.For(instrument).Count(reading =>
+                        Equals(reading.Tags[InfoCarrierMetrics.OutcomeTagName], "success")));
+                }
             }
             finally
             {

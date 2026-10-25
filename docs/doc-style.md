@@ -194,6 +194,8 @@ On 2026-10-25, the server configuration budget rose to 1,800 for endpoint select
 custom context resolution. The API surface budget rose to 560 for the corresponding overloads.
 Later that day, the client budget rose to 1,200 and the server budget to 1,850 for streamed payload
 limits, partial enumeration, and per-registration enforcement.
+The metrics increment later that day raised the client budget to 1,250 and server budget to 1,950
+for registration labels, instrument names, and streamed measurement outcomes.
 
 ## Before committing
 

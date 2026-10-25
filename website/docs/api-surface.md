@@ -77,7 +77,7 @@ Anything else you catch is EF Core's own: `DbUpdateException`, `DbUpdateConcurre
 | Type | Notes |
 |---|---|
 | `InfoCarrierEventId` | Holds `QuerySplit`, the one event this provider raises. Pass it to `LogTo` or `ConfigureWarnings` like any EF Core event id. See [Logging](configuration/client.md#logging). |
-| `InfoCarrierMetrics` | The meter name and instrument names, as constants. See [Counting round trips](configuration/client.md#counting-round-trips). |
+| `InfoCarrierMetrics` | Meter, instrument, and tag constants for client attempts and HTTP server requests. See [Counting round trips](configuration/client.md#counting-round-trips) and [server requests](configuration/server.md#counting-server-requests). |
 
 ## Wire contracts
 

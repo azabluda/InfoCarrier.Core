@@ -101,6 +101,14 @@ public static class InfoCarrierFaultMapper
         return exception;
     }
 
+    // Diagnostics must not reconstruct exceptions: their constructors can run application code.
+    // Bound unknown remote names to the existing fallback rather than publishing arbitrary labels.
+    internal static string GetMetricExceptionTypeName(InfoCarrierFault fault)
+    {
+        try { return Resolve(fault.TypeName)?.FullName ?? typeof(InfoCarrierServerException).FullName!; }
+        catch (Exception) { return typeof(InfoCarrierServerException).FullName!; }
+    }
+
     private static Exception Construct(InfoCarrierFault fault, Exception? inner)
     {
         if (Resolve(fault.TypeName) is { } type)

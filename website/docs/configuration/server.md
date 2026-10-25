@@ -324,6 +324,21 @@ overrides, auditing, soft-delete conventions. The client's request is work arriv
 Nothing registered on the client reaches the server, so anything a client's own model declares is a
 convenience.
 
+## Counting server requests
+
+The `InfoCarrier.Core` meter publishes `infocarrier.server.requests` and
+`infocarrier.server.request.duration` for requests that reach the InfoCarrier HTTP handler. They count completions and
+record seconds through response writing, including streamed queries. Each carries
+`infocarrier.operation`, `infocarrier.outcome`, and `error.type` on failure. Unreadable envelopes
+and unrecognized operation values use `Unknown` as the operation.
+
+`infocarrier.endpoint.name` is the configured server name, empty for unnamed registrations.
+`infocarrier.endpoint.registration` starts at one within the host and follows server registration
+order. Retained unnamed handles keep distinct numbers; mapping the same registration twice keeps
+its number. Client and server numbering are independent. Low-level mappings without a registration
+omit these labels. Route patterns, URLs, caller identities, and transaction tokens are not labels.
+See [Counting round trips](client.md#counting-round-trips) for collector setup and outcome values.
+
 ## Model parity
 
 Both halves build a model from the same `DbContext` source, and the wire names entity types and

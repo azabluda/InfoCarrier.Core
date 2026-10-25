@@ -165,15 +165,33 @@ public class NamedClientRegistrationTest
     public async Task Host_disposes_the_activated_http_client_wrapper()
     {
         var services = new ServiceCollection();
-        HttpClient? http = null;
-        services.AddInfoCarrierClient("orders", o => o.WithEndpoint("http://orders"))
-            .ConfigureHttpClient(client => http = client);
+        var wrappers = new Dictionary<string, HttpClient>(StringComparer.Ordinal);
+        foreach (string name in new[] { "", "orders", "archive" })
+        {
+            Action<InfoCarrierClientOptions> configure = o => o.WithEndpoint("http://localhost");
+            (name.Length == 0 ? services.AddInfoCarrierClient(configure) : services.AddInfoCarrierClient(name, configure))
+                .ConfigureHttpClient(http => wrappers.Add(name, http));
+        }
         using (ServiceProvider provider = services.BuildServiceProvider())
         {
-            new DbContextOptionsBuilder().UseApplicationServiceProvider(provider).UseInfoCarrier("orders");
-            Assert.NotNull(http);
+            foreach (string name in new[] { "", "orders", "archive" })
+            {
+                IInfoCarrierClient? activated = null;
+                for (int lease = 0; lease < 2; lease++)
+                {
+                    using IServiceScope scope = provider.CreateScope();
+                    var options = new DbContextOptionsBuilder().UseApplicationServiceProvider(scope.ServiceProvider);
+                    if (name.Length == 0) { options.UseInfoCarrier(); } else { options.UseInfoCarrier(name); }
+                    if (activated is null) { activated = Attached(options); }
+                    else { Assert.Same(activated, Attached(options)); }
+                }
+            }
+            Assert.Equal(3, wrappers.Count);
         }
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => http!.GetAsync("http://orders"));
+        foreach (HttpClient http in wrappers.Values)
+        {
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => http.GetAsync("http://localhost"));
+        }
     }
 
     [Fact]

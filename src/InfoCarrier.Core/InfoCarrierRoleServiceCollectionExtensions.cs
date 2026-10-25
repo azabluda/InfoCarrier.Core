@@ -52,7 +52,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
             services.AddSingleton(provider =>
                 provider.GetRequiredService<InfoCarrierClientRegistrationCatalog>().Snapshot());
         }
-        catalog.Add(clientName, registration);
+        registration = catalog.Add(clientName, registration);
 
         // Key only the complete activation, never its serializer, mappers, or policy separately.
         services.AddKeyedSingleton<InfoCarrierClientActivation>(registration.Identity, (provider, _) =>
@@ -134,7 +134,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
             services.AddSingleton(provider =>
                 provider.GetRequiredService<InfoCarrierServerRegistrationCatalog>().Snapshot());
         }
-        registrations.Add(serverName, registration);
+        registration = registrations.Add(serverName, registration);
         services.AddKeyedSingleton<InfoCarrierServerActivation>(registration.Identity, (provider, _) =>
             new InfoCarrierServerActivation(provider, provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().Get(registration.Identity)));

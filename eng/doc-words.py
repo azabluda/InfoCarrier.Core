@@ -164,7 +164,8 @@ BUDGET = {
     # 1580 on 2026-10-08 for structural prototypes, recursive limits, and identity-conflict refusal.
     # 1800 on 2026-10-25 for endpoint selection and scoped custom context resolution.
     # 1850 on 2026-10-25 to document per-registration streamed request limits.
-    "website/docs/configuration/server.md": 1850,
+    # 1950 on 2026-10-25 for endpoint metric labels and measurement boundaries.
+    "website/docs/configuration/server.md": 1950,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to
@@ -206,7 +207,8 @@ BUDGET = {
     # 1000 on 2026-10-24 for ConfigureShared execution, composition, ordering, and agreement limits.
     # 1150 on 2026-10-25 for named selection, failure rules, and independent same-context factories.
     # 1200 on 2026-10-25 for whole-response streaming limits and partial enumeration.
-    "website/docs/configuration/client.md": 1200,
+    # 1250 on 2026-10-25 for registration labels and streamed measurement outcomes.
+    "website/docs/configuration/client.md": 1250,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

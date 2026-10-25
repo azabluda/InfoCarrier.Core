@@ -69,16 +69,17 @@ public static class InfoCarrierEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
+        InfoCarrierMetricIdentity? metricIdentity = null;
         if (endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>() is { } store)
         {
-            _ = store.Default;
+            metricIdentity = store.Default.MetricIdentity;
         }
         return MapEndpoint(endpoints, pattern, provider =>
         {
             IInfoCarrierServer server = provider.GetRequiredService<IInfoCarrierServer>();
             return (server is DefaultInfoCarrierServer facade ? facade.Server : server,
                 provider.GetRequiredService<IInfoCarrierSerializer>());
-        });
+        }, metricIdentity);
     }
 
     /// <summary>Maps a named server to the supplied route pattern.</summary>
@@ -118,12 +119,13 @@ public static class InfoCarrierEndpointExtensions
         InfoCarrierRegistrationIdentity identity)
     {
         InfoCarrierServerActivation activation = store.Activate(endpoints.ServiceProvider, identity);
-        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer));
+        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer), store.Get(identity).MetricIdentity);
     }
 
     private static IEndpointConventionBuilder MapEndpoint(
         IEndpointRouteBuilder endpoints, string pattern,
-        Func<IServiceProvider, (IInfoCarrierServer Server, IInfoCarrierSerializer Serializer)> resolve)
+        Func<IServiceProvider, (IInfoCarrierServer Server, IInfoCarrierSerializer Serializer)> resolve,
+        InfoCarrierMetricIdentity? metricIdentity)
     {
         // Validate the complete selected pair during endpoint setup, before requests arrive.
         _ = resolve(endpoints.ServiceProvider);
@@ -133,6 +135,7 @@ public static class InfoCarrierEndpointExtensions
 
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
+            using InfoCarrierRequestMeasurement? measurement = InfoCarrierMetrics.StartEndpoint(metricIdentity);
             ILogger logger = http.RequestServices.GetRequiredService<ILoggerFactory>()
                 .CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint");
             string phase = "request body reading";
@@ -145,6 +148,7 @@ public static class InfoCarrierEndpointExtensions
                     && Enum.TryParse(operationHeader, out InfoCarrierOperation streamOperation)
                     && streamOperation == InfoCarrierOperation.Query)
                 {
+                    if (measurement is not null) { measurement.Operation = streamOperation; }
                     QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
                             http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not a query request.");
@@ -155,8 +159,9 @@ public static class InfoCarrierEndpointExtensions
                         : BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted);
                     await QueryStreamFrameCodec.WriteAsync(
                         http.Response.Body,
-                        FaultFrames(frames, logger, http.RequestAborted),
+                        FaultFrames(frames, logger, measurement, http.RequestAborted),
                         http.RequestAborted).ConfigureAwait(false);
+                    measurement?.Complete();
                     return;
                 }
 
@@ -171,6 +176,7 @@ public static class InfoCarrierEndpointExtensions
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
+                    measurement?.Fail(exception, http.RequestAborted);
                     Log(logger, LogLevel.Warning, 35010, "InfoCarrier request was rejected because its envelope could not be read.");
                     phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
@@ -181,6 +187,7 @@ public static class InfoCarrierEndpointExtensions
                     selectedServer, serializer,
                     http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
                 InfoCarrierEnvelope response;
+                if (measurement is not null) { measurement.Operation = request.Operation; }
                 try
                 {
                     dispatching = true;
@@ -188,6 +195,7 @@ public static class InfoCarrierEndpointExtensions
                 }
                 catch (NotSupportedException exception)
                 {
+                    measurement?.Fail(exception, http.RequestAborted);
                     dispatching = false;
                     phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
@@ -195,14 +203,20 @@ public static class InfoCarrierEndpointExtensions
                 }
 
                 dispatching = false;
+                if (response.Fault is { } responseFault)
+                {
+                    measurement?.FailFault(responseFault);
+                }
                 http.Response.ContentType = "application/json";
                 phase = "response envelope serialization";
                 byte[] bytes = serializer.Serialize(response);
                 phase = "response body writing";
                 await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
+                measurement?.Complete();
             }
             catch (Exception exception)
             {
+                measurement?.Fail(exception, http.RequestAborted);
                 // Dispatch owns its failures. The adapter observes only HTTP boundary failures.
                 if (!dispatching)
                 {
@@ -220,6 +234,7 @@ public static class InfoCarrierEndpointExtensions
     private static async IAsyncEnumerable<QueryStreamFrame> FaultFrames(
         IAsyncEnumerable<QueryStreamFrame> frames,
         ILogger logger,
+        InfoCarrierRequestMeasurement? measurement,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using IAsyncEnumerator<QueryStreamFrame> enumerator = frames.GetAsyncEnumerator(cancellationToken);
@@ -245,6 +260,7 @@ public static class InfoCarrierEndpointExtensions
 
             if (fault is not null)
             {
+                measurement?.FailFault(fault);
                 if (!started)
                 {
                     yield return new QueryStartFrame(QueryStreamFrameCodec.Version, 0, false, null);
@@ -255,6 +271,10 @@ public static class InfoCarrierEndpointExtensions
             }
 
             started = true;
+            if (frame is QueryFaultFrame returnedFault)
+            {
+                measurement?.FailFault(returnedFault.Fault);
+            }
             yield return frame!;
         }
     }

@@ -20,12 +20,14 @@ internal sealed class InfoCarrierServerRegistrationCatalog
         }
     }
 
-    internal void Add(string? name, InfoCarrierServerRegistration registration)
+    internal InfoCarrierServerRegistration Add(string? name, InfoCarrierServerRegistration registration)
     {
         ValidateName(name);
+        registration = registration with { MetricIdentity = new(name ?? "", _registrations.Count + 1) };
         _registrations.Add(registration.Identity, registration);
         if (name is null) { _defaultIdentity = registration.Identity; }
         else { _names.Add(name, registration.Identity); }
+        return registration;
     }
 
     internal void Replace(InfoCarrierServerRegistration registration)
