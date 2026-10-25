@@ -1,0 +1,133 @@
+name: Slow comparison
+
+# Optional investigation, never a required merge check or a committed SQL baseline.
+# The selected branch supplies the code; ref can pin an exact commit for reproducibility.
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Store comparisons to run
+        required: true
+        default: both
+        type: choice
+        options: [both, sqlite, firebird]
+      ref:
+        description: Optional commit or branch to test instead of the selected branch
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
+  CI: true
+
+jobs:
+  compare:
+    name: Slow ${{ matrix.store }} comparison
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+    strategy:
+      fail-fast: false
+      matrix:
+        store: ${{ fromJSON(inputs.suite == 'both' && '["Sqlite","Firebird"]' || inputs.suite == 'sqlite' && '["Sqlite"]' || '["Firebird"]') }}
+    env:
+      STORE: ${{ matrix.store }}
+      REQUESTED_REF: ${{ inputs.ref || github.ref }}
+      RESULTS: artifacts/slow-comparison/${{ matrix.store }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record tested revision
+        id: revision
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:RESULTS | Out-Null
+          $testedCommit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot determine tested commit.' }
+          "sha=$testedCommit" >> $env:GITHUB_OUTPUT
+          @{
+            commit = $testedCommit
+            requestedRef = $env:REQUESTED_REF
+            store = $env:STORE
+            run = $env:GITHUB_RUN_ID
+            attempt = $env:GITHUB_RUN_ATTEMPT
+          } | ConvertTo-Json | Set-Content "$env:RESULTS/revision.json" -Encoding utf8
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Record environment
+        run: dotnet --info | Set-Content "$env:RESULTS/dotnet-info.txt" -Encoding utf8
+
+      - name: Restore
+        run: dotnet restore $env:TEST_PROJECT
+
+      - name: Build
+        run: dotnet build $env:TEST_PROJECT --no-restore --configuration Release -p:TreatWarningsAsErrors=true
+
+      # A failed comparison stays visible as a failed optional run. Logs and TRX remain
+      # available after test failures or crashes; no badge, PR comment, or baseline is changed.
+      - name: Compare InfoCarrier with plain EF
+        id: comparison
+        env:
+          INFOCARRIER_LIVE_COMPARE: '1'
+        run: |
+          dotnet test $env:TEST_PROJECT --no-build --no-restore --configuration Release `
+            --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.$env:STORE" `
+            --logger "trx;LogFileName=results.trx" --logger "console;verbosity=normal" `
+            --results-directory $env:RESULTS 2>&1 | Tee-Object "$env:RESULTS/console.log"
+          $comparisonExit = $LASTEXITCODE
+          $comparisonExit | Set-Content "$env:RESULTS/exit-code.txt" -Encoding utf8
+          exit $comparisonExit
+
+      - name: Publish comparison summary
+        if: always()
+        env:
+          TESTED_COMMIT: ${{ steps.revision.outputs.sha }}
+          COMPARISON_OUTCOME: ${{ steps.comparison.outcome }}
+        run: |
+          $summary = @(
+            "## Slow $env:STORE comparison"
+            ('Commit: [{0}](https://github.com/{1}/commit/{0})' -f $env:TESTED_COMMIT, $env:GITHUB_REPOSITORY)
+            "Requested ref: $env:REQUESTED_REF"
+            "Test step: $env:COMPARISON_OUTCOME"
+            ''
+            'Optional investigation. This is not a required merge check.'
+            ''
+          )
+          $resultFile = Join-Path $env:RESULTS 'results.trx'
+          if (Test-Path -LiteralPath $resultFile) {
+            [xml]$testResults = Get-Content -Raw -LiteralPath $resultFile
+            $counters = $testResults.TestRun.ResultSummary.Counters
+            if ($null -eq $counters) { throw 'The test report has no counters.' }
+            $summary += '| Passed | Failed | Total |'
+            $summary += '|---:|---:|---:|'
+            $summary += '| {0} | {1} | {2} |' -f $counters.passed, $counters.failed, $counters.total
+          } else {
+            $summary += 'No test report was produced. Inspect setup/build/test logs for the failure.'
+          }
+          $summary += ''
+          $summary += 'Download the artifact for test results, SQL/outcome diagnostics, and the runtime environment.'
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: slow-${{ matrix.store }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.RESULTS }}/
+          retention-days: 14
+          if-no-files-found: warn
