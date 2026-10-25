@@ -111,10 +111,10 @@ logging, transaction, and metric isolation still require the later acceptance ch
 claim transparent relay support or prove all named-registration paths.
 
 Named `AddInfoCarrierClient` and `UseInfoCarrier(clientName: ...)` are implemented in P2, with
-typed and untyped attachment checks. Remaining additions are named `AddInfoCarrierServer<TContext>`,
-server-handle and server-name endpoint mapping, and unambiguous typed mapping. Preserve the existing
-route-pattern overload. Select exact parameter order and names with compile-time examples so a
-route string cannot be mistaken for a registration name.
+typed and untyped attachment checks. P3 adds `AddInfoCarrierServer<TContext>(string serverName, ...)`,
+`MapInfoCarrier(string pattern, string serverName)`, `MapInfoCarrier(InfoCarrierServerBuilder server,
+string pattern = "infocarrier")`, and `MapInfoCarrier<TContext>(string pattern = "infocarrier")`.
+The existing single-string overload remains a route pattern. A named mapping requires both strings.
 
 Do not add a client-handle API unless named selection and explicit `UseInfoCarrier(client)` prove
 insufficient. Do not add named Entity Framework factory syntax. Two uses of the same context type
@@ -154,6 +154,30 @@ the registered context's model. Do not confuse that existing startup behavior wi
 introduce child containers or new endpoint lifetime scopes. Custom context-factory ownership and
 named activation disposal still need explicit implementation review.
 
+P3 uses one keyed, host-owned server activation per opaque identity. It retains the matching
+server and serializer. The unkeyed default server is a non-owning interface facade over that
+activation, so dependency injection does not dispose one server through multiple owning aliases.
+Default endpoint mapping unwraps this facade to preserve streaming; manually supplied server and
+serializer services remain available through the low-level default mapping path.
+
+The named custom-context overload takes the name, configuration callback, then a typed resolver.
+Requiring the configuration argument avoids ambiguity between two single-argument callbacks.
+The resolver selects a host-owned scoped context, usually a keyed scoped registration. InfoCarrier
+disposes the existing operation or transaction scope, not a second context owner. Tests inspect
+actual stores and context disposal counts, including host shutdown with transactions still open.
+
+Transaction commit against a different endpoint fails. Existing rollback remains idempotent when
+the token is absent from that endpoint; it does not end the owning endpoint's transaction.
+This preserves existing transaction semantics rather than introducing forwarding or distributed work.
+
+The P1 source review also confirms that `CompileQuery` still obtains client and serializer from the
+executing query context. `ExtensionInfo.GetServiceProviderHashCode` and `ShouldUseSameServiceProvider`
+retain ordered mapper-instance identity. Server query and save executors build expression serializers
+from the selected server's mapper and admission snapshot. The new catalogs, activations, and default
+facade introduce no process-wide client/server mode or ambient registration selection. Host logging
+capture and HTTP context access remain shared infrastructure; caller selectors and forwarding grants
+remain in each server descriptor. Metrics still lack registration tags and remain P5 work.
+
 No child service providers, endpoint containers, or hidden scopes are permitted. Preserve existing
 request and transaction scopes. Verify each host-owned resource is disposed exactly once and that
 explicitly supplied resources retain their documented ownership. Check active transaction cleanup.
@@ -171,10 +195,11 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
 ## Bounded implementation sequence
 
 - [x] P0: Reconcile the merged baseline, record simultaneous participation, and propose selection rules.
-- [ ] P1: Finalize selection signatures and failure rules with compile-time usage examples. Trace all
+- [x] P1: Finalize selection signatures and failure rules with compile-time usage examples. Trace all
   policy carriers and ownership paths. Add focused default coexistence tests in both registration orders.
-  Selection rules are approved and default coexistence tests pass. Exact overload checks and the
-  complete ownership audit remain open; do not mark the whole step complete yet.
+  Selection rules are approved, default coexistence tests pass, and named/handle/type calls compile
+  in P2/P3 tests. The source trace above records policy and ownership boundaries. The remaining
+  behavior matrix, including adversarial mapper/cache and forwarding checks, stays in P4/P5.
 - [x] P2: Implement client catalogs, isolated HTTP configurations, and named attachment. Document named
   clients with standard context registrations and honest same-context custom-factory examples.
   Implemented named overloads are `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)`
@@ -186,8 +211,13 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   clean trimming, documentation, and file hygiene passed on 2026-10-25. Specification failure names
   and reasons are unchanged from the coexistence measurement. Remaining mapper/cache, metric,
   and combined named-client/server acceptance checks stay in P4 and P5.
-- [ ] P3: Implement named server registration, descriptor activation, handle/name mapping, and typed
+- [x] P3: Implement named server registration, descriptor activation, handle/name mapping, and typed
   ambiguity checks. Include custom scoped context selection where necessary. Update endpoint guidance.
+  The overloads and documentation are implemented. Focused tests cover same-type stores, distinct SQL
+  grants, independent request limits, startup selection errors, context disposal, and transaction ownership.
+  Full specification comparison and transport tests, Release rebuild, package validation, clean
+  trimming, documentation, and file hygiene passed on 2026-10-25. Specification failure names and
+  reasons are unchanged from the named-client measurement.
 - [ ] P4: Verify policy and cache isolation through concurrent stored-data tests. Cover shared context
   types, pooling, compiled queries, mapper identity, streaming, limits, caller identity, SQL grants,
   document behavior, logging grants, and wrong-endpoint transaction rejection.

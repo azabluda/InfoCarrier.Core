@@ -39,7 +39,8 @@ BUDGET = {
     # others because the member's name says where it goes and not what it prevents, and a reader
     # scanning this table has to be able to tell whether it applies to them.
     # 540 on 2026-10-08 for the trusted anonymous-shape catalog registration.
-    "website/docs/api-surface.md": 540,
+    # 560 on 2026-10-25 for named server registration and endpoint selection overloads.
+    "website/docs/api-surface.md": 560,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -161,7 +162,8 @@ BUDGET = {
     # than to the change that added the fifth grant. Do not raise this a sixth time without doing
     # it.
     # 1580 on 2026-10-08 for structural prototypes, recursive limits, and identity-conflict refusal.
-    "website/docs/configuration/server.md": 1580,
+    # 1800 on 2026-10-25 for endpoint selection and scoped custom context resolution.
+    "website/docs/configuration/server.md": 1800,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to

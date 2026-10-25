@@ -69,6 +69,55 @@ plain-text message naming the problem, with no stack trace and no server paths. 
 ran and that failed comes back as a fault inside a normal response. See
 [Handling errors](../guide/errors.md).
 
+## Several endpoints
+
+Register separate servers when endpoints need different policies, even when they use the same context type:
+
+```csharp
+InfoCarrierServerBuilder admin = builder.Services.AddInfoCarrierServer<ShopContext>("admin", o => o
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier)
+    .AllowArbitrarySqlExecution(true));
+builder.Services.AddInfoCarrierServer<ShopContext>("public", o => o
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier)
+    .AllowArbitrarySqlExecution(false));
+
+// After building the application
+app.MapInfoCarrier(admin, "api/admin").RequireAuthorization("Admin");
+app.MapInfoCarrier("api/public", serverName: "public");
+```
+
+A retained server builder selects its own registration. It must belong to this host's registration
+snapshot. A name supports registration and mapping in separate modules. Names are case-sensitive;
+empty or duplicate names fail during registration. Missing names and foreign handles fail during mapping.
+Client and server names are independent, so each can use `orders` in the same host.
+
+`MapInfoCarrier()` selects the unnamed default. Named registrations do not create or replace it.
+Repeated unnamed server registration retains earlier handles and selects the latest as default.
+`MapInfoCarrier<ShopContext>("api/data")` works only when exactly one server registration uses that
+context type. Missing or ambiguous matches fail during mapping. A route pattern alone never selects a name.
+
+Each endpoint keeps its server, serializer limits, shared settings, caller policy, and logging grants.
+The same pair handles buffered requests and streamed queries. The host owns the activated servers
+and disposes their open transactions at shutdown.
+
+### Selecting a scoped context
+
+For two registrations of one context type with different stores, resolve a host-owned scoped context:
+
+```csharp
+builder.Services.AddKeyedScoped<ShopContext>("archive", (sp, _) =>
+    new ShopContext(new DbContextOptionsBuilder<ShopContext>()
+        .UseApplicationServiceProvider(sp).UseSqlServer(archiveConnection).Options));
+
+builder.Services.AddInfoCarrierServer<ShopContext>("archive",
+    configure: o => o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier),
+    resolveContext: sp => sp.GetRequiredKeyedService<ShopContext>("archive"));
+```
+
+The resolver receives the operation or transaction scope. That scope owns context disposal.
+Return a context registered in that scope; do not construct an untracked context in the resolver.
+Without a resolver, the server uses the normal concrete context registration.
+
 ## Payload limits
 
 A server deserializes what an untrusted peer sent it, so this is the direction that matters. The

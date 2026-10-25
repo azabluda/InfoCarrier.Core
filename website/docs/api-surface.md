@@ -13,10 +13,10 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | `InfoCarrierClient.Create(HttpClient, Action<InfoCarrierClientOptions>)` | Creates the default HTTP client directly. The caller owns the supplied `HttpClient`. |
 | `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies role and shared deployment options to a custom client. |
 | `DbContextOptionsBuilder.UseInfoCarrier()`, `UseInfoCarrier(string clientName)` | Attaches the unnamed default or named client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |
-| `IServiceCollection.AddInfoCarrierServer<TContext>(Action<InfoCarrierServerOptions>?)` | Registers the default serializer and in-process server for `TContext`. |
+| `IServiceCollection.AddInfoCarrierServer<TContext>(Action<InfoCarrierServerOptions>?)`, `AddInfoCarrierServer<TContext>(string serverName, Action<InfoCarrierServerOptions>?)` | Registers the unnamed default or a named server. A further overload accepts a scoped context resolver. See [server configuration](configuration/server.md#selecting-a-scoped-context). |
 | `InfoCarrierServerBuilder.AddHttpCallerIdentity(Func<HttpContext, string?>)` | From `InfoCarrier.Core.AspNetCore`. Binds transactions from that server registration to their caller. Off unless called. |
 | `IServiceCollection.AddEntityFrameworkInfoCarrier()` | Registers the provider's EF services. Only needed when you build EF's internal service provider yourself. |
-| `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")` | The server endpoint. In `InfoCarrier.Core.AspNetCore`. Returns `IEndpointConventionBuilder`. |
+| `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")`, `MapInfoCarrier(string pattern, string serverName)`, `MapInfoCarrier(InfoCarrierServerBuilder server, string pattern)`, `MapInfoCarrier<TContext>(string pattern)` | Maps the default, named, retained, or unique context registration. In `InfoCarrier.Core.AspNetCore`. Returns `IEndpointConventionBuilder`. |
 | `DatabaseFacade.UseInfoCarrierTransaction(IDbContextTransaction)` | Joins a transaction another context began. Non-owning. |
 
 ## The three replaceable objects

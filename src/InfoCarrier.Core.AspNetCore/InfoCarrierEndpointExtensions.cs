@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.AspNetCore;
 
@@ -68,9 +69,64 @@ public static class InfoCarrierEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        // Validate the complete default role during endpoint setup, before requests arrive.
-        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierServer>();
-        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
+        if (endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>() is { } store)
+        {
+            _ = store.Default;
+        }
+        return MapEndpoint(endpoints, pattern, provider =>
+        {
+            IInfoCarrierServer server = provider.GetRequiredService<IInfoCarrierServer>();
+            return (server is DefaultInfoCarrierServer facade ? facade.Server : server,
+                provider.GetRequiredService<IInfoCarrierSerializer>());
+        });
+    }
+
+    /// <summary>Maps a named server to the supplied route pattern.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier(
+        this IEndpointRouteBuilder endpoints, string pattern, string serverName)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverName);
+        InfoCarrierServerRegistrationStore store = GetStore(endpoints);
+        return MapSelected(endpoints, pattern, store, store.Get(serverName).Identity);
+    }
+
+    /// <summary>Maps the registration retained by a server builder from this host.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier(
+        this IEndpointRouteBuilder endpoints, InfoCarrierServerBuilder server, string pattern = "infocarrier")
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(server);
+        return MapSelected(endpoints, pattern, GetStore(endpoints), server.Identity);
+    }
+
+    /// <summary>Maps the only server registration for the context type; rejects missing or ambiguous matches.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier<TContext>(
+        this IEndpointRouteBuilder endpoints, string pattern = "infocarrier") where TContext : DbContext
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        InfoCarrierServerRegistrationStore store = GetStore(endpoints);
+        return MapSelected(endpoints, pattern, store, store.GetForContext(typeof(TContext)).Identity);
+    }
+
+    private static InfoCarrierServerRegistrationStore GetStore(IEndpointRouteBuilder endpoints)
+        => endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>()
+            ?? throw new InvalidOperationException("No InfoCarrier servers are registered. Call AddInfoCarrierServer before mapping endpoints.");
+
+    private static IEndpointConventionBuilder MapSelected(
+        IEndpointRouteBuilder endpoints, string pattern, InfoCarrierServerRegistrationStore store,
+        InfoCarrierRegistrationIdentity identity)
+    {
+        InfoCarrierServerActivation activation = store.Activate(endpoints.ServiceProvider, identity);
+        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer));
+    }
+
+    private static IEndpointConventionBuilder MapEndpoint(
+        IEndpointRouteBuilder endpoints, string pattern,
+        Func<IServiceProvider, (IInfoCarrierServer Server, IInfoCarrierSerializer Serializer)> resolve)
+    {
+        // Validate the complete selected pair during endpoint setup, before requests arrive.
+        _ = resolve(endpoints.ServiceProvider);
 
         // Fail trusted catalog construction during endpoint setup, before requests arrive.
         _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
@@ -83,7 +139,7 @@ public static class InfoCarrierEndpointExtensions
             bool dispatching = false;
             try
             {
-                IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
+                (IInfoCarrierServer selectedServer, IInfoCarrierSerializer serializer) = resolve(http.RequestServices);
 
                 if (http.Request.Headers.TryGetValue("InfoCarrier-Operation", out var operationHeader)
                     && Enum.TryParse(operationHeader, out InfoCarrierOperation streamOperation)
@@ -92,7 +148,7 @@ public static class InfoCarrierEndpointExtensions
                     QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
                             http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not a query request.");
-                    IInfoCarrierServer streamServer = http.RequestServices.GetRequiredService<IInfoCarrierServer>();
+                    IInfoCarrierServer streamServer = selectedServer;
                     http.Response.ContentType = "application/json";
                     IAsyncEnumerable<QueryStreamFrame> frames = streamServer is InProcessInfoCarrierServer inProcess
                         ? inProcess.QueryFramesAsync(streamRequest, http.RequestAborted)
@@ -122,7 +178,7 @@ public static class InfoCarrierEndpointExtensions
                 }
 
                 var server = new InfoCarrierEnvelopeServer(
-                    http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer,
+                    selectedServer, serializer,
                     http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
                 InfoCarrierEnvelope response;
                 try

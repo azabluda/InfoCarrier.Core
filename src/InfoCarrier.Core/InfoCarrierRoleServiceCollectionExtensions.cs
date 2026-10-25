@@ -76,35 +76,77 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         this IServiceCollection services,
         Action<InfoCarrierServerOptions>? configure = null)
         where TContext : DbContext
+        => AddServer<TContext>(services, null, configure, null);
+
+    /// <summary>Registers a named server without changing the unnamed default.</summary>
+    public static InfoCarrierServerBuilder AddInfoCarrierServer<TContext>(
+        this IServiceCollection services,
+        string serverName,
+        Action<InfoCarrierServerOptions>? configure = null)
+        where TContext : DbContext
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverName);
+        return AddServer<TContext>(services, serverName, configure, null);
+    }
+
+    /// <summary>Registers a named server with an application-selected, host-owned scoped context.</summary>
+    /// <remarks>
+    /// The resolver receives the operation or transaction scope. Resolve a context owned by that
+    /// scope, such as a keyed scoped registration. InfoCarrier does not separately dispose the context.
+    /// </remarks>
+    public static InfoCarrierServerBuilder AddInfoCarrierServer<TContext>(
+        this IServiceCollection services,
+        string serverName,
+        Action<InfoCarrierServerOptions>? configure,
+        Func<IServiceProvider, TContext> resolveContext)
+        where TContext : DbContext
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverName);
+        ArgumentNullException.ThrowIfNull(resolveContext);
+        return AddServer(services, serverName, configure, resolveContext);
+    }
+
+    private static InfoCarrierServerBuilder AddServer<TContext>(
+        IServiceCollection services,
+        string? serverName,
+        Action<InfoCarrierServerOptions>? configure,
+        Func<IServiceProvider, TContext>? resolveContext)
+        where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        var options = new InfoCarrierServerOptions();
-        configure?.Invoke(options);
-        InfoCarrierServerRegistration registration = options.Build(typeof(TContext));
-
-        InfoCarrierServerRegistrationCatalog registrations = services
+        InfoCarrierServerRegistrationCatalog? existing = services
             .Where(service => service.ServiceType == typeof(InfoCarrierServerRegistrationCatalog))
             .Select(service => service.ImplementationInstance)
-            .OfType<InfoCarrierServerRegistrationCatalog>()
-            .SingleOrDefault() ?? new InfoCarrierServerRegistrationCatalog();
-        if (!services.Any(service => ReferenceEquals(service.ImplementationInstance, registrations)))
+            .OfType<InfoCarrierServerRegistrationCatalog>().SingleOrDefault();
+        existing?.ValidateName(serverName);
+        var options = new InfoCarrierServerOptions();
+        configure?.Invoke(options);
+        InfoCarrierServerRegistration registration = options.Build(typeof(TContext)) with
+        {
+            ContextResolver = resolveContext is null ? null : provider => resolveContext(provider),
+        };
+
+        InfoCarrierServerRegistrationCatalog registrations = existing ?? new InfoCarrierServerRegistrationCatalog();
+        if (existing is null)
         {
             services.AddSingleton(registrations);
             services.AddSingleton(provider =>
                 provider.GetRequiredService<InfoCarrierServerRegistrationCatalog>().Snapshot());
         }
-        registrations.SetDefault(registration);
-        services.RemoveAll<IInfoCarrierSerializer>();
-        services.AddSingleton<IInfoCarrierSerializer>(provider =>
-            new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(
-                provider.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.MaxRequestBytes)));
-        services.RemoveAll<IInfoCarrierServer>();
-        services.AddSingleton<IInfoCarrierServer>(provider => new InProcessInfoCarrierServer(
-            provider,
-            provider.GetRequiredService<ILogger<InProcessInfoCarrierServer>>(),
-            provider.GetService<ServerLogCapture>(),
-            provider.GetRequiredService<InfoCarrierServerRegistrationStore>().Default));
+        registrations.Add(serverName, registration);
+        services.AddKeyedSingleton<InfoCarrierServerActivation>(registration.Identity, (provider, _) =>
+            new InfoCarrierServerActivation(provider, provider
+                .GetRequiredService<InfoCarrierServerRegistrationStore>().Get(registration.Identity)));
+        if (serverName is null)
+        {
+            services.RemoveAll<IInfoCarrierSerializer>();
+            services.AddSingleton<IInfoCarrierSerializer>(provider => provider
+                .GetRequiredService<InfoCarrierServerRegistrationStore>().ActivateDefault(provider).Serializer);
+            services.RemoveAll<IInfoCarrierServer>();
+            services.AddSingleton<IInfoCarrierServer>(provider => new DefaultInfoCarrierServer(provider
+                .GetRequiredService<InfoCarrierServerRegistrationStore>().ActivateDefault(provider).Server));
+        }
 
         if (registration.LogForwardingMinimumLevel is not null)
         {
@@ -128,7 +170,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
     }
 }
 
-/// <summary>Additional registrations for the default InfoCarrier server role.</summary>
+/// <summary>Additional configuration and an endpoint handle for one InfoCarrier server registration.</summary>
 public sealed class InfoCarrierServerBuilder
 {
     private InfoCarrierServerRegistration _registration;
@@ -161,39 +203,6 @@ public sealed class InfoCarrierServerBuilder
 
     /// <summary>The application's service collection.</summary>
     public IServiceCollection Services { get; }
-}
-
-internal sealed class InfoCarrierServerRegistrationCatalog
-{
-    private readonly Dictionary<InfoCarrierRegistrationIdentity, InfoCarrierServerRegistration> _registrations = [];
-    private InfoCarrierRegistrationIdentity? _defaultIdentity;
-
-    internal void SetDefault(InfoCarrierServerRegistration registration)
-    {
-        _registrations.Add(registration.Identity, registration);
-        _defaultIdentity = registration.Identity;
-    }
-
-    internal void Replace(InfoCarrierServerRegistration registration)
-        => _registrations[registration.Identity] = registration;
-
-    internal InfoCarrierServerRegistrationStore Snapshot()
-        => _defaultIdentity is { } defaultIdentity
-            ? new InfoCarrierServerRegistrationStore(_registrations, defaultIdentity)
-            : throw new InvalidOperationException("No default InfoCarrier server is registered.");
-}
-
-internal sealed class InfoCarrierServerRegistrationStore(
-    IReadOnlyDictionary<InfoCarrierRegistrationIdentity, InfoCarrierServerRegistration> registrations,
-    InfoCarrierRegistrationIdentity defaultIdentity)
-{
-    private readonly IReadOnlyDictionary<InfoCarrierRegistrationIdentity, InfoCarrierServerRegistration> _registrations
-        = new Dictionary<InfoCarrierRegistrationIdentity, InfoCarrierServerRegistration>(registrations);
-
-    internal InfoCarrierServerRegistration Default => _registrations[defaultIdentity];
-
-    internal InfoCarrierServerRegistration Get(InfoCarrierRegistrationIdentity identity)
-        => _registrations[identity];
 }
 
 /// <summary>Creates an HTTP InfoCarrier client without dependency injection.</summary>

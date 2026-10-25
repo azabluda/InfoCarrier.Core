@@ -190,6 +190,8 @@ The client configuration page has a 1,000-word budget from 2026-10-24 to cover `
 execution, composition, ordering, and agreement limits.
 Raised to 1,150 on 2026-10-25 for named client selection, failure rules, transport ownership,
 and independent factories using the same context type.
+On 2026-10-25, the server configuration budget rose to 1,800 for endpoint selection and scoped
+custom context resolution. The API surface budget rose to 560 for the corresponding overloads.
 
 ## Before committing
 

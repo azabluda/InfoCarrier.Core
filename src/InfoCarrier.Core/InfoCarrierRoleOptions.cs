@@ -117,9 +117,13 @@ internal sealed record InfoCarrierServerRegistration(
     internal bool AllowsArbitrarySql => Deployment.AllowArbitrarySqlExecution;
     internal IReadOnlyList<Type> AllowedTypes => Deployment.AllowedTypes;
     internal IReadOnlyList<Type> AnonymousShapeTypes => Deployment.AnonymousShapeTypes;
+    internal Func<IServiceProvider, DbContext>? ContextResolver { get; init; }
 
     internal DbContext ResolveContext(IServiceProvider provider)
-        => (DbContext)provider.GetRequiredService(ContextType);
+        => ContextResolver is { } resolve
+            ? resolve(provider) ?? throw new InvalidOperationException(
+                $"The InfoCarrier context resolver for '{ContextType.Name}' returned null.")
+            : (DbContext)provider.GetRequiredService(ContextType);
 }
 
 /// <summary>Opaque identity for one complete role registration.</summary>

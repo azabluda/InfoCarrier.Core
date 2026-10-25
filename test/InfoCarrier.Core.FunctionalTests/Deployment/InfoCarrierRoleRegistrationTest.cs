@@ -43,7 +43,8 @@ public class InfoCarrierRoleRegistrationTest
 
         await using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
 
-        Assert.IsType<InProcessInfoCarrierServer>(provider.GetRequiredService<IInfoCarrierServer>());
+        IInfoCarrierServer server = provider.GetRequiredService<IInfoCarrierServer>();
+        Assert.Same(server, provider.GetRequiredService<IInfoCarrierServer>());
         Assert.Null(provider.GetService<DbContext>());
     }
 
