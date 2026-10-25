@@ -2,7 +2,7 @@
 
 Date: 2026-10-25  
 Issue: [#105](https://github.com/azabluda/InfoCarrier.Core/issues/105)  
-Status: implementation and local acceptance complete; awaiting owner review and continuous integration
+Status: registration isolation implemented and validated; extension-point reconciliation remains open
 
 ## Delivery boundary
 
@@ -14,6 +14,87 @@ owner's explicit instruction. Stop each pushed iteration when continuous integra
 Keep the ordinary application unchanged: one unnamed client, standard Entity Framework context
 registration with `UseInfoCarrier()`, one unnamed server, and `MapInfoCarrier()`.
 Names and retained server builders are optional selection tools for applications that need them.
+
+## Extension-point audit and reconciliation, 2026-10-25
+
+The owner requested this audit after reviewing hardcoded activation dependencies. The existing
+acceptance results establish isolation for the built-in implementations. They do not establish
+consistent replacement through public interfaces. The earlier completion statements are superseded
+by this open work. This section proposes the correction boundary; exact signatures and implementation
+are not yet approved or implemented.
+
+### Verified restrictions
+
+Source references below use repository-relative paths and member names so they survive line changes.
+
+| Public boundary | Current construction and replacement behavior | Required reconciliation |
+|---|---|---|
+| `IInfoCarrierSerializer` | `InfoCarrierRoleServiceCollectionExtensions.CreateClient` constructs `SystemTextJsonInfoCarrierSerializer`. `InfoCarrierServerActivation` does the same. The unnamed HTTP mapping resolves the public service, while named, typed, and handle mappings retain the activation's serializer. | One registration-specific replacement mechanism must apply consistently to all selection forms and both client/server configuration. |
+| `IInfoCarrierTransport` | `CreateClient` constructs `HttpInfoCarrierTransport`. Manual `TransportInfoCarrierClient` construction accepts a custom transport, but `AddInfoCarrierClient` returns `IHttpClientBuilder` and always provisions HTTP. | Separate transport-independent registration from the HTTP convenience path. A custom transport must retain named selection and deployment configuration without creating an unused HTTP client. |
+| `IInfoCarrierClient` | `UseInfoCarrier(client, configure)` supports explicit custom clients. The named catalog has no public custom-client factory path. | Decide the factory boundary for custom clients and decorators without losing descriptor policy, activation identity, or measurement ownership. |
+| `IInfoCarrierServer` | `InfoCarrierServerActivation` constructs concrete `InProcessInfoCarrierServer`. Unnamed mapping permits a public-service replacement; selected mappings do not. The activation's `Server` property is concrete. | Define whether custom servers and decorators are supported by registration, then use that decision consistently across default, name, handle, and type selection. |
+| `IExpressionSerializer` and `IDynamicValueMapper` | Client provider services register these through Entity Framework's internal provider. The server constructs `ExpressionSerializer.CreateForModel`; save execution casts its mapper to concrete `DynamicValueMapper`. | A host service override cannot replace both pipelines. Preserve model, admission, anonymous-shape, and mapper invariants while deciding the supported model-aware pipeline boundary. |
+| Streaming and wire encoding | `TransportInfoCarrierClient` uses `QueryStreamFrameCodec`, concrete JSON row serialization, and a concrete serializer check for streamed response limits. HTTP mapping writes fixed JSON frames and uses a concrete server check for streaming. | Serializer substitution must not imply arbitrary wire-format replacement. Define envelope, row, and frame ownership separately; preserve limit enforcement and streaming for supported replacements. |
+| Mappers and caller identity | Descriptor-local `AddValueMappers` and the server builder's caller factory already provide configuration boundaries. Server fallback lookups also exist for direct construction. | Retain first-claim-wins mapper order and caller isolation. Do not describe unrelated host registrations as per-registration replacements. |
+| Shared infrastructure | Logger services, HTTP context access, host scopes, and the optional host clock remain ordinary services. | Keep these host-owned; replacement work does not require making every internal implementation independently selectable. |
+
+Relevant files: `src/InfoCarrier.Core/InfoCarrierRoleServiceCollectionExtensions.cs`,
+`InfoCarrierClientRegistrationCatalog.cs`, `InfoCarrierServerRegistrationCatalog.cs`,
+`InfoCarrierServiceCollectionExtensions.cs`, `InfoCarrierOptionsExtension.cs`,
+`InProcessInfoCarrierServer.cs`, `ExpressionSerializer.cs`, `TransportInfoCarrierClient.cs`, and
+`src/InfoCarrier.Core.AspNetCore/InfoCarrierEndpointExtensions.cs`.
+
+The wire serializer is distinct from expression translation and dynamic-value mapping. A custom
+gRPC adapter can implement the existing transport interface, but it needs corresponding server
+hosting. `MapInfoCarrier` remains an HTTP adapter. This feature need not implement gRPC itself;
+it must let an adapter integrate without abandoning registration selection and policy ownership.
+
+### Proposed replacement and ownership rules
+
+- Keep complete immutable descriptors and opaque activation identities. Store supported factory
+  choices in the descriptor; do not scatter serializer, transport, and policy under unrelated keys.
+- Use the same activation path for unnamed, named, typed, and handle selection. A documented
+  replacement must not be silently ignored by one selection form. Define how existing unkeyed
+  overrides interact with the new path before changing their behavior.
+- Factories receive the host provider and the immutable configuration they need. Long-lived
+  activations must not capture scoped services. Operation-specific pipelines receive the actual
+  context/model and operate within the existing host operation or transaction scope.
+- Separate factories that create activation-owned objects from factories that return host-owned
+  services. Define this distinction explicitly before selecting signatures. Activation-created
+  disposable dependencies require exactly-once cleanup, including partial construction failure;
+  objects resolved from the host must not be disposed again by an activation.
+- Current client cleanup disposes only its HTTP wrapper. Current server cleanup disposes only its
+  concrete server. Neither is a general ownership contract for custom disposable serializers,
+  transports, clients, or decorators. Test aliasing, asynchronous cleanup, and constructor failure.
+- Keep byte limits and admission policy effective for supported custom components. Move enforcement
+  to a component-independent boundary where possible; otherwise reject unsupported combinations
+  clearly. Do not silently drop limits because a serializer is not the built-in concrete type.
+- Preserve metrics without double counting when replacing clients, transports, or decorators.
+  Define which layer measures one operation, including streaming completion and cancellation.
+- Shared ordinary configuration methods may choose matching components on both ends. Document
+  declarations, registration, hosting, selection, and disposal together. They do not prove agreement
+  between separately deployed applications; no handshake is added.
+- Keep built-in HTTP/JSON defaults short. Advanced replacement must use additive APIs rather than
+  forcing names, factories, or custom containers on the ordinary application.
+
+### Bounded correction plan
+
+1. Reconcile intended public contracts with the inventory above. Choose factory and ownership
+   signatures, including whole-client/server decoration and the model-aware pipeline boundary.
+   Compile representative ordinary, named, manual, same-host client/server, and adapter declarations
+   before implementing new public overloads. Do not claim every public interface is fully replaceable.
+2. Implement registration-local replacement through a single activation path. Retain the existing
+   isolation, snapshot, cache, caller, and transaction rules. Keep transport-independent registration
+   separate from HTTP setup. Review whether a dedicated frame/streaming contract is required.
+3. Prove substitution with recording/decorating serializers and an in-process custom transport,
+   rather than adding a gRPC dependency. Test both ends, two distinct named implementations, all
+   selection forms, stored data, cancellation, limits, metrics, disposal, and construction failures.
+   Test custom server streaming behavior explicitly instead of depending on a concrete type check.
+4. Update user documentation alongside implementation, including complete advanced composition
+   examples and explicit wire-format limits. Repeat the repository checks required by those changes.
+
+This audit/plan iteration changes no public signatures or runtime behavior. Registration isolation
+is retained. The pull request and issue remain incomplete until this reconciliation is resolved.
 
 ## Verified starting point
 
