@@ -37,9 +37,13 @@ mappers. It does not add the context or endpoint.
 
 Version 11 uses `AddInfoCarrierClient` and `AddInfoCarrierServer<TContext>` as its role entry
 points. Shared shapes, types, mappers, and arbitrary SQL permission belong in either role callback.
-The callbacks can call the same application-owned extension method.
+Apply the same ordinary shared method through `ConfigureShared` in both callbacks.
 
 Low-level server, serializer, transport, and envelope types remain available for custom hosting.
+For direct construction, use `new InProcessInfoCarrierServer(provider, options)` with
+`InfoCarrierServerOptions`. The constructor snapshots the settings. Register the `DbContext` alias
+yourself for this low-level path.
+Configure the serializer's payload limits separately when composing the transport yourself.
 
 ## The endpoint
 

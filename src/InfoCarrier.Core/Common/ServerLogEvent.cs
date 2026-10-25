@@ -12,7 +12,7 @@ namespace InfoCarrier.Core.Common;
 ///         a store round trip is written by the server's provider on the server's context, and a
 ///         caller holding only the client context has no route to it. This record is that route,
 ///         and it is one the server has to open deliberately — see
-///         <see cref="IInfoCarrierServerLogForwarding" />.
+///         <see cref="InfoCarrierServerOptions.LogForwarding" />.
 ///     </para>
 ///     <para>
 ///         <b>The message is a formatted string and not a structured event, on purpose.</b> A log

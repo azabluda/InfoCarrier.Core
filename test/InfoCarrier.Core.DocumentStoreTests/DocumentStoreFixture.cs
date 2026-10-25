@@ -124,10 +124,6 @@ public class DocumentStoreFixture : IAsyncLifetime
                 TrustedAnonymousShapeManifest.ForAssembly(typeof(DocumentStoreFixture).Assembly));
         });
 
-        if (ServerDeclaresDocumentStore)
-        {
-            services.AddInfoCarrierServerDocumentStore();
-        }
 
         _serverProvider = services.BuildServiceProvider();
         _ = _serverProvider.GetRequiredService<AnonymousShapeCatalog>();
@@ -142,7 +138,9 @@ public class DocumentStoreFixture : IAsyncLifetime
 
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var envelopeServer = new InfoCarrierEnvelopeServer(
-            new InProcessInfoCarrierServer(_serverProvider), serializer);
+            new InProcessInfoCarrierServer(_serverProvider,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance,
+                options: new InfoCarrierServerOptions().WithStoresOwnedDataInsideOwner(ServerDeclaresDocumentStore)), serializer);
         // The spec suite's transport, not a copy of it (2026-09-13). This fixture had its own
         // three-line `WireTransport` doing the same double round trip, written because the harness
         // was inside the spec project and out of reach. It is a project now, and one transport

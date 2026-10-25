@@ -39,7 +39,9 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
                     return interceptor;
                 });
                 s.AddSingleton<TimeProvider>(clock);
-                if (idle) { s.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10)); }
+                if (idle) { s.AddInfoCarrierServer<Northwind.Shared.NorthwindContext>(o => o
+                    .ConfigureShared(Northwind.Shared.NorthwindDeployment.ConfigureInfoCarrier)
+                    .WithTransactionIdleTimeout(TimeSpan.FromMinutes(10))); }
                 s.AddScoped(_ => new FailingScope(() => Interlocked.Increment(ref scopesDisposed)));
             }));
         _ = host.CreateClient();
@@ -76,7 +78,9 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
             .ConfigureServices(s =>
             {
                 s.AddSingleton<TimeProvider>(clock);
-                s.AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
+                s.AddInfoCarrierServer<Northwind.Shared.NorthwindContext>(o => o
+                    .ConfigureShared(Northwind.Shared.NorthwindDeployment.ConfigureInfoCarrier)
+                    .WithTransactionIdleTimeout(TimeSpan.FromMinutes(10)));
             }));
         using var client = host.CreateClient();
         var server = (InProcessInfoCarrierServer)host.Services.GetRequiredService<IInfoCarrierServer>();
@@ -97,12 +101,13 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var interceptor = new FailingTransactions { PauseRollback = release.Task };
         var services = new ServiceCollection().AddLogging()
-            .AddInfoCarrierServerTransactionTimeout(TimeSpan.FromMinutes(10));
+            .AddInfoCarrierServer<Northwind.Shared.NorthwindContext>(o => o
+                    .ConfigureShared(Northwind.Shared.NorthwindDeployment.ConfigureInfoCarrier)
+                    .WithTransactionIdleTimeout(TimeSpan.FromMinutes(10))).Services;
         services.AddSingleton<TimeProvider>(clock);
         services.AddSingleton<ILoggerFactory>(_ => new OwnedLoggerFactory(logs));
         services.AddDbContext<Northwind.Shared.NorthwindContext>(b => b.UseSqlite("Data Source=:memory:").AddInterceptors(interceptor));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<Northwind.Shared.NorthwindContext>());
-        services.AddSingleton<IInfoCarrierServer, InProcessInfoCarrierServer>();
         services.AddSingleton(_ => new AdvanceOnDispose(clock));
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var server = provider.GetRequiredService<IInfoCarrierServer>();

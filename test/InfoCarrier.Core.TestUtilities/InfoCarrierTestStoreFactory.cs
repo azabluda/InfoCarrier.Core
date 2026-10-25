@@ -50,11 +50,13 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
         bool relationalClientStore = false,
         bool arbitrarySqlExecution = false,
         Type[]? allowedTypes = null,
-        object[]? anonymousShapes = null)
+        object[]? anonymousShapes = null,
+        Action<InfoCarrierServerOptions>? configureServer = null)
     {
         var props = new SharedTestStoreProperties
         {
             ContextType = contextType,
+            ConfigureServer = configureServer,
             OnModelCreating = onModelCreating,
             ConfigureConventions = configureConventions,
             OnAddOptions = onAddOptions,

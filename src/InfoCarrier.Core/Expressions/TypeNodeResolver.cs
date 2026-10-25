@@ -86,7 +86,7 @@ public class TypeNodeResolver(IModel? model = null, TypeAllowlist? allowlist = n
     ///         carrier problem rather than an oversight.</b> This service is DI-scoped, so its
     ///         allowlist is <c>TypeAllowlist.ForModel(model)</c> and knows only what the model
     ///         implies. The application's own registrations
-    ///         (<see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />) travel on the
+    ///         (<see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" />) travel on the
     ///         <em>options</em>, and <c>InfoCarrierOptionsExtension.AllowedTypesFor</c> says why
     ///         they must be read per execution and never captured: what <c>CompileQuery</c> returns
     ///         is cached across every context sharing an options shape.

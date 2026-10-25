@@ -37,23 +37,18 @@ public class InfoCarrierDeploymentBuilderTest
     [Fact]
     public void Shared_configuration_is_fluent_and_boolean_permissions_can_be_reset()
     {
-        var builder = new InfoCarrierDeploymentBuilder();
-        var mapper = new StubMapper();
-
-        InfoCarrierDeploymentBuilder result = builder
+        var builder = new InfoCarrierClientOptions();
+        InfoCarrierClientOptions result = builder
             .AddAnonymousShapes(new { Id = 0 })
             .AddAllowedTypes(typeof(DateOnly))
-            .AddValueMappers(mapper)
+            .AddValueMappers(new StubMapper())
             .AllowArbitrarySqlExecution(true)
             .AllowArbitrarySqlExecution(false);
-        var services = new ServiceCollection();
-        services.AddInfoCarrier(configure => configure
-            .AllowArbitrarySqlExecution(true)
-            .AllowArbitrarySqlExecution(false));
-
         Assert.Same(builder, result);
-        using ServiceProvider provider = services.BuildServiceProvider();
-        Assert.Null(provider.GetService<IInfoCarrierArbitrarySqlExecution>());
+        var options = new DbContextOptionsBuilder();
+        options.UseInfoCarrier(StubClient.Instance, o => o.ConfigureShared(b => b
+            .AllowArbitrarySqlExecution(true).AllowArbitrarySqlExecution(false)));
+        Assert.False(options.Options.FindExtension<InfoCarrierOptionsExtension>()!.ArbitrarySqlExecutionAllowed);
     }
 
     [Fact]
@@ -176,76 +171,22 @@ public class InfoCarrierDeploymentBuilderTest
         Assert.IsType<UriValueMapper>(mappers[2]);
     }
 
-    [Fact]
-    public void Server_AddInfoCarrier_translates_shared_permissions()
-    {
-        var services = new ServiceCollection();
 
-        services.AddInfoCarrier(builder => builder
-            .AddAllowedTypes(typeof(DateOnly))
-            .AllowArbitrarySqlExecution(true));
-
-        using ServiceProvider provider = services.BuildServiceProvider();
-        Assert.Equal(
-            typeof(DateOnly),
-            Assert.Single(provider.GetServices<global::InfoCarrier.Core.Expressions.IInfoCarrierAllowedTypes>()).Types.Single());
-        Assert.NotNull(provider.GetService<IInfoCarrierArbitrarySqlExecution>());
-    }
 
     [Fact]
-    public void Server_AddInfoCarrier_invokes_configuration_once_and_rejects_null()
+    public void Server_registration_invokes_configuration_once_and_rejects_null_services()
     {
         var services = new ServiceCollection();
         var calls = 0;
-
-        services.AddInfoCarrier(_ => calls++);
-
+        services.AddInfoCarrierServer<DbContext>(_ => calls++);
         Assert.Equal(1, calls);
-        Assert.Throws<ArgumentNullException>(() => services.AddInfoCarrier(null!));
         Assert.Throws<ArgumentNullException>(() =>
-            InfoCarrierServiceCollectionExtensions.AddInfoCarrier(null!, _ => { }));
+            InfoCarrierRoleServiceCollectionExtensions.AddInfoCarrierServer<DbContext>(null!));
     }
 
-    [Fact]
-    public void Repeated_server_calls_compose_application_mappers_before_standard_mappers()
-    {
-        var first = new StubMapper();
-        var second = new StubMapper();
-        var services = new ServiceCollection();
 
-        services.AddInfoCarrier(builder => builder.ConfigureShared(b => b.AddValueMappers(first)));
-        services.AddInfoCarrier(builder => builder.ConfigureShared(b => b.AddValueMappers(second)));
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
-        Assert.Equal(4, mappers.Length);
-        Assert.Same(first, mappers[0]);
-        Assert.Same(second, mappers[1]);
-        Assert.IsType<IPAddressValueMapper>(mappers[2]);
-        Assert.IsType<UriValueMapper>(mappers[3]);
-    }
 
-    [Fact]
-    public void Application_mapper_lists_start_empty_on_both_roles()
-    {
-        InfoCarrierOptionsExtension client = ClientExtension();
-        var clientServices = new ServiceCollection();
-        client.ApplyServices(clientServices);
-        var services = new ServiceCollection();
-
-        services.AddInfoCarrier();
-
-        using ServiceProvider provider = services.BuildServiceProvider();
-        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
-        Assert.Collection(
-            clientProvider.GetServices<IInfoCarrierValueMapper>(),
-            mapper => Assert.IsType<IPAddressValueMapper>(mapper),
-            mapper => Assert.IsType<UriValueMapper>(mapper));
-        Assert.Collection(
-            provider.GetServices<IInfoCarrierValueMapper>(),
-            mapper => Assert.IsType<IPAddressValueMapper>(mapper),
-            mapper => Assert.IsType<UriValueMapper>(mapper));
-    }
 
     [Fact]
     public void One_application_method_configures_both_roles_without_shared_state()
@@ -257,101 +198,73 @@ public class InfoCarrierDeploymentBuilderTest
             created.Add(mapper);
             builder.AddValueMappers(mapper);
         }
-
-        var options = new DbContextOptionsBuilder();
-        options.UseInfoCarrier(StubClient.Instance, builder => builder.ConfigureShared(Configure));
-        InfoCarrierOptionsExtension client = options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
-        var clientServices = new ServiceCollection();
-        client.ApplyServices(clientServices);
+        using var http = new HttpClient();
+        IInfoCarrierClient client = InfoCarrierClient.Create(http, o => o
+            .WithEndpoint("https://example.test/data").ConfigureShared(Configure));
         var services = new ServiceCollection();
-        services.AddInfoCarrier(builder => builder.ConfigureShared(Configure));
-
-        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
-        using ServiceProvider provider = services.BuildServiceProvider();
+        services.AddInfoCarrierServer<DbContext>(o => o.ConfigureShared(Configure));
         Assert.Equal(2, created.Count);
         Assert.NotSame(created[0], created[1]);
-        Assert.Same(created[0], clientProvider.GetServices<IInfoCarrierValueMapper>().First());
-        Assert.Same(created[1], provider.GetServices<IInfoCarrierValueMapper>().First());
+        var options = new DbContextOptionsBuilder().UseInfoCarrier(client);
+        var clientServices = new ServiceCollection();
+        options.Options.FindExtension<InfoCarrierOptionsExtension>()!.ApplyServices(clientServices);
+        using ServiceProvider provider = clientServices.BuildServiceProvider();
+        Assert.Same(created[0], provider.GetServices<IInfoCarrierValueMapper>().First());
     }
 
     [Fact]
-    public void Failed_additive_server_call_does_not_change_existing_state()
+    public void Failed_server_registration_does_not_change_existing_services()
     {
-        var accepted = new StubMapper();
-        var rejected = new StubMapper();
         var services = new ServiceCollection();
-        services.AddInfoCarrier(builder => builder.AddValueMappers(accepted));
-
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(builder =>
-        {
-            builder.AddValueMappers(rejected);
-            builder.AddAllowedTypes([typeof(DateOnly), null!]);
-        }));
-
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IInfoCarrierValueMapper[] mappers = provider.GetServices<IInfoCarrierValueMapper>().ToArray();
-        Assert.DoesNotContain(rejected, mappers);
-        Assert.Same(accepted, mappers[0]);
+        services.AddInfoCarrierServer<DbContext>(o => o.AddValueMappers(new StubMapper()));
+        ServiceDescriptor[] before = [.. services];
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierServer<DbContext>(o => o
+            .AddValueMappers(new StubMapper()).AddAllowedTypes([typeof(DateOnly), null!])));
+        Assert.Equal(before, services);
     }
 
     [Fact]
-    public void Server_configuration_snapshots_caller_owned_arrays()
+    public void Client_configuration_snapshots_caller_owned_mapper_arrays()
     {
         var original = new StubMapper();
         IInfoCarrierValueMapper[] mappers = [original];
-        var services = new ServiceCollection();
-        services.AddInfoCarrier(builder => builder.AddValueMappers(mappers));
-
+        InfoCarrierOptionsExtension client = ClientExtension(mappers);
         mappers[0] = new StubMapper();
-
+        var services = new ServiceCollection();
+        client.ApplyServices(services);
         using ServiceProvider provider = services.BuildServiceProvider();
         Assert.Same(original, provider.GetServices<IInfoCarrierValueMapper>().First());
     }
 
     [Fact]
-    public void Version_10_3_marks_only_approved_v11_configuration_removals_obsolete()
+    public void Version_11_removes_legacy_configuration_and_type_forwarding()
     {
-        const string url = "https://github.com/azabluda/InfoCarrier.Core/issues/221";
-        (MethodInfo Method, string DiagnosticId, string Replacement)[] expected =
-        [
-            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowTypes), 1),
-                "ICC1001", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
-            (Method(typeof(InfoCarrierDbContextOptionsBuilder), nameof(InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution), 0),
-                "ICC1002", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierAllowedTypes), 2),
-                "ICC1003", "InfoCarrierDeploymentBuilder.AddAllowedTypes"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution), 1),
-                "ICC1004", "InfoCarrierDeploymentBuilder.AllowArbitrarySqlExecution"),
-            (Method(typeof(InfoCarrierServiceCollectionExtensions), nameof(InfoCarrierServiceCollectionExtensions.AddInfoCarrierStandardValueMappers), 1),
-                "ICC1005", "AddInfoCarrier")
-        ];
-
-        foreach ((MethodInfo method, string diagnosticId, string replacement) in expected)
+        Assembly assembly = typeof(InfoCarrierClientOptions).Assembly;
+        foreach (string name in new[]
         {
-            ObsoleteAttribute obsolete = Assert.Single(method.GetCustomAttributes<ObsoleteAttribute>());
-            Assert.False(obsolete.IsError);
-            Assert.Equal(diagnosticId, obsolete.DiagnosticId);
-            Assert.Equal(url, obsolete.UrlFormat);
-            Assert.Contains(replacement, obsolete.Message, StringComparison.Ordinal);
+            "InfoCarrier.Core.InfoCarrierDbContextOptionsBuilder",
+            "InfoCarrier.Core.IInfoCarrierArbitrarySqlExecution",
+            "InfoCarrier.Core.Expressions.IInfoCarrierAllowedTypes",
+            "InfoCarrier.Core.IInfoCarrierServerDocumentStore",
+            "InfoCarrier.Core.IInfoCarrierServerLogForwarding",
+            "InfoCarrier.Core.IInfoCarrierSensitiveServerLogForwarding",
+            "InfoCarrier.Core.IInfoCarrierServerTransactionTimeout",
+        })
+        {
+            Assert.Null(assembly.GetType(name));
         }
-
-        MethodInfo[] obsoleteConfigurationMethods =
-        [
-            .. typeof(InfoCarrierDbContextOptionsBuilder).GetMethods(BindingFlags.Instance | BindingFlags.Public),
-            .. typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public)
-        ];
         Assert.Equal(
-            expected.Select(item => item.Method).OrderBy(method => method.Name),
-            obsoleteConfigurationMethods
-                .Where(method => method.IsDefined(typeof(ObsoleteAttribute)))
-                .OrderBy(method => method.Name));
+            [nameof(InfoCarrierServiceCollectionExtensions.AddEntityFrameworkInfoCarrier)],
+            typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                .Select(method => method.Name).Order());
+        Assert.DoesNotContain(typeof(IInfoCarrierValueMapper), assembly.GetForwardedTypes());
     }
 
     [Fact]
     public void Unreleased_anonymous_role_methods_are_absent()
     {
         Assert.DoesNotContain(
-            typeof(InfoCarrierDbContextOptionsBuilder).GetMethods(BindingFlags.Instance | BindingFlags.Public),
+            typeof(InfoCarrierClientOptions).GetMethods(BindingFlags.Instance | BindingFlags.Public),
             method => method.Name is "UseInfoCarrierDeployment" or "UseRegisteredAnonymousShapes");
         Assert.DoesNotContain(
             typeof(InfoCarrierServiceCollectionExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public),
@@ -368,10 +281,7 @@ public class InfoCarrierDeploymentBuilderTest
         return options.Options.FindExtension<InfoCarrierOptionsExtension>()!;
     }
 
-    private static MethodInfo Method(Type type, string name, int parameterCount)
-        => Assert.Single(
-            type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public),
-            method => method.Name == name && method.GetParameters().Length == parameterCount);
+
 
     private sealed record NamedRecord(int Value);
 

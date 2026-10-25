@@ -78,7 +78,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
     {
         var logs = new FailureLogs();
         await using var host = factory.WithWebHostBuilder(b => b.ConfigureLogging(l => l.AddProvider(logs))
-            .ConfigureServices(s => s.AddInfoCarrier(o => o.AddAllowedTypes(typeof(RefusedMethods)))));
+            .ConfigureServices(s => s.AddInfoCarrierServer<Northwind.Shared.NorthwindContext>(o => o
+                .ConfigureShared(Northwind.Shared.NorthwindDeployment.ConfigureInfoCarrier)
+                .AddAllowedTypes(typeof(RefusedMethods)))));
         using HttpClient client = host.CreateClient();
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         ExpressionNode node = new ConstantNode { Type = new TypeNode

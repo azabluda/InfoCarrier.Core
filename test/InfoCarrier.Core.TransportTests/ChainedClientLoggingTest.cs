@@ -201,15 +201,14 @@ public class ChainedClientLoggingTest
                 .AddScoped<DbContext>(s => s.GetRequiredService<Context>());
             if (middleGrant)
             {
-                services.AddSingleton(capture).AddInfoCarrierServerLogForwarding(LogLevel.Debug);
+                services.AddSingleton(capture);
             }
             _middle = services.BuildServiceProvider();
             _server = new InProcessInfoCarrierServer(
                 _middle,
                 MiddleFactory.CreateLogger<InProcessInfoCarrierServer>(),
                 _middle.GetService<ServerLogCapture>(),
-                _middle.GetService<IInfoCarrierServerLogForwarding>(),
-                _middle.GetService<IInfoCarrierSensitiveServerLogForwarding>());
+                new InfoCarrierServerOptions().WithLogForwarding(middleGrant ? LogLevel.Debug : null));
             var dispatcher = new InfoCarrierEnvelopeServer(_server, serializer, MiddleFactory.CreateLogger<InfoCarrierEnvelopeServer>());
             _client = new TransportInfoCarrierClient(new ClientProcessingLoggingTest.LocalTransport(dispatcher, response =>
             {

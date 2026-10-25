@@ -34,7 +34,7 @@ namespace InfoCarrier.Core;
 /// <param name="arbitrarySqlAllowed">
 ///     Whether this server permits a payload to carry SQL it will execute (#60) - true when the
 ///     application registered
-///     <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />.
+///     <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />.
 ///     <b>This is the security boundary</b>; the client's matching option only decides what it
 ///     sends. Default <c>false</c>, so a server that says nothing refuses.
 /// </param>

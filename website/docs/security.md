@@ -104,7 +104,8 @@ commit it. Ending someone else's transaction is the smaller half.
 Bind it to the caller who opened it. This needs an authenticated transport and no client change:
 
 ```csharp
-builder.Services.AddInfoCarrierHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
+builder.Services.AddInfoCarrierServer<ShopContext>()
+    .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
 ```
 
 See [Binding a transaction to its caller](configuration/server.md#binding-a-transaction-to-its-caller)

@@ -182,7 +182,7 @@ public sealed record SaveChangesResult
     /// <remarks>
     ///     This is the half a caller most often wants: EF raises its write-time warnings from the
     ///     update pipeline, which runs on the server. See
-    ///     <see cref="IInfoCarrierServerLogForwarding" /> for the grant and what it discloses.
+    ///     <see cref="InfoCarrierServerOptions.LogForwarding" /> for the grant and what it discloses.
     /// </remarks>
     public IReadOnlyList<ServerLogEvent>? ServerLog { get; init; }
 }

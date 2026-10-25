@@ -52,7 +52,7 @@ public class InfoCarrierDatabase(
 
     /// <summary>
     ///     Whether the server's store writes rows rather than documents
-    ///     (<see cref="InfoCarrierDbContextOptionsBuilder.UseNonRelationalServerStore" />).
+    ///     (<see cref="InfoCarrierClientOptions.ServerUsesRelationalQueryRules" />).
     /// </summary>
     /// <remarks>
     ///     <b>It decides how much of a document has to travel with a change (#100).</b> On a

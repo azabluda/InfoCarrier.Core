@@ -24,35 +24,47 @@ public class AnonymousShapeStructuralRegistrationTest
     }
 
     [Fact]
-    public void Prototype_calls_compose_snapshot_the_input_and_use_the_server_model()
+    public async Task Prototype_calls_compose_snapshot_the_input_and_use_the_server_model()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<PrototypeContext>(options => options.UseInMemoryDatabase("prototype-registration"));
+        string databaseName = Guid.NewGuid().ToString();
+        services.AddDbContext<PrototypeContext>(o => o.UseInMemoryDatabase(databaseName));
         services.AddScoped<DbContext>(p => p.GetRequiredService<PrototypeContext>());
         object[] first = [new { StructuralConfigured = 1 }];
-        services.AddInfoCarrier(builder => builder.AddAnonymousShapes(first));
-        services.AddInfoCarrier(builder => builder.AddAnonymousShapes(new { StructuralSecond = "" }));
+        var serverOptions = new InfoCarrierServerOptions()
+            .AddAnonymousShapes(first)
+            .AddAnonymousShapes(new { StructuralSecond = "" });
         first[0] = new { NotConfigured = 2 };
         using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
-        using IServiceScope scope = provider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<PrototypeContext>();
-        AnonymousShapeCatalog catalog = provider.GetRequiredService<AnonymousShapeCatalog>();
-        Assert.Single(provider.GetServices<AnonymousShapeCatalog>());
-        var resolver = new TypeNodeResolver(context.Model);
-        resolver.UseAnonymousShapeCatalog(catalog);
-        Assert.NotNull(resolver.Resolve(new TypeNodeMapper().ToTypeNode(new { StructuralConfigured = 9 }.GetType())));
-        Assert.NotNull(resolver.Resolve(new TypeNodeMapper().ToTypeNode(new { StructuralSecond = "two" }.GetType())));
-        Assert.Throws<InvalidOperationException>(() => resolver.Resolve(new TypeNodeMapper().ToTypeNode(first[0].GetType())));
-        Assert.Throws<InvalidOperationException>(() => new TypeNodeResolver().UseAnonymousShapeCatalog(catalog));
+        using (IServiceScope scope = provider.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<PrototypeContext>();
+            context.Add(new PrototypeRow { Id = 1 });
+            context.SaveChanges();
+        }
+        await using var server = new InProcessInfoCarrierServer(provider,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessInfoCarrierServer>.Instance,
+            options: serverOptions);
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var dispatcher = new InfoCarrierEnvelopeServer(server, serializer);
+        var client = new TransportInfoCarrierClient(
+            new TestUtilities.InProcessInfoCarrierTransport(dispatcher.DispatchAsync, serializer), serializer);
+        var options = new DbContextOptionsBuilder<PrototypeContext>().UseInfoCarrier(client, o => o
+            .AddAnonymousShapes(new { StructuralConfigured = 0 }, new { StructuralSecond = "" }, new { NotConfigured = 0 }));
+        using var remote = new PrototypeContext(options.Options);
+        Assert.Equal(1, (await remote.Set<PrototypeRow>().Select(row => new { StructuralConfigured = row.Id }).SingleAsync()).StructuralConfigured);
+        Assert.Equal("1", (await remote.Set<PrototypeRow>().Select(row => new { StructuralSecond = row.Id.ToString() }).SingleAsync()).StructuralSecond);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            remote.Set<PrototypeRow>().Select(row => new { NotConfigured = row.Id }).SingleAsync());
     }
 
     [Fact]
     public void Prototype_registration_rejects_named_records_and_null_prototypes()
     {
         var services = new ServiceCollection();
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierServer<PrototypeContext>(
             builder => builder.AddAnonymousShapes(new NamedRecord(1))));
-        Assert.Throws<ArgumentException>(() => services.AddInfoCarrier(
+        Assert.Throws<ArgumentException>(() => services.AddInfoCarrierServer<PrototypeContext>(
             builder => builder.AddAnonymousShapes(new object[] { null! })));
     }
 
@@ -73,7 +85,15 @@ public class AnonymousShapeStructuralRegistrationTest
 
     private static List<List<T>> Nest<T>(T value) => [[value]];
     private sealed record NamedRecord(int Id);
-    private sealed class PrototypeContext(DbContextOptions<PrototypeContext> options) : DbContext(options);
+    private sealed class PrototypeRow
+    {
+        public int Id { get; set; }
+    }
+
+    private sealed class PrototypeContext(DbContextOptions<PrototypeContext> options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder) => modelBuilder.Entity<PrototypeRow>();
+    }
 
     [Fact]
     public void Prototypes_from_another_assembly_restore_the_actual_client_type()

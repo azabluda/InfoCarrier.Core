@@ -115,12 +115,15 @@ public class HttpCallerIdentityTest
 
     private static (IInfoCarrierServerCallerIdentity Identity, IHttpContextAccessor Accessor) Build()
     {
-        ServiceProvider provider = new ServiceCollection()
-            .AddInfoCarrierHttpCallerIdentity(http => http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value)
-            .BuildServiceProvider();
+        var services = new ServiceCollection();
+        InfoCarrierServerBuilder server = services.AddInfoCarrierServer<Microsoft.EntityFrameworkCore.DbContext>()
+            .AddHttpCallerIdentity(http => http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        ServiceProvider provider = services.BuildServiceProvider();
+        InfoCarrierServerRegistration registration = provider.GetRequiredService<InfoCarrierServerRegistrationStore>()
+            .Get(server.Identity);
 
         return (
-            provider.GetRequiredService<IInfoCarrierServerCallerIdentity>(),
+            registration.CallerIdentityFactory!(provider),
             provider.GetRequiredService<IHttpContextAccessor>());
     }
 

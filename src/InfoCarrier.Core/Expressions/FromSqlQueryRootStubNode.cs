@@ -27,9 +27,9 @@ namespace InfoCarrier.Core.Expressions;
 ///         uncomposed <c>FromSqlRaw</c> reaches the store unwrapped - so this is arbitrary SQL
 ///         execution and there is no read-only subset of it. A server rebuilds this node only if
 ///         it registered
-///         <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />,
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />,
 ///         and a client sends one only if it called
-///         <see cref="InfoCarrierDbContextOptionsBuilder.AllowArbitrarySqlExecution()" />. Both
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />. Both
 ///         default to refusing. Read <c>docs/security-review.md</c> section 5a.
 ///     </para>
 /// </remarks>

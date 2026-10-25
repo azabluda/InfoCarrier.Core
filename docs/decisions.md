@@ -3,6 +3,14 @@
 Record of design decisions for InfoCarrier.Core v2. Each entry states context, decision,
 and rationale.
 
+### Configuration supersession, 2026-10-24
+
+Version 11 replaces the configuration-only marker interfaces and legacy registration helpers named
+in historical entries below. Applications use client/server options and ordinary shared methods
+through `ConfigureShared`. Each server reads an immutable configuration snapshot; direct construction
+accepts the same `InfoCarrierServerOptions`. Standard mappers are automatic. The caller-identity
+interface remains a transport behavior seam. See the [current design](plans/v11/configuration-api-design.md).
+
 > **Status note.** The pre-implementation research phase closed 2026-07-22
 > ([`research-findings.md`](research-findings.md)); the project is now in **implementation**
 > (see [`roadmap.md`](plans/v10/roadmap.md)). Each entry is marked:

@@ -10,6 +10,16 @@ Milestone **M5** exit criterion. Reviewed **2026-08-10** against commit `f346a63
 
 ---
 
+## Configuration API supersession, 2026-10-24
+
+The historical configuration names below are superseded in version 11. Shared methods call
+`AddAllowedTypes` and `AllowArbitrarySqlExecution(bool)` through `ConfigureShared` in client and
+server options. Only the server snapshot grants admission. `WithLogForwarding` configures the
+forwarding level and separate sensitive-data grant. These changes remove configuration markers;
+forwarding remains disabled until an explicit level is configured.
+Admission rules and disclosure risks are unchanged. Sensitive logging still requires both grants.
+See [server configuration](../website/docs/configuration/server.md) for current setup.
+
 ## 1. The path, in order
 
 ### Addendum 2026-10-08: bounded anonymous data and trusted catalogs

@@ -36,7 +36,7 @@ public sealed record QueryDataResult
     ///     server does not forward its log (the default) or logged nothing.
     /// </summary>
     /// <remarks>
-    ///     See <see cref="IInfoCarrierServerLogForwarding" /> for the grant and what it discloses.
+    ///     See <see cref="InfoCarrierServerOptions.LogForwarding" /> for the grant and what it discloses.
     /// </remarks>
     public IReadOnlyList<ServerLogEvent>? ServerLog { get; init; }
 }

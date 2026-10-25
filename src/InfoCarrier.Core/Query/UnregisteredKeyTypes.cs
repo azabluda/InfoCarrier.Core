@@ -10,7 +10,7 @@ namespace InfoCarrier.Core.Query;
 /// <summary>
 ///     Names the key types that keep an operator on this client because the server was never told
 ///     about them, so the <see cref="InfoCarrierEventId.QuerySplit" /> event can say what to pass to
-///     <see cref="InfoCarrierDbContextOptionsBuilder.AllowTypes" />.
+///     <see cref="InfoCarrierDeploymentBuilderExtensions.AddAllowedTypes" />.
 /// </summary>
 /// <remarks>
 ///     <para>

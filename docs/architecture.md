@@ -11,6 +11,14 @@ together; how entities materialize; and the test strategy. Authority: requiremen
 
 ---
 
+## Version 11 configuration supersession, 2026-10-24
+
+Historical entries below retain their original configuration names. Version 11 replaces the legacy
+configuration builder, marker interfaces, and service-registration helpers with client/server options
+and `ConfigureShared`. Server policy comes from its immutable registration snapshot. Standard value
+mappers are automatic. See the [current configuration design](plans/v11/configuration-api-design.md)
+and [server configuration](../website/docs/configuration/server.md) for the maintained public surface.
+
 ## 1. System overview
 
 ```

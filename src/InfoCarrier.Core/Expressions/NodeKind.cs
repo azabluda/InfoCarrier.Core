@@ -62,7 +62,7 @@ public enum NodeKind
     ///     <c>FromSqlQueryRootExpression</c> (#60). A <see cref="QueryRootStub" /> that also
     ///     carries the caller's SQL text and its arguments; rebound server-side, and only on a
     ///     server that registered
-    ///     <see cref="InfoCarrierServiceCollectionExtensions.AddInfoCarrierArbitrarySqlExecution" />.
+    ///     <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />.
     /// </summary>
     FromSqlQueryRootStub = 15,
 
