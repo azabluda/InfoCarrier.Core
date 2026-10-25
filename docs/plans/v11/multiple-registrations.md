@@ -98,6 +98,9 @@ is retained. The pull request and issue remain incomplete until this reconciliat
 
 ### Reference comparison and revised API proposal
 
+The comparison remains relevant, but its specialized `UseSerializer` recommendation below is
+superseded by the generic replacement investigation that follows. These sketches are not approved APIs.
+
 The first illustrative `WithSerializerFactory(sp => sp.GetRequiredService<OrdersSerializer>())`
 was an original sketch, not an established API copied from another library. Its signature did not
 distinguish borrowed services from newly created objects. Withdraw that sketch as the proposed
@@ -183,6 +186,114 @@ server's model-aware construction or save mapper requirements. Whole-client/serv
 decorators also remain open until their policy and streaming obligations are defined. This
 reference comparison settles neither by implication. No runtime changes or new ownership types
 are introduced in this plan iteration.
+
+### Generic replacement investigation and revised direction
+
+The owner requested investigation of a generic `ReplaceService` operation rather than one public
+method per component. The previous rejection of that approach was premature. Recommend one typed
+replacement operation for registered InfoCarrier service contracts, preserving each contract's
+defined lifetime. This does not promise replacement of arbitrary objects constructed internally,
+or of services whose interface omits behavior required by their consumers.
+
+```csharp
+// Proposed, not implemented. No separate AddSingleton is required for these replacements.
+services.AddInfoCarrierClient("orders", o => o.WithEndpoint(ordersEndpoint))
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>()
+    .ReplaceService<IInfoCarrierTransport, OrdersTransport>();
+
+services.AddInfoCarrierClient("catalog", o => o.WithEndpoint(catalogEndpoint));
+```
+
+The builder records implementation types, not preconstructed instances or ambiguous ownership
+delegates. Default service metadata supplies lifetime and required constructor context. Unknown
+service contracts fail at configuration rather than becoming unused registrations. Repeated
+replacement of the same single-service contract selects the last implementation; multi-service
+chains such as value mappers retain their separate composition rules. Whole-service replacement
+is not decoration: a replacement cannot request its own contract and expect the previous service.
+
+#### Framework mechanism and executable evidence
+
+.NET 10's parameterless
+[`FromKeyedServicesAttribute`](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/Microsoft.Extensions.DependencyInjection.Abstractions/src/FromKeyedServicesAttribute.cs)
+inherits the consuming registration's key. The
+[`CallSiteFactory` implementation](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/Microsoft.Extensions.DependencyInjection/src/ServiceLookup/CallSiteFactory.cs)
+uses that key for annotated constructor dependencies. Unannotated dependencies use ordinary host
+resolution. For example, an application transport can express registration-local and host dependencies:
+
+```csharp
+public OrdersTransport(
+    [FromKeyedServices] IInfoCarrierSerializer serializer,
+    ILogger<OrdersTransport> logger)
+{
+    // Retain the supplied dependencies; do not dispose the host-owned serializer.
+}
+```
+
+A local .NET 10 executable referencing the actual InfoCarrier interfaces passed 21 checks.
+Two opaque object keys selected different serializers and supplied each to its matching transport.
+The actual `TransportInfoCarrierClient` accepted the selected dependencies at an explicit assembly
+boundary. Ordinary host dependencies remained shared. Singleton reuse, exactly-once synchronous
+and asynchronous disposal, captive-scope refusal, and cleanup after a consumer constructor failure
+worked through the one host provider. Scoped model-aware pipeline construction received separate
+synthetic `IModel` instances and disposed/recreated pipelines across ordinary host operation scopes.
+
+The probe is an ignored research artifact at `artifacts/generic-replacement-probe/Probe.csproj`,
+with source in `Program.cs` and output in `run.log`. Run it with
+`dotnet run --project artifacts/generic-replacement-probe/Probe.csproj`. It is not product support
+or a stored-data acceptance test. Its small registration sketch appends keyed descriptors; it does
+not implement the production snapshot, replacement validation, HTTP selection, or cache rules.
+The run reported a NuGet vulnerability-feed access warning and a probe documentation/analyzer
+warning; neither prevented compilation or execution.
+
+#### Proposed construction and ownership contract
+
+- Retain names as labels, opaque identities, and complete policy descriptors. Freeze the replacement
+  type map with each descriptor. At host setup, register the selected implementation graph with
+  private identity keys; never register limits, permissions, or mapper policy as scattered keyed
+  services. This deliberately broadens the earlier activation-only keyed boundary, using the host's
+  existing container rather than introducing a local resolver or child provider.
+- Host-created keyed service instances are host-owned. Activations borrow them and must not dispose
+  them a second time. Preserve the HTTP factory's handler ownership and define wrapper ownership
+  separately. Type replacements no longer require an owned-versus-borrowed factory convention.
+- Use normal constructor injection for shared application services. Registration-local dependencies
+  must use inherited-key injection or an explicit built-in assembly factory. Automatic propagation
+  through unannotated constructors is not supported: it can fail resolution or consume an unrelated
+  unkeyed service. Publish that requirement in the advanced example, including transitive dependencies.
+- Preserve service lifetime metadata and host scope validation. Implementation types do not choose
+  their own lifetime. Validate dependency graphs, unknown contracts, constructor ambiguity, cycles,
+  and disposal before claiming equivalence with EF replacement. Host-provided instances and factory
+  overloads are later decisions, not necessary for the initial typed operation.
+- Finalize selected service registrations after builder configuration and before provider creation.
+  Do not leave both the default and replaced implementation as disposable aliases. Retain catalog
+  snapshot and handle ownership checks; registration order must not change the chosen implementation.
+- Skip HTTP client provisioning for a custom transport. Resolve the client-builder return-type
+  decision already identified above; generic replacement does not make `IHttpClientBuilder` an
+  appropriate transport-independent return type.
+
+#### Model-aware pipeline result and remaining work
+
+The probe also passed an expected-failure check against the actual `ServerQueryExecutor`:
+an interface-only `IExpressionSerializer` caused `InvalidCastException` before its methods ran.
+`Prepare` and streaming execution cast to `ExpressionSerializer` and `DynamicValueMapper`.
+Save execution also requires concrete mapper operations absent from `IDynamicValueMapper`.
+The client has concrete checks for execution admission settings. Constructor replacement alone
+cannot correct these incomplete contracts, and subclass-only substitution is not the target result.
+
+Generic service selection can be shared across activation and operation services, but their creation
+contexts and lifetimes differ. Operation pipelines must use the actual leased context/model,
+including a transaction's retained context. The synthetic keyed-model probe does not demonstrate
+that connection. Resolve the model-aware contract and context handoff before implementing scoped
+pipeline registration; do not resolve another context merely because it has the same type.
+Continue using EF's own provider/cache rules on the client. Include relevant pipeline replacement
+identity in cache equivalence or resolve it per execution where safe; never capture a registration's
+pipeline in a shared compiled delegate.
+
+Next implementation boundary: prototype the generic builder/descriptor map, host-owned keyed
+construction, and built-in constructor adaptation for serializer and transport first. Add real
+two-endpoint stored-data, limits, streaming, metrics, and disposal checks. Then remove concrete
+pipeline assumptions behind complete interfaces and verify the same replacement operation for
+query and save paths on both ends. Built-in default declarations must stay concise. No production
+API or behavior has changed during this investigation.
 
 ## Verified starting point
 
