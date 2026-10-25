@@ -221,6 +221,28 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
 - [ ] P4: Verify policy and cache isolation through concurrent stored-data tests. Cover shared context
   types, pooling, compiled queries, mapper identity, streaming, limits, caller identity, SQL grants,
   document behavior, logging grants, and wrong-endpoint transaction rejection.
+  P4a adds `NamedRegistrationCacheIsolationTest`: matching mapper instances must share the actual
+  Entity Framework compiled-query cache, while different mapper instances must not. Scoped serializers
+  remain distinct. The matrix covers pooled and ordinary factories, both client/server registration
+  orders, explicitly compiled delegates, normal query-cache reuse, mapped predicates/projections,
+  streaming enumeration, tracking, save counts, and independently read SQLite data. A middle host
+  accepts incoming operations while its named clients call two upstream endpoints. Client and server
+  both use the public label `orders` without joining their policies. The same workload also runs
+  directly against SQLite as a control. Explicitly compiled delegates are shared only when models
+  match, respecting Entity Framework's existing model restriction. Mapper counters must increase in
+  every case; entity materialization alone does not establish that the mapper seam was exercised.
+  Fixed mapper configurations are reused across theory cases to avoid creating unrelated internal
+  providers. Explicit test pools are owned and disposed by the test factories.
+  P4b adds `NamedEndpointPolicyIsolationTest`: concurrent transactions use different caller selectors
+  on named endpoints, and buffered/streamed queries retain independent forwarding grants, including
+  the sensitive-data grant. The positive streaming cases first failed because an async iterator's
+  yield restored the caller's execution context and lost the active log-capture sink. Capture now
+  surrounds each iterator advance and disposal, closes before yielding a frame, and forwards permitted
+  events after enumeration. Rows remain streamed. The regression checks passed after this fix.
+  On 2026-10-25, the focused checks, full transport suite, specification comparison, Release rebuild,
+  clean trimming, documentation, and file hygiene passed. Specification failure names and reasons
+  are unchanged from the server-selection measurement. Additional allowed-type/anonymous-shape admission,
+  document-repair, and response-limit/cancellation isolation checks remain outstanding before P4 can close.
 - [ ] P5: Add bounded metric tags and lifetime/disposal coverage. Run final validation and reconcile
   documentation, obsolete code, issue acceptance, and the pull-request description.
 

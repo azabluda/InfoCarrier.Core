@@ -348,22 +348,46 @@ public sealed class InProcessInfoCarrierServer(
             var executor = new ServerQueryExecutor(
                 lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
 
-            using ServerLogCapture.Scope? capture = BeginLogCapture();
-            await foreach (QueryStreamFrame frame in executor.ExecuteStreamAsync(request, cancellationToken)
-                .WithCancellation(cancellationToken).ConfigureAwait(false))
+            List<ServerLogEvent>? logs = null;
+            IAsyncEnumerator<QueryStreamFrame> frames = executor.ExecuteStreamAsync(request, cancellationToken)
+                .GetAsyncEnumerator(cancellationToken);
+            try
             {
-                if (frame is not QueryCompleteFrame)
+                while (true)
                 {
-                    yield return frame;
+                    bool moved;
+                    // Iterator yields restore the caller's execution context. Re-enter capture for
+                    // each advance, then leave it before yielding a frame to the HTTP adapter.
+                    using (ServerLogCapture.Scope? capture = BeginLogCapture())
+                    {
+                        moved = await frames.MoveNextAsync().ConfigureAwait(false);
+                        Collect(capture);
+                    }
+                    if (!moved) { break; }
+                    if (frames.Current is not QueryCompleteFrame) { yield return frames.Current; }
                 }
             }
+            finally
+            {
+                using ServerLogCapture.Scope? capture = BeginLogCapture();
+                await frames.DisposeAsync().ConfigureAwait(false);
+                Collect(capture);
+            }
 
-            foreach (ServerLogEvent log in CollectedLog(capture, lease.Context) ?? [])
+            foreach (ServerLogEvent log in logs ?? [])
             {
                 yield return new QueryLogFrame(log);
             }
 
             yield return new QueryCompleteFrame();
+
+            void Collect(ServerLogCapture.Scope? capture)
+            {
+                if (CollectedLog(capture, lease.Context) is { Count: > 0 } events)
+                {
+                    (logs ??= []).AddRange(events);
+                }
+            }
         }
         finally
         {
