@@ -60,8 +60,10 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             InfoCarrierOperation.Query,
             (destination, token) => _serializer.SerializeAsync(destination, request, token),
             cancellationToken).ConfigureAwait(false);
+        using Stream? bounded = (_serializer as SystemTextJsonInfoCarrierSerializer)?.Limits
+            .CreateReadLimit<QueryDataResult>(response.Content);
         await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
-            response.Content, cancellationToken).ConfigureAwait(false))
+            bounded ?? response.Content, cancellationToken).ConfigureAwait(false))
         {
             yield return frame;
         }
@@ -115,8 +117,10 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         QueryStartFrame? start = null;
         var rows = new List<DynamicValueNode>();
         var logs = new List<ServerLogEvent>();
+        using Stream? bounded = (_serializer as SystemTextJsonInfoCarrierSerializer)?.Limits
+            .CreateReadLimit<QueryDataResult>(response.Content);
         await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
-            response.Content, cancellationToken).ConfigureAwait(false))
+            bounded ?? response.Content, cancellationToken).ConfigureAwait(false))
         {
             switch (frame)
             {

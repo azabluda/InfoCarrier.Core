@@ -132,6 +132,9 @@ A query tree is kilobytes, and a `SaveChanges` request is no bigger than the gra
 tracked, so a low limit is usually safe. Cap the request bytes at your gateway too; this limit
 catches whatever the gateway lets through.
 
+The limit also applies while decoding streamed requests. Each mapped server registration uses its
+own limit and admission settings.
+
 ## Granting what the model does not imply
 
 Two deployment settings widen what a client may send. Both deny by default, and both are the

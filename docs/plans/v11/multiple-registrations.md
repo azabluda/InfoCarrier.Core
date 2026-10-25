@@ -218,7 +218,7 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   Full specification comparison and transport tests, Release rebuild, package validation, clean
   trimming, documentation, and file hygiene passed on 2026-10-25. Specification failure names and
   reasons are unchanged from the named-client measurement.
-- [ ] P4: Verify policy and cache isolation through concurrent stored-data tests. Cover shared context
+- [x] P4: Verify policy and cache isolation through concurrent stored-data tests. Cover shared context
   types, pooling, compiled queries, mapper identity, streaming, limits, caller identity, SQL grants,
   document behavior, logging grants, and wrong-endpoint transaction rejection.
   P4a adds `NamedRegistrationCacheIsolationTest`: matching mapper instances must share the actual
@@ -241,10 +241,30 @@ configuration. Retain ordinary `ConfigureShared` methods and separate client/ser
   events after enumeration. Rows remain streamed. The regression checks passed after this fix.
   On 2026-10-25, the focused checks, full transport suite, specification comparison, Release rebuild,
   clean trimming, documentation, and file hygiene passed. Specification failure names and reasons
-  are unchanged from the server-selection measurement. Additional allowed-type/anonymous-shape admission,
-  document-repair, and response-limit/cancellation isolation checks remain outstanding before P4 can close.
+  are unchanged from the server-selection measurement.
+  P4c adds independent allowed-type and anonymous-shape admission, streamed request limits, and named
+  response limits for both one large row and many small rows. These checks exposed missing limits
+  on stream decoding and framed query responses. A per-decode, leave-open read wrapper now counts
+  the complete incoming payload, including framing, and rejects the first read exceeding its limit.
+  Exact-boundary tests verify equality is accepted, overflow fails, cancellation is preserved, and
+  caller-owned streams remain open. A synchronized command test cancels one named request while a
+  second endpoint continues, then verifies that the cancelled registration accepts its next query.
+  `NamedDocumentPolicyTest` updates attached stubs concurrently through MongoDB and InMemory endpoints
+  using the same context type and both registration orders. Independent store reads verify saved values
+  and retained owned data. A materialization probe verifies that the InMemory endpoint does not perform
+  document-repair reads; an independent full read proves the probe observes stored owned data.
+  Both clients use non-relational query rules, while only MongoDB enables document repair.
+  The final P4 checks passed on 2026-10-25: full specification comparison, transport suite, Release
+  rebuild, clean trimming, documentation checks, and file hygiene. Specification failure names and
+  reasons remain unchanged from P4b. No public signatures changed in this increment.
 - [ ] P5: Add bounded metric tags and lifetime/disposal coverage. Run final validation and reconcile
   documentation, obsolete code, issue acceptance, and the pull-request description.
+  Review both buffered and streamed transport paths: named labels alone are insufficient if streamed
+  operations bypass the existing round-trip instruments. Verify successful, failed, cancelled, and
+  early-disposed enumeration, with one measurement per actual request and no registration-policy
+  lookup through ambient state. Keep meter-listener tests isolated from parallel test traffic.
+  Labels must also distinguish retained unnamed server registrations selected by handles, without
+  colliding with valid public names such as `default`. Cardinality must follow configured registrations.
 
 Each step is a new commit on the same branch. Update its checkbox with the work. Cleanup is limited
 to paths replaced by this feature; the legacy cleanup already merged is not another task.

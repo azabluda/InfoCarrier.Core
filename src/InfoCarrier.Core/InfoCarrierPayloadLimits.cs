@@ -21,8 +21,9 @@ namespace InfoCarrier.Core;
 ///     <para>
 ///         <b>Why a byte count and not a node count.</b> The bound has to be checkable
 ///         <em>before</em> parsing begins, because the memory a parse costs is what it is
-///         bounding; a node count is only knowable by parsing. The guards are O(1) length tests
-///         on bytes already in hand.
+///         bounding; a node count is only knowable by parsing. Buffered guards are O(1) length
+///         tests on bytes already in hand. Streamed decoding counts bytes as they arrive and
+///         refuses the first read that exceeds the bound, before parsing that read.
 ///     </para>
 ///     <para>
 ///         <b>Why two numbers.</b> The direction is the whole of the threat model. Roadmap M5
@@ -140,7 +141,16 @@ public sealed class InfoCarrierPayloadLimits
     public void GuardRequest(int payloadLength, string what)
         => Guard(payloadLength, what, MaxRequestBytes, nameof(MaxRequestBytes));
 
-    private static void Guard(int payloadLength, string what, int? max, string limitName)
+    internal Stream? CreateReadLimit<T>(Stream source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        int? maximum = IsRequest<T>() ? MaxRequestBytes : MaxResponseBytes;
+        return maximum is { } limit
+            ? new ReadLimitStream(source, limit, IsRequest<T>() ? nameof(MaxRequestBytes) : nameof(MaxResponseBytes))
+            : null;
+    }
+
+    private static void Guard(long payloadLength, string what, int? max, string limitName)
     {
         if (max is { } limit && payloadLength > limit)
         {
@@ -150,6 +160,50 @@ public sealed class InfoCarrierPayloadLimits
                 $"The {what} is {payloadLength} bytes, which exceeds the maximum of {limit} bytes "
                 + $"(InfoCarrierPayloadLimits.{limitName}). Raise the limit on the configured "
                 + "serializer, or pass null to opt out of it.");
+        }
+    }
+
+    // A per-decode byte counter. The decoder owns this wrapper; the caller still owns the source.
+    // Reading at most the remaining allowance plus one byte detects overflow before parsing it.
+    private sealed class ReadLimitStream(Stream source, int maximum, string limitName) : Stream
+    {
+        private long _read;
+        private bool _disposed;
+        public override bool CanRead => !_disposed && source.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+        public override int Read(Span<byte> buffer) => Count(source.Read(buffer[..Allowance(buffer.Length)]));
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => Count(await source.ReadAsync(buffer[..Allowance(buffer.Length)], cancellationToken).ConfigureAwait(false));
+
+        private int Allowance(int requested)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            Guard(_read, "streamed payload", maximum, limitName);
+            return (int)Math.Min(requested, maximum - _read + 1);
+        }
+
+        private int Count(int count)
+        {
+            _read += count;
+            Guard(_read, "streamed payload", maximum, limitName);
+            return count;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            _disposed = true;
+            base.Dispose(disposing);
         }
     }
 

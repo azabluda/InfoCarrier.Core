@@ -195,6 +195,10 @@ builder.Services.AddInfoCarrierClient(options => options
 Pass `null` to opt out of a limit. It is spelled as an explicit `null` rather than a very large
 number so that opting out is visible in your code.
 
+The response limit counts the complete streamed response, including frame metadata, rather than
+each row separately. Enumeration can return rows before a later read exceeds the limit.
+Each named client uses its own limit.
+
 The client role exposes only `MaxResponseBytes`, because it never deserializes a request. Configure
 `MaxRequestBytes` on the server role. See
 [Configuring the server](server.md#payload-limits).

@@ -124,6 +124,50 @@ public class PayloadLimitsTest
         Assert.NotNull(serializer.Deserialize<string>(Payload(64)));
     }
 
+    [Theory]
+    [InlineData(63)]
+    [InlineData(64)]
+    [InlineData(65)]
+    public async Task Streamed_responses_enforce_the_exact_bound_and_leave_the_source_open(int size)
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer(
+            new InfoCarrierPayloadLimits(maxRequestBytes: null, maxResponseBytes: 64));
+        using var source = new MemoryStream(Payload(size));
+        if (size <= 64)
+        {
+            Assert.Equal(new string('x', size - 2), await serializer.DeserializeAsync<string>(source));
+        }
+        else
+        {
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await serializer.DeserializeAsync<string>(source));
+            Assert.Contains(nameof(InfoCarrierPayloadLimits.MaxResponseBytes), failure.Message);
+        }
+        Assert.True(source.CanRead);
+    }
+
+    [Fact]
+    public async Task A_bounded_stream_preserves_cancellation_and_source_ownership()
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer(
+            new InfoCarrierPayloadLimits(maxResponseBytes: 64));
+        using var source = new MemoryStream(Payload(64));
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await serializer.DeserializeAsync<string>(source, cancellation.Token));
+        Assert.True(source.CanRead);
+        Assert.Equal(0, source.Position);
+    }
+
+    [Fact]
+    public async Task A_bounded_decoder_rejects_a_null_source()
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(maxResponseBytes: 64));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+            await serializer.DeserializeAsync<string>((Stream)null!));
+    }
+
     /// <summary>
     ///     Opting out is spelled as an explicit null, not as a very large number.
     /// </summary>
