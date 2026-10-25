@@ -1,10 +1,12 @@
 # Custom transports
 
-A transport is one interface with one method:
+A transport implements synchronous and asynchronous envelope exchange:
 
 ```csharp
 public interface IInfoCarrierTransport
 {
+    InfoCarrierEnvelope Send(InfoCarrierEnvelope request);
+
     Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default);
@@ -12,8 +14,77 @@ public interface IInfoCarrierTransport
 ```
 
 An `InfoCarrierEnvelope` is a serializable record. Get one to the server, get the answer back, and
-you have a transport. HTTP is the default because it is what most applications want. Nothing in the
-library depends on it.
+you have a transport. HTTP is the default adapter. Another protocol needs its own client transport
+and corresponding server hosting.
+
+## Replacing registered components
+
+Replace a serializer for one client without changing other clients:
+
+```csharp
+services.AddInfoCarrierClient("orders", o => o.WithEndpoint(ordersEndpoint))
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>();
+
+services.AddInfoCarrierClient("catalog", o => o.WithEndpoint(catalogEndpoint));
+```
+
+In the orders server application, select the compatible serializer on its server registration:
+
+```csharp
+var orders = services.AddInfoCarrierServer<OrdersContext>("orders")
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>();
+
+app.MapInfoCarrier(orders, "api/orders");
+```
+
+This works with unnamed, named, retained-handle, and typed endpoint selection. Context injection
+does not change: `UseInfoCarrier("orders")` selects the client, while application code uses its context.
+
+`ReplaceService<TService, TImplementation>()` preserves the service's lifetime, as Entity Framework's
+method does. `ReplaceService<TService, TCurrentImplementation, TNewImplementation>()` targets an
+original implementation. A matching targeted choice takes precedence over a contract-wide choice.
+Repeated calls for the same service and original implementation use the last choice. There is no
+lifetime argument or construction lambda.
+
+Currently, client registrations support replacement of `IInfoCarrierSerializer` and
+`IInfoCarrierTransport`; server registrations support `IInfoCarrierSerializer`. Other contracts
+fail during configuration. This does not replace Entity Framework's internal provider services.
+
+The host constructs replacements and supplies their constructor dependencies. No separate
+`AddSingleton<OrdersSerializer>()` is needed. These components retain singleton lifetime and must
+support concurrent calls. The host disposes them; a transport must not dispose its injected serializer.
+
+For a replacement transport, select registration-local dependencies through inherited keys:
+
+```csharp
+services.AddInfoCarrierClient("orders", o => o.WithEndpoint(ordersEndpoint))
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>()
+    .ReplaceService<IInfoCarrierTransport, OrdersTransport>();
+
+// Constructor of an application implementation of IInfoCarrierTransport:
+public OrdersTransport(
+    [FromKeyedServices] IInfoCarrierSerializer serializer,
+    ILogger<OrdersTransport> logger)
+{
+    // Retain dependencies; implement Send and SendAsync for the application's protocol.
+}
+```
+
+Import `Microsoft.Extensions.DependencyInjection` for the annotation. Parameterless
+`[FromKeyedServices]` selects the serializer from the transport's own registration. Unannotated
+dependencies use ordinary host resolution; they do not inherit its key. Do not put public registration
+names in these constructors. Custom channel services can use ordinary host injection.
+
+The client builder still implements `IHttpClientBuilder`, so existing handler configuration chains
+work. A replacement transport does not activate that private HTTP client or its handler callbacks.
+Use custom protocol hosting on the server; `MapInfoCarrier` remains HTTP hosting.
+The registration still requires an absolute endpoint URI. Configure application channel dependencies
+through host services; replacing the transport does not configure a channel automatically.
+
+Registration limits wrap custom deserialization too. Streamed response limits include all framing.
+The built-in query stream still uses JSON frames and JSON row data; replacing the envelope/payload
+serializer does not replace that format. A different streaming format needs a separate adapter.
+The built-in HTTP adapter also retains its `application/json` content type.
 
 ## Decorating the HTTP one
 
@@ -24,6 +95,9 @@ the transport, and a decorator does that in a few lines:
 public sealed class LoggingTransport(IInfoCarrierTransport inner, ILogger<LoggingTransport> logger)
     : IInfoCarrierTransport
 {
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        => SendAsync(request).GetAwaiter().GetResult();
+
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)
@@ -71,6 +145,9 @@ public sealed class LoopbackTransport(IInfoCarrierServer server, IInfoCarrierSer
 {
     private readonly InfoCarrierEnvelopeServer _endpoint = new(server, serializer);
 
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        => SendAsync(request).GetAwaiter().GetResult();
+
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)
@@ -97,6 +174,9 @@ For gRPC, a message bus or named pipes, the client half is the same shape as HTT
 public sealed class MyTransport(IMyChannel channel, IInfoCarrierSerializer serializer)
     : IInfoCarrierTransport
 {
+    public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        => SendAsync(request).GetAwaiter().GetResult();
+
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)
@@ -125,10 +205,11 @@ The server half is whatever hosts your protocol, ending in a call to
 
 ## A different serializer
 
-`IInfoCarrierSerializer` is four methods over a `byte[]`: `Serialize`, `Deserialize` and their async
-counterparts. The library never assumes JSON. Implement it for MessagePack or protobuf if the
-payload size matters to you, and register the same implementation on both halves.
+`IInfoCarrierSerializer` provides byte-array serialization/deserialization and their async counterparts,
+plus stream methods with buffered defaults. Select compatible implementations on both halves through
+`ReplaceService`, or pass the serializer explicitly when assembling a transport and client yourself.
+Query framing and row data still use the built-in JSON format.
 
-The one thing to keep is the size limit: a deserializer that will parse anything it is handed is
-what `InfoCarrierPayloadLimits` exists to prevent. See
+Registered replacements retain the role's byte limits. Direct custom composition must enforce its
+own limits with `InfoCarrierPayloadLimits`. See
 [Configuring the server](server.md#payload-limits).

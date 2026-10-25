@@ -35,6 +35,9 @@ mappers. It does not add the context or endpoint.
 
 ## Version 11 configuration
 
+For a custom wire serializer, use
+[component replacement](transports.md#replacing-registered-components) on the server builder. Every endpoint selection form uses that registration's choice.
+
 Version 11 uses `AddInfoCarrierClient` and `AddInfoCarrierServer<TContext>` as its role entry
 points. Shared shapes, types, mappers, and arbitrary SQL permission belong in either role callback.
 Apply the same ordinary shared method through `ConfigureShared` in both callbacks.

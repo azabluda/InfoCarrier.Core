@@ -15,6 +15,81 @@ Keep the ordinary application unchanged: one unnamed client, standard Entity Fra
 registration with `UseInfoCarrier()`, one unnamed server, and `MapInfoCarrier()`.
 Names and retained server builders are optional selection tools for applications that need them.
 
+## Typed component replacement increment, 2026-10-26
+
+The owner approved EF-style replacement and standard .NET inherited-key injection for advanced
+implementations. This increment implements the first construction boundary, not the entire open
+extension-point reconciliation. The older design sketches below are historical where they differ.
+
+Implemented public API:
+
+```csharp
+services.AddInfoCarrierClient("orders", o => o.WithEndpoint(ordersEndpoint))
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>()
+    .ReplaceService<IInfoCarrierTransport, OrdersTransport>();
+
+var server = services.AddInfoCarrierServer<OrdersContext>("orders")
+    .ReplaceService<IInfoCarrierSerializer, OrdersSerializer>();
+```
+
+Both builders also accept `ReplaceService<TService, TCurrentImplementation, TNewImplementation>()`.
+The replacement map follows EF's original-descriptor matching: targeted original implementations
+take precedence over contract-wide replacements; repeated choices for the same pair use the last
+choice. Types are constructed by the host with the original singleton lifetime. No lifetime or
+lambda overload is introduced. Unsupported contracts fail during configuration; that explicit
+diagnostic differs from EF's traversal of existing descriptors and is documented.
+
+`AddInfoCarrierClient` returns `InfoCarrierClientBuilder`, which implements `IHttpClientBuilder`.
+Existing assignments and HTTP extension chains remain valid, including replacement after an HTTP
+extension. Replacements reject unrelated application HTTP builders. This avoids an additional
+HTTP-configuration method or registration overload. HTTP factory infrastructure and lazy wrapper
+registration remain available, but a custom transport does not create the default HTTP wrapper or
+run its handler callbacks. An unused private configuration is not an activated client or handler.
+
+The complete descriptor snapshots the replacement map. The host owns keyed implementation instances
+under the registration's opaque identity. A transport uses parameterless `[FromKeyedServices]` for
+its selected serializer and ordinary injection for host dependencies. Activations borrow those
+objects; client activation no longer disposes the HTTP wrapper, which now has its own host-owned
+keyed registration. The HTTP factory still owns pooled handlers.
+
+The selected serializer's concrete host registration is wrapped by a non-disposable policy boundary
+registered under its interface. That boundary enforces role byte limits before custom decoding,
+while the host disposes the concrete implementation once. The transport and client receive the same
+boundary. Streamed query frames use that boundary's limits independently of the custom serializer's
+concrete type. All server mapping forms obtain the selected serializer from the same activation.
+One implementation type can serve two contracts through independently owned instances. A regression
+test in both registration orders rejected an unnecessary restriction before its removal, then verified
+separate instances and exactly-once disposal for each.
+
+Sixteen focused tests cover incompatible prefixed payload serialization on both
+ends, every endpoint selection form, concurrent custom/default client tracking and saves with direct
+store verification, inherited-key coupling, skipped HTTP activation for custom transport, EF
+precedence, repeated replacement, scope validation, snapshot retention, construction failure,
+exactly-once synchronous/asynchronous disposal, and limits with an internally unbounded custom
+serializer. The fixture joins request cleanup before deleting SQLite files. These are behavior
+checks, not destination-only tests.
+
+Remaining: model-aware query/save pipeline contracts and replacement; whole-client/server
+replacement or decoration contracts; final cache, streaming, ownership, and full-feature acceptance
+reconciliation. Built-in framing and row data remain JSON. Serializer replacement is not arbitrary
+stream-format replacement or a gRPC implementation. Documentation now states that limit and
+shows advanced registration and constructor requirements together.
+Custom transport registration still requires the role's absolute endpoint URI, and application
+channel dependencies remain ordinary host configuration. Endpoint-free registration, access to
+registration-specific construction settings, and adapter media-type configuration need reconciliation
+before claiming complete transport-independent composition. Built-in HTTP still declares
+`application/json`; the prefixed test codec proves replacement invocation, not a new supported
+media type or a general protobuf hosting contract.
+
+Final-source validation passed: normal functional Passed: 29,692, Failed: 0, Total: 29,926;
+document store Passed: 237, Failed: 0, Total: 237; transport Passed: 292, Failed: 0, Total: 292.
+Specification failure names and reasons are unchanged. Release rebuild under warnings-as-errors,
+package validation, clean trimming (115 InfoCarrier warnings), strict documentation, links, word
+budgets, file hygiene, and whitespace checks passed. The normal measurement was repeated after
+removing the multi-contract restriction; the final transport run includes the selected-instance
+assertion. Slow SQLite and Firebird results still belong to parent `0edd48f6` and were not repeated
+for this increment. Full-feature acceptance remains open with the contracts listed above.
+
 ## Extension-point audit and reconciliation, 2026-10-25
 
 The owner requested this audit after reviewing hardcoded activation dependencies. The existing

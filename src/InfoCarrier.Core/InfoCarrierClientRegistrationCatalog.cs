@@ -8,6 +8,7 @@ namespace InfoCarrier.Core;
 internal sealed class InfoCarrierClientRegistrationCatalog
 {
     private readonly Dictionary<string, InfoCarrierRegistrationIdentity> _names = new(StringComparer.Ordinal);
+    private readonly Dictionary<InfoCarrierRegistrationIdentity, InfoCarrierClientRegistration> _registrations = [];
     private InfoCarrierRegistrationIdentity? _defaultIdentity;
     private int _registrationCount;
 
@@ -23,19 +24,26 @@ internal sealed class InfoCarrierClientRegistrationCatalog
     {
         ValidateName(name);
         registration = registration with { MetricIdentity = new(name ?? "", ++_registrationCount) };
+        _registrations.Add(registration.Identity, registration);
         if (name is null) { _defaultIdentity = registration.Identity; }
         else { _names.Add(name, registration.Identity); }
         return registration;
     }
 
-    internal InfoCarrierClientRegistrationStore Snapshot() => new(_names, _defaultIdentity);
+    internal void Replace(InfoCarrierClientRegistration registration) => _registrations[registration.Identity] = registration;
+
+    internal InfoCarrierClientRegistrationStore Snapshot() => new(_registrations, _names, _defaultIdentity);
 }
 
 internal sealed class InfoCarrierClientRegistrationStore(
+    IReadOnlyDictionary<InfoCarrierRegistrationIdentity, InfoCarrierClientRegistration> registrations,
     IReadOnlyDictionary<string, InfoCarrierRegistrationIdentity> names,
     InfoCarrierRegistrationIdentity? defaultIdentity)
 {
+    private readonly Dictionary<InfoCarrierRegistrationIdentity, InfoCarrierClientRegistration> _registrations = new(registrations);
     private readonly Dictionary<string, InfoCarrierRegistrationIdentity> _names = new(names, StringComparer.Ordinal);
+
+    internal InfoCarrierClientRegistration Registration(InfoCarrierRegistrationIdentity identity) => _registrations[identity];
 
     internal IInfoCarrierClient GetDefault(IServiceProvider provider)
         => defaultIdentity is { } identity
@@ -53,28 +61,19 @@ internal sealed class InfoCarrierClientRegistrationStore(
         => provider.GetRequiredKeyedService<InfoCarrierClientActivation>(identity).Client;
 }
 
-// The host owns this complete activation and disposes the factory-created HttpClient wrapper.
+// The activation borrows keyed dependencies. The host owns their disposal, including HTTP wrappers;
 // IHttpClientFactory retains ownership of pooled handlers. Direct creation retains caller ownership.
-internal sealed class InfoCarrierClientActivation : IDisposable
+internal sealed class InfoCarrierClientActivation
 {
-    private readonly HttpClient _httpClient;
-
     internal InfoCarrierClientActivation(
-        HttpClient httpClient, InfoCarrierClientRegistration registration, ILogger<TransportInfoCarrierClient> logger)
+        IServiceProvider provider, InfoCarrierClientRegistration registration)
     {
-        _httpClient = httpClient;
-        try
-        {
-            Client = InfoCarrierRoleServiceCollectionExtensions.CreateClient(httpClient, registration, logger);
-        }
-        catch
-        {
-            httpClient.Dispose();
-            throw;
-        }
+        Client = new TransportInfoCarrierClient(
+            provider.GetRequiredKeyedService<IInfoCarrierTransport>(registration.Identity),
+            provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity),
+            provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>(), registration);
     }
 
     internal IInfoCarrierClient Client { get; }
 
-    public void Dispose() => _httpClient.Dispose();
 }

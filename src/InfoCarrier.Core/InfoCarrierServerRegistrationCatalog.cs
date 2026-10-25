@@ -88,7 +88,7 @@ internal sealed class InfoCarrierServerActivation : IAsyncDisposable
 {
     internal InfoCarrierServerActivation(IServiceProvider provider, InfoCarrierServerRegistration registration)
     {
-        Serializer = new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(registration.MaxRequestBytes));
+        Serializer = provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity);
         Server = new InProcessInfoCarrierServer(provider,
             provider.GetRequiredService<ILogger<InProcessInfoCarrierServer>>(),
             provider.GetService<ServerLogCapture>(), registration);

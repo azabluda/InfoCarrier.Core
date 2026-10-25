@@ -150,8 +150,13 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
                 response = await transport.SendAsync(InfoCarrierOperation.Query,
                     (destination, token) => _serializer.SerializeAsync(destination, request, token),
                     cancellationToken).ConfigureAwait(false);
-                bounded = (_serializer as SystemTextJsonInfoCarrierSerializer)?.Limits
-                    .CreateReadLimit<QueryDataResult>(response.Content);
+                InfoCarrierPayloadLimits? limits = _serializer switch
+                {
+                    InfoCarrierSerializerBoundary boundary => boundary.Limits,
+                    SystemTextJsonInfoCarrierSerializer json => json.Limits,
+                    _ => null,
+                };
+                bounded = limits?.CreateReadLimit<QueryDataResult>(response.Content);
                 frames = QueryStreamFrameCodec.ReadAsync(bounded ?? response.Content, cancellationToken)
                     .GetAsyncEnumerator(cancellationToken);
             }

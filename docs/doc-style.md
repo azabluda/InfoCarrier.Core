@@ -198,6 +198,8 @@ The metrics increment later that day raised the client budget to 1,250 and serve
 for registration labels, instrument names, and streamed measurement outcomes.
 The post-implementation cleanup raised the client budget to 1,300 for the removed low-level
 options mutation methods and their supported callback replacement.
+The component-replacement increment raised the API reference budget to 600 and the transport page
+to 750 for typed replacement, ownership, inherited-key injection, and the fixed streaming-format boundary.
 
 ## Before committing
 

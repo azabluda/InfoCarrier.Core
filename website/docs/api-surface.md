@@ -9,7 +9,8 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 
 | Member | What it does |
 |---|---|
-| `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)`, `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)` | Registers the unnamed default or a named HTTP client. Returns `IHttpClientBuilder` for handler configuration. |
+| `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)`, `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)` | Registers the unnamed default or a named client. Returns `InfoCarrierClientBuilder`, which implements `IHttpClientBuilder` for handler configuration. |
+| `ReplaceService<TService, TImplementation>()`, `ReplaceService<TService, TCurrentImplementation, TNewImplementation>()` | Replaces supported registration-local implementations while preserving lifetime. Clients support serializers and transports; servers support serializers. See [component replacement](configuration/transports.md#replacing-registered-components). |
 | `InfoCarrierClient.Create(HttpClient, Action<InfoCarrierClientOptions>)` | Creates the default HTTP client directly. The caller owns the supplied `HttpClient`. |
 | `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies role and shared deployment options to a custom client. |
 | `DbContextOptionsBuilder.UseInfoCarrier()`, `UseInfoCarrier(string clientName)` | Attaches the unnamed default or named client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |

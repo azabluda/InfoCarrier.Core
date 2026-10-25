@@ -13,14 +13,14 @@ namespace InfoCarrier.Core;
 public static class InfoCarrierRoleServiceCollectionExtensions
 {
     /// <summary>Registers the default HTTP client role.</summary>
-    public static IHttpClientBuilder AddInfoCarrierClient(
+    public static InfoCarrierClientBuilder AddInfoCarrierClient(
         this IServiceCollection services,
         Action<InfoCarrierClientOptions> configure)
         => AddClient(services, null, configure);
 
     /// <summary>Registers a named HTTP client without changing the unnamed default.</summary>
     /// <remarks>Names are case-sensitive. Duplicate names are rejected.</remarks>
-    public static IHttpClientBuilder AddInfoCarrierClient(
+    public static InfoCarrierClientBuilder AddInfoCarrierClient(
         this IServiceCollection services,
         string clientName,
         Action<InfoCarrierClientOptions> configure)
@@ -29,7 +29,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         return AddClient(services, clientName, configure);
     }
 
-    private static IHttpClientBuilder AddClient(
+    private static InfoCarrierClientBuilder AddClient(
         IServiceCollection services,
         string? clientName,
         Action<InfoCarrierClientOptions> configure)
@@ -54,11 +54,18 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         }
         registration = catalog.Add(clientName, registration);
 
-        // Key only the complete activation, never its serializer, mappers, or policy separately.
+        InfoCarrierServiceComponents.AddSerializer(services, registration.Identity,
+            new InfoCarrierPayloadLimits(maxResponseBytes: registration.MaxResponseBytes));
+        services.AddKeyedSingleton<HttpClient>(registration.Identity, (provider, _) =>
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(registration.HttpClientName));
+        services.AddKeyedSingleton<IInfoCarrierTransport>(registration.Identity, (provider, _) =>
+            new HttpInfoCarrierTransport(provider.GetRequiredKeyedService<HttpClient>(registration.Identity),
+                provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity), registration.Endpoint!.ToString()));
+        // Policy stays in the complete descriptor. Keyed component construction uses the same
+        // identity, so the host owns replacements and their inherited-key dependencies.
         services.AddKeyedSingleton<InfoCarrierClientActivation>(registration.Identity, (provider, _) =>
-            new InfoCarrierClientActivation(
-                provider.GetRequiredService<IHttpClientFactory>().CreateClient(registration.HttpClientName),
-                registration, provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>()));
+            new InfoCarrierClientActivation(provider, provider
+                .GetRequiredService<InfoCarrierClientRegistrationStore>().Registration(registration.Identity)));
         if (clientName is null)
         {
             services.RemoveAll<IInfoCarrierClient>();
@@ -66,7 +73,8 @@ public static class InfoCarrierRoleServiceCollectionExtensions
                 .GetRequiredService<InfoCarrierClientRegistrationStore>().GetDefault(provider));
         }
 
-        return services.AddHttpClient(registration.HttpClientName);
+        services.AddHttpClient(registration.HttpClientName);
+        return new InfoCarrierClientBuilder(services, catalog, registration);
     }
 
     /// <summary>Registers the default server role for <typeparamref name="TContext" />.</summary>
@@ -133,12 +141,15 @@ public static class InfoCarrierRoleServiceCollectionExtensions
                 provider.GetRequiredService<InfoCarrierServerRegistrationCatalog>().Snapshot());
         }
         registration = registrations.Add(serverName, registration);
+        InfoCarrierServiceComponents.AddSerializer(services, registration.Identity,
+            new InfoCarrierPayloadLimits(registration.MaxRequestBytes));
         services.AddKeyedSingleton<InfoCarrierServerActivation>(registration.Identity, (provider, _) =>
             new InfoCarrierServerActivation(provider, provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().Get(registration.Identity)));
         if (serverName is null)
         {
-            services.RemoveAll<IInfoCarrierSerializer>();
+            foreach (ServiceDescriptor descriptor in services.Where(d => d.ServiceType == typeof(IInfoCarrierSerializer)
+                && !d.IsKeyedService).ToArray()) { services.Remove(descriptor); }
             services.AddSingleton<IInfoCarrierSerializer>(provider => provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().ActivateDefault(provider).Serializer);
             services.RemoveAll<IInfoCarrierServer>();
@@ -197,6 +208,19 @@ public sealed class InfoCarrierServerBuilder
         };
         _registrations.Replace(replacement);
         _registration = replacement;
+    }
+
+    internal void Replace<TService,
+        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
+            System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        Type? currentImplementation = null)
+        where TService : class where TImplementation : class, TService
+    {
+        IReadOnlyDictionary<(Type Contract, Type? Current), Type> replacements = InfoCarrierServiceComponents.Replace<TService, TImplementation>(
+            Services, Identity, _registration.Replacements,
+            new InfoCarrierPayloadLimits(_registration.MaxRequestBytes), client: false, currentImplementation);
+        _registration = _registration with { Replacements = replacements };
+        _registrations.Replace(_registration);
     }
 
     /// <summary>The application's service collection.</summary>

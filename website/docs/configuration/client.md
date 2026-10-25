@@ -259,6 +259,9 @@ measured while nothing is listening.
 
 ## The internal service provider
 
+For registration-local wire serializers and transports, use
+[component replacement](transports.md#replacing-registered-components). Those services belong to the host, outside EF's internal provider.
+
 Register application [value mappers](value-mappers.md) with `AddValueMappers` in the client role
 callback. Build EF's internal service provider yourself only when replacing a provider service or
 assembling a custom provider configuration.

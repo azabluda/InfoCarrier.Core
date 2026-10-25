@@ -102,6 +102,8 @@ internal sealed record InfoCarrierClientRegistration(
 {
     internal string HttpClientName { get; } = $"InfoCarrier.Core.Client.{Guid.NewGuid():N}";
     internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
+    internal IReadOnlyDictionary<(Type Contract, Type? Current), Type> Replacements { get; init; }
+        = new Dictionary<(Type, Type?), Type>();
 }
 
 internal sealed record InfoCarrierServerRegistration(
@@ -116,6 +118,8 @@ internal sealed record InfoCarrierServerRegistration(
     Func<IServiceProvider, IInfoCarrierServerCallerIdentity>? CallerIdentityFactory = null)
 {
     internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
+    internal IReadOnlyDictionary<(Type Contract, Type? Current), Type> Replacements { get; init; }
+        = new Dictionary<(Type, Type?), Type>();
     internal bool AllowsArbitrarySql => Deployment.AllowArbitrarySqlExecution;
     internal IReadOnlyList<Type> AllowedTypes => Deployment.AllowedTypes;
     internal IReadOnlyList<Type> AnonymousShapeTypes => Deployment.AnonymousShapeTypes;
