@@ -12,8 +12,8 @@ namespace InfoCarrier.Core;
 
 /// <summary>
 ///     An <see cref="IInfoCarrierClient" /> implemented over the <see cref="IInfoCarrierTransport" />
-///     seam. Wraps each operation's payload in a versioned <see cref="InfoCarrierEnvelope" />,
-///     sends it, and unwraps the response payload.
+///     seam. Buffered operations use a versioned <see cref="InfoCarrierEnvelope" />. Streamed
+///     queries identify their request contract directly and validate the response start frame.
 /// </summary>
 /// <remarks>
 ///     Initializes a new instance of the <see cref="TransportInfoCarrierClient" /> class.
@@ -152,7 +152,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             try
             {
                 response = await transport.SendAsync(InfoCarrierOperation.Query,
-                    (destination, token) => _serializer.SerializeAsync(destination, request, token),
+                    (destination, token) => _serializer.SerializeAsync(destination,
+                        request with { ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion }, token),
                     cancellationToken).ConfigureAwait(false);
                 InfoCarrierPayloadLimits? limits = _serializer switch
                 {
@@ -375,6 +376,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             phase = "transport exchange";
             InfoCarrierEnvelope response = await _transport.SendAsync(envelope, cancellationToken).ConfigureAwait(false);
 
+            ValidateResponse(response);
+
             // The fault first, and before the payload is looked at (wire-protocol W5). A failed
             // response carries a placeholder payload, so reading it first would deserialize a null
             // and report the failure as an empty result — which is the one way an error can do more
@@ -412,6 +415,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             phase = "transport exchange";
             InfoCarrierEnvelope response = _transport.Send(envelope);
 
+            ValidateResponse(response);
+
             if (response.Fault is { } fault)
             {
                 phase = "returned server fault";
@@ -426,6 +431,14 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         {
             LogFailure(operation, phase, exception, default, returnedFault);
             throw;
+        }
+    }
+
+    private static void ValidateResponse(InfoCarrierEnvelope response)
+    {
+        if (response.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+        {
+            throw new InfoCarrierProtocolException(InfoCarrierEnvelope.CurrentProtocolVersion, response.ProtocolVersion);
         }
     }
 

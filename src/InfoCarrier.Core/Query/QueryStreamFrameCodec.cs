@@ -17,7 +17,7 @@ public static class QueryStreamFrameCodec
     /// <summary>
     ///     The current query stream protocol version.
     /// </summary>
-    public const int Version = 1;
+    public const int Version = InfoCarrierEnvelope.CurrentProtocolVersion;
 
     /// <summary>
     ///     Writes a complete query frame sequence to <paramref name="destination" />.
@@ -107,7 +107,7 @@ public static class QueryStreamFrameCodec
 
             if (frame is QueryStartFrame start && start.Version != Version)
             {
-                throw new JsonException($"Unsupported query stream version '{start.Version}'.");
+                throw new InfoCarrierProtocolException(Version, start.Version);
             }
 
             started = true;

@@ -23,7 +23,7 @@ namespace InfoCarrier.Core;
 ///     </para>
 ///     <para>
 ///         <b>The version check is the point of a version field.</b> A field carried and never
-///         read is documentation, not a compatibility mechanism. This refuses a major version it
+///         read is documentation, not a compatibility mechanism. This refuses a wire contract it
 ///         does not implement, and says both numbers — a client one release ahead should learn
 ///         that from the first response, not from a deserialization error deep in a payload whose
 ///         shape it no longer shares.
@@ -63,9 +63,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         {
             Log(LogLevel.Warning, 35002,
                 "InfoCarrier {Operation} was rejected because its protocol version is unsupported.", operation);
-            throw new NotSupportedException(
-                $"InfoCarrier protocol version {request.ProtocolVersion} is not supported by this "
-                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
+            throw new InfoCarrierProtocolException(request.ProtocolVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
         }
 
         try
@@ -161,9 +159,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
         {
             Log(LogLevel.Warning, 35002, "InfoCarrier {Operation} was rejected because its protocol version is unsupported.", operation);
-            throw new NotSupportedException(
-                $"InfoCarrier protocol version {request.ProtocolVersion} is not supported by this "
-                + $"server, which speaks version {InfoCarrierEnvelope.CurrentProtocolVersion}.");
+            throw new InfoCarrierProtocolException(request.ProtocolVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
         }
 
         try

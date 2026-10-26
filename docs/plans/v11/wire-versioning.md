@@ -2,7 +2,7 @@
 
 Owner decisions recorded 2026-10-26. This document defines the scope of
 [issue #50](https://github.com/azabluda/InfoCarrier.Core/issues/50). Implementation uses wire
-contract 3; full repository validation is in progress.
+contract 3; verification evidence is recorded in the [implementation plan](../v10/implementation-plan.md).
 
 ## Accepted completion boundary for issue 50
 

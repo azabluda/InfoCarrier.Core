@@ -12,6 +12,12 @@ namespace InfoCarrier.Core.Common;
 public sealed record QueryDataRequest : IInfoCarrierRequest
 {
     /// <summary>
+    ///     The streamed request's wire contract version. Zero means identification is absent.
+    ///     Buffered requests use their enclosing envelope's version instead.
+    /// </summary>
+    public int ProtocolVersion { get; init; }
+
+    /// <summary>
     ///     The serialized expression tree payload (the serialized query expression DTO).
     ///     Produced by the client's expression serializer; consumed by the server's
     ///     rebind-and-execute pipeline.

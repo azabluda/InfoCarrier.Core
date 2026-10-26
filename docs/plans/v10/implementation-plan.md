@@ -628,7 +628,7 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       same-major previous-minor support window, the version 10 exclusion, and staged published-client
       evidence. Migration design needs real contract changes before its correctness, design quality,
       and flexibility can be assessed.
-- [ ] **WVP1. Specify and implement identification, checks, and diagnostics.** Define accepted and
+- [x] **WVP1. Specify and implement identification, checks, and diagnostics.** Define accepted and
       refused combinations explicitly, cover buffered and streamed paths, and distinguish permanent
       version refusals from transient failures. Explicitly reject all pre-issue-50 payloads,
       including older version 11 development clients and streamed requests missing the new contract

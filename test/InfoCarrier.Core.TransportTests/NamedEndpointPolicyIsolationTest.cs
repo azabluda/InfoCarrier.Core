@@ -41,7 +41,8 @@ public class NamedEndpointPolicyIsolationTest
             // Repeat the same generated request through the streaming protocol. This checks the
             // selected endpoint's grants in both protocol paths without depending on client replay.
             await using IInfoCarrierResponse response = await ((IInfoCarrierStreamTransport)transport.Inner).SendAsync(
-                InfoCarrierOperation.Query, (stream, token) => serializer.SerializeAsync(stream, transport.Request!, token));
+                InfoCarrierOperation.Query, (stream, token) => serializer.SerializeAsync(stream,
+                    transport.Request! with { ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion }, token));
             var events = new List<ServerLogEvent>();
             await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(response.Content))
             {

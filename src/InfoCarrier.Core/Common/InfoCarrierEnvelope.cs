@@ -3,7 +3,7 @@
 namespace InfoCarrier.Core.Common;
 
 /// <summary>
-///     The versioned envelope every request and response carries (wire-protocol §1).
+///     The versioned envelope for buffered requests and responses (wire-protocol §1).
 ///     Protocol version is present from day 1; the payload is the operation-specific body
 ///     serialized via the configured <see cref="IInfoCarrierSerializer" />.
 /// </summary>
@@ -17,15 +17,14 @@ namespace InfoCarrier.Core.Common;
 public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
 {
     /// <summary>
-    ///     The current wire contract major version.
+    ///     The current wire contract version, independent of package versions.
     /// </summary>
-    public const int CurrentProtocolVersion = 2;
+    public const int CurrentProtocolVersion = 3;
 
     /// <summary>
-    ///     The wire contract version. A server rejects an unsupported major version with a
-    ///     well-known error payload (wire-protocol §1 versioning policy).
+    ///     The wire contract version. Unsupported versions are refused before operation execution.
     /// </summary>
-    public required int ProtocolVersion { get; init; } = CurrentProtocolVersion;
+    public int ProtocolVersion { get; init; }
 
     /// <summary>
     ///     The operation discriminator.

@@ -40,6 +40,31 @@ This release blocker is duplicated beside `EnablePackageValidation` in `Director
 and in the release checklist below. The duplication is intentional because either location can
 be the one read during release work.
 
+## Client and server compatibility
+
+A version 11 server supports clients from its current and previous minor release. The first
+release, 11.0, supports only 11.0 clients. Version 10 compatibility and pre-policy version 11
+development contracts are excluded. This is a release window, not a fixed duration.
+
+Package support and wire admission are separate: several releases can share the same independent
+integer wire contract. The server accepts supported wire contracts without inferring the caller's
+package version. Acceptance alone does not extend the package support promise. Structure and
+semantics must both remain compatible throughout the supported window.
+
+[Issue #50](https://github.com/azabluda/InfoCarrier.Core/issues/50) establishes identification and
+refusal using wire contract 3; it ships no migration mechanism. The
+[wire specification](wire-protocol.md) records the checks and evolution rules. The
+[separate migration story](plans/v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes)
+requires actual contract changes to assess correctness, design quality, and flexibility before
+stable version 11 publication.
+
+From 11.1, verify the previous minor using a real published client package against the current
+sample server in separate processes. Test behavior and effects, not merely successful parsing.
+For 11.0, small pre-policy request examples establish refusal; they are not previous-minor
+acceptance evidence. An incompatible change cannot silently discard a still-supported minor:
+retain its behavior, complete the migration work, defer the change, or obtain an explicit owner
+decision revising the promise.
+
 ## Why not a property in `Directory.Build.props`
 
 It was one, until N8. The number lived in `VersionPrefix`/`VersionSuffix` **and** in the tag, which
@@ -347,6 +372,10 @@ Both procedures below end at the same place, so the shared tail is written once.
 ### A minor from `main`
 
 1. Land the work on `main`, gates green.
+   For version 11 releases, check the client/server policy above as part of those gates. From
+   11.1, this includes published previous-minor acceptance evidence. Before the first stable 11.0,
+   review the separate migration story against actual contract changes; an untested mechanism
+   must not be described as validated.
 2. Update `website/docs/limitations.md` if the failure set moved, and write the suite's figure
    there: the `Total tests: …` line of `eng/measure.sh`'s own summary, then
    ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing

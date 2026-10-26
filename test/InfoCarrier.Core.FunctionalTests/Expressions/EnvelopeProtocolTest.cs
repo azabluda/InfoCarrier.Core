@@ -35,12 +35,13 @@ public class EnvelopeProtocolTest
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(3)]
+    [InlineData(2)]
+    [InlineData(4)]
     [InlineData(99)]
     [InlineData(-1)]
     public async Task An_unsupported_protocol_version_is_refused_by_number(int version)
     {
-        NotSupportedException ex = await Assert.ThrowsAsync<NotSupportedException>(
+        InfoCarrierProtocolException ex = await Assert.ThrowsAsync<InfoCarrierProtocolException>(
             () => Server(new ThrowingServer()).DispatchAsync(
                 Envelope(InfoCarrierOperation.BeginTransaction, version: version)));
 
@@ -58,7 +59,7 @@ public class EnvelopeProtocolTest
     {
         var server = new RecordingServer();
 
-        await Assert.ThrowsAsync<NotSupportedException>(
+        await Assert.ThrowsAsync<InfoCarrierProtocolException>(
             () => Server(server).DispatchAsync(
                 Envelope(InfoCarrierOperation.BeginTransaction, version: 7)));
 
@@ -92,7 +93,7 @@ public class EnvelopeProtocolTest
     /// </summary>
     [Fact]
     public async Task A_version_mismatch_escapes_rather_than_becoming_a_fault()
-        => await Assert.ThrowsAsync<NotSupportedException>(
+        => await Assert.ThrowsAsync<InfoCarrierProtocolException>(
             () => Server(new ThrowingServer()).DispatchAsync(
                 Envelope(InfoCarrierOperation.BeginTransaction, version: InfoCarrierEnvelope.CurrentProtocolVersion + 1)));
 

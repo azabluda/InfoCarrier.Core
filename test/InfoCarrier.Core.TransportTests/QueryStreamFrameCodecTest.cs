@@ -63,7 +63,7 @@ public class QueryStreamFrameCodecTest
 
         await QueryStreamFrameCodec.WriteAsync(stream, Frames());
         string json = Encoding.UTF8.GetString(stream.ToArray());
-        Assert.StartsWith("[[0,1,7,false,\"System.Int32\"],[2,", json, StringComparison.Ordinal);
+        Assert.StartsWith($"[[0,{QueryStreamFrameCodec.Version},7,false,\"System.Int32\"],[2,", json, StringComparison.Ordinal);
         Assert.EndsWith("]]", json, StringComparison.Ordinal);
 
         stream.Position = 0;
@@ -87,10 +87,9 @@ public class QueryStreamFrameCodecTest
     [Theory]
     [InlineData("[]", "empty")]
     [InlineData("[[1,{}],[3]]", "start")]
-    [InlineData("[[0,2,0,false,null],[3]]", "version")]
-    [InlineData("[[0,1,0,false,null]]", "terminal")]
-    [InlineData("[[0,1,0,false,null],[3],[3]]", "after")]
-    [InlineData("[[0,1,0,false,null],[99]]", "tag")]
+    [InlineData("[[0,3,0,false,null]]", "terminal")]
+    [InlineData("[[0,3,0,false,null],[3],[3]]", "after")]
+    [InlineData("[[0,3,0,false,null],[99]]", "tag")]
     public async Task Malformed_streams_are_rejected(string json, string expected)
     {
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));

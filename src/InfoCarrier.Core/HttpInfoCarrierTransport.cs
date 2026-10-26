@@ -53,6 +53,7 @@ public sealed class HttpInfoCarrierTransport(
 
         if (!response.IsSuccessStatusCode)
         {
+            ThrowProtocolRefusal(response, request.ProtocolVersion);
             string detail = System.Text.Encoding.UTF8.GetString(responseBody);
             throw new InfoCarrierTransportException(
                 $"The InfoCarrier server at '{_requestUri}' answered {(int)response.StatusCode} "
@@ -85,7 +86,11 @@ public sealed class HttpInfoCarrierTransport(
             Content = new StreamingContent(writeRequest),
         };
         request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(MediaType);
-        request.Headers.Add("InfoCarrier-Operation", operation.ToString());
+        // The legacy selector would let a pre-policy server execute a request while ignoring its
+        // new body identification. A new selector makes that server try (and refuse) an envelope.
+        request.Headers.Add("InfoCarrier-Stream-Operation", operation.ToString());
+        request.Headers.Add("InfoCarrier-Protocol-Version", InfoCarrierEnvelope.CurrentProtocolVersion.ToString(
+            System.Globalization.CultureInfo.InvariantCulture));
         request.Options.Set(BrowserResponseStreaming, true);
 
         HttpResponseMessage response = await _httpClient.SendAsync(
@@ -95,6 +100,7 @@ public sealed class HttpInfoCarrierTransport(
         {
             try
             {
+                ThrowProtocolRefusal(response, InfoCarrierEnvelope.CurrentProtocolVersion);
                 string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 throw new InfoCarrierTransportException(
                     $"The InfoCarrier server at '{_requestUri}' answered {(int)response.StatusCode} "
@@ -128,6 +134,7 @@ public sealed class HttpInfoCarrierTransport(
     ///     The request never reached a server, or what came back was not an envelope. A failure
     ///     the server reported is not this: it arrives inside the envelope.
     /// </exception>
+    /// <exception cref="InfoCarrierProtocolException">The server reported an incompatible wire contract.</exception>
     public async Task<InfoCarrierEnvelope> SendAsync(
         InfoCarrierEnvelope request,
         CancellationToken cancellationToken = default)
@@ -144,6 +151,7 @@ public sealed class HttpInfoCarrierTransport(
 
         if (!response.IsSuccessStatusCode)
         {
+            ThrowProtocolRefusal(response, request.ProtocolVersion);
             // Both the status and the body. A transport failure reported as a bare status code
             // is indistinguishable from a dozen unrelated causes to whoever has to diagnose it.
             string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -176,6 +184,23 @@ public sealed class HttpInfoCarrierTransport(
             ?? throw new InfoCarrierTransportException(
                 $"The InfoCarrier server at '{_requestUri}' answered 200 with a body that is not an "
                 + $"envelope ({responseBody.Length} bytes).");
+    }
+
+    private static void ThrowProtocolRefusal(HttpResponseMessage response, int clientVersion)
+    {
+        if (response.StatusCode == HttpStatusCode.BadRequest
+            && response.Headers.TryGetValues("InfoCarrier-Protocol-Version", out IEnumerable<string>? versions)
+            && int.TryParse(versions.SingleOrDefault(), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int serverVersion))
+        {
+            if (response.Headers.TryGetValues("InfoCarrier-Client-Protocol-Version", out IEnumerable<string>? clients)
+                && int.TryParse(clients.SingleOrDefault(), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out int receivedVersion))
+            {
+                clientVersion = receivedVersion;
+            }
+            throw new InfoCarrierProtocolException(clientVersion, serverVersion);
+        }
     }
 
     private static byte[] ReadContent(HttpContent content)
