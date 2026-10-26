@@ -610,6 +610,16 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       Keep both overloads until version 11 ([#234](https://github.com/azabluda/InfoCarrier.Core/issues/234),
       [#235](https://github.com/azabluda/InfoCarrier.Core/issues/235)).
 
+## Phase DOCSTYLE: documentation presentation ([#254](https://github.com/azabluda/InfoCarrier.Core/issues/254))
+
+- [x] **DOCSTYLE1. Apply the reviewed MkDocs presentation to the 10.3 documentation.**
+      Extend the three-page prototype to the whole site, including its error page. Keep source
+      Markdown unchanged, retain native search and navigation, preserve warning colors, and use
+      horizontal scrolling for code that cannot fit. Verify strict builds, documentation links,
+      word budgets, and desktop/mobile rendering in both themes. Compare generated text, heading
+      identifiers, and link targets with the unchanged release baseline. Publication remains a
+      separate owner-authorized action.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
