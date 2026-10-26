@@ -620,6 +620,12 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       identifiers, and link targets with the unchanged release baseline. Publication remains a
       separate owner-authorized action.
 
+- [x] **DOCSTYLE2. Refine the background and footer after visual review.** Keep the glow visible
+      throughout the page, tie its movement to scroll position, and retain a static fallback for
+      reduced motion or unsupported browsers. Align the footer with the reading column, preserve
+      its license and theme credit, and stack those items on narrow screens. Verify the strict
+      build, desktop/mobile presentation, file hygiene, and unchanged source Markdown.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

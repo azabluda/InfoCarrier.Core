@@ -18,7 +18,9 @@ body:has(.ic-docs) {
   --md-code-bg-color: #edf2f8;
   --md-code-fg-color: #263449;
   --md-code-hl-comment-color: #526177;
-  background: radial-gradient(circle at 10% 0%, #447dff0a, transparent 34rem), var(--md-default-bg-color);
+  --ic-glow-blue: #447dff0a;
+  --ic-glow-green: transparent;
+  background: var(--md-default-bg-color);
 }
 
 body[data-md-color-scheme="slate"]:has(.ic-docs) {
@@ -50,16 +52,62 @@ body[data-md-color-scheme="slate"]:has(.ic-docs) {
   --md-code-hl-special-color: #78b7ff;
   --md-code-hl-generic-color: #78b7ff;
   --md-code-hl-variable-color: #78b7ff;
-  background:
-    radial-gradient(circle at 10% 0%, #447dff24, transparent 34rem),
-    radial-gradient(circle at 95% 8%, #36daa71a, transparent 30rem),
-    var(--md-default-bg-color);
+  --ic-glow-blue: #447dff24;
+  --ic-glow-green: #36daa71a;
+  background: var(--md-default-bg-color);
 }
 
-body:has(.ic-docs),
-body[data-md-color-scheme="slate"]:has(.ic-docs) {
-  background-repeat: no-repeat;
-  background-size: 100% 44rem;
+body:has(.ic-docs) {
+  isolation: isolate;
+}
+
+/* Extend past the viewport so movement cannot expose a gradient edge. */
+body:has(.ic-docs)::before,
+body:has(.ic-docs)::after {
+  position: fixed;
+  inset: -3rem;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+}
+
+body:has(.ic-docs)::before {
+  background: radial-gradient(circle at 10% 3rem, var(--ic-glow-blue), transparent 34rem);
+}
+
+body:has(.ic-docs)::after {
+  z-index: -2;
+  background: radial-gradient(circle at 95% 6.5rem, var(--ic-glow-green), transparent 30rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll(root block)) {
+    body:has(.ic-docs)::before,
+    body:has(.ic-docs)::after {
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(root block);
+    }
+
+    body:has(.ic-docs)::before {
+      animation-name: ic-glow-blue-drift;
+    }
+
+    body:has(.ic-docs)::after {
+      animation-name: ic-glow-green-drift;
+    }
+  }
+}
+
+@keyframes ic-glow-blue-drift {
+  from { transform: translate3d(-1rem, -.5rem, 0); }
+  to { transform: translate3d(1rem, 1.25rem, 0); }
+}
+
+@keyframes ic-glow-green-drift {
+  from { transform: translate3d(1rem, 1rem, 0); }
+  to { transform: translate3d(-1.25rem, -1rem, 0); }
 }
 
 body:has(.ic-docs) .md-header {
@@ -96,6 +144,50 @@ body:has(.ic-docs) .md-search__form {
 
 body:has(.ic-docs) .md-search__input::placeholder {
   color: var(--md-default-fg-color--light);
+}
+
+body:has(.ic-docs) .md-footer {
+  border-top: 1px solid var(--ic-line);
+  background: transparent;
+}
+
+body:has(.ic-docs) .md-footer-meta {
+  background: transparent;
+}
+
+body:has(.ic-docs) .md-footer-meta__inner.md-grid {
+  width: 100%;
+  max-width: 47.6rem;
+  margin-inline: auto;
+  padding: 1.2rem .8rem;
+}
+
+body:has(.ic-docs) .md-copyright {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  align-items: baseline;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--md-default-fg-color--light);
+  font-size: .65rem;
+  line-height: 1.7;
+}
+
+body:has(.ic-docs) .md-copyright__highlight {
+  margin-inline-end: auto;
+  color: inherit;
+}
+
+body:has(.ic-docs) .md-copyright a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: .15em;
+}
+
+body:has(.ic-docs) .md-copyright a:hover {
+  color: var(--ic-accent);
 }
 
 .ic-docs {
@@ -319,6 +411,11 @@ body:has(.ic-docs) :focus-visible {
 }
 
 @media (max-width: 44.984375em) {
+  body:has(.ic-docs) .md-copyright__highlight {
+    flex-basis: 100%;
+    margin-inline-end: 0;
+  }
+
   .ic-docs {
     padding-top: .5rem;
   }
