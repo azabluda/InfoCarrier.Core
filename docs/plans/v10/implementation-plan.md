@@ -620,6 +620,34 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       identifiers, and link targets with the unchanged release baseline. Publication remains a
       separate owner-authorized action.
 
+## Phase WVP: version-skew policy ([#50](https://github.com/azabluda/InfoCarrier.Core/issues/50))
+
+- [x] **WVP0. Record the accepted completion boundary and separate migration follow-up.** The owner
+      confirmed on 2026-10-26 that issue 50 ships no migration mechanism. The
+      [scope and follow-up story](../v11/wire-versioning.md) define acceptance criteria, the
+      same-major previous-minor support window, the version 10 exclusion, and staged published-client
+      evidence. Migration design needs real contract changes before its correctness, design quality,
+      and flexibility can be assessed.
+- [ ] **WVP1. Specify and implement identification, checks, and diagnostics.** Define accepted and
+      refused combinations explicitly, cover buffered and streamed paths, and distinguish permanent
+      version refusals from transient failures. Explicitly reject all pre-issue-50 payloads,
+      including older version 11 development clients and streamed requests missing the new contract
+      identification, before any operation executes. No conversion adapters or speculative migration
+      interfaces belong to this step.
+- [ ] **WVP2. Verify and document the implemented policy.** Add meaningful acceptance and boundary
+      tests, update user guidance, and pass the required gates. Test pre-issue-50 buffered and
+      streamed refusal with representative old payloads and applicable headers; assert a clear
+      compatibility refusal and no operation effects. The owner allowed captured payload examples
+      for these refusal tests on 2026-10-26. No preserved build or running older client is required.
+      Published previous-minor acceptance begins with 11.1 against the actual published 11.0 client
+      in separate processes; refusal fixtures are not a substitute for that later obligation.
+- [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
+      with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
+      Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
+      [#220](https://github.com/azabluda/InfoCarrier.Core/issues/220) are candidates, not assumed
+      migrations. Evaluate the design before stable version 11 publication. No new GitHub issue is
+      implied by this internal plan entry.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
