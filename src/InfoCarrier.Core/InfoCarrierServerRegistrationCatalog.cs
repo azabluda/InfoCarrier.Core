@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.Common;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
 
@@ -82,27 +81,41 @@ internal sealed class InfoCarrierServerRegistrationStore(
     }
 }
 
-// One host-owned activation owns the complete endpoint pair. Default resolution uses a non-owning
-// facade so the container does not track and dispose the same server through two service aliases.
-internal sealed class InfoCarrierServerActivation : IAsyncDisposable
+// Activations borrow the host-owned keyed components. Facades avoid duplicate disposal
+// through interface aliases while preserving optional streaming capability.
+internal sealed class InfoCarrierServerActivation
 {
     internal InfoCarrierServerActivation(IServiceProvider provider, InfoCarrierServerRegistration registration)
     {
         Serializer = provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity);
-        Server = new InProcessInfoCarrierServer(provider,
-            provider.GetRequiredService<ILogger<InProcessInfoCarrierServer>>(),
-            provider.GetService<ServerLogCapture>(), registration);
+        Server = provider.GetRequiredKeyedService<IInfoCarrierServer>(registration.Identity);
     }
 
-    internal InProcessInfoCarrierServer Server { get; }
+    internal IInfoCarrierServer Server { get; }
     internal IInfoCarrierSerializer Serializer { get; }
 
-    public ValueTask DisposeAsync() => Server.DisposeAsync();
 }
 
-internal sealed class DefaultInfoCarrierServer(InProcessInfoCarrierServer server) : IInfoCarrierServer
+internal sealed class DefaultInfoCarrierServer(IInfoCarrierServer server) : IInfoCarrierServer, IInfoCarrierStreamServer
 {
-    internal InProcessInfoCarrierServer Server { get; } = server;
+    internal IInfoCarrierServer Server { get; } = server;
+
+    public async IAsyncEnumerable<Query.QueryStreamFrame> QueryFramesAsync(QueryDataRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (Server is IInfoCarrierStreamServer streaming)
+        {
+            await foreach (Query.QueryStreamFrame frame in streaming.QueryFramesAsync(request, cancellationToken)
+                .ConfigureAwait(false)) { yield return frame; }
+            yield break;
+        }
+        QueryDataResult result = await Server.QueryDataAsync(request, cancellationToken).ConfigureAwait(false);
+        yield return new Query.QueryStartFrame(Query.QueryStreamFrameCodec.Version, 0, result.IsEntityResult, result.ElementTypeName);
+        foreach (Expressions.DynamicValueNode row in BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults))
+        { yield return new Query.QueryRowFrame(row); }
+        foreach (ServerLogEvent log in result.ServerLog ?? []) { yield return new Query.QueryLogFrame(log); }
+        yield return new Query.QueryCompleteFrame();
+    }
 
     public QueryDataResult QueryData(QueryDataRequest request) => Server.QueryData(request);
     public SaveChangesResult SaveChanges(SaveChangesRequest request) => Server.SaveChanges(request);

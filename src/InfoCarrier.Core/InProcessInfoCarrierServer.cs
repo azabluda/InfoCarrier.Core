@@ -36,7 +36,7 @@ public sealed class InProcessInfoCarrierServer(
     ILogger<InProcessInfoCarrierServer> logger,
     ServerLogCapture? logCapture = null,
     InfoCarrierServerOptions? options = null)
-    : IInfoCarrierServer, IAsyncDisposable
+    : IInfoCarrierServer, IInfoCarrierStreamServer, IAsyncDisposable
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private InfoCarrierServerRegistration? _registration = options?.Build(typeof(DbContext));
@@ -299,7 +299,8 @@ public sealed class InProcessInfoCarrierServer(
         ArgumentNullException.ThrowIfNull(request);
 
         using SyncLease lease = AcquireSync(request.TransactionId);
-        ServerQueryExecutor executor = CreateQueryExecutor(lease.Context);
+        using IInfoCarrierServerPipeline pipeline = CreatePipeline(lease.Context);
+        ServerQueryExecutor executor = CreateQueryExecutor(lease.Context, pipeline.Serializer);
 
         using ServerLogCapture.Scope? capture = BeginLogCapture();
         QueryDataResult result = executor.Execute(request);
@@ -313,10 +314,11 @@ public sealed class InProcessInfoCarrierServer(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Lease lease = Acquire(request.TransactionId);
+        Lease lease = await AcquireAsync(request.TransactionId).ConfigureAwait(false);
         try
         {
-            ServerQueryExecutor executor = CreateQueryExecutor(lease.Context);
+            await using IInfoCarrierServerPipeline pipeline = CreatePipeline(lease.Context);
+            ServerQueryExecutor executor = CreateQueryExecutor(lease.Context, pipeline.Serializer);
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             QueryDataResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -340,13 +342,12 @@ public sealed class InProcessInfoCarrierServer(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Lease lease = Acquire(request.TransactionId);
+        Lease lease = await AcquireAsync(request.TransactionId).ConfigureAwait(false);
         try
         {
-            ExpressionSerializer serializer = ExpressionSerializer.CreateForModel(
-                lease.Context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(lease.Context.Model));
-            var executor = new ServerQueryExecutor(
-                lease.Context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
+            await using IInfoCarrierServerPipeline pipeline = CreatePipeline(lease.Context);
+            IExpressionSerializer serializer = pipeline.Serializer;
+            ServerQueryExecutor executor = CreateQueryExecutor(lease.Context, serializer);
 
             List<ServerLogEvent>? logs = null;
             IAsyncEnumerator<QueryStreamFrame> frames = executor.ExecuteStreamAsync(request, cancellationToken)
@@ -395,22 +396,25 @@ public sealed class InProcessInfoCarrierServer(
         }
     }
 
-    private ServerQueryExecutor CreateQueryExecutor(DbContext context)
-    {
-        ExpressionSerializer serializer = CreateExpressionSerializer(context);
-        return new ServerQueryExecutor(context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots);
-    }
+    private ServerQueryExecutor CreateQueryExecutor(DbContext context, IExpressionSerializer serializer)
+        => new(context, serializer, ArbitrarySqlAllowed, RelationalQueryRoots)
+        {
+            PayloadLimits = _registration is { } registration
+                ? new InfoCarrierPayloadLimits(registration.MaxRequestBytes)
+                : InfoCarrierPayloadLimits.Default,
+        };
 
-    private ServerSaveChangesExecutor CreateSaveChangesExecutor(DbContext context)
-    {
-        ExpressionSerializer serializer = CreateExpressionSerializer(context);
-        return new ServerSaveChangesExecutor(
-            context, (Expressions.DynamicValueMapper)serializer.ValueMapper, ServerStoreIsDocument);
-    }
+    private ServerSaveChangesExecutor CreateSaveChangesExecutor(DbContext context, IExpressionSerializer serializer)
+        => new(context, serializer.ValueMapper, ServerStoreIsDocument);
 
-    private ExpressionSerializer CreateExpressionSerializer(DbContext context)
-        => ExpressionSerializer.CreateForModel(
-            context.Model, ValueMappers, AllowedTypes, AnonymousCatalogFor(context.Model));
+    private IInfoCarrierServerPipeline CreatePipeline(DbContext context)
+    {
+        IInfoCarrierServerPipelineFactory factory = _registration is { } registration
+            ? _serviceProvider.GetKeyedService<IInfoCarrierServerPipelineFactory>(registration.Identity)
+                ?? new InfoCarrierServerPipelineFactory()
+            : _serviceProvider.GetService<IInfoCarrierServerPipelineFactory>() ?? new InfoCarrierServerPipelineFactory();
+        return factory.Create(context, [.. AllowedTypes], ValueMappers, AnonymousCatalogFor(context.Model) ?? Expressions.AnonymousShapeCatalog.Empty);
+    }
 
     /// <inheritdoc />
     public SaveChangesResult SaveChanges(SaveChangesRequest request)
@@ -418,7 +422,8 @@ public sealed class InProcessInfoCarrierServer(
         ArgumentNullException.ThrowIfNull(request);
 
         using SyncLease lease = AcquireSync(request.TransactionId);
-        ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context);
+        using IInfoCarrierServerPipeline pipeline = CreatePipeline(lease.Context);
+        ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context, pipeline.Serializer);
 
         using ServerLogCapture.Scope? capture = BeginLogCapture();
         SaveChangesResult result = executor.Execute(request);
@@ -432,10 +437,11 @@ public sealed class InProcessInfoCarrierServer(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Lease lease = Acquire(request.TransactionId);
+        Lease lease = await AcquireAsync(request.TransactionId).ConfigureAwait(false);
         try
         {
-            ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context);
+            await using IInfoCarrierServerPipeline pipeline = CreatePipeline(lease.Context);
+            ServerSaveChangesExecutor executor = CreateSaveChangesExecutor(lease.Context, pipeline.Serializer);
 
             using ServerLogCapture.Scope? capture = BeginLogCapture();
             SaveChangesResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
@@ -674,7 +680,7 @@ public sealed class InProcessInfoCarrierServer(
         RequireCaller(open, transactionId);
 
         // THE ONE PLACE LIVENESS IS REFRESHED, and it is the one place because every request
-        // naming a token arrives here: `Acquire` calls it for a query and a save, and the four
+        // naming a token arrives here: the lease helpers call it for a query and a save, and the four
         // savepoint operations call it directly. So the idle timeout of #54 measures IDLENESS
         // rather than age, and a long unit of work that keeps talking is never evicted.
         open.Touch(Clock);
@@ -767,12 +773,17 @@ public sealed class InProcessInfoCarrierServer(
     ///     back would commit work the caller believes is provisional, which is the one failure
     ///     mode a transaction exists to prevent.
     /// </remarks>
-    private Lease Acquire(string? transactionId)
+    private async ValueTask<Lease> AcquireAsync(string? transactionId)
     {
         if (transactionId is null)
         {
             AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
-            return new Lease(ResolveContext(scope.ServiceProvider), scope);
+            try { return new Lease(ResolveContext(scope.ServiceProvider), scope); }
+            catch
+            {
+                await scope.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
         }
 
         OpenTransaction open = Open(transactionId);
@@ -792,7 +803,12 @@ public sealed class InProcessInfoCarrierServer(
         if (transactionId is null)
         {
             IServiceScope scope = _serviceProvider.CreateScope();
-            return new SyncLease(ResolveContext(scope.ServiceProvider), scope);
+            try { return new SyncLease(ResolveContext(scope.ServiceProvider), scope); }
+            catch
+            {
+                scope.Dispose();
+                throw;
+            }
         }
 
         OpenTransaction open = Open(transactionId);

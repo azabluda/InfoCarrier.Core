@@ -171,7 +171,7 @@ public class DynamicValueMapper(
     ///     navigation in hand at this point to ask. The query is what knows; see
     ///     <see cref="ProjectionShape" /> (A55/A56).
     /// </remarks>
-    internal DynamicValueNode ToRowValue(
+    public virtual DynamicValueNode ToRowValue(
         object? value,
         Type type,
         Func<object, INavigationBase, bool> isNavigationLoaded,
@@ -234,7 +234,7 @@ public class DynamicValueMapper(
     ///     'Microsoft.EntityFrameworkCore.DbContext' is not on the deserialization allowlist"*
     ///     (C92). Handing the complex type down lets the walk drop what the model does not map.
     /// </remarks>
-    internal DynamicValueNode ToComplexValue(object? value, IComplexProperty complexProperty)
+    public virtual DynamicValueNode ToComplexValue(object? value, IComplexProperty complexProperty)
         => ToDynamicValue(value, complexProperty.ClrType, declared: null, complexProperty.ComplexType);
 
     private DynamicValueNode ToDynamicValue(

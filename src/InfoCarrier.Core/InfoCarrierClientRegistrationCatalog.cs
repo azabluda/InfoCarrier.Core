@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace InfoCarrier.Core;
 
@@ -68,10 +67,8 @@ internal sealed class InfoCarrierClientActivation
     internal InfoCarrierClientActivation(
         IServiceProvider provider, InfoCarrierClientRegistration registration)
     {
-        Client = new TransportInfoCarrierClient(
-            provider.GetRequiredKeyedService<IInfoCarrierTransport>(registration.Identity),
-            provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity),
-            provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>(), registration);
+        IInfoCarrierClient selected = provider.GetRequiredKeyedService<IInfoCarrierClient>(registration.Identity);
+        Client = InfoCarrierClient.Configure(selected, registration);
     }
 
     internal IInfoCarrierClient Client { get; }

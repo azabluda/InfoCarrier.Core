@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using InfoCarrier.Core.Expressions;
@@ -44,9 +44,8 @@ public class ExpressionSerializer(
     ///         <c>QueryExecutor</c>, which hands the same list to the boundary analyzer.
     ///     </para>
     ///     <para>
-    ///         Not on <see cref="IExpressionSerializer" />, for the reason stated on
-    ///         <c>ToNode</c>: the interface is a wire seam an application may implement, and the
-    ///         one caller already holds this class.
+    ///         Updated 2026-10-26: this operation is part of the interface so custom
+    ///         implementations receive the same execution policy without concrete casts.
     ///     </para>
     /// </remarks>
     /// <param name="types">The executing context's declared types.</param>
@@ -80,8 +79,8 @@ public class ExpressionSerializer(
     ///         carry. The per-call shape stays, because the reason above is unchanged.
     ///     </para>
     ///     <para>
-    ///         Not on <see cref="IExpressionSerializer" />: the interface is a wire seam an
-    ///         application may implement, and the one caller already holds this class.
+    ///         Updated 2026-10-26: the interface includes this operation so a replacement
+    ///         receives the same relational-root policy as boundary analysis.
     ///     </para>
     /// </remarks>
     /// <param name="expression">The tree to translate.</param>

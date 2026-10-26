@@ -45,8 +45,8 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
                 s.AddScoped(_ => new FailingScope(() => Interlocked.Increment(ref scopesDisposed)));
             }));
         _ = host.CreateClient();
-        InProcessInfoCarrierServer server = host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>()
-            .ActivateDefault(host.Services).Server;
+        InProcessInfoCarrierServer server = host.Services.GetRequiredKeyedService<InProcessInfoCarrierServer>(
+            host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.Identity);
         await server.BeginTransactionAsync();
         await server.BeginTransactionAsync();
         if (idle)
@@ -84,8 +84,8 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
                     .WithTransactionIdleTimeout(TimeSpan.FromMinutes(10)));
             }));
         using var client = host.CreateClient();
-        InProcessInfoCarrierServer server = host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>()
-            .ActivateDefault(host.Services).Server;
+        InProcessInfoCarrierServer server = host.Services.GetRequiredKeyedService<InProcessInfoCarrierServer>(
+            host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.Identity);
         string token = (await server.BeginTransactionAsync()).TransactionId;
         clock.Advance(TimeSpan.FromMinutes(11));
         await server.DisposeAsync();

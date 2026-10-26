@@ -10,9 +10,9 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | Member | What it does |
 |---|---|
 | `IServiceCollection.AddInfoCarrierClient(Action<InfoCarrierClientOptions>)`, `AddInfoCarrierClient(string clientName, Action<InfoCarrierClientOptions>)` | Registers the unnamed default or a named client. Returns `InfoCarrierClientBuilder`, which implements `IHttpClientBuilder` for handler configuration. |
-| `ReplaceService<TService, TImplementation>()`, `ReplaceService<TService, TCurrentImplementation, TNewImplementation>()` | Replaces supported registration-local implementations while preserving lifetime. Clients support serializers and transports; servers support serializers. See [component replacement](configuration/transports.md#replacing-registered-components). |
+| `ReplaceService<TService, TImplementation>()`, `ReplaceService<TService, TCurrentImplementation, TNewImplementation>()` | Replaces supported registration-local implementations while preserving lifetime. Clients support client, serializer, and transport contracts; servers support server, serializer, and pipeline-factory contracts. See [component replacement](configuration/transports.md#replacing-registered-components). |
 | `InfoCarrierClient.Create(HttpClient, Action<InfoCarrierClientOptions>)` | Creates the default HTTP client directly. The caller owns the supplied `HttpClient`. |
-| `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies role and shared deployment options to a custom client. |
+| `InfoCarrierClient.Configure(IInfoCarrierClient, Action<InfoCarrierClientOptions>)` | Applies client and shared deployment options to a custom client. |
 | `DbContextOptionsBuilder.UseInfoCarrier()`, `UseInfoCarrier(string clientName)` | Attaches the unnamed default or named client. Pass `IInfoCarrierClient` explicitly for manual options or custom factories. |
 | `IServiceCollection.AddInfoCarrierServer<TContext>(Action<InfoCarrierServerOptions>?)`, `AddInfoCarrierServer<TContext>(string serverName, Action<InfoCarrierServerOptions>?)` | Registers the unnamed default or a named server. A further overload accepts a scoped context resolver. See [server configuration](configuration/server.md#selecting-a-scoped-context). |
 | `InfoCarrierServerBuilder.AddHttpCallerIdentity(Func<HttpContext, string?>)` | From `InfoCarrier.Core.AspNetCore`. Binds transactions from that server registration to their caller. Off unless called. |
@@ -33,28 +33,38 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | Type | What it is |
 |---|---|
 | `InProcessInfoCarrierServer` | `IInfoCarrierServer` over a `DbContext` resolved from an `IServiceProvider`. Direct constructor: `(IServiceProvider serviceProvider, InfoCarrierServerOptions? options = null)`. Settings are snapshotted. |
-| `InfoCarrierEnvelopeServer` | Version check, dispatch, and turning a failure into a fault. Constructor: `(IInfoCarrierServer server, IInfoCarrierSerializer serializer)`; one method, `DispatchAsync`. Use it if you write a transport. |
+| `InfoCarrierEnvelopeServer` | Version check, dispatch, and turning a failure into a fault. Constructor: `(IInfoCarrierServer server, IInfoCarrierSerializer serializer)`; `Dispatch` and `DispatchAsync`. Use it if you write a transport. |
 
 ## Interfaces you may implement
 
 | Interface | Members | Page |
 |---|---|---|
-| `IInfoCarrierTransport` | `SendAsync(InfoCarrierEnvelope, CancellationToken)` | [Custom transports](configuration/transports.md) |
+| `IInfoCarrierTransport` | `Send` and `SendAsync` | [Custom transports](configuration/transports.md) |
 | `IInfoCarrierSerializer` | `Serialize<T>`, `Deserialize<T>`, and async counterparts | [Custom transports](configuration/transports.md#a-different-serializer) |
 | `InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper` | `TryMapToWire`, `TryMapFromWire` | [Value mappers](configuration/value-mappers.md) |
-| `IInfoCarrierServer` | The nine server operations | (none) |
-| `IInfoCarrierClient` | The client half of the same nine | (none) |
+| `IInfoCarrierServer` | The nine server operations | [Replacements](configuration/transports.md#client-server-and-pipeline-replacements) |
+| `IInfoCarrierClient` | The client half of the same nine | [Replacements](configuration/transports.md#client-server-and-pipeline-replacements) |
 
 `IInfoCarrierServer` and `IInfoCarrierClient` exist to be substituted in unusual hosting
 arrangements. Most applications use `InProcessInfoCarrierServer` and `TransportInfoCarrierClient`
 unchanged.
 
+`IInfoCarrierStreamServer` adds streamed query frames. `IExpressionSerializer` and
+`InfoCarrier.Core.Expressions.IDynamicValueMapper` cover expression translation, execution policy,
+row mapping, and saves. Client replacements use Entity Framework's options builder.
+`IInfoCarrierServerPipelineFactory` creates operation-owned `IInfoCarrierServerPipeline` instances
+against the actual server context. See [pipeline replacements](configuration/transports.md#client-server-and-pipeline-replacements).
+
+`GetInfoCarrierClient` selects a complete client. `GetInfoCarrierServerEndpoint` selects a
+host-owned server/serializer pair by default, name, handle, or unique context type for custom hosting.
+`InfoCarrierClientSettings` supplies immutable construction settings through inherited-key injection.
+
 ## Configuration types
 
 | Type | Notes |
 |---|---|
-| `InfoCarrierClientOptions` | Endpoint, response limit, server query rules, and shared deployment settings. |
-| `InfoCarrierServerOptions` | Request limit, transaction timeout, document storage, log forwarding, and shared deployment settings. |
+| `InfoCarrierClientOptions` | Endpoint, media type, response limit, server query rules, and shared deployment settings. |
+| `InfoCarrierServerOptions` | Request limit, media type, transaction timeout, document storage, log forwarding, and shared deployment settings. |
 | `InfoCarrierLogForwardingOptions` | Minimum level and the separate sensitive-data grant. Available through `InfoCarrierServerOptions.LogForwarding`. |
 | `InfoCarrierDeploymentBuilder` | Configures shared shapes, types, mappers, and arbitrary SQL. In `InfoCarrier.Core.Abstractions`. |
 | `InfoCarrierDeploymentBuilderExtensions` | Generic shared methods preserve the concrete builder type throughout fluent chains. |

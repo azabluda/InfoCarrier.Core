@@ -18,9 +18,12 @@ public sealed class InfoCarrierClientOptions : InfoCarrierDeploymentBuilder
     /// <summary>The largest response payload the client accepts, or null for no limit.</summary>
     public int? MaxResponseBytes { get; set; }
 
+    /// <summary>The HTTP envelope and request payload media type. Stream response frames remain JSON.</summary>
+    public string MediaType { get; set; } = "application/json";
+
     internal InfoCarrierClientRegistration Build(bool requireEndpoint = true)
     {
-        if (requireEndpoint && (Endpoint is null || !Endpoint.IsAbsoluteUri))
+        if ((requireEndpoint && Endpoint is null) || Endpoint is { IsAbsoluteUri: false })
         {
             throw new InvalidOperationException(
                 $"{nameof(Endpoint)} must be an absolute URI. Configured value: '{Endpoint}'.");
@@ -28,8 +31,13 @@ public sealed class InfoCarrierClientOptions : InfoCarrierDeploymentBuilder
 
         Positive(MaxResponseBytes, nameof(MaxResponseBytes));
         return new(new InfoCarrierRegistrationIdentity(), Endpoint, ServerUsesRelationalQueryRules,
-            MaxResponseBytes, CreateSnapshot());
+            MaxResponseBytes, CreateSnapshot()) { MediaType = ValidateMediaType(MediaType) };
     }
+
+    internal static string ValidateMediaType(string value)
+        => System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(value, out var mediaType)
+            && mediaType.MediaType is { } parsed && !parsed.Contains('*')
+            ? mediaType.ToString() : throw new ArgumentException("MediaType must be a concrete HTTP media type.", nameof(value));
 
     internal static void Positive(int? value, string name)
     {
@@ -55,6 +63,9 @@ public sealed class InfoCarrierServerOptions : InfoCarrierDeploymentBuilder
     /// <summary>Server log forwarding settings.</summary>
     public InfoCarrierLogForwardingOptions LogForwarding { get; } = new();
 
+    /// <summary>The HTTP envelope response media type. Stream response frames remain JSON.</summary>
+    public string MediaType { get; set; } = "application/json";
+
     internal InfoCarrierServerRegistration Build(Type contextType)
     {
         InfoCarrierClientOptions.Positive(MaxRequestBytes, nameof(MaxRequestBytes));
@@ -79,7 +90,7 @@ public sealed class InfoCarrierServerOptions : InfoCarrierDeploymentBuilder
             TransactionIdleTimeout,
             LogForwarding.MinimumLevel,
             LogForwarding.IncludeSensitiveData,
-            CreateSnapshot());
+            CreateSnapshot()) { MediaType = InfoCarrierClientOptions.ValidateMediaType(MediaType) };
     }
 }
 
@@ -101,6 +112,7 @@ internal sealed record InfoCarrierClientRegistration(
     InfoCarrierDeploymentSnapshot Deployment)
 {
     internal string HttpClientName { get; } = $"InfoCarrier.Core.Client.{Guid.NewGuid():N}";
+    internal string MediaType { get; init; } = "application/json";
     internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
     internal IReadOnlyDictionary<(Type Contract, Type? Current), Type> Replacements { get; init; }
         = new Dictionary<(Type, Type?), Type>();
@@ -117,6 +129,7 @@ internal sealed record InfoCarrierServerRegistration(
     InfoCarrierDeploymentSnapshot Deployment,
     Func<IServiceProvider, IInfoCarrierServerCallerIdentity>? CallerIdentityFactory = null)
 {
+    internal string MediaType { get; init; } = "application/json";
     internal InfoCarrierMetricIdentity? MetricIdentity { get; init; }
     internal IReadOnlyDictionary<(Type Contract, Type? Current), Type> Replacements { get; init; }
         = new Dictionary<(Type, Type?), Type>();

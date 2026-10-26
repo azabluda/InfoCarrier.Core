@@ -22,6 +22,7 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     : IInfoCarrierClient, IInfoCarrierClientConfiguration
 {
     private readonly IInfoCarrierTransport _transport = transport;
+    private readonly bool _measureRequests = true;
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
 
@@ -77,9 +78,12 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         IInfoCarrierTransport transport,
         IInfoCarrierSerializer serializer,
         ILogger<TransportInfoCarrierClient> logger,
-        InfoCarrierClientRegistration registration)
+        InfoCarrierClientRegistration registration, bool measureRequests = true)
         : this(transport, serializer, logger)
-        => ((IInfoCarrierClientConfiguration)this).Registration = registration;
+    {
+        ((IInfoCarrierClientConfiguration)this).Registration = registration;
+        _measureRequests = measureRequests;
+    }
 
     /// <inheritdoc />
     public QueryDataResult QueryData(
@@ -138,8 +142,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         IInfoCarrierStreamTransport transport, QueryDataRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using InfoCarrierRequestMeasurement? measurement = InfoCarrierMetrics.StartClient(
-            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, InfoCarrierOperation.Query);
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, InfoCarrierOperation.Query) : null;
         IInfoCarrierResponse? response = null;
         Stream? bounded = null;
         IAsyncEnumerator<QueryStreamFrame>? frames = null;
@@ -309,8 +313,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
 
     private TResponse RoundTrip<TRequest, TResponse>(InfoCarrierOperation operation, TRequest request)
     {
-        using InfoCarrierRequestMeasurement? measurement = InfoCarrierMetrics.StartClient(
-            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation);
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation) : null;
 
         try
         {
@@ -333,8 +337,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         // Buffered operations share this boundary. Since 2026-10-25 streamed queries use their
         // response-enumeration boundary, so their duration includes reading and response disposal.
         // Starting without listeners allocates no measurement and takes no timestamp.
-        using InfoCarrierRequestMeasurement? measurement = InfoCarrierMetrics.StartClient(
-            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation);
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation) : null;
 
         try
         {

@@ -30,7 +30,16 @@ public class InfoCarrierRoleRegistrationTest
 
         using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
 
-        Assert.IsType<TransportInfoCarrierClient>(provider.GetRequiredService<IInfoCarrierClient>());
+        IInfoCarrierClient client = provider.GetRequiredService<IInfoCarrierClient>();
+        Assert.Same(client, provider.GetInfoCarrierClient());
+        using IServiceScope scope = provider.CreateScope();
+        Assert.Same(client, scope.ServiceProvider.GetRequiredService<IInfoCarrierClient>());
+
+        DbContextOptions options = new DbContextOptionsBuilder()
+            .UseApplicationServiceProvider(provider).UseInfoCarrier().Options;
+        InfoCarrierOptionsExtension extension = options.FindExtension<InfoCarrierOptionsExtension>()!;
+        Assert.Same(client, extension.InfoCarrierClient);
+        Assert.Contains(typeof(DateOnly), extension.AllowedTypes);
     }
 
     [Fact]

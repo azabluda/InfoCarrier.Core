@@ -41,7 +41,7 @@ namespace InfoCarrier.Core.Query;
 ///         answer for an entity type is still a wrong answer, and this one was silent.
 ///     </para>
 /// </remarks>
-internal sealed class ProjectionShape
+public sealed class ProjectionShape
 {
     private readonly Dictionary<string, ProjectionShape>? _members;
 

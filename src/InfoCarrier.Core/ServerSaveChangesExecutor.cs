@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -40,7 +40,7 @@ namespace InfoCarrier.Core;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="ServerSaveChangesExecutor" /> class.
 /// </remarks>
-public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper)
+public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper mapper)
 {
     /// <summary>
     ///     <c>EF.Property&lt;T&gt;</c>, for a key property that has no CLR member.
@@ -65,7 +65,7 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
             .Method.GetGenericMethodDefinition();
 
     private readonly DbContext _context = context;
-    private readonly DynamicValueMapper _mapper = mapper;
+    private readonly IDynamicValueMapper _mapper = mapper;
     private readonly bool _documentStore;
 
     /// <summary>
@@ -79,7 +79,7 @@ public class ServerSaveChangesExecutor(DbContext context, DynamicValueMapper map
     ///     so that a change set which does not mention part of a document must be completed from
     ///     the store before it is written (<see cref="InfoCarrierServerOptions.StoresOwnedDataInsideOwner" />, #102).
     /// </param>
-    public ServerSaveChangesExecutor(DbContext context, DynamicValueMapper mapper, bool documentStore)
+    public ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper mapper, bool documentStore)
         : this(context, mapper)
         => _documentStore = documentStore;
 

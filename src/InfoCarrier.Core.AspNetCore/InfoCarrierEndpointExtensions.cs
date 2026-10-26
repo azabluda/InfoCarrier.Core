@@ -70,16 +70,18 @@ public static class InfoCarrierEndpointExtensions
         ArgumentNullException.ThrowIfNull(endpoints);
 
         InfoCarrierMetricIdentity? metricIdentity = null;
+        string mediaType = "application/json";
         if (endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>() is { } store)
         {
             metricIdentity = store.Default.MetricIdentity;
+            mediaType = store.Default.MediaType;
         }
         return MapEndpoint(endpoints, pattern, provider =>
         {
             IInfoCarrierServer server = provider.GetRequiredService<IInfoCarrierServer>();
             return (server is DefaultInfoCarrierServer facade ? facade.Server : server,
                 provider.GetRequiredService<IInfoCarrierSerializer>());
-        }, metricIdentity);
+        }, metricIdentity, mediaType);
     }
 
     /// <summary>Maps a named server to the supplied route pattern.</summary>
@@ -119,13 +121,13 @@ public static class InfoCarrierEndpointExtensions
         InfoCarrierRegistrationIdentity identity)
     {
         InfoCarrierServerActivation activation = store.Activate(endpoints.ServiceProvider, identity);
-        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer), store.Get(identity).MetricIdentity);
+        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer), store.Get(identity).MetricIdentity, store.Get(identity).MediaType);
     }
 
     private static IEndpointConventionBuilder MapEndpoint(
         IEndpointRouteBuilder endpoints, string pattern,
         Func<IServiceProvider, (IInfoCarrierServer Server, IInfoCarrierSerializer Serializer)> resolve,
-        InfoCarrierMetricIdentity? metricIdentity)
+        InfoCarrierMetricIdentity? metricIdentity, string mediaType)
     {
         // Validate the complete selected pair during endpoint setup, before requests arrive.
         _ = resolve(endpoints.ServiceProvider);
@@ -154,7 +156,7 @@ public static class InfoCarrierEndpointExtensions
                         ?? throw new InvalidOperationException("The request body is not a query request.");
                     IInfoCarrierServer streamServer = selectedServer;
                     http.Response.ContentType = "application/json";
-                    IAsyncEnumerable<QueryStreamFrame> frames = streamServer is InProcessInfoCarrierServer inProcess
+                    IAsyncEnumerable<QueryStreamFrame> frames = streamServer is IInfoCarrierStreamServer inProcess
                         ? inProcess.QueryFramesAsync(streamRequest, http.RequestAborted)
                         : BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted);
                     await QueryStreamFrameCodec.WriteAsync(
@@ -165,13 +167,10 @@ public static class InfoCarrierEndpointExtensions
                     return;
                 }
 
-                using var buffer = new MemoryStream();
-                await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
-
                 InfoCarrierEnvelope request;
                 try
                 {
-                    request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())
+                    request = await serializer.DeserializeAsync<InfoCarrierEnvelope>(http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
@@ -207,7 +206,7 @@ public static class InfoCarrierEndpointExtensions
                 {
                     measurement?.FailFault(responseFault);
                 }
-                http.Response.ContentType = "application/json";
+                http.Response.ContentType = mediaType;
                 phase = "response envelope serialization";
                 byte[] bytes = serializer.Serialize(response);
                 phase = "response body writing";

@@ -65,6 +65,8 @@ public class ServerQueryExecutor(
     private readonly IExpressionSerializer _expressionSerializer = expressionSerializer;
     private readonly bool _arbitrarySqlAllowed = arbitrarySqlAllowed;
 
+    internal InfoCarrierPayloadLimits PayloadLimits { get; init; } = InfoCarrierPayloadLimits.Default;
+
     /// <summary>Executes a buffered query through the provider's synchronous pipeline.</summary>
     public virtual QueryDataResult Execute(QueryDataRequest request)
     {
@@ -145,11 +147,8 @@ public class ServerQueryExecutor(
 
     private (Expression Query, ProjectionShape? Shape) Prepare(QueryDataRequest request)
     {
-        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
-        if (_expressionSerializer is ExpressionSerializer serializer)
-        {
-            serializer.UseServerContext(_context);
-        }
+        _expressionSerializer.ValueMapper.ResetReferenceScope();
+        _expressionSerializer.UseServerContext(_context);
 
         Expression query = Rebind(DeserializeNode(request.SerializedQuery));
         query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
@@ -167,11 +166,8 @@ public class ServerQueryExecutor(
         QueryDataRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ((DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper).ResetReferenceScope();
-        if (_expressionSerializer is ExpressionSerializer serializer)
-        {
-            serializer.UseServerContext(_context);
-        }
+        _expressionSerializer.ValueMapper.ResetReferenceScope();
+        _expressionSerializer.UseServerContext(_context);
 
         Expression query = Rebind(DeserializeNode(request.SerializedQuery));
         query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
@@ -272,7 +268,7 @@ public class ServerQueryExecutor(
     private Expression Rebind(ExpressionNode node)
     {
         // Rebind query-root stubs to real EntityQueryRootExpression via the server model.
-        return ((ExpressionSerializer)_expressionSerializer).ToExpression(node, RebindQueryRoot);
+        return _expressionSerializer.ToExpression(node, RebindQueryRoot);
     }
 
     private Expression RebindQueryRoot(QueryRootStubNode stub, Type elementType)
@@ -291,7 +287,7 @@ public class ServerQueryExecutor(
             return _relationalQueryRoots.CreateScalarRoot(
                 elementType,
                 sqlQuery.Sql,
-                ((ExpressionSerializer)_expressionSerializer).ToExpression(sqlQuery.Arguments));
+                _expressionSerializer.ToExpression(sqlQuery.Arguments));
         }
 
         // Resolve the entity type through the server model — shared-type entities by name
@@ -346,7 +342,7 @@ public class ServerQueryExecutor(
             return _relationalQueryRoots.CreateEntityRoot(
                 entityType,
                 fromSql.Sql,
-                ((ExpressionSerializer)_expressionSerializer).ToExpression(fromSql.Arguments));
+                _expressionSerializer.ToExpression(fromSql.Arguments));
         }
 
         return new Microsoft.EntityFrameworkCore.Query.EntityQueryRootExpression(entityType);
@@ -644,7 +640,7 @@ public class ServerQueryExecutor(
         Type? elementType,
         ProjectionShape? shape)
     {
-        var mapper = (DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        var mapper = _expressionSerializer.ValueMapper;
         var stateManager = _context.GetService<Microsoft.EntityFrameworkCore.ChangeTracking.Internal.IStateManager>();
 
         // A no-tracking result is not in the change tracker, and `DbContext.Entry` on an
@@ -824,17 +820,14 @@ public class ServerQueryExecutor(
     ///     be on (milestone M5).
     /// </summary>
     /// <remarks>
-    ///     It uses <see cref="InfoCarrierPayloadLimits.Default" /> rather than a configured
-    ///     instance because this executor is constructed from <c>(DbContext, IExpressionSerializer)</c>
-    ///     and has no options seam to read one from. That is the same gap M5's envelope criterion
-    ///     names: the expression payload travels through <see cref="ExpressionJsonContext" />
-    ///     directly rather than through the configured <see cref="IInfoCarrierSerializer" />, so
-    ///     nothing configured on the latter reaches here yet. The bound is applied at the default
-    ///     in the meantime, because an unconfigurable bound is worth more than no bound.
+    ///     The selected server supplies its request limit independently of the envelope codec.
+    ///     This also protects custom adapters that dispatch decoded request objects directly.
+    ///     Corrected 2026-10-26: this previously used the global default because the executor
+    ///     had no registration settings. Direct construction retains that safe default.
     /// </remarks>
-    private static ExpressionNode DeserializeNode(byte[] payload)
+    private ExpressionNode DeserializeNode(byte[] payload)
     {
-        InfoCarrierPayloadLimits.Default.GuardRequest(payload.Length, "serialized query");
+        PayloadLimits.GuardRequest(payload.Length, "serialized query");
         return System.Text.Json.JsonSerializer.Deserialize<ExpressionNode>(
             payload, ExpressionJsonContext.Default.ExpressionNode)!;
     }

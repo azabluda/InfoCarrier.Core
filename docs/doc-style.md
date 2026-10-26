@@ -77,6 +77,10 @@ have to agree — a page over its own number is still a red build, so the number
 commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
 missing *fact*. What is suspended is the ceremony, not the standard.
 
+The 2026-10-26 registration extension pass sets `configuration/transports` to 1,350 words and
+`api-surface` to 750. The added material explains role replacement, model-aware pipeline ownership,
+custom hosting selection, endpoint-free transports, and media types.
+
 ## Rules
 
 1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an

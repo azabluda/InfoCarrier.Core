@@ -44,7 +44,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         catalog?.ValidateName(clientName);
         var options = new InfoCarrierClientOptions();
         configure(options);
-        InfoCarrierClientRegistration registration = options.Build();
+        InfoCarrierClientRegistration registration = options.Build(requireEndpoint: false);
         if (catalog is null)
         {
             catalog = new InfoCarrierClientRegistrationCatalog();
@@ -60,7 +60,23 @@ public static class InfoCarrierRoleServiceCollectionExtensions
             provider.GetRequiredService<IHttpClientFactory>().CreateClient(registration.HttpClientName));
         services.AddKeyedSingleton<IInfoCarrierTransport>(registration.Identity, (provider, _) =>
             new HttpInfoCarrierTransport(provider.GetRequiredKeyedService<HttpClient>(registration.Identity),
-                provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity), registration.Endpoint!.ToString()));
+                provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity), (registration.Endpoint ?? throw new InvalidOperationException(
+                    "The HTTP transport requires an absolute Endpoint. Configure WithEndpoint or replace IInfoCarrierTransport." )).ToString())
+            { MediaType = registration.MediaType });
+        services.AddKeyedSingleton<TransportInfoCarrierClient>(registration.Identity, (provider, _) =>
+            new TransportInfoCarrierClient(
+                provider.GetRequiredKeyedService<IInfoCarrierTransport>(registration.Identity),
+                provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity),
+                provider.GetRequiredService<ILogger<TransportInfoCarrierClient>>(), provider
+                    .GetRequiredService<InfoCarrierClientRegistrationStore>().Registration(registration.Identity), measureRequests: false));
+        services.AddKeyedSingleton<IInfoCarrierClient>(registration.Identity, (provider, _) =>
+            provider.GetRequiredKeyedService<TransportInfoCarrierClient>(registration.Identity));
+        services.AddKeyedSingleton<InfoCarrierClientSettings>(registration.Identity, (provider, _) =>
+        {
+            InfoCarrierClientRegistration selected = provider.GetRequiredService<InfoCarrierClientRegistrationStore>()
+                .Registration(registration.Identity);
+            return new(selected.Endpoint, selected.MaxResponseBytes, selected.MediaType, selected.MetricIdentity!.Name);
+        });
         // Policy stays in the complete descriptor. Keyed component construction uses the same
         // identity, so the host owns replacements and their inherited-key dependencies.
         services.AddKeyedSingleton<InfoCarrierClientActivation>(registration.Identity, (provider, _) =>
@@ -68,7 +84,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
                 .GetRequiredService<InfoCarrierClientRegistrationStore>().Registration(registration.Identity)));
         if (clientName is null)
         {
-            services.RemoveAll<IInfoCarrierClient>();
+            RemoveUnkeyed<IInfoCarrierClient>(services);
             services.AddSingleton<IInfoCarrierClient>(provider => provider
                 .GetRequiredService<InfoCarrierClientRegistrationStore>().GetDefault(provider));
         }
@@ -143,6 +159,13 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         registration = registrations.Add(serverName, registration);
         InfoCarrierServiceComponents.AddSerializer(services, registration.Identity,
             new InfoCarrierPayloadLimits(registration.MaxRequestBytes));
+        services.AddKeyedSingleton<IInfoCarrierServerPipelineFactory, InfoCarrierServerPipelineFactory>(registration.Identity);
+        services.AddKeyedSingleton<InProcessInfoCarrierServer>(registration.Identity, (provider, _) =>
+            new InProcessInfoCarrierServer(provider, provider.GetRequiredService<ILogger<InProcessInfoCarrierServer>>(),
+                provider.GetService<ServerLogCapture>(), provider
+                    .GetRequiredService<InfoCarrierServerRegistrationStore>().Get(registration.Identity)));
+        services.AddKeyedSingleton<IInfoCarrierServer>(registration.Identity, (provider, _) =>
+            new DefaultInfoCarrierServer(provider.GetRequiredKeyedService<InProcessInfoCarrierServer>(registration.Identity)));
         services.AddKeyedSingleton<InfoCarrierServerActivation>(registration.Identity, (provider, _) =>
             new InfoCarrierServerActivation(provider, provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().Get(registration.Identity)));
@@ -152,7 +175,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
                 && !d.IsKeyedService).ToArray()) { services.Remove(descriptor); }
             services.AddSingleton<IInfoCarrierSerializer>(provider => provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().ActivateDefault(provider).Serializer);
-            services.RemoveAll<IInfoCarrierServer>();
+            RemoveUnkeyed<IInfoCarrierServer>(services);
             services.AddSingleton<IInfoCarrierServer>(provider => new DefaultInfoCarrierServer(provider
                 .GetRequiredService<InfoCarrierServerRegistrationStore>().ActivateDefault(provider).Server));
         }
@@ -167,6 +190,12 @@ public static class InfoCarrierRoleServiceCollectionExtensions
         return new InfoCarrierServerBuilder(services, registrations, registration);
     }
 
+    private static void RemoveUnkeyed<TService>(IServiceCollection services)
+    {
+        foreach (ServiceDescriptor descriptor in services.Where(d => d.ServiceType == typeof(TService)
+            && !d.IsKeyedService).ToArray()) { services.Remove(descriptor); }
+    }
+
     internal static IInfoCarrierClient CreateClient(
         HttpClient httpClient,
         InfoCarrierClientRegistration registration,
@@ -174,7 +203,7 @@ public static class InfoCarrierRoleServiceCollectionExtensions
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer(
             new InfoCarrierPayloadLimits(maxResponseBytes: registration.MaxResponseBytes));
-        var transport = new HttpInfoCarrierTransport(httpClient, serializer, registration.Endpoint!.ToString());
+        var transport = new HttpInfoCarrierTransport(httpClient, serializer, registration.Endpoint!.ToString()) { MediaType = registration.MediaType };
         return new TransportInfoCarrierClient(transport, serializer, logger, registration);
     }
 }
@@ -260,51 +289,98 @@ public static class InfoCarrierClient
         return new ConfiguredInfoCarrierClient(client, options.Build(requireEndpoint: false));
     }
 
+    internal static IInfoCarrierClient Configure(IInfoCarrierClient client, InfoCarrierClientRegistration registration)
+        => new ConfiguredInfoCarrierClient(client, registration, measureRequests: true);
+
     private sealed class ConfiguredInfoCarrierClient(
         IInfoCarrierClient inner,
-        InfoCarrierClientRegistration registration)
+        InfoCarrierClientRegistration registration, bool measureRequests = false)
         : IInfoCarrierClient, IInfoCarrierClientConfiguration
     {
         public InfoCarrierClientRegistration? Registration { get; set; } = registration;
 
         public QueryDataResult QueryData(QueryDataRequest request, DbContext clientContext)
-            => inner.QueryData(request, clientContext);
+            => Measure(InfoCarrierOperation.Query, () => inner.QueryData(request, clientContext));
+        public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
+            => MeasureAsync(InfoCarrierOperation.Query, () => inner.QueryDataAsync(request, clientContext, cancellationToken), cancellationToken);
         public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext clientContext)
-            => inner.SaveChanges(request, clientContext);
-        public TransactionResult BeginTransaction() => inner.BeginTransaction();
-        public void CommitTransaction(string transactionId) => inner.CommitTransaction(transactionId);
-        public void RollbackTransaction(string transactionId) => inner.RollbackTransaction(transactionId);
-        public void CreateSavepoint(string transactionId, string name) => inner.CreateSavepoint(transactionId, name);
-        public void RollbackToSavepoint(string transactionId, string name) => inner.RollbackToSavepoint(transactionId, name);
-        public void ReleaseSavepoint(string transactionId, string name) => inner.ReleaseSavepoint(transactionId, name);
-        public bool SupportsSavepoints(string transactionId) => inner.SupportsSavepoints(transactionId);
-        public IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(
-            QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
-            => inner.QueryDataStreamAsync(request, clientContext, cancellationToken);
-        public Task<QueryDataResult> QueryDataAsync(
-            QueryDataRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
-            => inner.QueryDataAsync(request, clientContext, cancellationToken);
-        public Task<SaveChangesResult> SaveChangesAsync(
-            SaveChangesRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
-            => inner.SaveChangesAsync(request, clientContext, cancellationToken);
+            => Measure(InfoCarrierOperation.SaveChanges, () => inner.SaveChanges(request, clientContext));
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, DbContext clientContext, CancellationToken cancellationToken = default)
+            => MeasureAsync(InfoCarrierOperation.SaveChanges, () => inner.SaveChangesAsync(request, clientContext, cancellationToken), cancellationToken);
+        public TransactionResult BeginTransaction()
+            => Measure(InfoCarrierOperation.BeginTransaction, () => inner.BeginTransaction());
         public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default)
-            => inner.BeginTransactionAsync(cancellationToken);
+            => MeasureAsync(InfoCarrierOperation.BeginTransaction, () => inner.BeginTransactionAsync(cancellationToken), cancellationToken);
+        public void CommitTransaction(string transactionId)
+            => Measure<object?>(InfoCarrierOperation.CommitTransaction, () => { inner.CommitTransaction(transactionId); return null; });
         public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-            => inner.CommitTransactionAsync(transactionId, cancellationToken);
+            => MeasureAsync<object?>(InfoCarrierOperation.CommitTransaction, async () => { await inner.CommitTransactionAsync(transactionId, cancellationToken).ConfigureAwait(false); return null; }, cancellationToken);
+        public void RollbackTransaction(string transactionId)
+            => Measure<object?>(InfoCarrierOperation.RollbackTransaction, () => { inner.RollbackTransaction(transactionId); return null; });
         public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default)
-            => inner.RollbackTransactionAsync(transactionId, cancellationToken);
-        public Task CreateSavepointAsync(
-            string transactionId, string name, CancellationToken cancellationToken = default)
-            => inner.CreateSavepointAsync(transactionId, name, cancellationToken);
-        public Task RollbackToSavepointAsync(
-            string transactionId, string name, CancellationToken cancellationToken = default)
-            => inner.RollbackToSavepointAsync(transactionId, name, cancellationToken);
-        public Task ReleaseSavepointAsync(
-            string transactionId, string name, CancellationToken cancellationToken = default)
-            => inner.ReleaseSavepointAsync(transactionId, name, cancellationToken);
-        public Task<bool> SupportsSavepointsAsync(
-            string transactionId, CancellationToken cancellationToken = default)
-            => inner.SupportsSavepointsAsync(transactionId, cancellationToken);
+            => MeasureAsync<object?>(InfoCarrierOperation.RollbackTransaction, async () => { await inner.RollbackTransactionAsync(transactionId, cancellationToken).ConfigureAwait(false); return null; }, cancellationToken);
+        public void CreateSavepoint(string transactionId, string name)
+            => Measure<object?>(InfoCarrierOperation.CreateSavepoint, () => { inner.CreateSavepoint(transactionId, name); return null; });
+        public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => MeasureAsync<object?>(InfoCarrierOperation.CreateSavepoint, async () => { await inner.CreateSavepointAsync(transactionId, name, cancellationToken).ConfigureAwait(false); return null; }, cancellationToken);
+        public void RollbackToSavepoint(string transactionId, string name)
+            => Measure<object?>(InfoCarrierOperation.RollbackToSavepoint, () => { inner.RollbackToSavepoint(transactionId, name); return null; });
+        public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => MeasureAsync<object?>(InfoCarrierOperation.RollbackToSavepoint, async () => { await inner.RollbackToSavepointAsync(transactionId, name, cancellationToken).ConfigureAwait(false); return null; }, cancellationToken);
+        public void ReleaseSavepoint(string transactionId, string name)
+            => Measure<object?>(InfoCarrierOperation.ReleaseSavepoint, () => { inner.ReleaseSavepoint(transactionId, name); return null; });
+        public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default)
+            => MeasureAsync<object?>(InfoCarrierOperation.ReleaseSavepoint, async () => { await inner.ReleaseSavepointAsync(transactionId, name, cancellationToken).ConfigureAwait(false); return null; }, cancellationToken);
+        public bool SupportsSavepoints(string transactionId)
+            => Measure(InfoCarrierOperation.SupportsSavepoints, () => inner.SupportsSavepoints(transactionId));
+        public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default)
+            => MeasureAsync(InfoCarrierOperation.SupportsSavepoints, () => inner.SupportsSavepointsAsync(transactionId, cancellationToken), cancellationToken);
+
+        private T Measure<T>(InfoCarrierOperation operation, Func<T> execute)
+        {
+            using InfoCarrierRequestMeasurement? measurement = measureRequests ? InfoCarrierMetrics.StartClient(Registration?.MetricIdentity, operation) : null;
+            try { T result = execute(); measurement?.Complete(); return result; }
+            catch (Exception exception) { measurement?.Fail(exception, default); throw; }
+        }
+
+        private async Task<T> MeasureAsync<T>(InfoCarrierOperation operation, Func<Task<T>> execute, CancellationToken token)
+        {
+            using InfoCarrierRequestMeasurement? measurement = measureRequests ? InfoCarrierMetrics.StartClient(Registration?.MetricIdentity, operation) : null;
+            try { T result = await execute().ConfigureAwait(false); measurement?.Complete(); return result; }
+            catch (Exception exception) { measurement?.Fail(exception, token); throw; }
+        }
+
+        public async IAsyncEnumerable<QueryStreamFrame> QueryDataStreamAsync(QueryDataRequest request, DbContext clientContext,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            using InfoCarrierRequestMeasurement? measurement = measureRequests ? InfoCarrierMetrics.StartClient(Registration?.MetricIdentity, InfoCarrierOperation.Query) : null;
+            IAsyncEnumerator<QueryStreamFrame>? frames = null;
+            try
+            {
+                try { frames = inner.QueryDataStreamAsync(request, clientContext, cancellationToken).GetAsyncEnumerator(cancellationToken); }
+                catch (Exception exception) { measurement?.Fail(exception, cancellationToken); throw; }
+                while (true)
+                {
+                    bool next;
+                    try { next = await frames.MoveNextAsync().ConfigureAwait(false); }
+                    catch (Exception exception) { measurement?.Fail(exception, cancellationToken); throw; }
+                    if (!next) { yield break; }
+                    QueryStreamFrame frame = frames.Current;
+                    if (frame is QueryFaultFrame fault) { measurement?.FailFault(fault.Fault); }
+                    if (frame is QueryCompleteFrame) { measurement?.Complete(); }
+                    yield return frame;
+                }
+            }
+            finally
+            {
+                if (frames is not null)
+                {
+                    try { await frames.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception exception) { measurement?.Fail(exception, cancellationToken); throw; }
+                }
+            }
+        }
+
     }
 }
 

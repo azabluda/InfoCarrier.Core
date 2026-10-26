@@ -8,7 +8,7 @@ namespace InfoCarrier.Core;
 /// <summary>Replaces registration-local InfoCarrier service implementations.</summary>
 public static class InfoCarrierServiceReplacementExtensions
 {
-    /// <summary>Replaces a client serializer or transport, retaining its singleton lifetime.</summary>
+    /// <summary>Replaces a client, serializer, or transport, retaining its singleton lifetime.</summary>
     /// <remarks>
     /// The host constructs and owns the replacement. Constructor dependencies belonging to the
     /// same registration must use parameterless <see cref="FromKeyedServicesAttribute" />.
@@ -29,8 +29,8 @@ public static class InfoCarrierServiceReplacementExtensions
         return client;
     }
 
-    /// <summary>Replaces a server serializer, retaining its singleton lifetime.</summary>
-    /// <remarks>The host owns the replacement. Other server service contracts are not yet supported.</remarks>
+    /// <summary>Replaces a server, serializer, or pipeline factory, retaining its singleton lifetime.</summary>
+    /// <remarks>The host owns the replacement. Operation-owned pipelines use IInfoCarrierServerPipelineFactory.</remarks>
     public static InfoCarrierServerBuilder ReplaceService<TService,
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this InfoCarrierServerBuilder builder)
@@ -127,7 +127,8 @@ internal static class InfoCarrierServiceComponents
     {
         Type contract = typeof(TService);
         bool serializer = contract == typeof(IInfoCarrierSerializer);
-        if (!serializer && !(client && contract == typeof(IInfoCarrierTransport)))
+        if (!serializer && !(client && (contract == typeof(IInfoCarrierTransport) || contract == typeof(IInfoCarrierClient)))
+            && !(!client && (contract == typeof(IInfoCarrierServer) || contract == typeof(IInfoCarrierServerPipelineFactory))))
         {
             throw new InvalidOperationException($"InfoCarrier does not support replacement of '{contract.Name}' "
                 + $"for this {(client ? "client" : "server")} registration.");
@@ -136,7 +137,11 @@ internal static class InfoCarrierServiceComponents
         {
             throw new ArgumentException($"Replacement '{typeof(TImplementation).Name}' must be a concrete class.");
         }
-        Type original = serializer ? typeof(SystemTextJsonInfoCarrierSerializer) : typeof(HttpInfoCarrierTransport);
+        Type original = serializer ? typeof(SystemTextJsonInfoCarrierSerializer)
+            : contract == typeof(IInfoCarrierTransport) ? typeof(HttpInfoCarrierTransport)
+            : contract == typeof(IInfoCarrierClient) ? typeof(TransportInfoCarrierClient)
+            : contract == typeof(IInfoCarrierServer) ? typeof(InProcessInfoCarrierServer)
+            : typeof(InfoCarrierServerPipelineFactory);
         var replacements = new Dictionary<(Type Contract, Type? Current), Type>(previous)
         {
             [(contract, currentImplementation)] = typeof(TImplementation),

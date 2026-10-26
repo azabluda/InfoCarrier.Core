@@ -46,9 +46,10 @@ original implementation. A matching targeted choice takes precedence over a cont
 Repeated calls for the same service and original implementation use the last choice. There is no
 lifetime argument or construction lambda.
 
-Currently, client registrations support replacement of `IInfoCarrierSerializer` and
-`IInfoCarrierTransport`; server registrations support `IInfoCarrierSerializer`. Other contracts
-fail during configuration. This does not replace Entity Framework's internal provider services.
+Client registrations support `IInfoCarrierClient`, `IInfoCarrierSerializer`, and
+`IInfoCarrierTransport`. Server registrations support `IInfoCarrierServer`, `IInfoCarrierSerializer`,
+and `IInfoCarrierServerPipelineFactory`. Other contracts fail during configuration.
+Use Entity Framework's own options-builder `ReplaceService` for its internal provider services.
 
 The host constructs replacements and supplies their constructor dependencies. No separate
 `AddSingleton<OrdersSerializer>()` is needed. These components retain singleton lifetime and must
@@ -64,9 +65,11 @@ services.AddInfoCarrierClient("orders", o => o.WithEndpoint(ordersEndpoint))
 // Constructor of an application implementation of IInfoCarrierTransport:
 public OrdersTransport(
     [FromKeyedServices] IInfoCarrierSerializer serializer,
+    [FromKeyedServices] InfoCarrierClientSettings settings,
     ILogger<OrdersTransport> logger)
 {
-    // Retain dependencies; implement Send and SendAsync for the application's protocol.
+    // settings contains this client's name, endpoint, response limit, and media type.
+    // Implement Send and SendAsync for the application's protocol.
 }
 ```
 
@@ -78,13 +81,88 @@ names in these constructors. Custom channel services can use ordinary host injec
 The client builder still implements `IHttpClientBuilder`, so existing handler configuration chains
 work. A replacement transport does not activate that private HTTP client or its handler callbacks.
 Use custom protocol hosting on the server; `MapInfoCarrier` remains HTTP hosting.
-The registration still requires an absolute endpoint URI. Configure application channel dependencies
-through host services; replacing the transport does not configure a channel automatically.
+A custom transport can omit the endpoint URI. The default HTTP transport requires an absolute
+endpoint when it activates. Supplied relative URIs fail during registration. Configure application
+channel dependencies through host services.
 
-Registration limits wrap custom deserialization too. Streamed response limits include all framing.
-The built-in query stream still uses JSON frames and JSON row data; replacing the envelope/payload
-serializer does not replace that format. A different streaming format needs a separate adapter.
-The built-in HTTP adapter also retains its `application/json` content type.
+Registration limits wrap custom deserialization too. Selected server limits also guard decoded query
+expressions, including custom hosting. Streamed response limits include all framing.
+Expression nodes, query rows, and stream frames retain JSON encoding; replacing the envelope/payload
+serializer does not replace those formats. A different streaming format needs a separate adapter.
+Set `MediaType` in the client and server options for custom envelope/payload encoding.
+Its default is `application/json`. Stream response frames retain their JSON content type.
+
+## Client, server, and pipeline replacements
+
+A client or server replacement can wrap the built-in implementation through inherited-key injection:
+
+```csharp
+services.AddInfoCarrierClient("orders", configureOrders)
+    .ReplaceService<IInfoCarrierClient, AuditedClient>();
+
+// AuditedClient implements IInfoCarrierClient and borrows this dependency:
+public AuditedClient([FromKeyedServices] TransportInfoCarrierClient inner) { /* retain inner */ }
+
+services.AddInfoCarrierServer<OrdersContext>("orders")
+    .ReplaceService<IInfoCarrierServer, AuditedServer>();
+
+// AuditedServer implements IInfoCarrierServer and borrows this dependency:
+public AuditedServer([FromKeyedServices] InProcessInfoCarrierServer inner) { /* retain inner */ }
+```
+
+Implement `IInfoCarrierStreamServer` on a streaming server replacement. HTTP hosting detects this
+interface; otherwise, it adapts a buffered query result. Never dispose borrowed built-in services.
+Registered clients retain deployment settings and one client measurement around the replacement.
+HTTP endpoint measurements surround the selected server. A complete client or server replacement owns its execution
+semantics, including admission, transactions, and cancellation; a forwarding wrapper preserves them.
+
+Client expression services use standard Entity Framework replacement:
+
+```csharp
+services.AddDbContextFactory<OrdersContext>(options => options
+    .UseInfoCarrier("orders")
+    .ReplaceService<IExpressionSerializer, OrdersExpressionSerializer>()
+    .ReplaceService<IDynamicValueMapper, OrdersValueMapper>());
+```
+
+Import `InfoCarrier.Core.Expressions` for the mapper interface. These services retain scoped lifetime;
+Entity Framework includes replacement choices in its provider cache. The serializer's `ValueMapper`
+must be the same mapper used for expression values, result rows, and saves. Interfaces include the
+execution-policy, reference-scope, and materialization operations; subclassing built-ins is optional.
+
+The server builds pipelines against its actual leased context, which may retain a transaction:
+
+```csharp
+services.AddInfoCarrierServer<OrdersContext>("orders")
+    .ReplaceService<IInfoCarrierServerPipelineFactory, OrdersPipelineFactory>();
+```
+
+The singleton factory's `Create` receives that context, the selected allowed types, ordered value
+mappers, and trusted anonymous-shape catalog. Return a fresh `IInfoCarrierServerPipeline` for each
+operation. Its `Serializer.ValueMapper` serves translation, rows, and saves. The operation disposes
+the pipeline after success, failure, cancellation, or stream disposal. The pipeline owns any components
+it creates. The host owns the supplied context. Support both synchronous and asynchronous disposal.
+Do not retain contexts in the factory
+or resolve a second context. Custom translation must preserve the supplied admission policy.
+
+## Hosting a custom adapter
+
+Resolve the complete selected pair from the host:
+
+```csharp
+InfoCarrierServerEndpoint selected = app.Services.GetInfoCarrierServerEndpoint("orders");
+var dispatcher = new InfoCarrierEnvelopeServer(selected.Server, selected.Serializer);
+```
+
+The same resolver accepts a retained server builder, a unique context type through
+`GetInfoCarrierServerEndpoint<OrdersContext>()`, or no argument for the unnamed default.
+Missing selections and ambiguous context types fail. The pair borrows host-owned services and exposes
+`MaxRequestBytes` and `MediaType`. Enforce the request limit before buffering custom protocol input.
+Dispatch each decoded envelope through `dispatcher.DispatchAsync`. A custom protocol adapter owns its
+framing, authentication, cancellation, and transport measurements.
+
+Advanced consumers can resolve a client with `provider.GetInfoCarrierClient("orders")`.
+Typical application code only injects its context or context factory.
 
 ## Decorating the HTTP one
 
@@ -208,8 +286,8 @@ The server half is whatever hosts your protocol, ending in a call to
 `IInfoCarrierSerializer` provides byte-array serialization/deserialization and their async counterparts,
 plus stream methods with buffered defaults. Select compatible implementations on both halves through
 `ReplaceService`, or pass the serializer explicitly when assembling a transport and client yourself.
-Query framing and row data still use the built-in JSON format.
+Expression nodes, query framing, and row data still use the built-in JSON format.
 
-Registered replacements retain the role's byte limits. Direct custom composition must enforce its
+Registered replacements retain their registration's byte limits. Direct custom composition must enforce its
 own limits with `InfoCarrierPayloadLimits`. See
 [Configuring the server](server.md#payload-limits).

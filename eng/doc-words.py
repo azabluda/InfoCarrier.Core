@@ -41,9 +41,9 @@ BUDGET = {
     # 540 on 2026-10-08 for the trusted anonymous-shape catalog registration.
     # 560 on 2026-10-25 for named server registration and endpoint selection overloads.
     # 600 on 2026-10-25 for typed component replacement and its supported contracts.
-    "website/docs/api-surface.md": 600,
+    "website/docs/api-surface.md": 750,
     # Registration-local construction, inherited keys, lifetime, and fixed streaming format.
-    "website/docs/configuration/transports.md": 750,
+    "website/docs/configuration/transports.md": 1350,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.

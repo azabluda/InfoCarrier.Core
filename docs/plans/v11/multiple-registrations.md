@@ -2,7 +2,7 @@
 
 Date: 2026-10-25  
 Issue: [#105](https://github.com/azabluda/InfoCarrier.Core/issues/105)  
-Status: registration isolation implemented and validated; extension-point reconciliation remains open
+Status: implementation and local acceptance complete; awaiting continuous integration and owner approval
 
 ## Delivery boundary
 
@@ -14,6 +14,96 @@ owner's explicit instruction. Stop each pushed iteration when continuous integra
 Keep the ordinary application unchanged: one unnamed client, standard Entity Framework context
 registration with `UseInfoCarrier()`, one unnamed server, and `MapInfoCarrier()`.
 Names and retained server builders are optional selection tools for applications that need them.
+
+## Final extension reconciliation, 2026-10-26
+
+This section supersedes the open extension audit and its historical proposals below.
+The owner requested completion of all remaining work, final normal and slow comparisons, and
+preparation of the existing pull request for final approval. Do not merge it.
+
+- [x] P6a: Registration-local EF-style replacement for client, transport, and wire serializer;
+  server, wire serializer, and model-aware server pipeline factory. Original-implementation
+  precedence, singleton lifetimes, inherited-key injection, and immutable descriptor snapshots
+  remain unchanged. Unknown contracts fail clearly rather than silently affecting another role.
+- [x] P6b: Remove concrete expression-serializer and value-mapper casts from query, materialization,
+  and save execution. Their interfaces now declare the operations execution actually requires.
+  The serializer supplies the same mapper for expressions, row identity, materialization, and saves.
+  Projected owned-entity metadata uses the public immutable `ProjectionShape` inspection API.
+- [x] P6c: Construct server pipelines through `IInfoCarrierServerPipelineFactory` using the actual
+  leased context, ordered mappers, selected allowed types, and trusted shape catalog. A fresh
+  `IInfoCarrierServerPipeline` belongs to each operation and supports synchronous/asynchronous
+  disposal. Transactions retain their minting server's actual context; no second context or child
+  service provider is constructed for the pipeline. Client internal services use EF's own
+  options-builder `ReplaceService`, including EF's provider-cache identity and scoped lifetime.
+- [x] P6d: Whole-role replacements and forwarding wrappers share the selected activation path.
+  Borrowed built-in clients and servers have keyed concrete registrations. The host owns them and
+  custom replacements exactly once; default facades and activation objects borrow them.
+  Registered client measurement surrounds the selected implementation once, while the nested built-in
+  transport client suppresses its own measurement. Direct/manual clients retain their existing
+  measurement behavior. HTTP endpoint measurement surrounds the selected server.
+- [x] P6e: `IInfoCarrierStreamServer` replaces concrete server detection. Custom implementations can
+  preserve streaming; buffered servers retain frame adaptation. Envelope/payload serializer replacement
+  does not change JSON query rows or stream framing. Custom role implementations own their execution
+  semantics; forwarding implementations preserve the built-in policy and transaction behavior.
+- [x] P6f: Custom transports may omit the endpoint. The default HTTP transport validates its endpoint
+  during activation; explicitly supplied relative URIs still fail during registration. Inherited-key
+  `InfoCarrierClientSettings` provides an immutable name, endpoint, response limit, and media type.
+  HTTP payload media types are configurable on both role options; streamed response frames remain JSON.
+  Envelope decoding uses bounded stream deserialization before allocating the complete custom payload.
+  The query executor also uses the selected server's limit for decoded expression bytes. A direct
+  custom-adapter regression first showed that the old global default ignored a smaller selected
+  limit; buffered and streamed dispatch now reject it, while an unlimited registration executes
+  the same real SQLite count query. Both execution forms share one executor construction helper.
+- [x] P6g: Custom hosts resolve `InfoCarrierServerEndpoint` by unnamed default, public name, retained
+  builder, or unique context type. It borrows the matching server and bounded serializer and exposes
+  request limit and media type. Invalid handles, absent registrations, and ambiguous types keep the
+  existing explicit selection failures. Advanced consumers can resolve a complete named client without
+  exposing internal keys. Ordinary applications continue injecting only contexts or context factories.
+- [x] P6h: Interface-only replacements exercise all endpoint selection forms, actual transaction-context
+  reuse, entity identity/tracking, saves, independent stored-data reads, and exactly-once disposal.
+  Additional tests cover pipeline cleanup after synchronous, asynchronous, and streamed failures,
+  endpoint-free custom transport settings, custom HTTP media types, and missing/default selection.
+  A deterministic resolver-failure probe first failed in all three operation forms because its scope
+  was not disposed. Lease acquisition now disposes a failed construction scope synchronously or
+  asynchronously before propagating the failure. Async-only disposable dependencies are covered.
+  Streamed pipeline checks retain the pipeline while enumeration is active and verify cleanup after
+  early disposal and cancellation. The full normal run identified one default-client test tied to
+  the concrete transport-client type. Its replacement verifies singleton default selection across
+  scopes, standard context attachment, and retained allowed-type configuration through public APIs.
+  The focused registration class passes; final full measurement includes the revised test.
+  Earlier isolation, caller, cache, mapper, cancellation, limits, transaction, and metrics checks remain.
+- [x] P6i: Repeat the obsolete-code review after the extension change. Production code no longer casts
+  to `ExpressionSerializer` or `DynamicValueMapper`. The compiler's unused list still includes framework
+  interface dispatch, expression-generated materializers, lifecycle methods, and supported public manual
+  factories; those are retained for the reasons recorded in the earlier audit. Activation disposal
+  moved to the concrete host-owned server registration; activation objects no longer dispose dependencies.
+- [x] P6j: Final normal specification measurement, full transport suite, Release rebuild, package
+  validation, clean trim, documentation and hygiene checks, final-source slow SQLite and Firebird
+  comparisons, then updated issue and pull request for owner approval.
+
+Final-source local acceptance passed on 2026-10-26:
+
+| Suite | Passed | Failed | Total |
+|---|---:|---:|---:|
+| Normal functional | 29,692 | 0 | 29,926 |
+| Document store | 237 | 0 | 237 |
+| Transport | 306 | 0 | 306 |
+| Slow SQLite comparison | 27,604 | 0 | 27,771 |
+| Slow Firebird comparison | 109 | 0 | 110 |
+
+`eng/measure.sh issue-105-final-policy issue-105-service-replacement-final` reports unchanged
+failure names and reasons. The Release rebuild under warnings-as-errors, package validation,
+clean trim (115 InfoCarrier warnings, unchanged), strict documentation, links, word budgets,
+file hygiene, and whitespace checks passed. The Northwind console sample completed against a
+random-port HTTP host, including saves and rollback. Existing dependency and framework warnings
+remain. The final code includes both the construction-scope cleanup and decoded-query limit fixes.
+The full normal run and both slow comparisons were repeated after the last production change.
+Prepare the same pull request for final owner review; leave the issue open and do not merge.
+
+No gRPC implementation, protocol agreement, retry mechanism, distributed transaction, or separate
+configuration-object framework is introduced. A simultaneous client/server host uses independent
+registrations and host scopes. Future EF keyed-context support can select context registrations
+independently; its unsettled API is not a dependency of this implementation.
 
 ## Typed component replacement increment, 2026-10-26
 

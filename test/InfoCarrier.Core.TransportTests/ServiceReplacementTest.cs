@@ -14,7 +14,7 @@ using Item = InfoCarrier.Core.TransportTests.ClientServerCoexistenceTest.Item;
 
 namespace InfoCarrier.Core.TransportTests;
 
-public class ServiceReplacementTest
+public partial class ServiceReplacementTest
 {
     [Theory]
     [InlineData("default")]
@@ -346,7 +346,8 @@ public class ServiceReplacementTest
     {
         internal WebApplication App { get; } = app;
         internal Observations Observations { get; } = observations;
-        internal static async Task<Host> Start(string selection, bool custom)
+        internal static async Task<Host> Start(string selection, bool custom,
+            Action<InfoCarrierServerBuilder>? customize = null, Action<InfoCarrierServerOptions>? configure = null)
         {
             string path = Path.Combine(Path.GetTempPath(), $"icc-replacement-{Guid.NewGuid():N}.db");
             WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -356,8 +357,8 @@ public class ServiceReplacementTest
             builder.Services.AddSingleton(observations);
             builder.Services.AddDbContext<Context>(o => o.UseSqlite($"Data Source={path};Pooling=false"));
             InfoCarrierServerBuilder server = selection == "default"
-                ? builder.Services.AddInfoCarrierServer<Context>()
-                : builder.Services.AddInfoCarrierServer<Context>("orders");
+                ? builder.Services.AddInfoCarrierServer<Context>(configure)
+                : builder.Services.AddInfoCarrierServer<Context>("orders", configure);
             if (custom)
             {
                 if (selection == "type")
@@ -366,6 +367,7 @@ public class ServiceReplacementTest
                 }
                 else { server.ReplaceService<IInfoCarrierSerializer, PrefixSerializer>(); }
             }
+            customize?.Invoke(server);
             WebApplication app = builder.Build();
             var requests = new ConcurrentBag<Task>();
             app.Use(async (_, next) =>
