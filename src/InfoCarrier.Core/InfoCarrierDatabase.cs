@@ -222,7 +222,7 @@ public class InfoCarrierDatabase(
         try
         {
             (Common.SaveChangesRequest request, List<IUpdateEntry> sent,
-                Expressions.DynamicValueMapper mapper) = PrepareSave(entries);
+                Expressions.IDynamicValueMapper mapper) = PrepareSave(entries);
 
             phase = "exchange";
             Common.SaveChangesResult result;
@@ -275,7 +275,7 @@ public class InfoCarrierDatabase(
         try
         {
             (Common.SaveChangesRequest request, List<IUpdateEntry> sent,
-                Expressions.DynamicValueMapper mapper) = PrepareSave(entries);
+                Expressions.IDynamicValueMapper mapper) = PrepareSave(entries);
 
 
             phase = "exchange";
@@ -361,11 +361,11 @@ public class InfoCarrierDatabase(
     }
 
     private (Common.SaveChangesRequest Request, List<IUpdateEntry> Sent,
-        Expressions.DynamicValueMapper Mapper) PrepareSave(IList<IUpdateEntry> entries)
+        Expressions.IDynamicValueMapper Mapper) PrepareSave(IList<IUpdateEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var mapper = (Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper;
+        var mapper = _expressionSerializer.ValueMapper;
         mapper.ResetReferenceScope();
         List<IUpdateEntry> sent = [.. Expand(entries)];
         var request = new Common.SaveChangesRequest
@@ -824,7 +824,7 @@ public class InfoCarrierDatabase(
     private static void ApplyGeneratedValues(
         List<IUpdateEntry> entries,
         Common.SaveChangesResult result,
-        Expressions.DynamicValueMapper mapper)
+        Expressions.IDynamicValueMapper mapper)
     {
         foreach (Common.GeneratedValues generated in result.GeneratedValues)
         {

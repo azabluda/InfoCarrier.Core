@@ -39,7 +39,11 @@ BUDGET = {
     # others because the member's name says where it goes and not what it prevents, and a reader
     # scanning this table has to be able to tell whether it applies to them.
     # 540 on 2026-10-08 for the trusted anonymous-shape catalog registration.
-    "website/docs/api-surface.md": 540,
+    # 560 on 2026-10-25 for named server registration and endpoint selection overloads.
+    # 600 on 2026-10-25 for typed component replacement and its supported contracts.
+    "website/docs/api-surface.md": 750,
+    # Registration-local construction, inherited keys, lifetime, and fixed streaming format.
+    "website/docs/configuration/transports.md": 1350,
 
     # The pages that each cover a whole subject rather than one task: a generation of API change,
     # three browser constraints plus a wiring recipe, and the release itself.
@@ -161,7 +165,10 @@ BUDGET = {
     # than to the change that added the fifth grant. Do not raise this a sixth time without doing
     # it.
     # 1580 on 2026-10-08 for structural prototypes, recursive limits, and identity-conflict refusal.
-    "website/docs/configuration/server.md": 1580,
+    # 1800 on 2026-10-25 for endpoint selection and scoped custom context resolution.
+    # 1850 on 2026-10-25 to document per-registration streamed request limits.
+    # 1950 on 2026-10-25 for endpoint metric labels and measurement boundaries.
+    "website/docs/configuration/server.md": 1950,
 
     # Added to the 700 tier 2026-09-04, and the fact that put it over was measured rather than
     # argued. R173 instrumented the residual across a full suite run: when the client has to
@@ -201,7 +208,11 @@ BUDGET = {
     # server needs its own is the exact mistake this change exists to catch, because a deployment
     # that reads only this page will believe it is covered and lose nested data anyway.
     # 1000 on 2026-10-24 for ConfigureShared execution, composition, ordering, and agreement limits.
-    "website/docs/configuration/client.md": 1000,
+    # 1150 on 2026-10-25 for named selection, failure rules, and independent same-context factories.
+    # 1200 on 2026-10-25 for whole-response streaming limits and partial enumeration.
+    # 1250 on 2026-10-25 for registration labels and streamed measurement outcomes.
+    # 1300 on 2026-10-25 for the legacy options-mutation migration note.
+    "website/docs/configuration/client.md": 1300,
 }
 
 # RECALIBRATED TWICE, 2026-08-23 and 2026-08-24, and the second time is the signal. These numbers

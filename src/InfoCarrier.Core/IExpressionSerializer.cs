@@ -17,6 +17,24 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public interface IExpressionSerializer
 {
+    /// <summary>The operation's mapper, shared by expression translation, rows, and saves.</summary>
+    IDynamicValueMapper ValueMapper { get; }
+
+    /// <summary>Sets the executing client's declared types before translating or materializing.</summary>
+    void UseExecutionAllowedTypes(IReadOnlyList<Type> types);
+
+    /// <summary>Sets the actual leased server context, including a retained transaction context.</summary>
+    void UseServerContext(Microsoft.EntityFrameworkCore.DbContext context);
+
+    /// <summary>Attaches the trusted server anonymous-shape catalog.</summary>
+    void UseAnonymousShapeCatalog(AnonymousShapeCatalog catalog);
+
+    /// <summary>Translates using the same relational-root policy as query boundary analysis.</summary>
+    ExpressionNode ToNode(Expression expression, Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots);
+
+    /// <summary>Rebinds roots against the executing server context.</summary>
+    Expression ToExpression(ExpressionNode node, Func<QueryRootStubNode, Type, Expression> queryRootFactory);
+
     /// <summary>
     ///     Translates a live expression tree to its serializable DTO.
     /// </summary>

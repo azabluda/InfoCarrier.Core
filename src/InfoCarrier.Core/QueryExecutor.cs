@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Linq.Expressions;
 using System.Reflection;
@@ -100,10 +100,7 @@ internal sealed class QueryExecutor<TElement>
             // this suite had before -- is sent and never returned, which is why nothing showed.
             IReadOnlyList<Type> allowedTypes = InfoCarrierOptionsExtension.AllowedTypesFor(queryContext.Context);
 
-            if (expressionSerializer is ExpressionSerializer serializer)
-            {
-                serializer.UseExecutionAllowedTypes(allowedTypes);
-            }
+            expressionSerializer.UseExecutionAllowedTypes(allowedTypes);
 
             var splitter = new QuerySplitter(
                 queryContext.Context.Model,
@@ -510,8 +507,7 @@ internal sealed class QueryExecutor<TElement>
             // Start of a message exchange: wire reference ids restart at 1 on both sides. One scope
             // per round trip, so a split query's second request does not decode against the first's
             // reference table.
-            ((Expressions.DynamicValueMapper)((ExpressionSerializer)_expressionSerializer).ValueMapper)
-                .ResetReferenceScope();
+            _expressionSerializer.ValueMapper.ResetReferenceScope();
 
             return new QueryDataRequest
             {
@@ -522,7 +518,7 @@ internal sealed class QueryExecutor<TElement>
                 // its SQL dropped -- `FromSql_arguments_cross_as_values...` answered 2 where 1 is
                 // correct, silently.
                 SerializedQuery = SerializeNode(
-                    ((ExpressionSerializer)_expressionSerializer).ToNode(serverQuery.Query, _relationalRoots)),
+                    _expressionSerializer.ToNode(serverQuery.Query, _relationalRoots)),
                 TrackingBehavior = _trackingBehavior,
                 IsAsync = async,
                 ReturnsSingleResult = serverQuery.ReturnsSingleResult,

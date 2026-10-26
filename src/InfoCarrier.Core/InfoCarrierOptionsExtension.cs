@@ -58,48 +58,11 @@ public class InfoCarrierOptionsExtension : IDbContextOptionsExtension
     }
 
     /// <summary>
-    ///     Adds to <see cref="AllowedTypes" /> for this options instance.
-    /// </summary>
-    /// <remarks>
-    ///     Additive rather than replacing, so two calls to <c>AllowTypes</c> both count. Every
-    ///     other <c>With…</c> on an EF options extension replaces, but this one names a set and a
-    ///     caller configuring options in two places would silently lose the first list.
-    /// </remarks>
-    public virtual InfoCarrierOptionsExtension WithAllowedTypes(IEnumerable<Type> types)
-    {
-        ArgumentNullException.ThrowIfNull(types);
-
-        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
-        clone.AllowedTypes = [.. AllowedTypes, .. types];
-        return clone;
-    }
-
-    internal InfoCarrierOptionsExtension WithRegisteredAnonymousShapes(IEnumerable<Type> types)
-    {
-        ArgumentNullException.ThrowIfNull(types);
-
-        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
-        clone.RegisteredAnonymousShapes = RegisteredAnonymousShapes.Add(types);
-        return clone;
-    }
-
-    /// <summary>
     ///     Whether this client may send a query carrying raw SQL (#60). <c>false</c> unless the
     ///     application called
     ///     <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />.
     /// </summary>
     public virtual bool ArbitrarySqlExecutionAllowed { get; private set; }
-
-    /// <summary>
-    ///     Sets <see cref="ArbitrarySqlExecutionAllowed" /> for this options instance.
-    /// </summary>
-    public virtual InfoCarrierOptionsExtension WithArbitrarySqlExecution()
-    {
-        var clone = (InfoCarrierOptionsExtension)MemberwiseClone();
-        clone.ArbitrarySqlExecutionAllowed = true;
-        return clone;
-    }
-
 
     /// <summary>
     ///     Whether the server's backing store is relational. <c>true</c> unless the application

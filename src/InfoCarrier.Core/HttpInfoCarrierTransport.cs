@@ -32,6 +32,9 @@ public sealed class HttpInfoCarrierTransport(
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly string _requestUri = requestUri;
 
+    /// <summary>The media type used for envelope and query request bodies.</summary>
+    public string MediaType { get; init; } = "application/json";
+
     /// <inheritdoc />
     public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
     {
@@ -42,7 +45,7 @@ public sealed class HttpInfoCarrierTransport(
         {
             Content = new ByteArrayContent(body),
         };
-        message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        message.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(MediaType);
 
         using HttpResponseMessage response = _httpClient.Send(
             message, HttpCompletionOption.ResponseContentRead, CancellationToken.None);
@@ -81,6 +84,7 @@ public sealed class HttpInfoCarrierTransport(
         {
             Content = new StreamingContent(writeRequest),
         };
+        request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(MediaType);
         request.Headers.Add("InfoCarrier-Operation", operation.ToString());
         request.Options.Set(BrowserResponseStreaming, true);
 
@@ -133,7 +137,7 @@ public sealed class HttpInfoCarrierTransport(
         byte[] body = await _serializer.SerializeAsync(request, cancellationToken).ConfigureAwait(false);
 
         using var content = new ByteArrayContent(body);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse(MediaType);
 
         using HttpResponseMessage response =
             await _httpClient.PostAsync(_requestUri, content, cancellationToken).ConfigureAwait(false);

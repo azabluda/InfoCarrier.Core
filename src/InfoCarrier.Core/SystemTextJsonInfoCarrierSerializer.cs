@@ -68,10 +68,13 @@ public sealed class SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits
         => new(JsonSerializer.SerializeAsync(destination, value, Options, cancellationToken));
 
     /// <inheritdoc />
-    public ValueTask<T?> DeserializeAsync<T>(
+    public async ValueTask<T?> DeserializeAsync<T>(
         Stream source,
         CancellationToken cancellationToken = default)
-        => JsonSerializer.DeserializeAsync<T>(source, Options, cancellationToken);
+    {
+        using Stream? bounded = _limits.CreateReadLimit<T>(source);
+        return await JsonSerializer.DeserializeAsync<T>(bounded ?? source, Options, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public byte[] Serialize<T>(T value)

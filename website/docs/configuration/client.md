@@ -17,6 +17,51 @@ InfoCarrier or SQLite.
 
 Other EF Core options work as usual: logging, `ConfigureWarnings`, tracking, and proxies.
 
+## Named clients
+
+Register a name when an application calls several servers:
+
+```csharp
+builder.Services.AddInfoCarrierClient("orders", options => options
+    .WithEndpoint("https://orders.example.com/infocarrier")
+    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+
+builder.Services.AddDbContextFactory<ShopContext>(options =>
+    options.UseInfoCarrier(clientName: "orders"));
+```
+
+Names are case-sensitive. Empty names and duplicate names fail during registration.
+A missing name fails when context options are resolved. It never falls back to the default.
+`UseInfoCarrier()` selects only the unnamed registration, even when exactly one named client exists.
+Named registration does not change that default. Repeating the unnamed registration replaces it.
+
+Each registration has its own transport and serializer configuration. Configure its returned
+`IHttpClientBuilder` to set headers or handlers. InfoCarrier keeps these configurations separate
+from application-owned HTTP clients with the same public name. The host disposes activated clients;
+the HTTP client factory owns pooled handlers.
+
+A client name does not name an Entity Framework context factory. For two destinations using the
+same context type, give each application factory independent options:
+
+```csharp
+builder.Services.AddKeyedSingleton<IDbContextFactory<ShopContext>>("orders", (sp, _) =>
+    new ShopContextFactory(new DbContextOptionsBuilder<ShopContext>()
+        .UseApplicationServiceProvider(sp).UseInfoCarrier("orders").Options));
+builder.Services.AddKeyedSingleton<IDbContextFactory<ShopContext>>("archive", (sp, _) =>
+    new ShopContextFactory(new DbContextOptionsBuilder<ShopContext>()
+        .UseApplicationServiceProvider(sp).UseInfoCarrier("archive").Options));
+
+public sealed class ShopContextFactory(DbContextOptions<ShopContext> options)
+    : IDbContextFactory<ShopContext>
+{
+    public ShopContext CreateDbContext() => new(options);
+}
+```
+
+Register both InfoCarrier clients first, including `archive` with its endpoint and shared settings.
+Resolve these application factories with `GetRequiredKeyedService<IDbContextFactory<ShopContext>>(name)`.
+Calling ordinary `AddDbContextFactory<ShopContext>` twice does not create named factories.
+
 ## What the client is told about the server
 
 Fluent methods and properties configure options. `ConfigureShared` preserves the role type in a chain:
@@ -68,6 +113,10 @@ Reference `InfoCarrier.Core.Abstractions` from the shared project, or link this 
 Abstractions has no Entity Framework Core dependency.
 
 Keep client-only settings outside this method.
+
+Version 11 removes `InfoCarrierOptionsExtension.WithAllowedTypes` and `WithArbitrarySqlExecution`.
+Configure deployment settings through client callbacks. For a custom client, use
+`UseInfoCarrier(client, configure)`.
 
 ## Direct creation and replaceable parts
 
@@ -150,6 +199,10 @@ builder.Services.AddInfoCarrierClient(options => options
 Pass `null` to opt out of a limit. It is spelled as an explicit `null` rather than a very large
 number so that opting out is visible in your code.
 
+The response limit counts the complete streamed response, including frame metadata, rather than
+each row separately. Enumeration can return rows before a later read exceeds the limit.
+Each named client uses its own limit.
+
 The client role exposes only `MaxResponseBytes`, because it never deserializes a request. Configure
 `MaxRequestBytes` on the server role. See
 [Configuring the server](server.md#payload-limits).
@@ -188,15 +241,26 @@ meter named `InfoCarrier.Core`:
 dotnet-counters monitor --process-id <pid> --counters InfoCarrier.Core
 ```
 
-It publishes two instruments. `infocarrier.client.round_trips` counts every request that finished,
-successful or failed. `infocarrier.client.round_trip.duration` records how long each one took, in
-seconds. Both carry the operation as a tag, so you can tell a query from a save, and a request that
-failed also carries `error.type`.
+`infocarrier.client.round_trips` counts completed attempts, including failures before sending.
+`infocarrier.client.round_trip.duration` records seconds through response disposal. Streamed queries
+include enumeration time. Both carry `infocarrier.operation` and `infocarrier.outcome`: `success`,
+`error`, `cancelled`, or `incomplete` when enumeration stops before completion. Failures carry `error.type`.
+Fault tags describe a loaded reported type, or `InfoCarrierServerException` for unknown types.
+
+Registered clients carry `infocarrier.client.name` and `infocarrier.client.registration`. The name
+is empty for unnamed registrations. The number starts at one within each host and follows registration
+order, distinguishing repeated unnamed registrations from a named client called `default`.
+Directly constructed clients omit these labels. URLs, caller identities, and transaction tokens are
+not metric labels. A host serving incoming requests also publishes separate
+[server instruments](server.md#counting-server-requests).
 
 Any OpenTelemetry exporter reads the same meter with `AddMeter("InfoCarrier.Core")`. Nothing is
 measured while nothing is listening.
 
 ## The internal service provider
+
+For registration-local wire serializers and transports, use
+[component replacement](transports.md#replacing-registered-components). Those services belong to the host, outside EF's internal provider.
 
 Register application [value mappers](value-mappers.md) with `AddValueMappers` in the client role
 callback. Build EF's internal service provider yourself only when replacing a provider service or

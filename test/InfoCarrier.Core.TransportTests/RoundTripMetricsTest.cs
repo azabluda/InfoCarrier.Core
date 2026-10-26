@@ -73,14 +73,19 @@ public class RoundTripMetricsTest
         Assert.All(recorded, r => Assert.Null(r.ErrorType));
     }
 
-    [Fact]
-    public async Task A_failed_round_trip_is_counted_and_carries_the_exception_type()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_failed_round_trip_is_counted_and_carries_the_exception_type(bool synchronous)
     {
         // Counting only the successes would understate exactly the case a reader is investigating:
         // a screen that is slow because its requests are failing and being retried.
         List<Recorded> recorded = await Measure(
-            async client => await Assert.ThrowsAsync<TimeoutException>(
-                () => client.CommitTransactionAsync("t1")),
+            async client =>
+            {
+                if (synchronous) { Assert.Throws<TimeoutException>(() => client.CommitTransaction("t1")); }
+                else { await Assert.ThrowsAsync<TimeoutException>(() => client.CommitTransactionAsync("t1")); }
+            },
             _ => throw new TimeoutException("the server did not answer"));
 
         Recorded count = Assert.Single(

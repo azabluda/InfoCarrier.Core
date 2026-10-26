@@ -4,8 +4,8 @@ namespace InfoCarrier.Core;
 
 /// <summary>
 ///     Abstraction over the serialization format used on the wire (requirements §4.1).
-///     The core library never hardcodes JSON/protobuf/MessagePack; envelopes and payloads
-///     serialize through this seam. The default implementation is System.Text.Json with
+///     Envelopes and payloads serialize through this seam; built-in query framing and row data
+///     retain their JSON format. The default implementation is System.Text.Json with
 ///     source-generated contexts (requirements §4.5).
 /// </summary>
 public interface IInfoCarrierSerializer

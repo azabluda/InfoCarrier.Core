@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
@@ -41,7 +41,7 @@ public class ClientResultMaterializer(
 {
     private readonly DbContext _context = context;
     private readonly IStateManager _stateManager = context.GetService<IStateManager>();
-    private readonly ExpressionSerializer _serializer = (ExpressionSerializer)serializer;
+    private readonly IExpressionSerializer _serializer = serializer;
     private readonly QueryTrackingBehavior _trackingBehavior = trackingBehavior;
     private readonly bool _deferTracking = deferTracking;
 
@@ -81,7 +81,7 @@ public class ClientResultMaterializer(
     /// </summary>
     public virtual IEnumerable<TElement> Materialize<TElement>(QueryDataResult result)
     {
-        var mapper = (DynamicValueMapper)_serializer.ValueMapper;
+        var mapper = _serializer.ValueMapper;
 
         // Entities are built here wherever they appear in the graph — as a whole row, or nested
         // inside a projection (`Select(c => new { c, o })`). Before this hook the nested case
@@ -132,7 +132,7 @@ public class ClientResultMaterializer(
         Action<Exception> reportFailure,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var mapper = (DynamicValueMapper)_serializer.ValueMapper;
+        var mapper = _serializer.ValueMapper;
         Func<DynamicValueNode, object?>? outer = mapper.EntityMaterializer;
         mapper.EntityMaterializer = node => MaterializeEntity(node, mapper);
 
@@ -171,7 +171,7 @@ public class ClientResultMaterializer(
 
     private TElement MaterializeRow<TElement>(
         QueryRowFrame row,
-        DynamicValueMapper mapper,
+        IDynamicValueMapper mapper,
         Action<Exception> reportFailure)
     {
         try
@@ -302,7 +302,7 @@ public class ClientResultMaterializer(
     ///     that points back at it resolves to this instance instead of recursing
     ///     (<c>docs/result-wire-format.md</c> §3.1).
     /// </remarks>
-    private object? MaterializeEntity(DynamicValueNode row, DynamicValueMapper mapper)
+    private object? MaterializeEntity(DynamicValueNode row, IDynamicValueMapper mapper)
     {
         // Consumed here, before anything nested is built: the hold belongs to *this* row, and a
         // join row carries navigations to both of its sides. Leaving it set deferred those too,
@@ -522,7 +522,7 @@ public class ClientResultMaterializer(
     ///     and under <see cref="QueryTrackingBehavior.NoTrackingWithIdentityResolution" /> the
     ///     server already collapsed duplicates, which the wire preserves as back-references.
     /// </remarks>
-    private object MaterializeUntracked(DynamicValueNode row, IEntityType entityType, DynamicValueMapper mapper)
+    private object MaterializeUntracked(DynamicValueNode row, IEntityType entityType, IDynamicValueMapper mapper)
     {
         // EF's materializer, but *without* a state-manager entry. The materializer is what gives
         // the instance its `ILazyLoader` — a no-tracking query still returns entities that may
@@ -820,7 +820,7 @@ public class ClientResultMaterializer(
     ///     </para>
     /// </remarks>
     private static void ApplyComplexValues(
-        DynamicValueNode row, object instance, IEntityType entityType, DynamicValueMapper mapper)
+        DynamicValueNode row, object instance, IEntityType entityType, IDynamicValueMapper mapper)
     {
         foreach (DynamicPropertyValue member in row.Properties)
         {
@@ -874,7 +874,7 @@ public class ClientResultMaterializer(
         object instance,
         IEntityType entityType,
         InternalEntityEntry? entry,
-        DynamicValueMapper mapper)
+        IDynamicValueMapper mapper)
     {
         foreach (DynamicPropertyValue member in row.Properties)
         {
@@ -1024,7 +1024,7 @@ public class ClientResultMaterializer(
         DynamicValueNode node,
         INavigationBase navigation,
         object instance,
-        DynamicValueMapper mapper)
+        IDynamicValueMapper mapper)
     {
         IClrCollectionAccessor accessor = navigation.GetCollectionAccessor()!;
         object collection = accessor.GetOrCreate(instance, forMaterialization: true);

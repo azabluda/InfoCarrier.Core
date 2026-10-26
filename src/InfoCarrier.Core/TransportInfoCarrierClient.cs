@@ -1,6 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Diagnostics;
 using System.Text.Json;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
@@ -23,6 +22,7 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
     : IInfoCarrierClient, IInfoCarrierClientConfiguration
 {
     private readonly IInfoCarrierTransport _transport = transport;
+    private readonly bool _measureRequests = true;
     private readonly IInfoCarrierSerializer _serializer = serializer;
     private readonly ILogger<TransportInfoCarrierClient> _logger = NullLogger<TransportInfoCarrierClient>.Instance;
 
@@ -56,12 +56,8 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             yield break;
         }
 
-        await using IInfoCarrierResponse response = await streamTransport.SendAsync(
-            InfoCarrierOperation.Query,
-            (destination, token) => _serializer.SerializeAsync(destination, request, token),
-            cancellationToken).ConfigureAwait(false);
-        await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
-            response.Content, cancellationToken).ConfigureAwait(false))
+        await foreach (QueryStreamFrame frame in ReadQueryFramesAsync(streamTransport, request, cancellationToken)
+            .ConfigureAwait(false))
         {
             yield return frame;
         }
@@ -82,9 +78,12 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         IInfoCarrierTransport transport,
         IInfoCarrierSerializer serializer,
         ILogger<TransportInfoCarrierClient> logger,
-        InfoCarrierClientRegistration registration)
+        InfoCarrierClientRegistration registration, bool measureRequests = true)
         : this(transport, serializer, logger)
-        => ((IInfoCarrierClientConfiguration)this).Registration = registration;
+    {
+        ((IInfoCarrierClientConfiguration)this).Registration = registration;
+        _measureRequests = measureRequests;
+    }
 
     /// <inheritdoc />
     public QueryDataResult QueryData(
@@ -107,16 +106,11 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         QueryDataRequest request,
         CancellationToken cancellationToken)
     {
-        await using IInfoCarrierResponse response = await transport.SendAsync(
-            InfoCarrierOperation.Query,
-            (destination, token) => _serializer.SerializeAsync(destination, request, token),
-            cancellationToken).ConfigureAwait(false);
-
         QueryStartFrame? start = null;
         var rows = new List<DynamicValueNode>();
         var logs = new List<ServerLogEvent>();
-        await foreach (QueryStreamFrame frame in QueryStreamFrameCodec.ReadAsync(
-            response.Content, cancellationToken).ConfigureAwait(false))
+        await foreach (QueryStreamFrame frame in ReadQueryFramesAsync(transport, request, cancellationToken)
+            .ConfigureAwait(false))
         {
             switch (frame)
             {
@@ -142,6 +136,84 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
             ElementTypeName = start?.ElementTypeName,
             ServerLog = logs.Count == 0 ? null : logs,
         };
+    }
+
+    private async IAsyncEnumerable<QueryStreamFrame> ReadQueryFramesAsync(
+        IInfoCarrierStreamTransport transport, QueryDataRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, InfoCarrierOperation.Query) : null;
+        IInfoCarrierResponse? response = null;
+        Stream? bounded = null;
+        IAsyncEnumerator<QueryStreamFrame>? frames = null;
+        try
+        {
+            try
+            {
+                response = await transport.SendAsync(InfoCarrierOperation.Query,
+                    (destination, token) => _serializer.SerializeAsync(destination, request, token),
+                    cancellationToken).ConfigureAwait(false);
+                InfoCarrierPayloadLimits? limits = _serializer switch
+                {
+                    InfoCarrierSerializerBoundary boundary => boundary.Limits,
+                    SystemTextJsonInfoCarrierSerializer json => json.Limits,
+                    _ => null,
+                };
+                bounded = limits?.CreateReadLimit<QueryDataResult>(response.Content);
+                frames = QueryStreamFrameCodec.ReadAsync(bounded ?? response.Content, cancellationToken)
+                    .GetAsyncEnumerator(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                measurement?.Fail(exception, cancellationToken);
+                throw;
+            }
+
+            while (true)
+            {
+                bool next;
+                try { next = await frames.MoveNextAsync().ConfigureAwait(false); }
+                catch (Exception exception)
+                {
+                    measurement?.Fail(exception, cancellationToken);
+                    throw;
+                }
+                if (!next) { yield break; }
+                QueryStreamFrame frame = frames.Current;
+                if (frame is QueryCompleteFrame) { measurement?.Complete(); }
+                if (frame is QueryFaultFrame fault)
+                {
+                    measurement?.FailFault(fault.Fault);
+                }
+                yield return frame;
+            }
+        }
+        finally
+        {
+            try
+            {
+                if (frames is not null) { await frames.DisposeAsync().ConfigureAwait(false); }
+            }
+            catch (Exception exception)
+            {
+                measurement?.Fail(exception, cancellationToken);
+                throw;
+            }
+            finally
+            {
+                bounded?.Dispose();
+                if (response is not null)
+                {
+                    try { await response.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception exception)
+                    {
+                        measurement?.Fail(exception, cancellationToken);
+                        throw;
+                    }
+                }
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -241,26 +313,19 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
 
     private TResponse RoundTrip<TRequest, TResponse>(InfoCarrierOperation operation, TRequest request)
     {
-        bool measured = InfoCarrierMetrics.Enabled;
-        long startedAt = measured ? Stopwatch.GetTimestamp() : 0L;
-        string? errorType = null;
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation) : null;
 
         try
         {
-            return Send<TRequest, TResponse>(operation, request);
+            TResponse response = Send<TRequest, TResponse>(operation, request);
+            measurement?.Complete();
+            return response;
         }
         catch (Exception exception)
         {
-            errorType = exception.GetType().FullName;
+            measurement?.Fail(exception, default);
             throw;
-        }
-        finally
-        {
-            if (measured && InfoCarrierMetrics.Enabled)
-            {
-                InfoCarrierMetrics.RoundTripCompleted(
-                    operation, Stopwatch.GetElapsedTime(startedAt), errorType);
-            }
         }
     }
 
@@ -269,34 +334,25 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
         TRequest request,
         CancellationToken cancellationToken)
     {
-        // THE ONE PLACE A ROUND TRIP HAPPENS, which is why the measurement is here and not at the
-        // nine call sites above: a tenth operation cannot forget to be counted. `Enabled` is asked
-        // first so that an application which never named the meter does not even take a timestamp,
-        // and asked again at the end so that a listener attaching mid-flight does not report a
-        // duration measured from zero.
-        bool measured = InfoCarrierMetrics.Enabled;
-        long startedAt = measured ? Stopwatch.GetTimestamp() : 0L;
-        string? errorType = null;
+        // Buffered operations share this boundary. Since 2026-10-25 streamed queries use their
+        // response-enumeration boundary, so their duration includes reading and response disposal.
+        // Starting without listeners allocates no measurement and takes no timestamp.
+        using InfoCarrierRequestMeasurement? measurement = _measureRequests ? InfoCarrierMetrics.StartClient(
+            ((IInfoCarrierClientConfiguration)this).Registration?.MetricIdentity, operation) : null;
 
         try
         {
-            return await SendAsync<TRequest, TResponse>(operation, request, cancellationToken)
+            TResponse response = await SendAsync<TRequest, TResponse>(operation, request, cancellationToken)
                 .ConfigureAwait(false);
+            measurement?.Complete();
+            return response;
         }
         catch (Exception exception)
         {
             // A failed round trip cost a round trip. Counting only the successes would understate
             // exactly the case a reader is investigating.
-            errorType = exception.GetType().FullName;
+            measurement?.Fail(exception, cancellationToken);
             throw;
-        }
-        finally
-        {
-            if (measured && InfoCarrierMetrics.Enabled)
-            {
-                InfoCarrierMetrics.RoundTripCompleted(
-                    operation, Stopwatch.GetElapsedTime(startedAt), errorType);
-            }
         }
     }
 

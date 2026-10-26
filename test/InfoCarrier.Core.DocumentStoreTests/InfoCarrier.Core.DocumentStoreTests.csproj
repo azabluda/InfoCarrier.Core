@@ -69,6 +69,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" VersionOverride="10.0.11" />
 
     <PackageReference Include="Mongo2Go" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" VersionOverride="10.0.11" />
     <PackageReference Include="MongoDB.EntityFrameworkCore" />
 
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -80,6 +82,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoCarrier.Core.Abstractions\InfoCarrier.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
+    <ProjectReference Include="..\..\src\InfoCarrier.Core.AspNetCore\InfoCarrier.Core.AspNetCore.csproj" />
     <!--
       THE SECOND CONSUMER OF THE SHARED HARNESS, AND THE REASON IT IS A PROJECT AGAIN. It is built
       at the repository's 10.0.1 floor and runs here on 10.0.11, which is the same compile-low /

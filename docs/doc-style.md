@@ -77,6 +77,10 @@ have to agree — a page over its own number is still a red build, so the number
 commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
 missing *fact*. What is suspended is the ceremony, not the standard.
 
+The 2026-10-26 registration extension pass sets `configuration/transports` to 1,350 words and
+`api-surface` to 750. The added material explains role replacement, model-aware pipeline ownership,
+custom hosting selection, endpoint-free transports, and media types.
+
 ## Rules
 
 1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an
@@ -188,6 +192,18 @@ which stopped being true on 2026-09-09.
 
 The client configuration page has a 1,000-word budget from 2026-10-24 to cover `ConfigureShared`
 execution, composition, ordering, and agreement limits.
+Raised to 1,150 on 2026-10-25 for named client selection, failure rules, transport ownership,
+and independent factories using the same context type.
+On 2026-10-25, the server configuration budget rose to 1,800 for endpoint selection and scoped
+custom context resolution. The API surface budget rose to 560 for the corresponding overloads.
+Later that day, the client budget rose to 1,200 and the server budget to 1,850 for streamed payload
+limits, partial enumeration, and per-registration enforcement.
+The metrics increment later that day raised the client budget to 1,250 and server budget to 1,950
+for registration labels, instrument names, and streamed measurement outcomes.
+The post-implementation cleanup raised the client budget to 1,300 for the removed low-level
+options mutation methods and their supported callback replacement.
+The component-replacement increment raised the API reference budget to 600 and the transport page
+to 750 for typed replacement, ownership, inherited-key injection, and the fixed streaming-format boundary.
 
 ## Before committing
 

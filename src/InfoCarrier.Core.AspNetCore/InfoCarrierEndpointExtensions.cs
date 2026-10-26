@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core.AspNetCore;
 
@@ -68,53 +69,113 @@ public static class InfoCarrierEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        // Validate the complete default role during endpoint setup, before requests arrive.
-        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierServer>();
-        _ = endpoints.ServiceProvider.GetRequiredService<IInfoCarrierSerializer>();
+        InfoCarrierMetricIdentity? metricIdentity = null;
+        string mediaType = "application/json";
+        if (endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>() is { } store)
+        {
+            metricIdentity = store.Default.MetricIdentity;
+            mediaType = store.Default.MediaType;
+        }
+        return MapEndpoint(endpoints, pattern, provider =>
+        {
+            IInfoCarrierServer server = provider.GetRequiredService<IInfoCarrierServer>();
+            return (server is DefaultInfoCarrierServer facade ? facade.Server : server,
+                provider.GetRequiredService<IInfoCarrierSerializer>());
+        }, metricIdentity, mediaType);
+    }
+
+    /// <summary>Maps a named server to the supplied route pattern.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier(
+        this IEndpointRouteBuilder endpoints, string pattern, string serverName)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverName);
+        InfoCarrierServerRegistrationStore store = GetStore(endpoints);
+        return MapSelected(endpoints, pattern, store, store.Get(serverName).Identity);
+    }
+
+    /// <summary>Maps the registration retained by a server builder from this host.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier(
+        this IEndpointRouteBuilder endpoints, InfoCarrierServerBuilder server, string pattern = "infocarrier")
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(server);
+        return MapSelected(endpoints, pattern, GetStore(endpoints), server.Identity);
+    }
+
+    /// <summary>Maps the only server registration for the context type; rejects missing or ambiguous matches.</summary>
+    public static IEndpointConventionBuilder MapInfoCarrier<TContext>(
+        this IEndpointRouteBuilder endpoints, string pattern = "infocarrier") where TContext : DbContext
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        InfoCarrierServerRegistrationStore store = GetStore(endpoints);
+        return MapSelected(endpoints, pattern, store, store.GetForContext(typeof(TContext)).Identity);
+    }
+
+    private static InfoCarrierServerRegistrationStore GetStore(IEndpointRouteBuilder endpoints)
+        => endpoints.ServiceProvider.GetService<InfoCarrierServerRegistrationStore>()
+            ?? throw new InvalidOperationException("No InfoCarrier servers are registered. Call AddInfoCarrierServer before mapping endpoints.");
+
+    private static IEndpointConventionBuilder MapSelected(
+        IEndpointRouteBuilder endpoints, string pattern, InfoCarrierServerRegistrationStore store,
+        InfoCarrierRegistrationIdentity identity)
+    {
+        InfoCarrierServerActivation activation = store.Activate(endpoints.ServiceProvider, identity);
+        return MapEndpoint(endpoints, pattern, _ => (activation.Server, activation.Serializer), store.Get(identity).MetricIdentity, store.Get(identity).MediaType);
+    }
+
+    private static IEndpointConventionBuilder MapEndpoint(
+        IEndpointRouteBuilder endpoints, string pattern,
+        Func<IServiceProvider, (IInfoCarrierServer Server, IInfoCarrierSerializer Serializer)> resolve,
+        InfoCarrierMetricIdentity? metricIdentity, string mediaType)
+    {
+        // Validate the complete selected pair during endpoint setup, before requests arrive.
+        _ = resolve(endpoints.ServiceProvider);
 
         // Fail trusted catalog construction during endpoint setup, before requests arrive.
         _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
 
         return endpoints.MapPost(pattern, async (HttpContext http) =>
         {
+            using InfoCarrierRequestMeasurement? measurement = InfoCarrierMetrics.StartEndpoint(metricIdentity);
             ILogger logger = http.RequestServices.GetRequiredService<ILoggerFactory>()
                 .CreateLogger("InfoCarrier.Core.AspNetCore.InfoCarrierEndpoint");
             string phase = "request body reading";
             bool dispatching = false;
             try
             {
-                IInfoCarrierSerializer serializer = http.RequestServices.GetRequiredService<IInfoCarrierSerializer>();
+                (IInfoCarrierServer selectedServer, IInfoCarrierSerializer serializer) = resolve(http.RequestServices);
 
                 if (http.Request.Headers.TryGetValue("InfoCarrier-Operation", out var operationHeader)
                     && Enum.TryParse(operationHeader, out InfoCarrierOperation streamOperation)
                     && streamOperation == InfoCarrierOperation.Query)
                 {
+                    if (measurement is not null) { measurement.Operation = streamOperation; }
                     QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
                             http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not a query request.");
-                    IInfoCarrierServer streamServer = http.RequestServices.GetRequiredService<IInfoCarrierServer>();
+                    IInfoCarrierServer streamServer = selectedServer;
                     http.Response.ContentType = "application/json";
-                    IAsyncEnumerable<QueryStreamFrame> frames = streamServer is InProcessInfoCarrierServer inProcess
+                    IAsyncEnumerable<QueryStreamFrame> frames = streamServer is IInfoCarrierStreamServer inProcess
                         ? inProcess.QueryFramesAsync(streamRequest, http.RequestAborted)
                         : BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted);
                     await QueryStreamFrameCodec.WriteAsync(
                         http.Response.Body,
-                        FaultFrames(frames, logger, http.RequestAborted),
+                        FaultFrames(frames, logger, measurement, http.RequestAborted),
                         http.RequestAborted).ConfigureAwait(false);
+                    measurement?.Complete();
                     return;
                 }
-
-                using var buffer = new MemoryStream();
-                await http.Request.Body.CopyToAsync(buffer, http.RequestAborted).ConfigureAwait(false);
 
                 InfoCarrierEnvelope request;
                 try
                 {
-                    request = serializer.Deserialize<InfoCarrierEnvelope>(buffer.ToArray())
+                    request = await serializer.DeserializeAsync<InfoCarrierEnvelope>(http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
+                    measurement?.Fail(exception, http.RequestAborted);
                     Log(logger, LogLevel.Warning, 35010, "InfoCarrier request was rejected because its envelope could not be read.");
                     phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
@@ -122,9 +183,10 @@ public static class InfoCarrierEndpointExtensions
                 }
 
                 var server = new InfoCarrierEnvelopeServer(
-                    http.RequestServices.GetRequiredService<IInfoCarrierServer>(), serializer,
+                    selectedServer, serializer,
                     http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
                 InfoCarrierEnvelope response;
+                if (measurement is not null) { measurement.Operation = request.Operation; }
                 try
                 {
                     dispatching = true;
@@ -132,6 +194,7 @@ public static class InfoCarrierEndpointExtensions
                 }
                 catch (NotSupportedException exception)
                 {
+                    measurement?.Fail(exception, http.RequestAborted);
                     dispatching = false;
                     phase = "bad request response writing";
                     await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
@@ -139,14 +202,20 @@ public static class InfoCarrierEndpointExtensions
                 }
 
                 dispatching = false;
-                http.Response.ContentType = "application/json";
+                if (response.Fault is { } responseFault)
+                {
+                    measurement?.FailFault(responseFault);
+                }
+                http.Response.ContentType = mediaType;
                 phase = "response envelope serialization";
                 byte[] bytes = serializer.Serialize(response);
                 phase = "response body writing";
                 await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
+                measurement?.Complete();
             }
             catch (Exception exception)
             {
+                measurement?.Fail(exception, http.RequestAborted);
                 // Dispatch owns its failures. The adapter observes only HTTP boundary failures.
                 if (!dispatching)
                 {
@@ -164,6 +233,7 @@ public static class InfoCarrierEndpointExtensions
     private static async IAsyncEnumerable<QueryStreamFrame> FaultFrames(
         IAsyncEnumerable<QueryStreamFrame> frames,
         ILogger logger,
+        InfoCarrierRequestMeasurement? measurement,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using IAsyncEnumerator<QueryStreamFrame> enumerator = frames.GetAsyncEnumerator(cancellationToken);
@@ -189,6 +259,7 @@ public static class InfoCarrierEndpointExtensions
 
             if (fault is not null)
             {
+                measurement?.FailFault(fault);
                 if (!started)
                 {
                     yield return new QueryStartFrame(QueryStreamFrameCodec.Version, 0, false, null);
@@ -199,6 +270,10 @@ public static class InfoCarrierEndpointExtensions
             }
 
             started = true;
+            if (frame is QueryFaultFrame returnedFault)
+            {
+                measurement?.FailFault(returnedFault.Fault);
+            }
             yield return frame!;
         }
     }

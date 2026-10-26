@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json;
 using InfoCarrier.Core.Common;
@@ -37,7 +37,7 @@ public static class ChangeEntryMapper
     ///     the server can mark it temporary too. It is meaningless to the store, but a principal
     ///     and its dependents share it, which is what identifies the relationship between them.
     /// </remarks>
-    public static ChangeEntry ToChangeEntry(IUpdateEntry entry, int correlationId, DynamicValueMapper mapper)
+    public static ChangeEntry ToChangeEntry(IUpdateEntry entry, int correlationId, IDynamicValueMapper mapper)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(mapper);
@@ -279,7 +279,7 @@ public static class ChangeEntryMapper
     public static byte[] Serialize(
         IEntityType entityType,
         IReadOnlyList<DynamicPropertyValue> properties,
-        DynamicValueMapper mapper)
+        IDynamicValueMapper mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
 
