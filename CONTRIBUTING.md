@@ -22,6 +22,9 @@ tracker issue, or the decision in `docs/decisions.md`. `OverrideAuditTest` fails
 override without one. A skip is allowed only where EF's own suite skips the same test.
 [`docs/test-policy.md`](docs/test-policy.md) has the rules.
 
+For focused runtime evidence and pull-request coverage limits, see
+[`docs/coverage-review.md`](docs/coverage-review.md).
+
 ## Warnings are errors in CI, and only in CI
 
 Locally a warning stays a warning, so half-finished work still builds. To see what the server sees:

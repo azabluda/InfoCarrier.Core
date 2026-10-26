@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION: InfoCarrier.Core.slnx
@@ -16,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       checks: write
       pull-requests: write
 
@@ -28,6 +33,9 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Check coverage review adapter
+        run: python -m unittest discover -s .github/scripts -p 'test_coverage_review.py' -v
 
       - name: Restore
         run: |
@@ -59,39 +67,40 @@ jobs:
         run: cat artifacts/coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload HTML report
+        id: report
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: artifacts/coverage/report
 
+      # Fork tokens cannot write comments. The summary and downloadable report remain available.
+      - name: Prepare exact baseline and changed-code configuration
+        id: review
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/coverage-review.py prepare
+
       - name: Comment on pull request
-        if: github.event_name == 'pull_request'
+        id: monitor
+        if: steps.review.outcome == 'success'
+        continue-on-error: true
         uses: uhafner/quality-monitor@0100da6973a1498aad89af676852a8c788d397f8  # v4.15.0
         with:
           pr-number: ${{ github.event.pull_request.number }}
           comments-strategy: UPDATE
           enable-delta: false
-          skip-annotations: true
+          # Empty enables annotations. Even the string 'false' suppresses them in this version.
+          skip-annotations: ${{ steps.review.outputs.skip-annotations }}
+          max-coverage-annotations: 30
           title-metric: line
-          config: >
-            {
-              "coverage": [
-                {
-                  "name": "InfoCarrier.Core",
-                  "tools": [
-                    {
-                      "id": "cobertura",
-                      "metric": "line",
-                      "sourcePath": ".",
-                      "pattern": "**/merged.cobertura.xml"
-                    },
-                    {
-                      "id": "cobertura",
-                      "metric": "branch",
-                      "sourcePath": ".",
-                      "pattern": "**/merged.cobertura.xml"
-                    }
-                  ]
-                }
-              ]
-            }
+          config: ${{ steps.review.outputs.config }}
+
+      - name: Add revisions, report link, and review limits to the same comment
+        if: steps.monitor.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COVERAGE_ARTIFACT_URL: ${{ steps.report.outputs.artifact-url }}
+        run: python .github/scripts/coverage-review.py finish
