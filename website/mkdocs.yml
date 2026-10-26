@@ -112,6 +112,9 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
 
+extra_css:
+  - assets/stylesheets/documentation.css
+
 plugins:
   - search
 
