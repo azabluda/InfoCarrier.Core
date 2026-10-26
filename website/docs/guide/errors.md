@@ -54,6 +54,19 @@ only view you get of what happened on the other side, so log it.
 var serverStack = ex.InnerException?.Data["InfoCarrier.ServerStackTrace"] as string;
 ```
 
+## Incompatible client and server
+
+`InfoCarrierProtocolException` means the client and server disagree about the wire contract.
+`ClientVersion` and `ServerVersion` identify the two contracts; zero means identification was
+missing. Upgrade the side named in the exception. Retrying the same request cannot resolve it.
+The server rejects an incompatible request before executing it. A client also checks the response
+version before reading results or reported faults.
+
+Version 11 servers support the current and previous minor's clients within version 11.
+Version 11.0 supports 11.0 clients only. Version 10 clients and version 11 development clients
+predating this policy are rejected. The wire version is independent of the package version.
+See [transport compatibility](../configuration/transports.md#compatibility) for custom transports.
+
 ## A failure of the journey
 
 If the request never reached a server, or what came back was not a valid response, you get
@@ -144,6 +157,7 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
 | `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
 | `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
 | `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
+| `InfoCarrierProtocolException` | Client and server wire contracts disagree | Upgrade the indicated side; do not retry |
 | `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](#knowing-whether-a-write-committed) |
 
 Catch the type, not the message: message text is not a supported contract on any EF Core provider,

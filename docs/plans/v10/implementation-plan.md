@@ -634,13 +634,21 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       including older version 11 development clients and streamed requests missing the new contract
       identification, before any operation executes. No conversion adapters or speculative migration
       interfaces belong to this step.
-- [ ] **WVP2. Verify and document the implemented policy.** Add meaningful acceptance and boundary
+- [x] **WVP2. Verify and document the implemented policy.** Add meaningful acceptance and boundary
       tests, update user guidance, and pass the required gates. Test pre-issue-50 buffered and
       streamed refusal with representative old payloads and applicable headers; assert a clear
       compatibility refusal and no operation effects. The owner allowed captured payload examples
       for these refusal tests on 2026-10-26. No preserved build or running older client is required.
       Published previous-minor acceptance begins with 11.1 against the actual published 11.0 client
       in separate processes; refusal fixtures are not a substitute for that later obligation.
+
+      Validated 2026-10-26: functional **Passed: 29693, Failed: 0, Total: 29927** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `eng/measure.sh issue-50` reported
+      **FAILING: 0, TOTAL: 30164**. Focused envelope tests **Passed: 19, Failed: 0, Total: 19**;
+      transport **Passed: 321, Failed: 0, Total: 321**. Strict Release solution build passed with
+      zero errors and 14 existing dependency-advisory warnings. Package validation passed; trimming
+      remained **115 <= 115**. Strict MkDocs, full documentation links, word budgets, changed-file
+      hygiene, and `git diff --check` passed. No migration mechanism or older client build was needed.
 - [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
       with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
       Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
