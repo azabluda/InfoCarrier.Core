@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION: InfoCarrier.Core.slnx
@@ -16,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: write
+      actions: read
       pull-requests: write
 
     steps:
@@ -59,39 +63,19 @@ jobs:
         run: cat artifacts/coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload HTML report
+        id: report
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: artifacts/coverage/report
 
-      - name: Comment on pull request
-        if: github.event_name == 'pull_request'
-        uses: uhafner/quality-monitor@0100da6973a1498aad89af676852a8c788d397f8  # v4.15.0
+      # Fork tokens cannot write comments. The summary and downloadable report remain available.
+      - name: Review coverage with octocov
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: k1LoW/octocov-action@a167dc0dee441b7ffc45e1b862ab55ec0d87f278  # v1
         with:
-          pr-number: ${{ github.event.pull_request.number }}
-          comments-strategy: UPDATE
-          enable-delta: false
-          skip-annotations: true
-          title-metric: line
-          config: >
-            {
-              "coverage": [
-                {
-                  "name": "InfoCarrier.Core",
-                  "tools": [
-                    {
-                      "id": "cobertura",
-                      "metric": "line",
-                      "sourcePath": ".",
-                      "pattern": "**/merged.cobertura.xml"
-                    },
-                    {
-                      "id": "cobertura",
-                      "metric": "branch",
-                      "sourcePath": ".",
-                      "pattern": "**/merged.cobertura.xml"
-                    }
-                  ]
-                }
-              ]
-            }
+          version: v0.83.3
+          checksum: 8d6576580d151e785474f193d740f63cb91b70ac767d402410fcd7f187a34202
+        env:
+          COVERAGE_REPORT_URL: ${{ steps.report.outputs.artifact-url }}
