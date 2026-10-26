@@ -21,7 +21,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      checks: write
       pull-requests: write
 
     steps:
@@ -33,9 +32,6 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Check coverage review adapter
-        run: python -m unittest discover -s .github/scripts -p 'test_coverage_review.py' -v
 
       - name: Restore
         run: |
@@ -74,33 +70,12 @@ jobs:
           path: artifacts/coverage/report
 
       # Fork tokens cannot write comments. The summary and downloadable report remain available.
-      - name: Prepare exact baseline and changed-code configuration
-        id: review
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Review coverage with octocov
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python .github/scripts/coverage-review.py prepare
-
-      - name: Comment on pull request
-        id: monitor
-        if: steps.review.outcome == 'success'
-        continue-on-error: true
-        uses: uhafner/quality-monitor@0100da6973a1498aad89af676852a8c788d397f8  # v4.15.0
+        uses: k1LoW/octocov-action@a167dc0dee441b7ffc45e1b862ab55ec0d87f278  # v1
         with:
-          pr-number: ${{ github.event.pull_request.number }}
-          comments-strategy: UPDATE
-          enable-delta: false
-          # Empty enables annotations. Even the string 'false' suppresses them in this version.
-          skip-annotations: ${{ steps.review.outputs.skip-annotations }}
-          max-coverage-annotations: 30
-          title-metric: line
-          config: ${{ steps.review.outputs.config }}
-
-      - name: Add revisions, report link, and review limits to the same comment
-        if: steps.monitor.outcome == 'success'
-        continue-on-error: true
+          version: v0.83.3
+          checksum: 8d6576580d151e785474f193d740f63cb91b70ac767d402410fcd7f187a34202
         env:
-          GH_TOKEN: ${{ github.token }}
-          COVERAGE_ARTIFACT_URL: ${{ steps.report.outputs.artifact-url }}
-        run: python .github/scripts/coverage-review.py finish
+          COVERAGE_REPORT_URL: ${{ steps.report.outputs.artifact-url }}

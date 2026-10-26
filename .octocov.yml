@@ -1,0 +1,25 @@
+repository: azabluda/InfoCarrier.Core
+coverage:
+  paths:
+    - artifacts/coverage/report/merged.cobertura.xml
+testExecutionTime:
+  if: false
+comment:
+  if: is_pull_request
+  updatePrevious: true
+  hideFooterLink: true
+  message: |
+    Coverage is informational. Review uncovered changed lines and affected files; zero coverage does not prove dead code.
+    [Detailed line and branch report](${COVERAGE_REPORT_URL}) (download `coverage-report`, open `index.html`).
+    If no compared revision is shown, the baseline is unavailable; comparisons start after the first main-branch report.
+summary:
+  if: true
+report:
+  if: is_default_branch
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+diff:
+  if: is_pull_request
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+viewer: artifact
