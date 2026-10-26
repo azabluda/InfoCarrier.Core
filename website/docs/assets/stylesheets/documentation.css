@@ -1,0 +1,329 @@
+/* Documentation layout, colors, and controls. */
+body:has(.ic-docs) {
+  --md-text-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --md-code-font: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --ic-panel: #ffffff;
+  --ic-panel-heading: #edf2f8;
+  --ic-line: #c7d1df;
+  --ic-accent: #14674f;
+  --md-default-bg-color: #f7f9fc;
+  --md-default-fg-color: #202b3b;
+  --md-default-fg-color--light: #536177;
+  --md-default-fg-color--lighter: #64748b;
+  --md-primary-fg-color: #edf2f8;
+  --md-primary-bg-color: #202b3b;
+  --md-primary-bg-color--light: #536177;
+  --md-accent-fg-color: #155eaa;
+  --md-typeset-a-color: #155eaa;
+  --md-code-bg-color: #edf2f8;
+  --md-code-fg-color: #263449;
+  --md-code-hl-comment-color: #526177;
+  background: radial-gradient(circle at 10% 0%, #447dff0a, transparent 34rem), var(--md-default-bg-color);
+}
+
+body[data-md-color-scheme="slate"]:has(.ic-docs) {
+  color-scheme: dark;
+  --ic-panel: #121722;
+  --ic-panel-heading: #171d29;
+  --ic-line: #2a3343;
+  --ic-accent: #63ddb6;
+  --md-default-bg-color: #0a0d14;
+  --md-default-fg-color: #f2f5f9;
+  --md-default-fg-color--light: #9ba8ba;
+  --md-default-fg-color--lighter: #9ba8ba;
+  --md-primary-fg-color: #121722;
+  --md-primary-bg-color: #f2f5f9;
+  --md-primary-bg-color--light: #9ba8ba;
+  --md-accent-fg-color: #63ddb6;
+  --md-typeset-a-color: #78b7ff;
+  --md-code-bg-color: #171d29;
+  --md-code-fg-color: #d8e0eb;
+  --md-code-hl-color: #63ddb61a;
+  --md-code-hl-keyword-color: #c7a0ff;
+  --md-code-hl-function-color: #f6d478;
+  --md-code-hl-string-color: #a7db8d;
+  --md-code-hl-number-color: #f3a36f;
+  --md-code-hl-comment-color: #9ba8ba;
+  --md-code-hl-name-color: #d8e0eb;
+  --md-code-hl-operator-color: #c7a0ff;
+  --md-code-hl-punctuation-color: #9ba8ba;
+  --md-code-hl-special-color: #78b7ff;
+  --md-code-hl-generic-color: #78b7ff;
+  --md-code-hl-variable-color: #78b7ff;
+  background:
+    radial-gradient(circle at 10% 0%, #447dff24, transparent 34rem),
+    radial-gradient(circle at 95% 8%, #36daa71a, transparent 30rem),
+    var(--md-default-bg-color);
+}
+
+body:has(.ic-docs),
+body[data-md-color-scheme="slate"]:has(.ic-docs) {
+  background-repeat: no-repeat;
+  background-size: 100% 44rem;
+}
+
+body:has(.ic-docs) .md-header {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ic-line);
+}
+
+body:has(.ic-docs) .md-tabs {
+  border-bottom: 1px solid var(--ic-line);
+}
+
+body:has(.ic-docs) .md-tabs__link {
+  opacity: 1;
+}
+
+body:has(.ic-docs) .md-tabs__item--active .md-tabs__link {
+  color: var(--ic-accent);
+}
+
+body:has(.ic-docs) .md-nav__link {
+  line-height: 1.5;
+}
+
+body:has(.ic-docs) .md-nav__link--active {
+  color: var(--ic-accent);
+}
+
+body:has(.ic-docs) .md-search__form {
+  background: var(--ic-panel-heading);
+  border: 1px solid var(--ic-line);
+  border-radius: .5rem;
+  color: var(--md-default-fg-color);
+}
+
+body:has(.ic-docs) .md-search__input::placeholder {
+  color: var(--md-default-fg-color--light);
+}
+
+.ic-docs {
+  --ic-edit-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 3 5 5L9 20l-6 1 1-6Z'/%3E%3Cpath d='m14 5 5 5'/%3E%3C/svg%3E");
+  --ic-view-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18'/%3E%3C/svg%3E");
+  --md-code-copy-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='12' height='13' rx='2'/%3E%3Cpath d='M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3'/%3E%3C/svg%3E");
+  max-width: 46rem;
+  margin-inline: auto;
+  padding-block: 1rem 3rem;
+}
+
+.ic-docs .md-typeset,
+.md-typeset .ic-docs {
+  font-size: .8rem;
+  line-height: 1.65;
+}
+
+.ic-docs > p,
+.ic-docs > ul,
+.ic-docs > ol {
+  max-width: 100%;
+}
+
+.ic-docs h1 {
+  margin-bottom: 1.2rem;
+  color: var(--md-default-fg-color);
+  font-size: clamp(1.9rem, 3.5vw, 3rem);
+  font-weight: 750;
+  letter-spacing: -.045em;
+  line-height: 1.12;
+}
+
+.ic-docs h1 + p {
+  margin-bottom: 2rem;
+  color: var(--md-default-fg-color--light);
+  font-size: .95rem;
+}
+
+.ic-docs h2 {
+  margin-top: 2.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--ic-line);
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+.ic-docs h3 {
+  margin-top: 1.8rem;
+  font-weight: 650;
+}
+
+.ic-docs .highlight {
+  overflow: hidden;
+  margin-block: 1.4rem;
+  border: 1px solid var(--ic-line);
+  border-radius: .8rem;
+  background: var(--ic-panel);
+  box-shadow: 0 .6rem 1.8rem #00000012;
+}
+
+.ic-docs .highlight pre {
+  margin: 0;
+}
+
+.ic-docs .highlight pre > code {
+  padding: 1rem;
+  background: var(--ic-panel);
+  font-size: .68rem;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  scrollbar-width: auto;
+  scrollbar-color: var(--md-default-fg-color--light) var(--ic-panel-heading);
+}
+
+.ic-docs .highlight pre > code::-webkit-scrollbar {
+  height: .5rem;
+}
+
+.ic-docs .highlight pre > code::-webkit-scrollbar-track {
+  background: var(--ic-panel-heading);
+}
+
+.ic-docs .highlight pre > code::-webkit-scrollbar-thumb {
+  background: var(--md-default-fg-color--light);
+  border: 2px solid var(--ic-panel-heading);
+  border-radius: .5rem;
+}
+
+.ic-docs .highlight span.filename {
+  margin: 0;
+  padding: .65rem 1rem;
+  border-bottom: 1px solid var(--ic-line);
+  background: var(--ic-panel-heading);
+  color: var(--ic-accent);
+  font-weight: 600;
+}
+
+.ic-docs .highlight .nc,
+.ic-docs .highlight .kt {
+  color: var(--md-typeset-a-color);
+}
+
+.ic-docs .md-code__nav {
+  background: transparent;
+}
+
+.ic-docs .md-code__button {
+  color: var(--md-default-fg-color--light);
+  background: transparent;
+  border-radius: .3rem;
+  opacity: 1;
+}
+
+.ic-docs .md-content__button {
+  color: var(--md-default-fg-color--light);
+}
+
+.ic-docs .md-content__button svg {
+  display: none;
+}
+
+.ic-docs .md-content__button::after {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  background-color: currentColor;
+  mask: var(--ic-view-icon) center / contain no-repeat;
+  content: "";
+}
+
+.ic-docs .md-content__button[rel="edit"]::after {
+  mask-image: var(--ic-edit-icon);
+}
+
+.ic-docs :is(.md-code__button, .md-content__button):is(:hover, :focus-visible) {
+  color: var(--ic-accent);
+}
+
+.ic-docs .md-typeset__table {
+  display: block;
+}
+
+.ic-docs table:not([class]) {
+  display: table;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ic-line);
+  border-radius: .65rem;
+  background: var(--ic-panel);
+  font-size: .72rem;
+}
+
+.ic-docs table:not([class]) th {
+  background: var(--ic-panel-heading);
+  color: var(--ic-accent);
+}
+
+.ic-docs table:not([class]) :is(th, td) {
+  min-width: 8rem;
+  padding: .8rem;
+  border-color: var(--ic-line);
+}
+
+.ic-docs table:not([class]) td code {
+  overflow-wrap: anywhere;
+}
+
+.ic-docs .admonition {
+  border-radius: .65rem;
+  background: var(--ic-panel);
+  box-shadow: none;
+}
+
+.ic-docs .grid.cards > ul > li {
+  border-color: var(--ic-line);
+  border-radius: .8rem;
+  background: var(--ic-panel);
+  box-shadow: none;
+}
+
+.ic-docs .grid.cards > ul > li:hover {
+  border-color: var(--ic-accent);
+}
+
+body:has(.ic-docs) :focus-visible {
+  outline: 3px solid var(--md-typeset-a-color);
+  outline-offset: 3px;
+}
+
+@media (min-width: 60em) {
+  body:has(.ic-docs) .md-sidebar--secondary {
+    width: 10.5rem;
+  }
+
+  body:has(.ic-docs) .md-nav--secondary .md-nav__title {
+    background: transparent;
+    box-shadow: none;
+    color: var(--md-default-fg-color);
+    font-weight: 700;
+  }
+}
+
+@media (min-width: 76.25em) {
+  body:has(.ic-docs) .md-sidebar--primary {
+    width: 10.5rem;
+  }
+
+  body:has(.ic-docs) .md-nav--primary .md-nav__title,
+  body:has(.ic-docs) .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link {
+    background: transparent;
+    box-shadow: none;
+    color: var(--md-default-fg-color);
+    font-weight: 700;
+  }
+
+  body:has(.ic-docs) .md-grid {
+    max-width: 74rem;
+  }
+}
+
+@media (max-width: 44.984375em) {
+  .ic-docs {
+    padding-top: .5rem;
+  }
+
+  .ic-docs .highlight pre > code {
+    padding: .8rem;
+  }
+}
