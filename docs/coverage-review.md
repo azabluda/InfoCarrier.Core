@@ -14,8 +14,10 @@ GitHub artifacts through `viewer: artifact`; no octocov.dev account or external 
 Octocov stores main-branch report metadata in GitHub Actions artifacts. Pull requests compare
 against the stored base-branch report. This may be an earlier commit than the current base; inspect
 the displayed revisions. The viewer withholds base-line coverage when its revision does not match
-the source diff. Missing baselines produce a current-only report, not a zero baseline. The first
-successful main run seeds the comparison store; this trial's first pull request has no such baseline.
+the source diff. Missing baselines produce a current-only report, not a zero baseline. Main runs
+update the comparison store automatically. This trial initially imported the verified main report
+from commit `451a842198024732f1e8b00b71c3f52f4b85af43` through a temporary seed job, then removed that job.
+There is no fixed workflow run number or seed step in the final configuration.
 Artifacts follow GitHub retention, so an expired baseline can make comparisons unavailable again.
 
 Changed lines exclude deletions; renames use the new path. Moved code can appear as additions.
@@ -72,8 +74,35 @@ established that framework-dispatched `CompileQuery` executes despite zero direc
 that synchronous transaction creation was absent from one scenario set but present in another.
 These remain reasons to investigate missing scenarios, never reasons for automatic deletion.
 
+Hosted acceptance used the same stored main baseline in both controlled runs:
+
+| Run | Project coverage | Covered lines | Probe / patch coverage |
+|---|---:|---:|---:|
+| [Uncovered addition](https://github.com/azabluda/InfoCarrier.Core/actions/runs/40325410026) | 92.7% | 8,906 of 9,600 | 0%, 0 of 66 lines |
+| [Tests added](https://github.com/azabluda/InfoCarrier.Core/actions/runs/40327416579) | 93.4% | 8,972 of 9,600 | 100%, 66 of 66 lines |
+
+The main baseline was 93.4%, with 8,906 of 9,534 lines covered. The tested report's difference
+against main displayed `+0.0%` because the tool rounds to one decimal; its exact covered-line
+increase was 66. Compare counts and patch coverage as well as the rounded percentage.
+
+Both trial workflows omitted the seed job. Octocov found metadata artifact
+`octocov-metadata-octocov-report@refs_heads_main`, which recorded the main commit and report artifact
+`12650592102`. The seed ran on the feature branch, so branch-name fallback could not supply this
+baseline. Both comments identified the correct baseline and tested merge revisions.
+The [same comment](https://github.com/azabluda/InfoCarrier.Core/pull/258#issuecomment-6414804434)
+was updated, not duplicated. Inspection of the HTML viewers confirmed 66 uncovered rows in the
+first run and 66 covered rows, with no uncovered probe rows, in the second run. The comparison
+artifacts remained on GitHub. Artifact links expire with their normal retention.
+
+The temporary production probe, its tests, and the seed job were removed by resetting the trial
+commits after both reports were captured. No temporary source or bootstrap setting remains in
+the reviewed implementation. The owner authorized hosted checks for the remaining temporary probes;
+the first local specification gate and the focused transport checks had already passed.
+
 - [x] C1: Replace custom code with pinned octocov configuration and compare local reports.
-- [ ] C2: Inspect hosted comment updates, artifact links, and missing-baseline output after continuous integration.
-- [ ] C3: Verify the comparison viewer after a main-branch baseline exists. Keep the issue open until acceptance is reconciled.
+- [x] C2: Inspect hosted comment updates, artifact links, and explicit missing-baseline output.
+- [x] C3: Verify automatic baseline lookup, downward/upward deltas, and the hosted comparison viewer.
+
+Keep the issue open for final review and separate owner merge approval.
 
 Reference: [released octocov documentation](https://github.com/k1LoW/octocov/blob/v0.83.3/README.md).
