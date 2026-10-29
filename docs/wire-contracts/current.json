@@ -1,0 +1,4697 @@
+{
+  "Contract": {
+    "AllocatedVersions": [
+      1,
+      2,
+      3
+    ],
+    "Frames": {
+      "QueryCompleteFrame": [
+        "Tag:3"
+      ],
+      "QueryFaultFrame": [
+        "Tag:4",
+        "Payload:InfoCarrier.Core.Common.InfoCarrierFault"
+      ],
+      "QueryLogFrame": [
+        "Tag:2",
+        "Payload:InfoCarrier.Core.Common.ServerLogEvent"
+      ],
+      "QueryRowFrame": [
+        "Tag:1",
+        "Payload:InfoCarrier.Core.Expressions.DynamicValueNode"
+      ],
+      "QueryStartFrame/entity": [
+        "Tag:0",
+        "Version:int32",
+        "Slot:int32",
+        "IsEntityResult:boolean",
+        "ElementTypeName:string?"
+      ],
+      "QueryStartFrame/scalar": [
+        "Tag:0",
+        "Version:int32",
+        "Slot:int32",
+        "IsEntityResult:boolean",
+        "ElementTypeName:string?"
+      ]
+    },
+    "Inventory": {
+      "context:InfoCarrier.Core.Expressions.ExpressionJsonContext": "InfoCarrier.Core",
+      "context:InfoCarrier.Core.InfoCarrierJsonContext": "InfoCarrier.Core",
+      "exclusion:JsonElement": "Application-supplied JSON content; only its outer JSON representation is covered.",
+      "nested:ChangeEntry.SerializedOriginalValues": "ExpressionJsonContext/DynamicValueNode;Request",
+      "nested:ChangeEntry.SerializedValues": "ExpressionJsonContext/DynamicValueNode;Request",
+      "nested:GeneratedValues.SerializedValues": "ExpressionJsonContext/DynamicValueNode;Response",
+      "nested:QueryDataRequest.SerializedQuery": "ExpressionJsonContext/ExpressionNode;Request",
+      "nested:QueryDataResult.SerializedResults": "ExpressionJsonContext/List<DynamicValueNode>;Response",
+      "runtime:ExpressionJsonContext.Object": "System.Boolean,System.Byte,System.Byte[],System.Char,System.DateOnly,System.DateTime,System.DateTimeOffset,System.Decimal,System.Double,System.Guid,System.Int16,System.Int32,System.Int64,System.SByte,System.Single,System.String,System.Text.Json.JsonElement,System.TimeOnly,System.TimeSpan,System.UInt16,System.UInt32,System.UInt64,System.Uri",
+      "runtime:InfoCarrierJsonContext.Object": "null",
+      "serializer:InfoCarrier.Core.InfoCarrierSerializerBoundary": "InfoCarrier.Core",
+      "serializer:InfoCarrier.Core.SystemTextJsonInfoCarrierSerializer": "InfoCarrier.Core"
+    },
+    "Types": {
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.BinaryNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "isLiftedToNull": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "left": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "method": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+            "Writable": true
+          },
+          "operator": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "right": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConditionalNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "ifFalse": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "ifTrue": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "test": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConstantNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "dynamicValue": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "primitiveValue": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "valueType": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicPropertyValue": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 3,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "isJoinRows": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "isLoadedNavigation": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "name": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "primitiveValue": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object",
+            "Writable": true
+          },
+          "value": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.EntityKeyNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicPropertyValue]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicValueNode]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Nullable`1[System.Int32]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object"
+        ],
+        "Direction": 3,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "entityKey": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.EntityKeyNode",
+            "Writable": true
+          },
+          "id": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+            "Writable": true
+          },
+          "isNull": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "isTracked": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "items": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicValueNode]",
+            "Writable": true
+          },
+          "primitiveValue": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object",
+            "Writable": true
+          },
+          "properties": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicPropertyValue]",
+            "Writable": true
+          },
+          "ref": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Nullable`1[System.Int32]",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "typeValue": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ElementInitNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "addMethod": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+            "Writable": true
+          },
+          "arguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.EntityKeyNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.Object]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 3,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "entityTypeName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "keyValues": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.Object]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.BinaryNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConditionalNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConstantNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.FromSqlQueryRootStubNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.InvocationNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.LambdaNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ListInitNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberInitNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodCallNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewArrayNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ParameterNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.QueryRootStubNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ServerContextStubNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.SqlQueryRootStubNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeBinaryNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.UnaryNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {
+          "kind:0": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConstantNode",
+          "kind:1": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ParameterNode",
+          "kind:10": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ConditionalNode",
+          "kind:11": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberInitNode",
+          "kind:12": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ListInitNode",
+          "kind:13": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.InvocationNode",
+          "kind:14": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.QueryRootStubNode",
+          "kind:15": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.FromSqlQueryRootStubNode",
+          "kind:16": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.SqlQueryRootStubNode",
+          "kind:17": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ServerContextStubNode",
+          "kind:2": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberNode",
+          "kind:3": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodCallNode",
+          "kind:4": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.LambdaNode",
+          "kind:5": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+          "kind:6": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewArrayNode",
+          "kind:7": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.BinaryNode",
+          "kind:8": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.UnaryNode",
+          "kind:9": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeBinaryNode"
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "discriminatorProperty": "$kind",
+          "ignoreUnknownDiscriminator": "False",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownDerivedHandling": "FailSerialization",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.FromSqlQueryRootStubNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arguments": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "elementType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "isAdHoc": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "True",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "sql": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.InvocationNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+            "Writable": true
+          },
+          "expression": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.LambdaNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ParameterNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "body": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "parameters": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ParameterNode]",
+            "Writable": true
+          },
+          "returnType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ListInitNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ElementInitNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "initializers": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ElementInitNode]",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "newExpression": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberBindingNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "declaringType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "memberKind": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberKind",
+            "Writable": true
+          },
+          "memberName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "value": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberInitNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.MemberBindingNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "bindings": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.MemberBindingNode]",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "newExpression": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberKind": {
+        "Children": [],
+        "Direction": 1,
+        "Encoding": "enum/System.Int32",
+        "Kind": "None",
+        "Mappings": {
+          "enum:Field": "1|\"Field\"",
+          "enum:Property": "0|\"Property\""
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.EnumConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "declaringType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "instance": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "memberKind": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberKind",
+            "Writable": true
+          },
+          "memberName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodCallNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+            "Writable": true
+          },
+          "instance": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "method": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "declaringType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "genericArguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+            "Writable": true
+          },
+          "name": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "parameterTypes": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+            "Writable": true
+          },
+          "returnType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewArrayNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "expressions": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NewNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]",
+            "Writable": true
+          },
+          "constructorParameterTypes": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "members": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind": {
+        "Children": [],
+        "Direction": 1,
+        "Encoding": "enum/System.Int32",
+        "Kind": "None",
+        "Mappings": {
+          "enum:Binary": "7|\"Binary\"",
+          "enum:Conditional": "10|\"Conditional\"",
+          "enum:Constant": "0|\"Constant\"",
+          "enum:FromSqlQueryRootStub": "15|\"FromSqlQueryRootStub\"",
+          "enum:Invocation": "13|\"Invocation\"",
+          "enum:Lambda": "4|\"Lambda\"",
+          "enum:ListInit": "12|\"ListInit\"",
+          "enum:Member": "2|\"Member\"",
+          "enum:MemberInit": "11|\"MemberInit\"",
+          "enum:MethodCall": "3|\"MethodCall\"",
+          "enum:New": "5|\"New\"",
+          "enum:NewArray": "6|\"NewArray\"",
+          "enum:Parameter": "1|\"Parameter\"",
+          "enum:QueryRootStub": "14|\"QueryRootStub\"",
+          "enum:ServerContextStub": "17|\"ServerContextStub\"",
+          "enum:SqlQueryRootStub": "16|\"SqlQueryRootStub\"",
+          "enum:TypeBinary": "9|\"TypeBinary\"",
+          "enum:Unary": "8|\"Unary\""
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.EnumConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ParameterNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "id": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "name": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.QueryRootStubNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "elementType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ServerContextStubNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.SqlQueryRootStubNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arguments": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "elementType": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "sql": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeBinaryNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "operand": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "operator": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "typeOperand": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 3,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "arrayElement": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          },
+          "arrayRank": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32",
+            "Writable": true
+          },
+          "entityTypeName": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "genericArguments": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]",
+            "Writable": true
+          },
+          "name": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "shapeMembers": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.UnaryNode": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "kind": {
+            "Readable": false,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.NodeKind",
+            "Writable": true
+          },
+          "method": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MethodNode",
+            "Writable": true
+          },
+          "operand": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode",
+            "Writable": true
+          },
+          "operator": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String",
+            "Writable": true
+          },
+          "type": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "AllowNamedFloatingPointLiterals",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Boolean": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Boolean",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.BooleanConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Byte": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Byte",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.ByteConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Byte[]": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/base64",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.ByteArrayConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Char": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Char",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.CharConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicPropertyValue]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicPropertyValue"
+        ],
+        "Direction": 3,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.DynamicValueNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode"
+        ],
+        "Direction": 3,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ElementInitNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ElementInitNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ExpressionNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.MemberBindingNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.MemberBindingNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.ParameterNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ParameterNode"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Expressions.TypeNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.TypeNode"
+        ],
+        "Direction": 3,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.Object]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object"
+        ],
+        "Direction": 3,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[TCollection,TElement]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String"
+        ],
+        "Direction": 3,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Collections.Generic.List`1[InfoCarrier.Core.Expressions.DynamicValueNode]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.DynamicValueNode"
+        ],
+        "Direction": 2,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonMetadataServicesConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.DateOnly": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.DateOnly",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DateOnlyConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.DateTime": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.DateTime",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DateTimeConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.DateTimeOffset": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.DateTimeOffset",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DateTimeOffsetConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Decimal": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Decimal",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DecimalConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Double": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Double",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DoubleConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Guid": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Guid",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.GuidConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int16": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Int16",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.Int16Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Int32",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.Int32Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int64": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Int64",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.Int64Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Nullable`1[System.Int32]": {
+        "Children": [
+          "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Int32"
+        ],
+        "Direction": 3,
+        "Encoding": "nullable",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.NullableConverter`1[T]",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Object": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "dynamic/registered-vocabulary",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DefaultObjectConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.SByte": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.SByte",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.SByteConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Single": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Single",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.SingleConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.String": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.String",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.StringConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Text.Json.JsonElement": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "opaque/application-json",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.JsonElementConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.TimeOnly": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.TimeOnly",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.TimeOnlyConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.TimeSpan": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.TimeSpan",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.TimeSpanConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.UInt16": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.UInt16",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.UInt16Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.UInt32": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.UInt32",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.UInt32Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.UInt64": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.UInt64",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.UInt64Converter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.Expressions.ExpressionJsonContext/System.Uri": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Uri",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.UriConverter",
+          "defaultIgnore": "WhenWritingNull",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "256",
+          "nullableAnnotations": "False",
+          "numberHandling": "AllowNamedFloatingPointLiterals",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.ChangeEntry": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "clrTypeName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "correlationId": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "entityTypeName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "modifiedComplexProperties": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          },
+          "modifiedProperties": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          },
+          "sentinelProperties": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          },
+          "serializedOriginalValues": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          },
+          "serializedValues": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          },
+          "state": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "temporaryProperties": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.GeneratedValues": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "correlationId": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "serializedValues": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierEnvelope": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierFault",
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierOperation",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 3,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "correlationId": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "fault": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierFault",
+            "Writable": true
+          },
+          "operation": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierOperation",
+            "Writable": true
+          },
+          "payload": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          },
+          "protocolVersion": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierFault": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierFault",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "failedCorrelationIds": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32[]",
+            "Writable": true
+          },
+          "inner": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierFault",
+            "Writable": true
+          },
+          "message": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "stackTrace": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "typeName": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.InfoCarrierOperation": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "enum/System.Int32",
+        "Kind": "None",
+        "Mappings": {
+          "enum:BeginTransaction": "2|2",
+          "enum:CommitTransaction": "3|3",
+          "enum:CreateSavepoint": "5|5",
+          "enum:Query": "0|0",
+          "enum:ReleaseSavepoint": "7|7",
+          "enum:RollbackToSavepoint": "6|6",
+          "enum:RollbackTransaction": "4|4",
+          "enum:SaveChanges": "1|1",
+          "enum:SupportsSavepoints": "8|8"
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.EnumConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.QueryDataRequest": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/Microsoft.EntityFrameworkCore.QueryTrackingBehavior",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Nullable`1[Microsoft.EntityFrameworkCore.QuerySplittingBehavior]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "isAsync": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "protocolVersion": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "returnsSingleResult": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "serializedQuery": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          },
+          "splitQueryBehavior": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Nullable`1[Microsoft.EntityFrameworkCore.QuerySplittingBehavior]",
+            "Writable": true
+          },
+          "trackingBehavior": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/Microsoft.EntityFrameworkCore.QueryTrackingBehavior",
+            "Writable": true
+          },
+          "transactionId": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.QueryDataResult": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ServerLogEvent]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "elementTypeName": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "isEntityResult": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean",
+            "Writable": true
+          },
+          "serializedResults": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]",
+            "Writable": true
+          },
+          "serverLog": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ServerLogEvent]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.SaveChangesRequest": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ChangeEntry]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "entries": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ChangeEntry]",
+            "Writable": true
+          },
+          "transactionId": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.SaveChangesResult": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.GeneratedValues]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ServerLogEvent]",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "count": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "generatedValues": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.GeneratedValues]",
+            "Writable": true
+          },
+          "serverLog": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ServerLogEvent]",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.SavepointRequest": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "name": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "transactionId": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.ServerLogEvent": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "category": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "eventId": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "eventName": {
+            "Readable": true,
+            "Required": false,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "True",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "True"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          },
+          "level": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32",
+            "Writable": true
+          },
+          "message": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.TransactionResult": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 2,
+        "Encoding": "Object",
+        "Kind": "Object",
+        "Mappings": {},
+        "Properties": {
+          "transactionId": {
+            "Readable": true,
+            "Required": true,
+            "Settings": {
+              "conditionalWrite": "False",
+              "converter": "default",
+              "getNullable": "False",
+              "numberHandling": "Strict",
+              "objectCreationHandling": "default",
+              "setNullable": "False"
+            },
+            "Type": "InfoCarrier.Core.InfoCarrierJsonContext/System.String",
+            "Writable": true
+          }
+        },
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/Microsoft.EntityFrameworkCore.QuerySplittingBehavior": {
+        "Children": [],
+        "Direction": 1,
+        "Encoding": "enum/System.Int32",
+        "Kind": "None",
+        "Mappings": {
+          "enum:SingleQuery": "0|0",
+          "enum:SplitQuery": "1|1"
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.EnumConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/Microsoft.EntityFrameworkCore.QueryTrackingBehavior": {
+        "Children": [],
+        "Direction": 1,
+        "Encoding": "enum/System.Int32",
+        "Kind": "None",
+        "Mappings": {
+          "enum:NoTracking": "1|1",
+          "enum:NoTrackingWithIdentityResolution": "2|2",
+          "enum:TrackAll": "0|0"
+        },
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.EnumConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Boolean": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Boolean",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.BooleanConverter",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Byte[]": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/base64",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.ByteArrayConverter",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ChangeEntry]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.ChangeEntry"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[TCollection,TElement]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.GeneratedValues]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.GeneratedValues"
+        ],
+        "Direction": 2,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[TCollection,TElement]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[InfoCarrier.Core.Common.ServerLogEvent]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/InfoCarrier.Core.Common.ServerLogEvent"
+        ],
+        "Direction": 2,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[TCollection,TElement]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Collections.Generic.IReadOnlyList`1[System.String]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.String"
+        ],
+        "Direction": 1,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[TCollection,TElement]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.Int32",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.Int32Converter",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32[]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/System.Int32"
+        ],
+        "Direction": 2,
+        "Encoding": "Enumerable",
+        "Kind": "Enumerable",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.ArrayConverter`2[TCollection,TElement]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Nullable`1[Microsoft.EntityFrameworkCore.QuerySplittingBehavior]": {
+        "Children": [
+          "InfoCarrier.Core.InfoCarrierJsonContext/Microsoft.EntityFrameworkCore.QuerySplittingBehavior"
+        ],
+        "Direction": 1,
+        "Encoding": "nullable",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.NullableConverter`1[T]",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.Object": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "dynamic/registered-vocabulary",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.DefaultObjectConverter",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      },
+      "InfoCarrier.Core.InfoCarrierJsonContext/System.String": {
+        "Children": [],
+        "Direction": 3,
+        "Encoding": "scalar/System.String",
+        "Kind": "None",
+        "Mappings": {},
+        "Properties": {},
+        "Settings": {
+          "caseInsensitive": "False",
+          "converter": "System.Text.Json.Serialization.Converters.StringConverter",
+          "defaultIgnore": "Never",
+          "dictionaryKeyPolicy": "none",
+          "maxDepth": "64",
+          "nullableAnnotations": "False",
+          "numberHandling": "Strict",
+          "objectCreationHandling": "Replace",
+          "outOfOrderMetadata": "False",
+          "referenceHandling": "none",
+          "requiredConstructor": "False",
+          "unknownTypeHandling": "JsonElement"
+        },
+        "SkipUnknown": true
+      }
+    },
+    "Version": 3
+  },
+  "FormatVersion": 1,
+  "Inspection": {
+    "Dependencies": [
+      "InfoCarrier.Core.Abstractions/1.0.0",
+      "InfoCarrier.Core.AspNetCore/1.0.0",
+      "InfoCarrier.Core/1.0.0",
+      "InfoCarrier.WireContract/11.0.0-alpha.0.29",
+      "Microsoft.EntityFrameworkCore.Abstractions/10.0.1",
+      "Microsoft.EntityFrameworkCore.Relational/10.0.1",
+      "Microsoft.EntityFrameworkCore/10.0.1"
+    ],
+    "Sdk": "10.0.401",
+    "SystemTextJson": "10.0.0.0"
+  }
+}
