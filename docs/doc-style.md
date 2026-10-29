@@ -81,6 +81,9 @@ The 2026-10-26 registration extension pass sets `configuration/transports` to 1,
 `api-surface` to 750. The added material explains role replacement, model-aware pipeline ownership,
 custom hosting selection, endpoint-free transports, and media types.
 
+The 2026-10-29 structural compatibility explanation raises `configuration/transports` to 1,400 words.
+It distinguishes compatible additions, manual semantic version changes, and custom serializer responsibilities.
+
 ## Rules
 
 1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an

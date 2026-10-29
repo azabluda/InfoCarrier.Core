@@ -65,6 +65,27 @@ acceptance evidence. An incompatible change cannot silently discard a still-supp
 retain its behavior, complete the migration work, defer the change, or obtain an explicit owner
 decision revising the promise.
 
+### Changing the wire contract
+
+Run `python eng/wire-contract.py --base-ref <target>` before merging serialization changes.
+Without a target, the local check compares uncommitted work with the description at HEAD.
+Compatible additions can retain the current wire integer. A known structural break under an unchanged integer fails;
+unclassified changes need investigation rather than an automatic increase.
+
+For a deliberate structural or semantic break, select a fresh integer, update
+`InfoCarrierEnvelope.CurrentProtocolVersion`, append it to [wire-versions.json](wire-versions.json),
+and record the reason in the [wire contract](wire-protocol.md#references-and-allocation).
+Semantic changes need no fabricated schema change. Allocations cannot be removed or reused.
+Run the structural check with `--record` after resolving compatibility failures, review and commit
+the description diff, then run the ordinary check and admission tests. Address supported clients separately.
+
+The structural reference is the description committed on the target branch, initially the recorded
+development description. No old build is required. Release revisions retain their own descriptions;
+`--release-ref <revision>` adds a comparison that a version increase cannot waive.
+This is not a released-client acceptance test. Before publishing 11.1 or later, verify
+the promised previous minor with published packages, including the supported patch range.
+A selected representative package does not redefine support as latest-patch-only.
+
 ## Why not a property in `Directory.Build.props`
 
 It was one, until N8. The number lived in `VersionPrefix`/`VersionSuffix` **and** in the tag, which

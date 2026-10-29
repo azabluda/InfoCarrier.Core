@@ -78,6 +78,128 @@ Changing the contract number does not fulfill the previous-minor support promise
 incompatible change must retain supported behavior, complete the migration follow-up, wait for a
 suitable release boundary, or obtain an explicit owner decision changing that promise.
 
+### Structural compatibility check
+
+Run the check from the repository root:
+
+    python eng/wire-contract.py
+
+The local default reads the description at `HEAD`, so checking out an older commit uses its own
+reference. This checks uncommitted work. Before pushing, include all feature-branch commits by
+comparing with the target branch:
+
+    python eng/wire-contract.py --base-ref issue-50-wire-versioning
+
+The C# tool in tools/InfoCarrier.WireContract inspects effective System.Text.Json metadata and
+writes the candidate description temporarily. The reference is read directly from
+[the committed description](wire-contracts/current.json) at the selected Git revision. No old source
+build, package restore, or old runtime is needed. The JSON describes effective contracts, rather
+than a general JSON Schema language. `FormatVersion` identifies the description format separately
+from the wire version.
+
+After an accepted contract change, run:
+
+    python eng/wire-contract.py --base-ref issue-50-wire-versioning --record
+
+Recording first compares the actual implementation with the protected reference. A known break
+without a fresh wire version, or incomplete analysis, prevents recording. Ordinary checks also
+verify that the saved candidate contract matches its implementation. Editing the candidate JSON
+cannot replace the target's description or make an incompatible change pass.
+
+Commit the reviewed description with the code. It changes only when the contract or its recorded
+inspection information changes; ordinary commits reuse the same file content. Compatible additions
+can update the description without changing the wire integer. Git preserves earlier descriptions
+with their corresponding source revisions, rather than creating a new file for every commit.
+
+The covered paths are buffered envelopes, operation records and primitive payloads, separately
+decoded expressions and dynamic values, type descriptors, reference fields, faults, logs, enum
+assignments, and polymorphic discriminator mappings. An authored root list connects nested bytes
+to their decoded contracts. Registered contexts are discovered across the shipped assemblies;
+a registered type without a covered direction or an unsupported converter fails inspection.
+
+The stream probe runs the actual writer and reader for all existing frame kinds. It checks tags,
+lengths, named positions, and embedded payload agreement with serializer metadata. Distinct integer
+values expose a Version/Slot swap. The examples exercise both start-frame Boolean/null branches;
+they do not infer arbitrary conditional behavior in handwritten code.
+
+Request checks ask whether the current server can read older requests. Response checks ask whether
+older clients can read current responses. They do not promise newer clients work with older servers.
+
+| Difference | Result |
+|---|---|
+| No covered structural change | Pass with the existing version |
+| New optional request property | Pass when the reader permits omission |
+| Additional response property | Pass when the older reader skips unknown fields |
+| New required request property or changed JSON token type | Fail with the unchanged version |
+| Removed or renamed field | Fail under the conservative field-preservation rule, even if parsing could succeed |
+| Reassigned enum/discriminator or changed frame layout | Fail with the unchanged version |
+| New variant | Older requests remain valid; older response readers are not assumed to understand it |
+| Unsupported encoding, options change, or incomplete inventory | Fail as incomplete analysis; a version increase does not resolve it |
+
+Numeric widening and equivalent CLR type replacements are not inferred. They can require explicit
+classification even when a reader would accept them. Failures identify the path, reference revision,
+direction, and both descriptions. Restore accidental changes, complete coverage or classification,
+or deliberately allocate a fresh version for a known break. Then record the candidate description;
+never replace the protected reference to dismiss a failure.
+
+The check does not detect changed units, business meaning, constructor/setter behavior, or changes
+inside arbitrary serialization code with unchanged metadata. Application JSON inside JsonElement,
+application-specific models, and third-party serializers are outside its structural guarantee.
+New handwritten serialization routes require explicit coverage. Transport selectors and admission
+behavior remain covered by the existing transport tests, not inferred by this metadata comparison.
+
+### References and allocation
+
+The Fast gate compares GitHub's pull-request merge candidate with its target parent. Merge-group
+checks use the queue's base revision. Push checks use the protected branch state before the entire
+push. Local checks use HEAD unless a target is supplied. Missing references, stale merge
+identities, incomplete inventories, and rewritten allocation histories fail explicitly.
+
+Before the initial description reaches the target branch, the reference is description commit
+e877418b42b8991f0d3dc9be9cdfdea794fe3d81, captured from development revision
+1d8eb806291d15b1233fcdabb855b30843d31f63. This establishes no prerelease support promise.
+The protected description contains its allocation history; the candidate's history cannot replace
+it. A missing description fails, including at the initial reference.
+
+Release tags preserve the same description file. To check an actual supported release revision,
+add `--release-ref <release-tag-or-commit>`; repeat it for each applicable revision. These extra
+comparisons require structural compatibility even if the candidate increases the wire number.
+A representative patch does not prove compatibility with every supported patch. No stable version
+11 release exists yet, so CI currently checks only its target reference. Release acceptance must
+select the applicable release references and run the published-client tests from 11.1. Retired
+release descriptions can remain in Git history without remaining active comparison targets.
+
+Keep required checks current with the target branch, or use a merge queue, to check concurrent
+allocations against the final merge candidate. Existing review controls must protect the workflow,
+checker, coverage definitions, and reference-selection code. Administrators who bypass those
+controls can bypass this check. No repository test can prevent its own authorized removal.
+
+The description records inspection toolchain and dependency identities. The runner prints those
+reference inputs and the actual candidate build inputs. Toolchain provenance changes alone do not
+require a new wire version or description update. The contract is inspected on every run, including
+after dependency changes; equal metadata does not prove unchanged dependency behavior.
+
+The inspector's coverage remains a limitation of a saved description. Adding previously omitted
+coverage may require a reviewed baseline-format transition. Missing historical information must
+not be invented or silently treated as compatible. Check and description-format changes need the
+same review protection as baseline selection.
+
+Allocated integers are recorded once in the append-only [history](wire-versions.json).
+The authoritative current value remains InfoCarrierEnvelope.CurrentProtocolVersion.
+For an incompatible structural change or a deliberate meaning change:
+
+1. Choose an integer greater than every allocated integer.
+2. Change the authoritative constant and append the allocation to the history.
+3. Record the reason here, including any supported clients that need separate compatibility work.
+4. Run the structural check with `--record`, review and commit the description diff, then run
+   the ordinary structural check, admission tests, and applicable repository checks.
+
+A semantic-only increase passes without a fabricated field change. Reverting code or retiring a
+contract does not free its integer. Compatible revisions may share one integer.
+This branch-state check does not replace supported-release acceptance. From 11.1, use real
+published previous-minor clients as described below; a version increase alone can still refuse
+clients the release policy requires supporting.
+
 ### Protocol 2 history: bounded anonymous shapes (2026-10-07)
 
 Contract 2 introduced bounded anonymous-shape descriptors; contract 3 retains that vocabulary.

@@ -10,6 +10,13 @@ contract 3; verification evidence is recorded in the [implementation plan](../v1
 explicit version identification, consistent compatibility checks, refusal diagnostics, and tests
 of those checks. It does not convert older wire contracts into newer contracts.
 
+On 2026-10-28, the owner added a deterministic structural check to the completion boundary.
+The approved approach is a small C# comparison of actual serializer metadata, with explicit
+handwritten-frame coverage. On 2026-10-29 the owner selected committed contract descriptions
+instead of rebuilding old source. Compatible additions retain their integer; meaning changes require
+a deliberate manual increase. The [structural guarantee and limits](../../wire-protocol.md#structural-compatibility-check)
+define this check. Completing the admission/refusal work alone does not complete issue 50.
+
 **All pre-issue-50 client payloads are rejected explicitly**, including payloads from version 11
 development builds made before this change. Old envelope requests and unversioned streamed query
 requests must not fall through to current execution. Missing new contract identification is a
@@ -79,7 +86,11 @@ Issue 50 is complete only when all of the following hold:
    than merely asserting a generic parsing error. Published-client acceptance coverage remains
    required from 11.1, when a published 11.0 client exists; that uses the actual released client
    package and separate processes. Refusal payload fixtures are not acceptance evidence.
-6. The design records, implementation plan, and user documentation match the implemented behavior.
+6. A deterministic structural check compares the candidate with protected committed descriptions, detects known
+   breaking changes under an unchanged integer, permits supported compatible additions, and
+   reports incomplete analysis separately. Manual semantic-only increases remain possible.
+   Allocation history prevents rollback and reuse; it does not promise older-client acceptance.
+7. The design records, implementation plan, and user documentation match the implemented behavior.
    Relevant focused tests and repository-required product, transport, build, package, documentation,
    and hygiene checks pass. The focused pull request is ready for review; merging and publishing
    require separate owner authorization.
@@ -105,8 +116,9 @@ Version checks and refusal tests do not establish that future conversions will b
 
 ## Follow-up story: design and validate migration against real contract changes
 
-Status: planned, not implemented; no GitHub issue has been created. This is separate work after
-issue 50, to be evaluated before the first stable version 11 publication.
+Status: planned, not implemented; tracked in [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262),
+created at the owner's request on 2026-10-29. This is separate work after issue 50, to be evaluated
+before the first stable version 11 publication.
 
 **User story:** As a maintainer supporting the approved client window, I need a migration design
 tested against actual contract changes, so that older supported clients retain their promised

@@ -316,6 +316,35 @@ do not replace published-client compatibility acceptance tests and do not change
 committed slow-run output. Published previous-minor acceptance starts with 11.1 against published
 11.0, in separate client and sample-server processes.
 
+### Amendment 2026-10-29: structural change detection
+
+The owner requires a deterministic structural check before issue 50 completes. The implementation
+uses effective System.Text.Json metadata and authored probes of the handwritten frame codec.
+Known compatible additions can retain their wire integer. Incompatible changes require an explicit
+fresh allocation; unclassified changes stop for coverage or classification work. Meaning changes
+remain the developer's responsibility, and a manual increase needs no structural difference.
+
+The owner superseded the exclusion of committed generated contract descriptions on 2026-10-29.
+Rebuilding old source depends on old toolchains, package feeds, and build configuration remaining
+usable. Instead, preserve the effective contract while that revision builds. The initial description
+in `docs/wire-contracts/current.json` matches development revision `1d8eb806291d15b1233fcdabb855b30843d31f63`.
+Later target branches and release revisions retain their own descriptions in Git.
+
+ADR-014's concern about regeneration hiding a regression still holds. Updating a candidate
+description cannot replace the target branch's protected description. The check must compare the
+actual candidate against that protected reference before recording an update, and must verify that
+the committed candidate description matches its implementation. The owner explicitly authorized
+this restricted snapshot workflow. Captured traffic and generated SQL acceptance baselines remain
+excluded. Frame probes and classifier tests remain authored promises exercised with mutations.
+Allocation history is authored source: a failure means restore history or allocate a fresh number.
+
+The strongest cost is maintaining explicit coverage for bytes containing other contracts and for
+handwritten encoding. The bounded experiment demonstrated ordinary property changes and positional
+swaps without a general schema solver or a second language runtime. This remains a structural check;
+application-specific JSON, arbitrary converter behavior, and undiscovered handwritten routes are
+excluded as documented in the [wire contract](wire-protocol.md#structural-compatibility-check).
+No migration or published-client framework is introduced.
+
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 
 **Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and

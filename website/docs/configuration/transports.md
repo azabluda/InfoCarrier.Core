@@ -19,6 +19,11 @@ and corresponding server hosting.
 
 ## Compatibility
 
+Compatible optional fields can share a wire version. Changes to field meanings can require a new
+version even when their types stay the same. The repository checks the default serialization
+contracts for structural changes; this does not validate your application models or custom
+serializers. Keep those contracts compatible across your supported deployments.
+
 Version 11 supports clients from its current and previous minor releases. The first release,
 11.0, supports only 11.0 clients. Version 10 and earlier version 11 development contracts are not
 supported. The support window is measured in releases, not elapsed time.
