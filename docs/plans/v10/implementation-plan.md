@@ -653,14 +653,30 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       committed descriptions instead of rebuilding old source. The initial wire-3 description
       matches the verified development revision `1d8eb806291d15b1233fcdabb855b30843d31f63`.
       The dated amendment in ADR-008 records the restricted exception to ADR-014.
-- [ ] **WVP3. Protect structural contracts before issue 50 completes.** Added by the owner on
+- [x] **WVP3. Protect structural contracts before issue 50 completes.** Added by the owner on
       2026-10-28 after the admission/refusal implementation. Compare effective serializer metadata
-      and authored frame probes with protected source; permit compatible additions, fail known
+      and authored frame probes with protected committed descriptions; permit compatible additions, fail known
       breaks under the same version, and stop on incomplete analysis. Keep explicit allocation
       history, semantic-only increases, and published-client acceptance separate. The
       [wire contract](../../wire-protocol.md#structural-compatibility-check) records coverage,
-      limitations, local execution, and failure resolution. Validate deliberate production-source
-      mutations and the existing repository gates before checking this item.
+      limitations, local execution, and failure resolution. The owner selected committed descriptions
+      on 2026-10-29; checks build only the candidate, read protected descriptions from Git, and
+      refuse recording until comparison passes. Local defaults use HEAD for historical checkouts;
+      continuous integration selects the target parent. Explicit release comparisons cannot be
+      waived by a version increase.
+
+      Validated 2026-10-29: functional **Passed: 29693, Failed: 0, Total: 29927** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `eng/measure.sh wire-guard-20261029-resumed`
+      reported **FAILING: 0, TOTAL: 30164**. Transport **Passed: 341, Failed: 0, Total: 341**;
+      focused guard tests **Passed: 20, Failed: 0, Total: 20**; baseline/recording tests
+      **Passed: 18, Failed: 0, Total: 18**. All 12 production mutation cases passed, including
+      field changes, discriminator renumbering, frame tag/length/position changes, and a new context.
+      Three stored-description command checks passed: fresh-version acknowledgement, strict release
+      rejection despite that increase, and a semantic-only increase. Wire version remains 3.
+      The Release rebuild with continuous-integration rules passed with zero errors and existing
+      dependency/advisory and framework trimming warnings. Strict MkDocs, documentation links,
+      word budgets, file hygiene, and `git diff --check` passed. No product source or public signature
+      changed; product trimming and package-validation gates were therefore not required locally.
 - [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
       with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
       Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
