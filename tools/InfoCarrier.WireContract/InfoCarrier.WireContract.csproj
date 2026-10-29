@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UseAppHost>false</UseAppHost>
+    <RootNamespace>InfoCarrier.WireContract</RootNamespace>
+    <AssemblyName>InfoCarrier.WireContract</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/InfoCarrier.Core/InfoCarrier.Core.csproj" />
+    <ProjectReference Include="../../src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
+    <InternalsVisibleTo Include="InfoCarrier.Core.TransportTests" />
+  </ItemGroup>
+</Project>

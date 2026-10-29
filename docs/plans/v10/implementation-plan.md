@@ -626,6 +626,70 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       its license and theme credit, and stack those items on narrow screens. Verify the strict
       build, desktop/mobile presentation, file hygiene, and unchanged source Markdown.
 
+## Phase WVP: version-skew policy ([#50](https://github.com/azabluda/InfoCarrier.Core/issues/50))
+
+- [x] **WVP0. Record the accepted completion boundary and separate migration follow-up.** The owner
+      confirmed on 2026-10-26 that issue 50 ships no migration mechanism. The
+      [scope and follow-up story](../v11/wire-versioning.md) define acceptance criteria, the
+      same-major previous-minor support window, the version 10 exclusion, and staged published-client
+      evidence. Migration design needs real contract changes before its correctness, design quality,
+      and flexibility can be assessed.
+- [x] **WVP1. Specify and implement identification, checks, and diagnostics.** Define accepted and
+      refused combinations explicitly, cover buffered and streamed paths, and distinguish permanent
+      version refusals from transient failures. Explicitly reject all pre-issue-50 payloads,
+      including older version 11 development clients and streamed requests missing the new contract
+      identification, before any operation executes. No conversion adapters or speculative migration
+      interfaces belong to this step.
+- [x] **WVP2. Verify and document the implemented policy.** Add meaningful acceptance and boundary
+      tests, update user guidance, and pass the required gates. Test pre-issue-50 buffered and
+      streamed refusal with representative old payloads and applicable headers; assert a clear
+      compatibility refusal and no operation effects. The owner allowed captured payload examples
+      for these refusal tests on 2026-10-26. No preserved build or running older client is required.
+      Published previous-minor acceptance begins with 11.1 against the actual published 11.0 client
+      in separate processes; refusal fixtures are not a substitute for that later obligation.
+
+      Validated 2026-10-26: functional **Passed: 29693, Failed: 0, Total: 29927** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `eng/measure.sh issue-50` reported
+      **FAILING: 0, TOTAL: 30164**. Focused envelope tests **Passed: 19, Failed: 0, Total: 19**;
+      transport **Passed: 321, Failed: 0, Total: 321**. Strict Release solution build passed with
+      zero errors and 14 existing dependency-advisory warnings. Package validation passed; trimming
+      remained **115 <= 115**. Strict MkDocs, full documentation links, word budgets, changed-file
+      hygiene, and `git diff --check` passed. No migration mechanism or older client build was needed.
+- [x] **WVP3a. Record the initial structural description.** On 2026-10-29 the owner approved
+      committed descriptions instead of rebuilding old source. The initial wire-3 description
+      matches the verified development revision `1d8eb806291d15b1233fcdabb855b30843d31f63`.
+      The dated amendment in ADR-008 records the restricted exception to ADR-014.
+- [x] **WVP3. Protect structural contracts before issue 50 completes.** Added by the owner on
+      2026-10-28 after the admission/refusal implementation. Compare effective serializer metadata
+      and authored frame probes with protected committed descriptions; permit compatible additions, fail known
+      breaks under the same version, and stop on incomplete analysis. Keep explicit allocation
+      history, semantic-only increases, and published-client acceptance separate. The
+      [wire contract](../../wire-protocol.md#structural-compatibility-check) records coverage,
+      limitations, local execution, and failure resolution. The owner selected committed descriptions
+      on 2026-10-29; checks build only the candidate, read protected descriptions from Git, and
+      refuse recording until comparison passes. Local defaults use HEAD for historical checkouts;
+      continuous integration selects the target parent. Explicit release comparisons cannot be
+      waived by a version increase.
+
+      Validated 2026-10-29: functional **Passed: 29693, Failed: 0, Total: 29927** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `eng/measure.sh wire-guard-20261029-resumed`
+      reported **FAILING: 0, TOTAL: 30164**. Transport **Passed: 341, Failed: 0, Total: 341**;
+      focused guard tests **Passed: 20, Failed: 0, Total: 20**; baseline/recording tests
+      **Passed: 18, Failed: 0, Total: 18**. All 12 production mutation cases passed, including
+      field changes, discriminator renumbering, frame tag/length/position changes, and a new context.
+      Three stored-description command checks passed: fresh-version acknowledgement, strict release
+      rejection despite that increase, and a semantic-only increase. Wire version remains 3.
+      The Release rebuild with continuous-integration rules passed with zero errors and existing
+      dependency/advisory and framework trimming warnings. Strict MkDocs, documentation links,
+      word budgets, file hygiene, and `git diff --check` passed. No product source or public signature
+      changed; product trimming and package-validation gates were therefore not required locally.
+- [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
+      with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
+      Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
+      [#220](https://github.com/azabluda/InfoCarrier.Core/issues/220) are candidates, not assumed
+      migrations. Evaluate the design before stable version 11 publication. The owner requested
+      [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262) on 2026-10-29 to track this work.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

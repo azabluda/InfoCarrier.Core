@@ -17,6 +17,40 @@ An `InfoCarrierEnvelope` is a serializable record. Get one to the server, get th
 you have a transport. HTTP is the default adapter. Another protocol needs its own client transport
 and corresponding server hosting.
 
+## Compatibility
+
+Compatible optional fields can share a wire version. Changes to field meanings can require a new
+version even when their types stay the same. The repository checks the default serialization
+contracts for structural changes; this does not validate your application models or custom
+serializers. Keep those contracts compatible across your supported deployments.
+
+Version 11 supports clients from its current and previous minor releases. The first release,
+11.0, supports only 11.0 clients. Version 10 and earlier version 11 development contracts are not
+supported. The support window is measured in releases, not elapsed time.
+
+The wire contract uses an independent integer, currently 3. Several package releases can share
+that contract. Older packages outside the support window may still work when they use the same
+contract, but are not covered by the compatibility promise. The server checks the wire contract,
+not a package version supplied by the caller. Current code accepts only wire contract 3 and does
+not convert older contracts.
+
+Custom envelope transports must preserve `ProtocolVersion`. Missing identification is zero and is
+rejected. For `IInfoCarrierStreamTransport`, the query body carries `QueryDataRequest.ProtocolVersion`.
+`TransportInfoCarrierClient` supplies it automatically. The response starts with a frame carrying
+the same contract version, which the client checks before reading rows or faults.
+
+Streamed HTTP requests use `InfoCarrier-Stream-Operation: Query`. The earlier
+`InfoCarrier-Operation` selector is rejected. The new selector also prevents earlier servers from
+silently executing a query while ignoring its added version field.
+The `InfoCarrier-Protocol-Version` request header is checked before the query body is parsed;
+the body version is checked too. The HTTP transport supplies both automatically.
+
+The HTTP endpoint answers a version refusal with status 400 and a plain text explanation. Its
+`InfoCarrier-Protocol-Version` and `InfoCarrier-Client-Protocol-Version` response headers identify
+the server and received client contracts. The HTTP transport raises `InfoCarrierProtocolException`,
+separately from connection failures. An older server without these refusal headers retains its
+existing error behavior. See [handling errors](../guide/errors.md#incompatible-client-and-server).
+
 ## Replacing registered components
 
 Replace a serializer for one client without changing other clients:

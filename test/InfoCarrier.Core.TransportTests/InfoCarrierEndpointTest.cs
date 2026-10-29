@@ -33,7 +33,7 @@ public class InfoCarrierEndpointTest(NorthwindServerFactory factory) : IClassFix
     {
         var transport = new HttpInfoCarrierTransport(factory.CreateClient(), Serializer);
 
-        InfoCarrierTransportException exception = await Assert.ThrowsAsync<InfoCarrierTransportException>(
+        InfoCarrierProtocolException exception = await Assert.ThrowsAsync<InfoCarrierProtocolException>(
             () => transport.SendAsync(
                 new InfoCarrierEnvelope
                 {

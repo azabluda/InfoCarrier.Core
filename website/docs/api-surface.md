@@ -20,6 +20,9 @@ All types are in `InfoCarrier.Core` unless stated otherwise.
 | `IEndpointRouteBuilder.MapInfoCarrier(string pattern = "infocarrier")`, `MapInfoCarrier(string pattern, string serverName)`, `MapInfoCarrier(InfoCarrierServerBuilder server, string pattern)`, `MapInfoCarrier<TContext>(string pattern)` | Maps the default, named, retained, or unique context registration. In `InfoCarrier.Core.AspNetCore`. Returns `IEndpointConventionBuilder`. |
 | `DatabaseFacade.UseInfoCarrierTransaction(IDbContextTransaction)` | Joins a transaction another context began. Non-owning. |
 
+`InfoCarrierProtocolException` reports incompatible wire contracts through `ClientVersion` and
+`ServerVersion`. Retry cannot fix it. See [handling errors](guide/errors.md#incompatible-client-and-server).
+
 ## The three replaceable objects
 
 | Type | Implements | Constructor |

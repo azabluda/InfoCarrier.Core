@@ -32,7 +32,7 @@ namespace InfoCarrier.Core.AspNetCore;
 ///         hand to <see cref="InfoCarrierEnvelopeServer.DispatchAsync" /> at all.
 ///     </para>
 ///     <para>
-///         <b>The second</b> is <see cref="NotSupportedException" /> from a protocol-version
+///         <b>The second</b> is <see cref="InfoCarrierProtocolException" /> from a protocol-version
 ///         mismatch. <see cref="InfoCarrierEnvelopeServer.DispatchAsync" /> checks the version
 ///         before its own try/catch on purpose (see that method's remarks): the two ends disagree
 ///         about what an envelope even is, so answering with one would be optimistic. Left
@@ -41,6 +41,8 @@ namespace InfoCarrier.Core.AspNetCore;
 ///         <c>text/plain</c> 500 with no message at all outside Development) instead of naming
 ///         both protocol versions, which is the whole reason
 ///         <see cref="InfoCarrierEnvelopeServer" /> writes that message in the first place.
+///         Streamed query requests are checked before entering their operation server, and refusal
+///         headers let the HTTP transport distinguish incompatibility from a transient failure.
 ///     </para>
 ///     <para>
 ///         Neither catch touches <see cref="OperationCanceledException" />: a cancelled request is
@@ -146,14 +148,31 @@ public static class InfoCarrierEndpointExtensions
             {
                 (IInfoCarrierServer selectedServer, IInfoCarrierSerializer serializer) = resolve(http.RequestServices);
 
-                if (http.Request.Headers.TryGetValue("InfoCarrier-Operation", out var operationHeader)
+                if (http.Request.Headers.ContainsKey("InfoCarrier-Operation"))
+                {
+                    throw new InfoCarrierProtocolException(0, InfoCarrierEnvelope.CurrentProtocolVersion);
+                }
+
+                if (http.Request.Headers.TryGetValue("InfoCarrier-Stream-Operation", out var operationHeader)
                     && Enum.TryParse(operationHeader, out InfoCarrierOperation streamOperation)
                     && streamOperation == InfoCarrierOperation.Query)
                 {
                     if (measurement is not null) { measurement.Operation = streamOperation; }
+                    _ = int.TryParse(http.Request.Headers["InfoCarrier-Protocol-Version"].ToString(),
+                        System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture,
+                        out int streamVersion);
+                    if (streamVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+                    {
+                        throw new InfoCarrierProtocolException(streamVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
+                    }
                     QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
                             http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not a query request.");
+                    if (streamRequest.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+                    {
+                        throw new InfoCarrierProtocolException(
+                            streamRequest.ProtocolVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
+                    }
                     IInfoCarrierServer streamServer = selectedServer;
                     http.Response.ContentType = "application/json";
                     IAsyncEnumerable<QueryStreamFrame> frames = streamServer is IInfoCarrierStreamServer inProcess
@@ -192,12 +211,12 @@ public static class InfoCarrierEndpointExtensions
                     dispatching = true;
                     response = await server.DispatchAsync(request, http.RequestAborted).ConfigureAwait(false);
                 }
-                catch (NotSupportedException exception)
+                catch (InfoCarrierProtocolException exception)
                 {
                     measurement?.Fail(exception, http.RequestAborted);
                     dispatching = false;
                     phase = "bad request response writing";
-                    await WriteBadRequestAsync(http, exception.Message).ConfigureAwait(false);
+                    await WriteProtocolRefusalAsync(http, exception).ConfigureAwait(false);
                     return;
                 }
 
@@ -212,6 +231,13 @@ public static class InfoCarrierEndpointExtensions
                 phase = "response body writing";
                 await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
                 measurement?.Complete();
+            }
+            catch (InfoCarrierProtocolException exception)
+            {
+                measurement?.Fail(exception, http.RequestAborted);
+                Log(logger, LogLevel.Warning, 35002,
+                    "InfoCarrier Query was rejected because its protocol version is unsupported.");
+                await WriteProtocolRefusalAsync(http, exception).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -337,6 +363,15 @@ public static class InfoCarrierEndpointExtensions
     {
         try { logger?.Log(level, new EventId(eventId), message, values); }
         catch (Exception) { }
+    }
+
+    private static Task WriteProtocolRefusalAsync(HttpContext http, InfoCarrierProtocolException exception)
+    {
+        http.Response.Headers["InfoCarrier-Protocol-Version"] = exception.ServerVersion.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        http.Response.Headers["InfoCarrier-Client-Protocol-Version"] = exception.ClientVersion.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        return WriteBadRequestAsync(http, exception.Message);
     }
 
     private static async Task WriteBadRequestAsync(HttpContext http, string message)

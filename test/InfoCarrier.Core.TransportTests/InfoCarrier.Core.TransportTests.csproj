@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\tools\InfoCarrier.WireContract\InfoCarrier.WireContract.csproj" />
     <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
     <ProjectReference Include="..\..\samples\Northwind.Shared\Northwind.Shared.csproj" />
     <ProjectReference Include="..\..\src\InfoCarrier.Core.AspNetCore\InfoCarrier.Core.AspNetCore.csproj" />

@@ -16,7 +16,8 @@ on:
     # whichever branch happened to build last.
     branches: [main, 'release/**']
   pull_request:
-    branches: [main, 'release/**']
+    branches: [main, 'release/**', issue-50-wire-versioning]
+  merge_group:
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -89,6 +90,13 @@ jobs:
 
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
+
+      # Inspect the merge candidate against the description stored on its target parent.
+      # Recording candidate metadata cannot replace the protected target description.
+      - name: Wire contract compatibility
+        run: |
+          python test/wire_contract_runner_test.py
+          python eng/wire-contract.py
 
       # THE PUBLIC-API GATE, and it belongs on the pull request rather than after the merge.
       # `dotnet pack` is what runs package validation: Directory.Build.props sets

@@ -122,8 +122,10 @@ public class RegistrationMetricsTest
                 using var request = new HttpRequestMessage(HttpMethod.Post, "/default");
                 if (mode == "stream")
                 {
-                    request.Headers.Add("InfoCarrier-Operation", nameof(InfoCarrierOperation.Query));
-                    request.Content = new ByteArrayContent(Serializer.Serialize(Request()));
+                    request.Headers.Add("InfoCarrier-Stream-Operation", nameof(InfoCarrierOperation.Query));
+                    request.Headers.Add("InfoCarrier-Protocol-Version", InfoCarrierEnvelope.CurrentProtocolVersion.ToString());
+                    request.Content = new ByteArrayContent(Serializer.Serialize(
+                        Request() with { ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion }));
                 }
                 else
                 {

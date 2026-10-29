@@ -42,7 +42,7 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Three pages, for the document-store grant | 520, 910 and 1300 | Raised 2026-09-11 for #102, the grant that stops a change set which does not mention the whole document from erasing the rest of it. `configuration/server` 1300, a fifth server-side grant and the first that prevents silent data loss rather than a refusal; the section has to say that the client's own switch does not make it unnecessary, because a deployment that reads only the client page will believe it is covered. `api-surface` 520, one row, a sentence longer than its neighbours because the member's name says where it goes and not what it prevents. **The server page is now a third longer than the next one and wants splitting**; `eng/doc-words.py` says so at the number and says why that is a separate change |
 | Two pages, for a key of the caller's own type | 950 and 1080 | Raised 2026-09-21, when measuring `AllowTypes` showed it decides where a query runs and not only whether one is refused. `guide/querying` 1080, a section naming the four operators that take a key, the registration on both halves, and the consequence a caller has to know before reaching for it: naming a type moves the operator to the database, so a query this client used to answer can start to raise EF Core's own refusal. `configuration/client` 950, two sentences and a link on the row that had described the `EF.Functions` case alone |
 | One page, for a client-side concurrency suppression | 950 | Raised 2026-09-27. `limitations` names a second unsupported scenario: an interceptor on the client that suppresses a concurrency exception writes nothing and reports the save as done. The page has to say where the interceptor goes instead, and that costs an example |
-| One page, for the marker-row pattern | 810 | Raised 2026-09-29. `guide/errors` shows how to learn whether a write committed (#185), and then had to say where that fails: on Cosmos DB, EF Core 10 writes each document separately, and a marker's id lost with the application cannot be looked for |
+| One page, for error recovery and compatibility | 950 | Raised 2026-10-26. `guide/errors` distinguishes permanent protocol refusals from connection failures and documents the version 11 compatibility boundary. Its marker-row pattern remains the guidance for uncertain writes |
 | One page, for shared helpers | 1200 | Raised 2026-10-06. `guide/querying` names the public shared helper requirement, registration on both ends, backend translation or refusal, and the different behavior of private or client-only helpers. |
 | Three pages, for trusted anonymous-shape catalogs | 540, 920 and 1580 | Raised 2026-10-08. `api-surface` 540 names the catalog API. `security` 920 explains trusted admission and the remaining execution risks. `configuration/server` 1580 explains structural prototype registration, recursive limits, model binding, and missing-registration or conflicting-identity failures. |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
@@ -80,6 +80,9 @@ missing *fact*. What is suspended is the ceremony, not the standard.
 The 2026-10-26 registration extension pass sets `configuration/transports` to 1,350 words and
 `api-surface` to 750. The added material explains role replacement, model-aware pipeline ownership,
 custom hosting selection, endpoint-free transports, and media types.
+
+The 2026-10-29 structural compatibility explanation raises `configuration/transports` to 1,400 words.
+It distinguishes compatible additions, manual semantic version changes, and custom serializer responsibilities.
 
 ## Rules
 
