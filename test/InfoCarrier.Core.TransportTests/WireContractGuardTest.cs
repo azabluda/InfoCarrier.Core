@@ -164,6 +164,8 @@ public class WireContractGuardTest
         var after = Describe(GuardJsonContext.Default.OriginalMessage);
         before.Types["message"] = before.Types["message"] with { Direction = direction };
         after.Types["message"] = after.Types["message"] with { Direction = direction };
+        after.Types["message"].Settings["discriminatorProperty"] = "$kind";
+        before.Types["message"].Settings["discriminatorProperty"] = "$kind";
         after.Types["message"].Mappings["kind:18"] = "message";
         Assert.Equal(pass, Compare(before, after).Passed);
     }
@@ -173,8 +175,15 @@ public class WireContractGuardTest
     {
         var before = Describe(GuardJsonContext.Default.OriginalMessage);
         var after = Describe(GuardJsonContext.Default.OriginalMessage);
+        foreach (string variant in new[] { "first", "second" })
+        {
+            before.Types[variant] = Describe(GuardJsonContext.Default.OriginalMessage).Types["message"];
+            after.Types[variant] = Describe(GuardJsonContext.Default.OriginalMessage).Types["message"];
+        }
         before.Types["message"].Mappings["kind:0"] = "first";
         after.Types["message"].Mappings["kind:0"] = "second";
+        before.Types["message"].Settings["discriminatorProperty"] = "$kind";
+        after.Types["message"].Settings["discriminatorProperty"] = "$kind";
         after.Types["message"].Properties.Clear();
         var result = Compare(before, after);
         Assert.False(result.Passed);
@@ -207,7 +216,8 @@ public class WireContractGuardTest
     }
 
     private static ComparisonResult Compare(ContractDescription before, ContractDescription after)
-        => ContractComparer.Compare(before, after, "authored-reference");
+        => ContractComparer.Compare(ContractSchema.Read(JsonSerializer.SerializeToNode(before)!),
+            ContractSchema.Read(ContractSchema.Write(after)), "authored-reference");
 
     private static string Details(ComparisonResult result) => JsonSerializer.Serialize(result);
 }

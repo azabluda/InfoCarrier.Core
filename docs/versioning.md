@@ -86,6 +86,11 @@ This is not a released-client acceptance test. Before publishing 11.1 or later, 
 the promised previous minor with published packages, including the supported patch range.
 A selected representative package does not redefine support as latest-patch-only.
 
+Descriptions use JSON Schema Draft 2020-12 with supplementary `x-infocarrier` annotations.
+Standard validators can check selected message shapes; the repository's bounded comparer also
+uses the annotations to check directions, numeric identities, and named frame positions.
+The description format version is separate from the wire integer.
+
 ## Why not a property in `Directory.Build.props`
 
 It was one, until N8. The number lived in `VersionPrefix`/`VersionSuffix` **and** in the tag, which

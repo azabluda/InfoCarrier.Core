@@ -100,6 +100,10 @@ internal static class ContractInspector
     internal static TypeContract InspectType(JsonTypeInfo info, WireDirection direction, Func<Type, string> key)
     {
         CheckConverter(info.Converter, key(info.Type));
+        if (info.Type.IsValueType && info.Kind is JsonTypeInfoKind.Object or JsonTypeInfoKind.Enumerable)
+        {
+            throw Incomplete(key(info.Type), "Value-type object or collection schemas require explicit nullability coverage.");
+        }
         if (info.OnDeserializing is not null || info.OnDeserialized is not null
             || info.OnSerializing is not null || info.OnSerialized is not null)
         {

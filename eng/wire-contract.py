@@ -82,10 +82,15 @@ def select_reference(base_ref, event_name, event, head):
 
 def read_description(text):
     description = json.loads(text)
-    if description.get("FormatVersion") != 1:
+    if description.get("FormatVersion") == 1:
+        contract = description.get("Contract", {})
+        complete = all(contract.get(name) for name in ("Types", "Frames", "Inventory", "AllocatedVersions"))
+    elif description.get("$schema") == "https://json-schema.org/draft/2020-12/schema" and description.get("x-infocarrier", {}).get("formatVersion") == 2:
+        metadata = description["x-infocarrier"]
+        complete = bool(description.get("$defs")) and all(metadata.get(name) for name in ("inventory", "allocatedVersions", "protocolVersion"))
+    else:
         raise ValueError("Unsupported description format. Extend coverage explicitly; do not regenerate the reference.")
-    contract = description.get("Contract", {})
-    if not all(contract.get(name) for name in ("Types", "Frames", "Inventory", "AllocatedVersions")):
+    if not complete:
         raise ValueError("Missing or empty contract inventory in committed description.")
     return description
 
@@ -111,7 +116,12 @@ def difference(saved, actual, path="Contract"):
 
 
 def verify_saved(saved, actual):
-    found = difference(saved["Contract"], actual["Contract"])
+    def structural(document):
+        result = json.loads(json.dumps(document))
+        result.pop("Inspection", None)
+        result.get("x-infocarrier", {}).pop("inspection", None)
+        return result
+    found = difference(structural(saved), structural(actual), "description")
     if found:
         path, previous, current = found
         raise ValueError(f"Saved candidate description is stale at {path}: saved={previous!r}; actual={current!r}. "
@@ -135,14 +145,12 @@ def inspect(source, ledger, output):
     dependencies = json.loads(executable.with_suffix(".deps.json").read_text(encoding="utf-8"))
     print("Resolved inputs: " + ", ".join(sorted(dependencies["libraries"])), flush=True)
     command(["dotnet", executable, "inspect", output, ledger], source, capture=False)
-    contract = json.loads(output.read_text(encoding="utf-8"))
-    if not contract.get("Types") or not contract.get("Frames") or not contract.get("Inventory"):
-        raise ValueError("Inspector returned an incomplete or empty contract inventory.")
-    runtime = contract["Inventory"].pop("runtime:System.Text.Json")
-    description = {"FormatVersion": 1, "Contract": contract,
-                   "Inspection": {"Sdk": sdk, "SystemTextJson": runtime,
-                                  "Dependencies": sorted(dependencies["libraries"])}}
-    write_json(output, contract)
+    description = read_description(output.read_text(encoding="utf-8"))
+    metadata = description["x-infocarrier"]
+    runtime = metadata["inventory"].pop("runtime:System.Text.Json")
+    metadata["inspection"] = {"Sdk": sdk, "SystemTextJson": runtime,
+                              "Dependencies": sorted(dependencies["libraries"])}
+    write_json(output, description)
     return executable, description
 
 
@@ -179,8 +187,8 @@ def main():
         descriptions = [(ref, mode, protected_description(ref)) for ref, mode in references]
         executable, actual = inspect(ROOT, ROOT / LEDGER, candidate)
         for ref, mode, description in descriptions:
-            print(f"Reference inspection inputs ({ref}): {json.dumps(description.get('Inspection', {}), sort_keys=True)}", flush=True)
-            write_json(baseline, description["Contract"])
+            print(f"Reference inspection inputs ({ref}): {json.dumps(description.get('Inspection', description.get('x-infocarrier', {}).get('inspection', {})), sort_keys=True)}", flush=True)
+            write_json(baseline, description)
             command(["dotnet", executable, mode, baseline, candidate, ref], capture=False)
         if args.record:
             write_json(ROOT / DESCRIPTION, actual)

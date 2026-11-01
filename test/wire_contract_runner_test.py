@@ -95,6 +95,25 @@ class BaselineSelectionTest(unittest.TestCase):
         actual["Inspection"] = {"Sdk": "a newer SDK"}
         GUARD.verify_saved(saved, actual)
 
+    def test_schema_description_is_one_document_with_embedded_metadata(self):
+        description = self.schema_description()
+        self.assertEqual(description, GUARD.read_description(json.dumps(description)))
+        self.assertNotIn("Contract", description)
+
+    def test_schema_provenance_does_not_mask_or_create_structural_changes(self):
+        saved, actual = self.schema_description(), self.schema_description()
+        actual["x-infocarrier"]["inspection"] = {"Sdk": "newer"}
+        GUARD.verify_saved(saved, actual)
+        actual["$defs"]["quantity"]["type"] = "string"
+        with self.assertRaisesRegex(ValueError, "defs/quantity/type"):
+            GUARD.verify_saved(saved, actual)
+
+    def test_schema_without_coverage_metadata_cannot_be_a_reference(self):
+        description = self.schema_description()
+        del description["x-infocarrier"]
+        with self.assertRaisesRegex(ValueError, "Unsupported"):
+            GUARD.read_description(json.dumps(description))
+
     def test_record_cannot_hide_breakage_even_if_candidate_snapshot_was_replaced(self):
         self.run_record(fail=True)
 
@@ -114,13 +133,19 @@ class BaselineSelectionTest(unittest.TestCase):
                 "Types": {"quantity": "integer"}, "Frames": {"start": [0]}, "Inventory": {"context": "default"}},
                 "Inspection": {"Sdk": "original"}}
 
+    @staticmethod
+    def schema_description():
+        return {"$schema": "https://json-schema.org/draft/2020-12/schema", "$defs": {"quantity": {"type": "integer"}},
+                "x-infocarrier": {"formatVersion": 2, "protocolVersion": 3, "allocatedVersions": [1, 2, 3],
+                                   "inventory": {"context": "default"}, "inspection": {"Sdk": "original"}}}
+
     def run_record(self, fail):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             description_path = root / GUARD.DESCRIPTION
             description_path.parent.mkdir(parents=True)
-            saved, actual = self.description(), self.description()
-            actual["Contract"]["Types"]["quantity"] = "string"
+            saved, actual = self.schema_description(), self.schema_description()
+            actual["$defs"]["quantity"]["type"] = "string"
             GUARD.write_json(description_path, actual if fail else saved)
             original_bytes = description_path.read_bytes()
             comparisons = []
@@ -146,7 +171,7 @@ class BaselineSelectionTest(unittest.TestCase):
                 else:
                     GUARD.main()
                     self.assertEqual(actual, json.loads(description_path.read_text()))
-            self.assertEqual([saved["Contract"]], comparisons)
+            self.assertEqual([saved], comparisons)
 
     def test_cleanup_rejects_paths_outside_its_temporary_directory(self):
         with self.assertRaisesRegex(ValueError, "cleanup"):

@@ -88,18 +88,32 @@ The local default reads the description at `HEAD`, so checking out an older comm
 reference. This checks uncommitted work. Before pushing, include all feature-branch commits by
 comparing with the target branch:
 
-    python eng/wire-contract.py --base-ref issue-50-wire-versioning
+    python eng/wire-contract.py --base-ref origin/main
 
 The C# tool in tools/InfoCarrier.WireContract inspects effective System.Text.Json metadata and
 writes the candidate description temporarily. The reference is read directly from
 [the committed description](wire-contracts/current.json) at the selected Git revision. No old source
-build, package restore, or old runtime is needed. The JSON describes effective contracts, rather
-than a general JSON Schema language. `FormatVersion` identifies the description format separately
-from the wire version.
+build, package restore, or old runtime is needed.
+
+The file is a JSON Schema 2020-12 catalogue. Shared message definitions and frame definitions live
+under `$defs`; local `$ref` values connect them. Select a definition when using a standard validator:
+the catalogue root itself intentionally imposes no message constraint. Fields use `properties`,
+`required`, and `additionalProperties`; arrays use `items`, and frames use `prefixItems` with exact
+lengths. Variant alternatives use `anyOf`, `allOf`, and discriminator constants.
+
+The standard format lets independent validators check the description and selected message shapes.
+Code generation is not an acceptance requirement. The structural safeguard additionally interprets
+the annotations below; a standard validator alone does not determine wire compatibility.
+
+`x-infocarrier` contains the supplementary information: coverage directions, serializer settings,
+numeric enum identities, named frame positions, nested-payload inventory, allocation history, and
+inspection inputs. Ordinary field names, requiredness, and references are not duplicated there.
+The description format is 2, independently of wire version 3. Historical format-1 descriptions
+remain readable without rewriting their Git revisions or building old source.
 
 After an accepted contract change, run:
 
-    python eng/wire-contract.py --base-ref issue-50-wire-versioning --record
+    python eng/wire-contract.py --base-ref origin/main --record
 
 Recording first compares the actual implementation with the protected reference. A known break
 without a fresh wire version, or incomplete analysis, prevents recording. Ordinary checks also
@@ -133,7 +147,7 @@ older clients can read current responses. They do not promise newer clients work
 | New required request property or changed JSON token type | Fail with the unchanged version |
 | Removed or renamed field | Fail under the conservative field-preservation rule, even if parsing could succeed |
 | Reassigned enum/discriminator or changed frame layout | Fail with the unchanged version |
-| New variant | Older requests remain valid; older response readers are not assumed to understand it |
+| New variant | Compatible for older requests; incompatible for older response readers unless explicitly classified |
 | Unsupported encoding, options change, or incomplete inventory | Fail as incomplete analysis; a version increase does not resolve it |
 
 Numeric widening and equivalent CLR type replacements are not inferred. They can require explicit
@@ -141,6 +155,21 @@ classification even when a reader would accept them. Failures identify the path,
 direction, and both descriptions. Restore accidental changes, complete coverage or classification,
 or deliberately allocate a fresh version for a known break. Then record the candidate description;
 never replace the protected reference to dismiss a failure.
+
+The schema describes the covered message shapes, not every runtime acceptance condition. Scalar
+ranges, date parsing, resource limits, opaque application JSON, and semantic rules still need runtime
+checks. Standard validators do not interpret `x-infocarrier` metadata. Some tools require strict
+unknown-keyword rejection to be disabled before they accept these annotations. In particular, two integer frame
+positions remain interchangeable to a generic validator; our named-position comparison and codec
+probe detect Version/Slot changes.
+
+The schema reader supports the generated subset rather than arbitrary JSON Schema. Unknown
+constraints, missing metadata, external references, and inconsistent schema/annotation combinations
+fail as incomplete analysis. Numeric representation modes beyond the covered strict/named-float
+settings, value-type objects or collections, and polymorphic readers forbidding additional fields
+need explicit coverage before use. The existing default routes remain covered. JsonSchema.Net is a
+test-only dependency for independent schema validation, not a runtime dependency of the checker or
+product. Our comparer continues using the same compatibility rules.
 
 The check does not detect changed units, business meaning, constructor/setter behavior, or changes
 inside arbitrary serialization code with unchanged metadata. Application JSON inside JsonElement,
