@@ -345,6 +345,20 @@ application-specific JSON, arbitrary converter behavior, and undiscovered handwr
 excluded as documented in the [wire contract](wire-protocol.md#structural-compatibility-check).
 No migration or published-client framework is introduced.
 
+### Amendment 2026-11-01: standard schema descriptions
+
+The committed description now uses JSON Schema Draft 2020-12. Standard keywords describe the
+covered object, scalar, variant, and frame shapes. `x-infocarrier` annotations retain directions,
+effective serializer settings, numeric assignments, named frame positions, inventory, and allocation
+information that ordinary validation does not express. Description format 2 remains independent
+of wire version 3. Historical format-1 descriptions remain readable from their protected revisions.
+
+This changes storage, not the wire representation or compatibility policy. The existing bounded
+comparer still decides compatibility; no general schema solver, runtime schema endpoint, or code
+generation requirement is added. Standard validators provide independent format and message-shape
+checks. Unknown constraints or inconsistent annotations stop as incomplete analysis, even after
+a version increase. Recording still requires comparison with the protected target description.
+
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 
 **Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and

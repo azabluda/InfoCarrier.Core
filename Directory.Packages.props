@@ -5,6 +5,8 @@
       Directory.Build.props references it with PrivateAssets="all", so it appears in no nuspec.
     -->
     <PackageVersion Include="MinVer" Version="8.0.0" />
+    <!-- Independent JSON Schema validation in the wire-description tests only. -->
+    <PackageVersion Include="JsonSchema.Net" Version="9.4.1" />
 
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" />

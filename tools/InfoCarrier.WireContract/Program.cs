@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace InfoCarrier.WireContract;
 
@@ -15,15 +16,25 @@ internal static class Program
                 int[] allocations = JsonSerializer.Deserialize<int[]>(File.ReadAllText(ledger))
                     ?? throw new InvalidOperationException("Missing allocation history.");
                 WireContract contract = ContractInspector.Inspect(allocations, await FrameContracts.InspectAsync());
-                File.WriteAllText(destination, JsonSerializer.Serialize(contract));
+                File.WriteAllText(destination, ContractSchema.Write(contract).ToJsonString());
                 Console.WriteLine($"Wire {contract.Version}: {contract.Types.Count} types, {contract.Frames.Count} frame cases; runtime {Environment.Version}.");
                 return 0;
             }
             if (args is [var mode, var baseline, var candidate, var reference]
                 && mode is "compare" or "compare-compatible")
             {
-                WireContract Read(string path) => JsonSerializer.Deserialize<WireContract>(File.ReadAllText(path))
-                    ?? throw new InvalidOperationException("Missing contract description: " + path);
+                WireContract Read(string path)
+                {
+                    try
+                    {
+                        return ContractSchema.Read(JsonNode.Parse(File.ReadAllText(path))
+                            ?? throw new InvalidOperationException("Missing contract description: " + path));
+                    }
+                    catch (Exception error) when (error is not OutOfMemoryException)
+                    {
+                        throw new InvalidOperationException($"Description={path}; baseline={reference}; {error.Message}", error);
+                    }
+                }
                 ComparisonResult result = ContractComparer.Compare(Read(baseline), Read(candidate), reference);
                 foreach (ContractChange change in result.Changes)
                 {

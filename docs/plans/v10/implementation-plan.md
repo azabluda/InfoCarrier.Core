@@ -683,6 +683,21 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       dependency/advisory and framework trimming warnings. Strict MkDocs, documentation links,
       word budgets, file hygiene, and `git diff --check` passed. No product source or public signature
       changed; product trimming and package-validation gates were therefore not required locally.
+- [x] **WVP4. Store the protected description as standard JSON Schema.** Description format 2
+      uses Draft 2020-12 with `x-infocarrier` annotations for the bounded structural comparer.
+      Historical format-1 references remain readable without rebuilding old source. The existing
+      continuous-integration gate compares the inspected candidate with the protected reference;
+      changing storage does not change wire version 3 or introduce code generation requirements.
+
+      Validated 2026-11-01: transport **Passed: 360, Failed: 0, Total: 360**; focused schema/guard
+      tests **Passed: 39, Failed: 0, Total: 39**; baseline/recording tests
+      **Passed: 21, Failed: 0, Total: 21**. Standard meta-schema validation, actual expression
+      payloads, discriminator/frame rejection, same-integer type-change rejection, and fresh
+      manual increases pass. A protected-main comparison reports wire **3 -> 3** and confirms
+      that the committed description matches inspection. Two independent online validators also
+      accepted all 94 definition examples and rejected the tested token, discriminator, tag,
+      length, and positional-type errors. The Release rebuild with continuous-integration warning
+      rules passed with zero errors and existing dependency/framework trimming warnings.
 - [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
       with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
       Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
