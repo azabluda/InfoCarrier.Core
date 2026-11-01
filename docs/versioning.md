@@ -72,6 +72,15 @@ Without a target, the local check compares uncommitted work with the description
 Compatible additions can retain the current wire integer. A known structural break under an unchanged integer fails;
 unclassified changes need investigation rather than an automatic increase.
 
+Use these signals to decide what to do:
+
+| Signal | Example | Action |
+|---|---|---|
+| Known structural break reported by the check | An integer property becomes a string | Restore the accidental change, or deliberately allocate a fresh wire version. |
+| Compatible structural addition | A new optional property whose absence and presence relevant readers tolerate | Keep the wire version and record the reviewed description. |
+| Incomplete analysis | A converter has no explicit coverage | Complete coverage or classification; increasing the version does not resolve this failure. |
+| Changed meaning with unchanged structure | A numeric length changes from meters to feet | Follow the semantic-change procedure below, even when the structural check passes. |
+
 For a deliberate structural or semantic break, select a fresh integer, update
 `InfoCarrierEnvelope.CurrentProtocolVersion`, append it to [wire-versions.json](wire-versions.json),
 and record the reason in the [wire contract](wire-protocol.md#references-and-allocation).
@@ -90,6 +99,38 @@ Descriptions use JSON Schema Draft 2020-12 with supplementary `x-infocarrier` an
 Standard validators can check selected message shapes; the repository's bounded comparer also
 uses the annotations to check directions, numeric identities, and named frame positions.
 The description format version is separate from the wire integer.
+
+### Before changing a field's meaning
+
+Do this when planning the change, before merging it. A passing structural check does not authorize
+reinterpreting existing fields. Examples include changing meters to feet, changing an omitted value's
+meaning, or changing a flag's promised effect.
+
+1. Write down the old and proposed meanings in `docs/wire-protocol.md`. Identify affected requests,
+   responses, omitted values, and supported clients. For example, an old client sends `length: 1`
+   meaning one meter; interpreting that same value as one foot changes the contract without
+   changing its schema.
+2. Check the client-support promise before proceeding. If a supported client would stop working
+   correctly, resolve that obligation before merging the incompatible change. Track conversion or
+   retained behavior in [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262), or defer
+   the change or obtain an explicit owner decision revising support. A new integer alone only
+   identifies the break; refusal does not preserve supported-client behavior.
+3. When the incompatible change can proceed, choose an integer above every previously allocated
+   integer. Update the single `InfoCarrierEnvelope.CurrentProtocolVersion` constant and append the
+   allocation to `docs/wire-versions.json`. There are no separate versions per serializable class.
+4. Add a focused behavioral test for the new meaning. For the units example, assert the intended
+   result for a known length. Verify explicit refusal of unsupported old contracts. If older
+   contracts must remain supported, test their preserved behavior separately; refusal is insufficient.
+   These tests document the deliberate change, rather than automatically discover its meaning.
+5. Run `python eng/wire-contract.py --base-ref origin/main --record`, review the description diff,
+   then run `python eng/wire-contract.py --base-ref origin/main`, admission tests, and the applicable
+   repository checks. Commit the implementation, tests, allocation, explanation, and description
+   together. A semantic-only increase needs no fabricated field or schema-shape change.
+
+The structural check can remain green before this procedure starts: it cannot detect changed units
+or promises. Recognizing those changes remains a developer and review responsibility. Increasing
+the wire version can satisfy allocation checks, but cannot waive incomplete analysis or the
+supported-client obligation.
 
 ## Why not a property in `Directory.Build.props`
 

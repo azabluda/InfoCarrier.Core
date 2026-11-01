@@ -225,6 +225,10 @@ For an incompatible structural change or a deliberate meaning change:
 
 A semantic-only increase passes without a fabricated field change. Reverting code or retiring a
 contract does not free its integer. Compatible revisions may share one integer.
+Follow the [semantic-change procedure](versioning.md#before-changing-a-fields-meaning) before
+changing units, omitted-value meanings, or other promises, even when structural checks pass.
+The [migration follow-up](https://github.com/azabluda/InfoCarrier.Core/issues/262) tracks preserving
+supported-client behavior; allocating an integer does not complete that work.
 This branch-state check does not replace supported-release acceptance. From 11.1, use real
 published previous-minor clients as described below; a version increase alone can still refuse
 clients the release policy requires supporting.
