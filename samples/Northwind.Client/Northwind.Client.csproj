@@ -40,7 +40,7 @@
       had already cost a run — the conclusion just was not carried this one step further.
 
       NOT `NoWarn`, and not `TreatWarningsAsErrors=false`. Both would hide the diagnostics, and
-      `eng/trim-ratchet.sh` COUNTS them: silencing them is how a ratchet starts reporting zero and
+      `eng/TrimRatchet.cs` COUNTS them: silencing them is how a ratchet starts reporting zero and
       passes for ever. These stay warnings, stay counted, and stay gated by direction against
       eng/trim-baseline.txt.
 

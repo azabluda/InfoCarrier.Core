@@ -1,80 +1,91 @@
-# Engineering script migration
+# Engineering commands
 
-[Issue #264](https://github.com/azabluda/InfoCarrier.Core/issues/264) replaces repository-owned
-Python and Bash orchestration with .NET 10 file-based C# applications. The first conversion is the
-wire-contract runner. The other commands retain their existing implementation until their behavior
-has been verified separately.
+[Issue #264](https://github.com/azabluda/InfoCarrier.Core/issues/264) moves repository-owned
+engineering automation to .NET file-based C# applications. Use the existing build jobs and root
+build properties. A separate scripting runtime, per-command project, or platform matrix is not needed.
 
-## Commands and prerequisites
+## Commands
 
-Run from the repository root:
+Run from the repository root unless noted otherwise. Put application arguments after `--`.
+
+| Entry file | Arguments | Behavior |
+|---|---|---|
+| `eng/WireContract.cs` | `[--base-ref revision] [--record] [--release-ref revision ...]` | Inspect the candidate and compare protected Git descriptions. |
+| `eng/DocLinks.cs` | `[file ...]` | Validate local Markdown pages and heading anchors; exit 1 for broken links. |
+| `eng/DocWords.cs` | `[--all] [--budget] [file ...]` | Count prose with existing budgets; `--budget` fails if exceeded. |
+| `eng/TrxFailures.cs` | `<results.trx> [more.trx ...]` | Stream XML, union failed names, and sort by Unicode code point. |
+| `eng/SpecParity.cs` | `<reasons.tsv ...> -- <results.trx ...>` | Write badge values to stdout and the parity table to stderr. |
+| `eng/SuiteSummary.cs` | `<results.trx> [more.trx ...]` | Write counters, failed names, parity, and the workflow summary beside the first TRX. |
+| `eng/Measure.cs` | `<label> [baseline-label]` | Run both specification projects and compare complete failure-name and reason snapshots. |
+| `eng/TrimRatchet.cs` | `[baseline-file]` | Clean-publish the Blazor client and enforce the existing trim-warning limit. |
+| `eng/DocsServe.cs` | `[--build] [MkDocs serve arguments ...]` | Create the documentation environment and preview it, or build strictly. |
+| `eng/MakeIcons.cs` | `[--output-root directory]` | Generate the five PNGs and three-frame ICO from source artwork. |
 
 ```text
-dotnet run --file eng/wire-contract.cs
-dotnet run --file eng/wire-contract.cs -- --base-ref origin/main
+dotnet run --file eng/Measure.cs -- change-label baseline-label
+dotnet run --file eng/DocWords.cs -- --all --budget
+dotnet run --file eng/WireContract.cs -- --base-ref origin/main
+dotnet run --file eng/DocsServe.cs -- --build
 dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --configuration Release
 ```
 
-The runner resolves its repository from its source path, so an absolute `--file` path also works
-from another working directory. Arguments after `--` belong to the application. `--record` and
-repeatable `--release-ref` retain their existing meaning; see the
-[wire check](wire-protocol.md#structural-compatibility-check).
+Measurement, trimming, documentation serving, and wire checking find the repository from source
+location. Documentation checks and icon generation retain current-directory input behavior.
+TRX and reason paths are caller-supplied paths. Measurement labels are filenames within
+`artifacts/measure`, not arbitrary paths. Test failures remain measurement data; missing summaries
+and failed builds are errors. The suite summary reports results; `dotnet test` remains the gate.
 
-Git remains required. `global.json` declares SDK 10.0.201 with `latestMinor` roll-forward.
-The existing build job runs the wire check and engineering tests with its installed SDK.
-One-time migration checks on 2026-11-02 passed on Windows and Linux with SDK 10.0.201 and the
-rolling SDK, including checkout paths with spaces and invocation from the documentation directory.
-Local development resolved SDK 10.0.401. Both local SDKs passed the focused tests and the actual wire comparison.
-The implementation does not use `#:include`, which requires SDK 10.0.300.
+## Source layout and future changes
 
-The runner needs no Python or Bash. Website builds and preview still require Python and MkDocs;
-replacing the website engine is outside this migration.
+Write all new engineering automation in C#, with PascalCase filenames and top-level entry files.
+Keep script-specific implementations in `eng/commands/`. Use `eng/shared/` only for code called by
+multiple commands. `ScriptHost` owns safe argument passing, concurrent pipe draining, log streaming,
+and cancellation of child process trees. Commands retain their argument parsing, outputs, and error decisions.
 
-## Build behavior
+The entry files use `#:include` to compile those sources. `global.json` therefore requires SDK
+10.0.300 with `latestMinor` roll-forward. The engineering test project compiles the same source
+files without the top-level entry statements. Keep comments on arguments, outputs, failures, and
+non-obvious safeguards current. Do not introduce new Python or Bash orchestration.
 
-The runner inherits the root `Directory.Build.props`, including nullable checking, implicit usings,
-documentation generation, code-style analyzers, and MinVer. There is no separate engineering
-properties file. The inherited `IsPackable=false` prevents script packages. The file-based SDK
-retains its default native-compilation analysis; argument logging uses the existing JSON node APIs
-without reflection-based serialization. No project file is committed for the runner, and no
-product project is referenced by its file-based build. Only the runner's explicit child command
-builds the existing `tools/InfoCarrier.WireContract` project.
+The root `Directory.Build.props` supplies nullable checking, implicit usings, analyzers, MinVer,
+and `IsPackable=false`. The icon command declares its codec packages; no product project is
+referenced by command builds. The wire command explicitly builds the existing inspector,
+and measurement explicitly builds the solution. The SDK restores and caches file-based builds;
+use `--no-cache` when investigating a stale build. Shared-source changes must invalidate the corresponding cache.
 
-The SDK restores and caches file-based builds automatically. One-time migration checks exercised
-initial, `--no-restore`, and `--no-build` launches. After changing inherited build settings, use
-`dotnet run --file eng/wire-contract.cs --no-cache -- --help` to force a build. The test project
-links the same runner source into one engineering harness; it is separate from specification-suite
-counters, badges, and transport coverage. Child arguments use `ProcessStartInfo.ArgumentList`.
-Cancellation kills the active child process tree before temporary-directory cleanup.
+## Preserved behavior and verification
 
-Tests cover protected Git selection, historical local defaults, stale merge candidates, pushes,
-merge groups, legacy descriptions, provenance-only changes, recording order, release comparisons,
-paths with spaces, missing inputs, child failures, cancellation, and cleanup rejection/failure.
-The actual inspector still checks allocation history and wire compatibility; its implementation
-and committed descriptions are unchanged.
+The wire runner retains protected baseline selection, historical local defaults, merge identity
+checks, recording restrictions, and strict release comparisons. The inspector, allocation ledger,
+protocol, and committed descriptions are unchanged. See the [wire contract](wire-protocol.md).
 
-## Documentation and remaining inventory
+Prose budgets, test project lists, TRX counters, badge calculations, and trimming limits remain
+unchanged. Counters are read independently; passed cases are never derived from total and failed.
+Parity excludes skipped cases and wire-free controls and rounds down. XML parsing retains nested
+failures and theory names containing `>`. SDK diagnostics stay outside machine-readable summary
+files. Cancellation and cleanup failures remain visible.
 
-Active wire commands are in `CLAUDE.md`, [wire-protocol.md](wire-protocol.md),
-and [versioning.md](versioning.md). They move with this runner. Repository experiment skills refer
-to `measure.sh`, so their command instructions change when that script moves. Historical plans
-retain their original command spellings.
+SkiaSharp 4.153.1 supplies PNG codecs under the
+[MIT license](https://www.nuget.org/packages/SkiaSharp/4.153.1). Its
+[Linux native-assets package](https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux.NoDependencies/4.153.1)
+avoids a separate graphics-system installation. The renderer retains alpha-floor trimming, square
+tolerance, margins, premultiplied Lanczos resizing, and mask composition. During migration, all
+five PNGs and all three ICO frames matched the former renderer pixel for pixel. Encoded bytes
+can differ because the PNG codec differs. Shipped artwork is unchanged; `--output-root` permits verification in artifacts.
 
-The user-facing documentation review covered README, `src/*/PACKAGE.md`, and `website/`.
-None invokes this runner or its former Python test. The website's source-build instructions still
-use `dotnet pack`; this bounded conversion does not change those instructions or prerequisites.
-Recheck user-facing instructions as the remaining scripts move, especially documentation preview
-and icon generation.
+Active contributor instructions, workflow invocations, and experiment skills use the new commands.
+The user-facing review includes README, package readmes, and website instructions. Source-build
+instructions name SDK 10.0.300; MkDocs comments name the new wrapper. Dated execution records retain
+commands that actually ran.
 
-`CONTRIBUTING.md` still describes the existing suite and website commands. It gains the engineering
-test command and this migration reference with the runner conversion.
+## External dependencies and remaining automation
 
-Remaining scripts in `eng/` are `doc-links.py`, `doc-words.py`, `trx-failures.py`, `spec-parity.py`,
-`make-icons.py`, `measure.sh`, `trim-ratchet.sh`, `suite-summary.sh`, and `docs-serve.sh`.
-The documentation gates still use Python. Suite measurement, trimming, summaries, and website
-preview still use Bash.
+Git remains necessary for Git operations. MkDocs still requires Python and builds the existing
+website. `DocsServe.cs` locates that interpreter only for MkDocs, then uses its virtual environment.
+The documentation workflow retains interpreter setup and pinned website requirements. Replacing
+MkDocs is outside this migration.
 
-Python automation outside `eng/` remains separate: `.claude/hooks/file-hygiene.py`,
+Automation hooks outside `eng/` remain separate: `.claude/hooks/file-hygiene.py`,
 `.claude/hooks/cs-search-reminder.py`, their `.codex/hooks/` counterparts, and
-`.codex/tests/test_hooks.py`. These are not converted by the first runner change. The repository
-does not become Python-free or Bash-free with this step.
+`.codex/tests/test_hooks.py`. Historical plans also mention earlier interpreter commands. The final
+repository audit must report these uses rather than describe them as removed.

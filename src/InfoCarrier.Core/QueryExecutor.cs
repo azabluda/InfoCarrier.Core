@@ -654,7 +654,7 @@ internal sealed class QueryExecutor<TElement>
         // every time it is read, so reference identity can never catch a repeat, and a property
         // returning a fresh one — `DateTime.Date` returns a `DateTime` that has a `Date` — walks
         // forever. It overflowed the test host's stack, and the run reported *fewer* failures
-        // for it, which is the shape `eng/measure.sh` guards the total against.
+        // for it, which is the shape `eng/Measure.cs` guards the total against.
         if (value.GetType() is { IsValueType: true } valueType
             && !(valueType.IsGenericType
                 && valueType.GetGenericTypeDefinition() is var definition

@@ -6,7 +6,7 @@ rule the suite runs on. Nothing about the rule changed with the move.
 
 **Status of the overhaul that produced it: done, 2026-09-15.** Every tier is converted, the suite is green, and the ratchet is gone: `eng/ratchet.sh` and both baseline files are
 deleted, and
-`eng/suite-summary.sh` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
+`dotnet run --file eng/SuiteSummary.cs --` reports the counts in CI. ADR-004 carries the dated amendment, and the CI job
 and the ruleset's required check are renamed from `Spec ratchet` to `Spec tests`.
 
 This replaces the first version of this file from the same day.
@@ -362,7 +362,7 @@ correct while client and server share one model.
   A caller could then catch `DbException` as with plain EF, but code written against the 10.1
   errors guide would stop matching, and no deviation would go, because EF's assertions name the
   exact driver type.
-- **The README badge shows EF parity**, which `eng/spec-parity.py` computes from the TRX and the
+- **The README badge shows EF parity**, which `dotnet run --file eng/SpecParity.cs --` computes from the TRX and the
   reasons `OverrideAudit` writes. The base is every test case that ran through InfoCarrier: a
   wire-free control and an xUnit skip are left out. A case counts against parity when an
   InfoCarrier reason covers it, and for it otherwise, so only a difference of this provider's lowers
@@ -406,7 +406,7 @@ and the one left is `Parameter_collection_in_subquery_and_Convert_as_compiled_qu
 
 **The reasons file counts 468 where the audit counts 467, and that is not a disagreement.** The
 audit counts DECLARATIONS, one per attribute. `*.override-reasons.tsv` lists every reason under
-every CONCRETE class that runs it, because `eng/spec-parity.py` joins it with a TRX and a TRX names
+every CONCRETE class that runs it, because `dotnet run --file eng/SpecParity.cs --` joins it with a TRX and a TRX names
 the concrete class. One reason here is declared on a base — the `[StoreLimit]` on
 `Interceptor_does_not_leak_across_contexts` — and two concrete classes inherit it.
 

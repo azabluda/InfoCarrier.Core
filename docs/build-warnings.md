@@ -10,7 +10,7 @@ each. Measured on a full rebuild:
 
 **The five are green, not tolerated debt.** They are `IL2110` and `IL2111` from the framework's
 own Razor output in `samples/Northwind.Client`, and that project downgrades exactly those two
-codes from error to warning so that `eng/trim-ratchet.sh` can keep counting them. The row in the
+codes from error to warning so that `eng/TrimRatchet.cs` can keep counting them. The row in the
 table below is the full reasoning. Every other warning is still an error under `CI=true`.
 
 **Do not restate this as "the build is clean".** That sentence stood here for five milestones,
@@ -58,8 +58,8 @@ file. Every suppression is scoped to the smallest place that makes sense.
 |---|---|---|
 | `EF1001` | file-scoped `#pragma warning disable EF1001` in the **19 files** that use EF Core internals | This provider is built on `IStateManager`, `EntityQueryable<>` and `InternalEntityEntry` by design. **This is what EF Core's own providers do** — `subrepos/efcore` has 51 such files across eight projects (21 in `EFCore.Relational`) and **no `NoWarn` for EF1001 anywhere**. Per file, so a **new** file reaching for an internal API still warns. |
 | `CS1591`, `CS1573`, `CS1574`, `CS1570` | `test/.editorconfig` and `samples/.editorconfig` | Nothing under `test/` or `samples/` is a public API surface anyone reads. Without this, the functional test project alone emits **1254** of them. In `src/` these stay **on**. |
-| `IL2xxx` | `-p:TreatWarningsAsErrors=false` on `eng/trim-ratchet.sh`'s own publish | The 88 trim warnings are unfixable by design and are gated by **direction**, not by zero. See below. |
-| `IL2110`, `IL2111` | `samples/Northwind.Client.csproj`, Release only | **Downgraded from error to warning, not silenced.** They come from the *framework's own* Razor output (`Router.NotFoundPage`, `LayoutView.Layout` in `App_razor.g.cs`) — not this repository's code, and not fixable here. `eng/trim-ratchet.sh` still counts them; `NoWarn` would make it count zero and pass for ever. Only these two codes: any other trim diagnostic still fails CI, which forces a look before a new one is tolerated. |
+| `IL2xxx` | `-p:TreatWarningsAsErrors=false` on `eng/TrimRatchet.cs`'s own publish | The 88 trim warnings are unfixable by design and are gated by **direction**, not by zero. See below. |
+| `IL2110`, `IL2111` | `samples/Northwind.Client.csproj`, Release only | **Downgraded from error to warning, not silenced.** They come from the *framework's own* Razor output (`Router.NotFoundPage`, `LayoutView.Layout` in `App_razor.g.cs`) — not this repository's code, and not fixable here. `eng/TrimRatchet.cs` still counts them; `NoWarn` would make it count zero and pass for ever. Only these two codes: any other trim diagnostic still fails CI, which forces a look before a new one is tolerated. |
 
 ## Two traps, both of which cost a run
 
@@ -76,7 +76,7 @@ carry a source line — so plain `TreatWarningsAsErrors` turns *those* into erro
 never sees them. Under `CI=true` the trimmed publish failed outright, which meant **the gate that
 exists to measure trim warnings was the one thing that could not tolerate them**.
 
-`NoWarn` would have been worse than useless: `eng/trim-ratchet.sh` **counts** these warnings, so
+`NoWarn` would have been worse than useless: `eng/TrimRatchet.cs` **counts** these warnings, so
 silencing them reports `OURS: 0` and passes for ever — the exact failure its clean-publish rule
 already exists to prevent. The two axes are kept separate instead: warnings-as-errors gates the
 ordinary build, and the *direction* of the trim count gates the publish.
@@ -97,4 +97,4 @@ with a deliberately unused `using` in `src/InfoCarrier.Core/Expressions/TypeNode
 | Gate | Measures | Unaffected by this document |
 |---|---|---|
 | the spec suite's own run | a green suite, and a reason on every override (`OverrideAuditTest`); it was `eng/ratchet.sh` until 2026-09-15 | yes |
-| `eng/trim-ratchet.sh` | ILLink `IL2xxx` **direction**, against `eng/trim-baseline.txt` | yes — the C# compiler never emits `IL2xxx`, and those 88 are unfixable by design |
+| `eng/TrimRatchet.cs` | ILLink `IL2xxx` **direction**, against `eng/trim-baseline.txt` | yes — the C# compiler never emits `IL2xxx`, and those 88 are unfixable by design |

@@ -37,7 +37,7 @@
     <IsPackable>false</IsPackable>
     <!--
       NOT A TEST PROJECT. It holds no tests and must not carry Microsoft.NET.Test.Sdk: a project
-      the runner recognises is a project eng/measure.sh would have to count, and there is nothing
+      the runner recognises is a project eng/Measure.cs would have to count, and there is nothing
       here to count.
     -->
     <IsTestProject>false</IsTestProject>

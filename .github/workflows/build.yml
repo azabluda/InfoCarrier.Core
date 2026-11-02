@@ -29,7 +29,7 @@ env:
   #
   # ADR-009 Tier D is a project of its own, because MongoDB.EntityFrameworkCore needs a newer EF
   # Core patch than src/ compiles against and one project has one package graph, so the spec suite
-  # is two test runs and eng/suite-summary.sh adds their counters.
+  # is two test runs and eng/SuiteSummary.cs adds their counters.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
@@ -39,14 +39,14 @@ env:
   CI: true
 
 jobs:
-  # The documentation gates, which cost seconds and need no .NET.
+  # The documentation gates use the same .NET SDK as the repository build.
   #
   # `mkdocs build --strict` in docs.yml checks that a linked PAGE exists. It does NOT check the
   # `#anchor` after it, so renaming a heading breaks every inbound link and the site build stays
   # green. Three links died that way once, one of them on the security path, which is what
-  # eng/doc-links.py was written for. It lived only in a contributor's memory until this job.
+  # eng/DocLinks.cs was written for. It lived only in a contributor's memory until this job.
   #
-  # Here rather than in docs.yml because docs.yml is filtered to `website/**`, and doc-links.py
+  # Here rather than in docs.yml because docs.yml is filtered to `website/**`, and DocLinks.cs
   # reads README.md, src/**/*.md and docs/**/*.md as well.
   docs-gates:
     name: Docs gates
@@ -54,17 +54,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-
-      - name: Setup Python
-        uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Links, including anchors
-        run: python eng/doc-links.py
+        run: dotnet run --file eng/DocLinks.cs --
 
       - name: Prose word budgets
-        run: python eng/doc-words.py --all --budget
+        run: dotnet run --file eng/DocWords.cs -- --all --budget
 
   # Must be green. Build plus the two suites that are expected to pass unconditionally:
   # serializer round-trip and the end-to-end vertical slice.
@@ -94,10 +96,13 @@ jobs:
       # Inspect the merge candidate against the description stored on its target parent.
       # Recording candidate metadata cannot replace the protected target description.
       - name: Wire contract compatibility
-        run: dotnet run --file eng/wire-contract.cs
+        run: dotnet run --file eng/WireContract.cs
 
       - name: Engineering script tests
         run: dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release
+
+      - name: Icon generator
+        run: dotnet run --file eng/MakeIcons.cs -- --output-root artifacts/icon-check
 
       # THE PUBLIC-API GATE, and it belongs on the pull request rather than after the merge.
       # `dotnet pack` is what runs package validation: Directory.Build.props sets
@@ -146,7 +151,7 @@ jobs:
       # InfoCarrier.Core" is not met and eng/trim-baseline.txt records why. The script publishes
       # clean on purpose: an incremental publish does not re-run ILLink and would report zero.
       - name: Trim ratchet (Blazor publish)
-        run: bash eng/trim-ratchet.sh
+        run: dotnet run --file eng/TrimRatchet.cs --
 
   # THE SPEC SUITE, GREEN, AND `dotnet test`'S OWN EXIT CODE IS THE GATE (2026-09-15). Until then
   # the suite was red on purpose and this job gated on the DIRECTION of the failure count against
@@ -193,7 +198,7 @@ jobs:
       # InfoCarrier.Core.TransportTests, which is not part of this number.
       #
       # INFOCARRIER_OVERRIDE_REASONS makes OverrideAuditTest write the reason of every override beside
-      # the TRX, which eng/suite-summary.sh joins with the results for the EF parity badge.
+      # the TRX, which eng/SuiteSummary.cs joins with the results for the EF parity badge.
       - name: Test (full suite, Tiers A-C)
         id: tiers-a-c
         timeout-minutes: 90
@@ -225,7 +230,7 @@ jobs:
       - name: Summary
         if: always()
         run: >
-          ./eng/suite-summary.sh
+          dotnet run --file eng/SuiteSummary.cs --
           artifacts/test-results/results.trx
           artifacts/test-results/tierd.trx
 
@@ -304,11 +309,11 @@ jobs:
           fail-on-empty: 'true'
 
       # Publishes EF parity to the `badges` branch, where shields.io reads it for README.md's
-      # spec-suite badge. The figures come from the counters file eng/suite-summary.sh writes, so
+      # spec-suite badge. The figures come from the counters file eng/SuiteSummary.cs writes, so
       # the TRX is parsed once and by one parser.
       #
       # THE BADGE SHOWED "passed / total passing" UNTIL 2026-09-15. The suite went green that day,
-      # which made that figure a constant. It shows EF parity now, eng/spec-parity.py's share of the
+      # which made that figure a constant. It shows EF parity now, eng/SpecParity.cs's share of the
       # test cases that ran through InfoCarrier on which it behaves as EF's own provider, and the
       # colour carries the rest: red when a test step failed, yellow while an InfoCarrier defect is
       # tracked by an [InfoCarrierDefect] override, green otherwise (the owner's decision, the same

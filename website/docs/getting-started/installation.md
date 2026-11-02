@@ -69,7 +69,7 @@ with no extra configuration.
 
 ### Building from source instead
 
-Nothing beyond the .NET 10 SDK is needed:
+To build from source, use .NET SDK 10.0.300 or later and Git:
 
 ```bash
 git clone https://github.com/azabluda/InfoCarrier.Core.git

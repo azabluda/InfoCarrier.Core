@@ -25,10 +25,14 @@ it lands in is decided on the issue, not here.
       Windows and Linux, with SDK 10.0.201 and the rolling SDK. Update active internal commands and
       inspect user-facing documentation. [Migration notes](../../engineering-scripts.md) record
       inherited build settings and remaining Python/Bash uses. The initial migration matrix passed;
-      ongoing checks use the existing build job. Review this bounded approach before continuing.
-- [ ] **E2. Convert the remaining engineering commands after E1 validation.** Preserve counters,
-      badges, trimming limits, output formats, and third-party prerequisites. Move each command's
-      active workflow, tests, and documentation together; retain historical references.
+      ongoing checks use the existing build job. The owner expanded the same pull request to E2.
+- [x] **E2. Convert all remaining engineering commands in the same pull request.** Preserve counters,
+      badges, trimming limits, output formats, and third-party prerequisites. Use PascalCase files,
+      top-level entry statements, testable script-specific implementations under `eng/commands/`,
+      and genuinely reusable process handling under `eng/shared/`. SDK 10.0.300 is the new minimum
+      for `#:include`, selected by the owner. Update active workflow, skill, contributor, and website
+      instructions. Remove superseded scripts after equivalence checks and audit remaining Python
+      references; preserve dated records and report third-party and hook dependencies accurately.
 
 ## Phase I — ordinary type-descriptor complexity ([#211](https://github.com/azabluda/InfoCarrier.Core/issues/211))
 

@@ -1,7 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -10,26 +8,14 @@ using System.Text.Json.Nodes;
 // Only the candidate is built. Protected descriptions always come from Git, never the candidate file.
 internal static class WireContractCli
 {
-    internal static string Root() => SourceRoot();
-
-    private static string SourceRoot([CallerFilePath] string source = "")
-        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(source)!, ".."));
-
-    public static async Task<int> Main(string[] args)
+    internal static string Root() => ScriptHost.Root;
+    public static Task<int> Run(string[] args) => ScriptHost.RunAsync(async token =>
     {
-        using var cancellation = new CancellationTokenSource();
-        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
-        Console.CancelKeyPress += cancel;
         try
         {
             return await new WireContractRunner(Root()).Run(args,
                 Environment.GetEnvironmentVariable("GITHUB_EVENT_NAME") ?? "",
-                Environment.GetEnvironmentVariable("GITHUB_EVENT_PATH"), cancellation.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            Console.Error.WriteLine("Wire contract check cancelled.");
-            return 130;
+                Environment.GetEnvironmentVariable("GITHUB_EVENT_PATH"), token);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException
             or InvalidOperationException or ArgumentException or JsonException or System.ComponentModel.Win32Exception)
@@ -37,11 +23,7 @@ internal static class WireContractCli
             Console.Error.WriteLine($"Wire contract check failed: {error.Message}");
             return 1;
         }
-        finally
-        {
-            Console.CancelKeyPress -= cancel;
-        }
-    }
+    }, "Wire contract check");
 }
 
 internal sealed record CommandResult(int ExitCode, string Output);
@@ -62,27 +44,8 @@ internal sealed class WireContractRunner(string root,
     // ArgumentList preserves spaces and metacharacters without a shell. Drain both pipes concurrently.
     internal static async Task<CommandResult> Execute(string[] args, string cwd, bool capture, CancellationToken token)
     {
-        var start = new ProcessStartInfo(args[0]) { WorkingDirectory = cwd, UseShellExecute = false,
-            RedirectStandardOutput = capture, RedirectStandardError = capture };
-        foreach (var argument in args.Skip(1))
-            start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Cannot start child process.");
-        var stdout = capture ? process.StandardOutput.ReadToEndAsync() : Task.FromResult("");
-        var stderr = capture ? process.StandardError.ReadToEndAsync() : Task.FromResult("");
-        try
-        {
-            await process.WaitForExitAsync(token);
-        }
-        catch (OperationCanceledException)
-        {
-            // A cancelled build must not leave its inspector or build workers running.
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(stdout, stderr);
-            throw;
-        }
-        return new(process.ExitCode, ((await stdout) + (await stderr)).Trim());
+        var result = await ScriptHost.Execute(args[0], args[1..], cwd, capture, token);
+        return new(result.ExitCode, (result.Output + result.Error).Trim());
     }
 
     private Task<CommandResult> Invoke(string[] args, bool capture, CancellationToken token, string? cwd = null)
@@ -100,6 +63,7 @@ internal sealed class WireContractRunner(string root,
 
     internal async Task<string> Commit(string reference, CancellationToken token = default)
     {
+        // Resolve user/event input once, with option parsing terminated, before constructing git show paths.
         var value = await Command(["git", "rev-parse", "--verify", "--end-of-options", reference + "^{commit}"], token);
         if (value.Length != 40 || value.Any(c => !"0123456789abcdef".Contains(c)))
             throw new InvalidOperationException("Reference did not resolve to an exact Git commit.");
@@ -117,6 +81,8 @@ internal sealed class WireContractRunner(string root,
     internal async Task<string> SelectReference(string? baseRef, string eventName, JsonNode eventData, string head,
         CancellationToken token = default)
     {
+        // Local checks default to the checked-out commit, including historical checkouts. CI inputs
+        // come only from its event: validate merge parents, queue identity, or protected push ancestry.
         string target;
         if (eventName.Length != 0)
         {
@@ -164,6 +130,8 @@ internal sealed class WireContractRunner(string root,
 
     internal static JsonObject ReadDescription(string text)
     {
+        // Historical format 1 remains readable. Format 2 must include schema and coverage metadata;
+        // an unknown/incomplete format is an error, never permission to regenerate a reference.
         var description = JsonNode.Parse(text) as JsonObject ?? throw new ArgumentException("Unsupported description format.");
         bool complete;
         if (description["FormatVersion"]?.ToJsonString() == "1")
@@ -240,6 +208,8 @@ internal sealed class WireContractRunner(string root,
 
     private async Task<(string Executable, JsonObject Description)> Inspect(string output, CancellationToken token)
     {
+        // Build only today's inspector. Historical references need neither old packages nor runtimes.
+        // Keep toolchain provenance separate from wire structure so SDK changes do not allocate versions.
         var sdk = await Command(["dotnet", "--version"], token);
         Console.WriteLine($"Inspecting {root}; SDK={sdk}");
         await Command(["dotnet", "build", Path.Combine(root, Tool, "InfoCarrier.WireContract.csproj"),
@@ -267,6 +237,8 @@ internal sealed class WireContractRunner(string root,
 
     internal void Cleanup(string path)
     {
+        // Restrict recursive deletion to this run's artifacts child and reject directory links.
+        // Cleanup errors propagate; otherwise a failed cleanup could silently accumulate stale inputs.
         var resolved = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         var artifacts = Path.GetFullPath(Path.Combine(root, "artifacts"));
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -288,7 +260,7 @@ internal sealed class WireContractRunner(string root,
             {
                 case "--help" or "-h":
                     Console.WriteLine("Check actual wire metadata against committed descriptions from protected Git revisions.\n"
-                        + "Usage: dotnet run --file eng/wire-contract.cs -- [--base-ref target] [--record] [--release-ref revision ...]\n"
+                        + "Usage: dotnet run --file eng/WireContract.cs -- [--base-ref target] [--record] [--release-ref revision ...]\n"
                         + "--base-ref: local target; unavailable in CI.\n--record: record only after protected comparisons pass.\n"
                         + "--release-ref: require compatibility with a release; repeat for each revision.");
                     return 0;
@@ -329,6 +301,8 @@ internal sealed class WireContractRunner(string root,
             foreach (var (revision, mode) in references)
                 descriptions.Add((revision, mode, await ProtectedDescription(revision, token)));
             var (executable, actual) = await Inspect(candidate, token);
+            // The inspector enforces allocation history and compatibility. Release comparisons remain
+            // strict even when a new development wire version acknowledges a structural break.
             foreach (var (revision, mode, document) in descriptions)
             {
                 var inputs = document["Inspection"] ?? document["x-infocarrier"]?["inspection"] ?? new JsonObject();
@@ -338,6 +312,7 @@ internal sealed class WireContractRunner(string root,
             }
             if (record)
             {
+                // No candidate description is overwritten until every protected comparison succeeds.
                 WriteJson(Path.Combine(root, Description), actual);
                 Console.WriteLine($"Recorded {Description}. Review and commit its diff; protected comparisons passed.");
             }

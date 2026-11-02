@@ -9,13 +9,17 @@ internal static class ChildProcess
 {
     public static async Task<int> Main(string[] args)
     {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         if (args[0] == "wait")
         {
             await File.WriteAllTextAsync(args[1] + ".tmp", Environment.ProcessId.ToString());
             File.Move(args[1] + ".tmp", args[1]);
+            // Publish readiness only after Windows has released the rename handle.
+            Directory.CreateDirectory(args[1] + ".ready");
             await Task.Delay(Timeout.InfiniteTimeSpan);
         }
         Console.WriteLine(JsonSerializer.Serialize(args));
+        Console.WriteLine("é Ω 漢字 😀");
         Console.Error.WriteLine("child stderr");
         return args[0] == "fail" ? 23 : 0;
     }

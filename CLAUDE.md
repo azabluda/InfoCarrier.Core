@@ -38,15 +38,23 @@ and how to check the loaded solution first:
 
 ## Commands
 
+**Write all new and changed repository-owned engineering automation in C# file-based applications
+under `eng/`. Do not add Python or Bash orchestration.** Use PascalCase filenames, for example
+`eng/Measure.cs`, and top-level entry statements. Keep each script's testable implementation in
+`eng/commands/`; put only code reused by multiple commands in `eng/shared/`. Use `#:include` with
+the SDK minimum in `global.json`, the root build properties, and existing workflow jobs.
+Pass arguments with `dotnet run --file eng/Measure.cs -- <label>`. Keep Git and MkDocs as explicit
+third-party dependencies; do not replace their engines as part of script work.
+
 ```powershell
 dotnet build InfoCarrier.Core.slnx                       # note: .slnx, not .sln
-bash eng/measure.sh <label> [baseline]                   # THE SUITE: both tiers, one number
+dotnet run --file eng/Measure.cs -- <label> [baseline]                   # THE SUITE: both tiers, one number
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
-dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in measure.sh
+dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in Measure.cs
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # the slow run of Tier C, seconds
 ```
@@ -215,40 +223,40 @@ claimed one. `Other` counts since the amendment of 2026-09-28.
 
 ### Running and reporting
 
-**Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `eng/measure.sh`, which runs
+**Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `dotnet run --file eng/Measure.cs --`, which runs
 every project in its own `projects` list and adds the figures. **That list holds TWO projects — the
 spec project and ADR-009 Tier D — so a project missing from it is missing from every measurement;
 add one there in the same commit that creates it.** `InfoCarrier.Core.TransportTests` is
 deliberately absent: it is this repository's own HTTP-transport suite, not a spec project, and the
 spec-suite badge counts spec tests. **So a `src/` change needs the transport line above as well as
-`measure.sh`.**
+`Measure.cs`.**
 
 **Report test results as `Passed: N, Failed: M, Total: T`, read out of the run's own output.** Never
 estimate a count, and never derive one figure from the others.
 
-`eng/` holds the scripts below and nothing else. No script does anything a comment inside it does
-not explain.
+`eng/` holds the entry files below, their testable implementations in `eng/commands/`, reusable
+helpers in `eng/shared/`, and command data. Each command explains its behavior in comments.
 
 | Script | What it is for |
 |---|---|
-| `eng/measure.sh <label> [baseline]` | The way to measure a change. See below. Runs every spec test project in its own `projects` list and adds the figures. |
-| `eng/trim-ratchet.sh [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
-| `eng/suite-summary.sh <results.trx> [more.trx ...]` | **CI only**: sums the spec suite's TRX counters into `counters.env`, lists failing names in the run summary, and runs `eng/spec-parity.py` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate. |
-| `eng/spec-parity.py <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory. |
-| `eng/trx-failures.py <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Python and not grep because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
-| `eng/doc-links.py [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so a renamed heading breaks inbound links silently. Exit 1 if any is broken. |
-| `dotnet run --file eng/wire-contract.cs -- [--base-ref target] [--record]` | Compares actual default serialization contracts with protected committed descriptions. Records a candidate only after compatibility checks pass. Run for serializer, contract, codec, or dependency changes; see `docs/wire-protocol.md` for coverage and limitations. |
-| `eng/doc-words.py [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
-| `eng/docs-serve.sh [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
-| `eng/make-icons.py` | Regenerates every shipped icon from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
+| `dotnet run --file eng/Measure.cs -- <label> [baseline]` | The way to measure a change. See below. Runs every spec test project in its own `projects` list and adds the figures. |
+| `dotnet run --file eng/TrimRatchet.cs -- [baseline]` | Publishes the Blazor sample trimmed and gates the direction of this product's `IL2xxx` count against `eng/trim-baseline.txt`. See below. |
+| `dotnet run --file eng/SuiteSummary.cs -- <results.trx> [more.trx ...]` | **CI only**: sums the spec suite's TRX counters into `counters.env`, lists failing names in the run summary, and runs `dotnet run --file eng/SpecParity.cs --` for the README badge. **It decides nothing**; `dotnet test`'s own exit code is the gate. |
+| `dotnet run --file eng/SpecParity.cs -- <reasons.tsv ...> -- <results.trx ...>` | **EF parity, the README badge**: the share of test cases that ran through InfoCarrier on which no `[InfoCarrierDesign]` or `[InfoCarrierDefect]` reason applies. It joins each TRX with the `*.override-reasons.tsv` that `OverrideAudit` writes when `INFOCARRIER_OVERRIDE_REASONS` names a directory. |
+| `dotnet run --file eng/TrxFailures.cs -- <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Uses XML parsing because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
+| `dotnet run --file eng/DocLinks.cs -- [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so a renamed heading breaks inbound links silently. Exit 1 if any is broken. |
+| `dotnet run --file eng/WireContract.cs -- [--base-ref target] [--record]` | Compares actual default serialization contracts with protected committed descriptions. Records a candidate only after compatibility checks pass. Run for serializer, contract, codec, or dependency changes; see `docs/wire-protocol.md` for coverage and limitations. |
+| `dotnet run --file eng/DocWords.cs -- [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
+| `dotnet run --file eng/DocsServe.cs -- [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
+| `dotnet run --file eng/MakeIcons.cs --` | Regenerates every shipped icon from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
 
-The wire runner needs .NET and Git. Other scripts still require Python or Bash; MkDocs requires
-Python. [Engineering script migration](docs/engineering-scripts.md) records inherited build settings,
+Engineering commands need .NET; Git remains necessary for Git operations. Within `eng/`, only the
+MkDocs wrapper requires an external Python runtime. [Engineering script migration](docs/engineering-scripts.md) records inherited build settings,
 cross-platform checks, and the remaining hook inventory.
 
 ## Measuring and gating
 
-**`eng/measure.sh <label> [baseline]`** (or the `/experiment` skill, which wraps the whole loop)
+**`dotnet run --file eng/Measure.cs -- <label> [baseline]`** (or the `/experiment` skill, which wraps the whole loop)
 prints the count, the exact list of tests fixed and broken, *and* a diff of the failure **reasons**.
 Three levels, because each one hides a mistake the level below it catches:
 
@@ -259,16 +267,16 @@ Three levels, because each one hides a mistake the level below it catches:
 
 **Never state a verdict from partial output**, and **read the reasons diff, not the count**.
 
-**Which gate to run before which commit.** `eng/measure.sh` says nothing about trimming and the trim
+**Which gate to run before which commit.** `dotnet run --file eng/Measure.cs --` says nothing about trimming and the trim
 gate says nothing about behaviour. They are separate axes, and one change was committed green on one
 while failing the other in CI. **And neither says anything about Native AOT**: trimming does not ask
 whether code can be *generated*, so the 59 IL3050 diagnostics a `PublishAot` publish reports are
-invisible to `trim-ratchet.sh`. Nothing gates that axis, because Native AOT is not supported.
+invisible to `TrimRatchet.cs`. Nothing gates that axis, because Native AOT is not supported.
 
 | Change touches | Run |
 |---|---|
-| `src/` | **both** `eng/measure.sh` and `eng/trim-ratchet.sh` |
-| `test/` only | `eng/measure.sh` |
+| `src/` | **both** `dotnet run --file eng/Measure.cs --` and `dotnet run --file eng/TrimRatchet.cs --` |
+| `test/` only | `dotnet run --file eng/Measure.cs --` |
 | `docs/`, `eng/` text only | neither |
 | **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
 
@@ -534,7 +542,7 @@ spec-suite badge is still `main`-only**, because a badge is a claim about the tr
 ## Current state
 
 **The suite is green, and CI fails on any failing test**: `dotnet test`'s own exit code is the gate,
-on every push and every pull request. **No document keeps the current count.** `eng/measure.sh`
+on every push and every pull request. **No document keeps the current count.** `dotnet run --file eng/Measure.cs --`
 prints it, a commit message or a PR body records it with its date, and the published site gives it
 once per release (`docs/versioning.md`, "A minor from `main`"). This paragraph gave the count until
 2026-09-21, when six hand-kept copies were found stale within days, two of them wrong and the two
@@ -657,7 +665,7 @@ property of the machine. **Do not remove it.**
   signature* in a fast deterministic test, or by *reading the source it comes from*, or by
   *instrumenting it to diagnose itself* — not by repetition.
 
-**The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `measure.sh`
+**The suite is deterministic. Run it once.** Do not re-run to "confirm" a result — `Measure.cs`
 already ran it, and repeating that is minutes of wall clock buying nothing. Flakiness is not the
 default assumption.
 

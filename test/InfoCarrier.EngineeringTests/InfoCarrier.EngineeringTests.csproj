@@ -6,10 +6,13 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../eng/wire-contract.cs" Link="WireContractRunner.cs" />
+    <Compile Include="../../eng/shared/*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../../eng/commands/*.cs" Link="%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
   </ItemGroup>
 </Project>

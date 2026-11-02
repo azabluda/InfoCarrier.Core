@@ -85,7 +85,7 @@ jobs:
           --no-build --configuration Release
 
       - name: Trim ratchet (Blazor publish)
-        run: bash eng/trim-ratchet.sh
+        run: dotnet run --file eng/TrimRatchet.cs --
 
       # ContinuousIntegrationBuild makes the build deterministic and normalises the source paths
       # SourceLink embeds. Only set here, never locally, which is what the property is for.

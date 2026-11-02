@@ -12,7 +12,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 /// <param name="Report">Every override with its label, reference, skip and deviation, as a table.</param>
 /// <param name="Reasons">
 ///     The same reasons for every concrete test class that runs them, tab-separated, for
-///     <c>eng/spec-parity.py</c>. See <see cref="OverrideAudit.ReasonsDirectoryVariable" />.
+///     <c>eng/SpecParity.cs</c>. See <see cref="OverrideAudit.ReasonsDirectoryVariable" />.
 /// </param>
 public sealed record OverrideAuditResult(IReadOnlyList<string> Violations, string Report, string Reasons);
 
@@ -57,7 +57,7 @@ public static class OverrideAudit
     ///     When it is set, <see cref="Run" /> writes <c>&lt;assembly&gt;.override-reasons.tsv</c> there.
     /// </summary>
     /// <remarks>
-    ///     CI sets it to the TRX directory, so that <c>eng/suite-summary.sh</c> can join every test
+    ///     CI sets it to the TRX directory, so that <c>eng/SuiteSummary.cs</c> can join every test
     ///     result with its reasons for the README badge. A switch and a file, because the test
     ///     report is for people and the join needs the concrete class of every inherited override,
     ///     which the report does not list.
@@ -211,7 +211,7 @@ public static class OverrideAudit
             _ => "?",
         };
 
-    /// <summary>The anchor Python-Markdown gives a heading, as <c>eng/doc-links.py</c> computes it.</summary>
+    /// <summary>The anchor Python-Markdown gives a heading, as <c>eng/DocLinks.cs</c> computes it.</summary>
     private static string Slug(string heading)
     {
         string text = Regex.Replace(heading, "`([^`]*)`", "$1");

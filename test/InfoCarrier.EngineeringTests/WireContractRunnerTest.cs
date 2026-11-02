@@ -344,6 +344,7 @@ public sealed class WireContractRunnerTest : IDisposable
         var result = await WireContractRunner.Execute(["dotnet", typeof(ChildProcess).Assembly.Location, .. args], root, true, default);
         Assert.Equal(exit, result.ExitCode);
         Assert.Contains(JsonSerializer.Serialize(args), result.Output);
+        Assert.Contains("é Ω 漢字 😀", result.Output);
         Assert.Contains("child stderr", result.Output);
     }
 
@@ -354,10 +355,19 @@ public sealed class WireContractRunnerTest : IDisposable
         var marker = Path.Combine(root, "child.pid");
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var running = WireContractRunner.Execute(["dotnet", typeof(ChildProcess).Assembly.Location, "wait", marker], root, true, cancellation.Token);
-        while (!File.Exists(marker))
-            await Task.Delay(20, cancellation.Token);
-        var pid = int.Parse(await File.ReadAllTextAsync(marker));
-        cancellation.Cancel();
+        int pid;
+        try
+        {
+            while (!Directory.Exists(marker + ".ready"))
+                await Task.Delay(20, cancellation.Token);
+            pid = int.Parse(await File.ReadAllTextAsync(marker));
+        }
+        finally
+        {
+            cancellation.Cancel();
+            // Disposal must wait for the child even when reading the readiness file fails.
+            try { await running; } catch (OperationCanceledException) { }
+        }
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
         Assert.Throws<ArgumentException>(() => Process.GetProcessById(pid));
     }

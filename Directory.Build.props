@@ -17,13 +17,13 @@
       ILLink's own warnings are never errors. The trimmed Blazor publish reports 88 IL2xxx
       warnings owned by InfoCarrier.Core, unfixable by design: the wire carries a type's NAME, so
       Assembly.GetType(string) and MakeGenericMethod are what this provider is made of, and
-      [DynamicallyAccessedMembers] cannot describe them. eng/trim-ratchet.sh gates their
+      [DynamicallyAccessedMembers] cannot describe them. eng/TrimRatchet.cs gates their
       DIRECTION against eng/trim-baseline.txt.
 
       This property covers the ILLink TASK only. It is NOT what keeps the trim ratchet green, and
       believing it was cost a run: most IL2xxx findings come from the trim ROSLYN ANALYZER during
       compilation (they carry a source line), so plain TreatWarningsAsErrors turns those into
-      errors and this property never sees them. eng/trim-ratchet.sh therefore passes
+      errors and this property never sees them. eng/TrimRatchet.cs therefore passes
       -p:TreatWarningsAsErrors=false on its own publish, and says why.
     -->
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>

@@ -16,13 +16,13 @@ conclusions from incomplete runs, and those conclusions cost more than completin
 1. **Clean tree.** Run `git status --short`. If dirty, stop and ask. A measurement against
    uncommitted state cannot be attributed.
 
-2. **Baseline.** Run `eng/measure.sh baseline`. Quote the printed line. If a `baseline` snapshot
+2. **Baseline.** Run `dotnet run --file eng/Measure.cs -- baseline`. Quote the printed line. If a `baseline` snapshot
    from this session already exists and HEAD has not moved, reuse it.
 
 3. **One change.** Apply only the described change. Do not include unrelated cleanups or another
    experiment.
 
-4. **Measure.** Run `eng/measure.sh <name> baseline`. Read `FAILING`, `TOTAL`, the complete
+4. **Measure.** Run `dotnet run --file eng/Measure.cs -- <name> baseline`. Read `FAILING`, `TOTAL`, the complete
    `FIXED` and `BROKEN` lists, and the failure-reason difference.
 
 5. **Verdict.** Use the lists and reasons, not only the count.
