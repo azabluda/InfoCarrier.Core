@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
-using Xunit.Sdk;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -207,21 +206,6 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     /// </remarks>
     private static Task AssertStoreRefuses(Func<Task> query)
         => SqliteStoreRefusal.AssertAsync(query, "no such column");
-
-    /// <inheritdoc />
-    /// <remarks>
-    ///     EF's own override, for EF issue #32561: concatenating a parameter collection onto a
-    ///     column collection returns the wrong rows on SQLite, and EF asserts the mismatch rather
-    ///     than the result. Ours mismatches identically — an <see cref="EqualException" /> out of
-    ///     the same assertion — so the override transfers.
-    /// </remarks>
-    [StoreIssue(
-        IssueTracker.EfCore, 32561,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/PrimitiveCollectionsQuerySqliteTest.cs", 1459, 1484,
-        Justification = "Issue #32561",
-        Deviation = DeviationKind.SqlNotAsserted)]
-    public override async Task Parameter_collection_Concat_column_collection()
-        => await Assert.ThrowsAsync<EqualException>(() => base.Parameter_collection_Concat_column_collection());
 
     // R31 deleted four overrides here. They were `PrimitiveCollectionsQueryRelationalTestBase`'s,
     // mirrored by hand because the test project did not then reference the relational

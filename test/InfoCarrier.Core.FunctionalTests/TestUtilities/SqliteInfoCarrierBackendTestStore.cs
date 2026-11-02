@@ -147,7 +147,21 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
     /// <inheritdoc />
     public override System.Data.Common.DbConnection CreateStoreConnection()
-        => new SqliteConnection(_connectionString);
+    {
+        var connection = new SqliteConnection(_connectionString);
+
+        // The live comparison opens its connection directly, before EF can invoke interceptors.
+        // Both paths must select the same store configuration.
+        connection.StateChange += (_, args) =>
+        {
+            if (args.CurrentState == System.Data.ConnectionState.Open)
+            {
+                SqliteLegacyPrecisionInterceptor.Configure(connection);
+            }
+        };
+
+        return connection;
+    }
 
     /// <inheritdoc />
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
@@ -161,7 +175,9 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
     /// <inheritdoc />
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
-        => base.AddProviderOptions(builder).UseSqlite(_connectionString);
+        => base.AddProviderOptions(builder)
+            .UseSqlite(_connectionString)
+            .AddInterceptors(SqliteLegacyPrecisionInterceptor.Instance);
 
     /// <inheritdoc />
     /// <remarks>
@@ -212,7 +228,7 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     {
         get
         {
-            _directClientConnection ??= new SqliteConnection(_connectionString);
+            _directClientConnection ??= (SqliteConnection)CreateStoreConnection();
             if (_initialized && _directClientConnection.State != System.Data.ConnectionState.Open)
             {
                 _directClientConnection.Open();
