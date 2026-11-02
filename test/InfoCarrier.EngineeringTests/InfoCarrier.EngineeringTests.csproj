@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- One harness for engineering scripts; it does not contribute to the specification badge. -->
+    <OutputType>Exe</OutputType>
+    <StartupObject>InfoCarrier.EngineeringTests.ChildProcess</StartupObject>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../eng/wire-contract.cs" Link="WireContractRunner.cs" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+</Project>

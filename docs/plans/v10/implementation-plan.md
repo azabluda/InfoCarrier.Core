@@ -16,6 +16,20 @@ it lands in is decided on the issue, not here.
 | M9 — provider neutrality (Phase J) | [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md) |
 | Post-10.0, issue-driven (Phases Q, R, V, S, T, U, Y, Z, X and H) | [`archive/implementation-plan-post-10.0.md`](archive/implementation-plan-post-10.0.md) |
 
+## Phase E — engineering script migration ([#264](https://github.com/azabluda/InfoCarrier.Core/issues/264))
+
+- [x] **E1. Convert the wire-contract runner to a .NET file-based application.** Preserve protected
+      baseline selection, historical defaults, recording restrictions, and release comparisons.
+      Keep the existing inspector and committed descriptions. Replace the Python runner tests with
+      a shared engineering test project. Validate child processes and file-based commands on
+      Windows and Linux, with SDK 10.0.201 and the rolling SDK. Update active internal commands and
+      inspect user-facing documentation. [Migration notes](../../engineering-scripts.md) record
+      build isolation and remaining Python/Bash uses. Matrix validation runs in the pull request;
+      do not continue the remaining conversions before this bounded approach is reviewed.
+- [ ] **E2. Convert the remaining engineering commands after E1 validation.** Preserve counters,
+      badges, trimming limits, output formats, and third-party prerequisites. Move each command's
+      active workflow, tests, and documentation together; retain historical references.
+
 ## Phase I — ordinary type-descriptor complexity ([#211](https://github.com/azabluda/InfoCarrier.Core/issues/211))
 
 - [x] **I1. Bound descriptor complexity before runtime type construction.** Independent delivery

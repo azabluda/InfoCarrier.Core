@@ -16,6 +16,17 @@ against an ASP.NET Core server.
 Both are green. So is `test/InfoCarrier.Core.DocumentStoreTests`, which runs a few of the same
 specification bases against an embedded MongoDB.
 
+Engineering script tests are separate from those specification counters:
+
+```text
+dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --configuration Release
+dotnet run --file eng/wire-contract.cs
+```
+
+The wire runner requires .NET and Git. Other engineering scripts still use Python and Bash;
+website builds require Python and MkDocs. See the [migration notes](docs/engineering-scripts.md)
+for SDK selection, file-based build behavior, and the remaining script inventory.
+
 **Never override a specification test without saying why.** An override carries an attribute that
 says what the store does and where that is shown: EF Core's own test at the release commit, a
 tracker issue, or the decision in `docs/decisions.md`. `OverrideAuditTest` fails the run on an

@@ -67,7 +67,7 @@ decision revising the promise.
 
 ### Changing the wire contract
 
-Run `python eng/wire-contract.py --base-ref <target>` before merging serialization changes.
+Run `dotnet run --file eng/wire-contract.cs -- --base-ref <target>` before merging serialization changes.
 Without a target, the local check compares uncommitted work with the description at HEAD.
 Compatible additions can retain the current wire integer. A known structural break under an unchanged integer fails;
 unclassified changes need investigation rather than an automatic increase.
@@ -122,8 +122,8 @@ meaning, or changing a flag's promised effect.
    result for a known length. Verify explicit refusal of unsupported old contracts. If older
    contracts must remain supported, test their preserved behavior separately; refusal is insufficient.
    These tests document the deliberate change, rather than automatically discover its meaning.
-5. Run `python eng/wire-contract.py --base-ref origin/main --record`, review the description diff,
-   then run `python eng/wire-contract.py --base-ref origin/main`, admission tests, and the applicable
+5. Run `dotnet run --file eng/wire-contract.cs -- --base-ref origin/main --record`, review the description diff,
+   then run `dotnet run --file eng/wire-contract.cs -- --base-ref origin/main`, admission tests, and the applicable
    repository checks. Commit the implementation, tests, allocation, explanation, and description
    together. A semantic-only increase needs no fabricated field or schema-shape change.
 
