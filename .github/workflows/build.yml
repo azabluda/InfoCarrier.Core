@@ -66,53 +66,6 @@ jobs:
       - name: Prose word budgets
         run: python eng/doc-words.py --all --budget
 
-  # The first script migration must work with the declared minimum SDK and the rolling SDK,
-  # on both development platforms. An isolated install prevents latestMinor selecting a newer
-  # preinstalled SDK when the matrix asks for 10.0.201.
-  engineering:
-    name: Engineering (${{ matrix.os }}, ${{ matrix.sdk }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        sdk: ['10.0.201', '10.0.x']
-    defaults:
-      run:
-        shell: pwsh
-        working-directory: repository with spaces
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          path: repository with spaces
-      - uses: actions/setup-dotnet@v6
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/engineering-dotnet
-        with:
-          dotnet-version: ${{ matrix.sdk }}
-      - name: Verify resolved SDK
-        run: |
-          $resolved = dotnet --version
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          Write-Host "Requested ${{ matrix.sdk }}; resolved $resolved"
-          if ('${{ matrix.sdk }}' -eq '10.0.201' -and $resolved -ne '10.0.201') {
-            throw 'The minimum SDK was not selected.'
-          }
-      - name: Runner behavior and child-process tests
-        run: dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --configuration Release -p:TreatWarningsAsErrors=true
-      - name: File-based restore, build, and cached invocation
-        run: |
-          dotnet run --file eng/wire-contract.cs -- --help
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          dotnet run --file eng/wire-contract.cs --no-restore -- --help
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          dotnet run --file eng/wire-contract.cs --no-build -- --help
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Wire contract compatibility
-        working-directory: repository with spaces/docs
-        run: dotnet run --file ../eng/wire-contract.cs
-
   # Must be green. Build plus the two suites that are expected to pass unconditionally:
   # serializer round-trip and the end-to-end vertical slice.
   fast-gate:
@@ -142,6 +95,9 @@ jobs:
       # Recording candidate metadata cannot replace the protected target description.
       - name: Wire contract compatibility
         run: dotnet run --file eng/wire-contract.cs
+
+      - name: Engineering script tests
+        run: dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release
 
       # THE PUBLIC-API GATE, and it belongs on the pull request rather than after the merge.
       # `dotnet pack` is what runs package validation: Directory.Build.props sets

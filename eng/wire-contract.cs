@@ -92,7 +92,9 @@ internal sealed class WireContractRunner(string root,
     {
         var result = await Invoke(args, capture, token, cwd);
         if (result.ExitCode != 0)
-            throw new InvalidOperationException($"Command failed ({result.ExitCode}): {JsonSerializer.Serialize(args)}\n{result.Output}");
+            throw new InvalidOperationException($"Command failed ({result.ExitCode}): "
+                + new JsonArray(args.Select(arg => (JsonNode?)JsonValue.Create(arg)).ToArray()).ToJsonString()
+                + $"\n{result.Output}");
         return result.Output.Trim();
     }
 

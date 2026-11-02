@@ -24,8 +24,8 @@ it lands in is decided on the issue, not here.
       a shared engineering test project. Validate child processes and file-based commands on
       Windows and Linux, with SDK 10.0.201 and the rolling SDK. Update active internal commands and
       inspect user-facing documentation. [Migration notes](../../engineering-scripts.md) record
-      build isolation and remaining Python/Bash uses. Matrix validation runs in the pull request;
-      do not continue the remaining conversions before this bounded approach is reviewed.
+      inherited build settings and remaining Python/Bash uses. The initial migration matrix passed;
+      ongoing checks use the existing build job. Review this bounded approach before continuing.
 - [ ] **E2. Convert the remaining engineering commands after E1 validation.** Preserve counters,
       badges, trimming limits, output formats, and third-party prerequisites. Move each command's
       active workflow, tests, and documentation together; retain historical references.

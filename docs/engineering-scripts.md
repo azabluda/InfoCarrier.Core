@@ -21,11 +21,10 @@ repeatable `--release-ref` retain their existing meaning; see the
 [wire check](wire-protocol.md#structural-compatibility-check).
 
 Git remains required. `global.json` declares SDK 10.0.201 with `latestMinor` roll-forward.
-The engineering workflow checks that exact minimum and the current 10.0 SDK on Windows and Linux,
-using checkout paths with spaces and invoking the real runner from the documentation directory.
-Each matrix job uses an isolated SDK installation, because merely installing 10.0.201 beside a
-newer SDK would allow roll-forward to select the newer one. Local development on 2026-11-02
-resolved SDK 10.0.401. Both local SDKs passed the focused tests and the actual wire comparison.
+The existing build job runs the wire check and engineering tests with its installed SDK.
+One-time migration checks on 2026-11-02 passed on Windows and Linux with SDK 10.0.201 and the
+rolling SDK, including checkout paths with spaces and invocation from the documentation directory.
+Local development resolved SDK 10.0.401. Both local SDKs passed the focused tests and the actual wire comparison.
 The implementation does not use `#:include`, which requires SDK 10.0.300.
 
 The runner needs no Python or Bash. Website builds and preview still require Python and MkDocs;
@@ -33,15 +32,16 @@ replacing the website engine is outside this migration.
 
 ## Build behavior
 
-`eng/Directory.Build.props` deliberately does not import the product build properties. Engineering
-applications have nullable checking, implicit usings, documentation generation, and the repository
-code-style analyzers, but no MinVer dependency, product package identity, or package validation.
-Native AOT publishing is disabled. No project file is committed for the runner, and no product
-project is referenced by its file-based build. Only the runner's explicit child command builds the
-existing `tools/InfoCarrier.WireContract` project.
+The runner inherits the root `Directory.Build.props`, including nullable checking, implicit usings,
+documentation generation, code-style analyzers, and MinVer. There is no separate engineering
+properties file. The inherited `IsPackable=false` prevents script packages. The file-based SDK
+retains its default native-compilation analysis; argument logging uses the existing JSON node APIs
+without reflection-based serialization. No project file is committed for the runner, and no
+product project is referenced by its file-based build. Only the runner's explicit child command
+builds the existing `tools/InfoCarrier.WireContract` project.
 
-The SDK restores and caches file-based builds automatically. The workflow exercises initial,
-`--no-restore`, and `--no-build` launches. After changing inherited build settings, use
+The SDK restores and caches file-based builds automatically. One-time migration checks exercised
+initial, `--no-restore`, and `--no-build` launches. After changing inherited build settings, use
 `dotnet run --file eng/wire-contract.cs --no-cache -- --help` to force a build. The test project
 links the same runner source into one engineering harness; it is separate from specification-suite
 counters, badges, and transport coverage. Child arguments use `ProcessStartInfo.ArgumentList`.

@@ -243,7 +243,7 @@ not explain.
 | `eng/make-icons.py` | Regenerates every shipped icon from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
 
 The wire runner needs .NET and Git. Other scripts still require Python or Bash; MkDocs requires
-Python. [Engineering script migration](docs/engineering-scripts.md) records build isolation,
+Python. [Engineering script migration](docs/engineering-scripts.md) records inherited build settings,
 cross-platform checks, and the remaining hook inventory.
 
 ## Measuring and gating
