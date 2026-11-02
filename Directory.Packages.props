@@ -44,6 +44,17 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="[10.0.1,11.0.0)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.1" />
+    <!--
+      Repository-only transitive pin: bundle 2.1.14 supplies native SQLite 3.54.0, verified from
+      sqlite3_libversion(). Both shipped projects disable central transitive pinning and have
+      no SQLite dependency. The newer-numbered bundle 3.0.5 currently supplies older SQLite 3.53.4.
+
+      Until 2026-11-02, samples and tests suppressed GHSA-2m69-gcr7-jv3q to retain SQLite 3.49.1.
+      The EF 10.0.1 specification store now explicitly selects SQLite's supported 15-digit real
+      to text conversion mode instead. The inherited exact decimal assertions remain unchanged;
+      the sample and unconfigured connections retain the native precision default.
+    -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
 
     <!--
       ADR-009 Tier C: Firebird, and it is TEST-ONLY. No shipped project references any of these
