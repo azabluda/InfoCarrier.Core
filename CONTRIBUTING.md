@@ -16,6 +16,17 @@ against an ASP.NET Core server.
 Both are green. So is `test/InfoCarrier.Core.DocumentStoreTests`, which runs a few of the same
 specification bases against an embedded MongoDB.
 
+Engineering script tests are separate from those specification counters:
+
+```text
+dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --configuration Release
+dotnet run --file eng/WireContract.cs
+```
+
+Engineering scripts require .NET SDK 10.0.300 or later. Git remains necessary for Git operations;
+website builds require Python and MkDocs. See the [migration notes](docs/engineering-scripts.md)
+for SDK selection, file-based build behavior, and the remaining script inventory.
+
 **Never override a specification test without saying why.** An override carries an attribute that
 says what the store does and where that is shown: EF Core's own test at the release commit, a
 tracker issue, or the decision in `docs/decisions.md`. `OverrideAuditTest` fails the run on an
@@ -42,30 +53,38 @@ Read [`docs/build-warnings.md`](docs/build-warnings.md) before adding a `NoWarn`
 
 | Your change touches | Run |
 |---|---|
-| `src/` | `eng/measure.sh` and `eng/trim-ratchet.sh` |
-| `test/` only | `eng/measure.sh` |
+| `src/` | `dotnet run --file eng/Measure.cs --` and `dotnet run --file eng/TrimRatchet.cs --` |
+| `test/` only | `dotnet run --file eng/Measure.cs --` |
 | `docs/`, `website/` or `eng/` text | neither |
 
-`eng/measure.sh <label>` runs the specification suite and prints the count, the tests fixed and
+`dotnet run --file eng/Measure.cs -- <label>` runs the specification suite and prints the count, the tests fixed and
 broken by name, and a diff of the failure *reasons*. Read the reasons. A count that did not move
 cannot tell "fixed four, broke four" apart from "changed nothing".
 
-`eng/trim-ratchet.sh` publishes the Blazor sample trimmed and compares its IL warnings against
+`dotnet run --file eng/TrimRatchet.cs --` publishes the Blazor sample trimmed and compares its IL warnings against
 [`eng/trim-baseline.txt`](eng/trim-baseline.txt). It fails when the count goes up. The count does
 not have to be zero.
 
-In CI the gate is the test run's own result, and `eng/suite-summary.sh` only collects the numbers.
+In CI the gate is the test run's own result, and `dotnet run --file eng/SuiteSummary.cs --` only collects the numbers.
 
 ## Documentation site
 
 ```bash
-eng/docs-serve.sh            # live reload; mkdocs prints the URL
-eng/docs-serve.sh --build    # one-shot strict build, what CI runs
+dotnet run --file eng/DocsServe.cs --            # live reload; mkdocs prints the URL
+dotnet run --file eng/DocsServe.cs -- --build    # one-shot strict build, what CI runs
 ```
 
 Either creates the virtual environment from `website/requirements.txt` if it is missing.
 `mkdocs build --strict` is the gate: a broken internal link, or a page missing from the nav, fails
 the build.
+
+## Engineering scripts
+
+Write new engineering commands in C#, with PascalCase filenames and top-level entry statements.
+Place the script-specific, testable implementation in `eng/commands/`. Use `eng/shared/` only for
+code reused by several commands. The entry files include those sources with `#:include`.
+Use the root build settings and existing workflow jobs. Extend `InfoCarrier.EngineeringTests`
+when a command has behavior that needs verification; it compiles the same implementation files.
 
 ## Commits
 

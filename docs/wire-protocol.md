@@ -82,13 +82,13 @@ suitable release boundary, or obtain an explicit owner decision changing that pr
 
 Run the check from the repository root:
 
-    python eng/wire-contract.py
+    dotnet run --file eng/WireContract.cs
 
 The local default reads the description at `HEAD`, so checking out an older commit uses its own
 reference. This checks uncommitted work. Before pushing, include all feature-branch commits by
 comparing with the target branch:
 
-    python eng/wire-contract.py --base-ref origin/main
+    dotnet run --file eng/WireContract.cs -- --base-ref origin/main
 
 The C# tool in tools/InfoCarrier.WireContract inspects effective System.Text.Json metadata and
 writes the candidate description temporarily. The reference is read directly from
@@ -113,7 +113,7 @@ remain readable without rewriting their Git revisions or building old source.
 
 After an accepted contract change, run:
 
-    python eng/wire-contract.py --base-ref origin/main --record
+    dotnet run --file eng/WireContract.cs -- --base-ref origin/main --record
 
 Recording first compares the actual implementation with the protected reference. A known break
 without a fresh wire version, or incomplete analysis, prevents recording. Ordinary checks also

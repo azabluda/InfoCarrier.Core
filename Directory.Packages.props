@@ -5,6 +5,9 @@
       Directory.Build.props references it with PrivateAssets="all", so it appears in no nuspec.
     -->
     <PackageVersion Include="MinVer" Version="8.0.0" />
+    <!-- Engineering icon generation only; MIT-licensed portable PNG codecs and native assets. -->
+    <PackageVersion Include="SkiaSharp" Version="4.153.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
     <!-- Independent JSON Schema validation in the wire-description tests only. -->
     <PackageVersion Include="JsonSchema.Net" Version="9.4.1" />
 

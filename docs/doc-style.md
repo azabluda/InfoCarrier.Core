@@ -47,13 +47,13 @@ The numbers below come from those files, not from memory. Re-measure before chan
 | Three pages, for trusted anonymous-shape catalogs | 540, 920 and 1580 | Raised 2026-10-08. `api-surface` 540 names the catalog API. `security` 920 explains trusted admission and the remaining execution risks. `configuration/server` 1580 explains structural prototype registration, recursive limits, model binding, and missing-registration or conflicting-identity failures. |
 | Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
 
-The whole-site figure is a reading, not a gate. `eng/doc-words.py` checks each file against its own
+The whole-site figure is a reading, not a gate. `dotnet run --file eng/DocWords.cs --` checks each file against its own
 budget and nothing against the total, so a site-wide number here can only ever be a record of where
 the set stood the last time somebody measured it. It read 9,473 across 19 pages when this table was
 written and now reads 11,609 across 23, and the growth is four new pages plus the corrections the
 cold reads asked for.
 
-**`py eng/doc-words.py --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
+**`dotnet run --file eng/DocWords.cs -- --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
 code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
 prose and double it under `wc -w`. The script holds the same budgets as this table. Keep the two in
 step.
@@ -72,7 +72,7 @@ the room, without arguing for it first. The whole set gets one thorough read bef
 that read is where the numbers are set on evidence; defending them one page at a time until then
 buys nothing and costs the fact the page was trying to carry.
 
-**What this does not relax.** `eng/doc-words.py` still gates, and this table and the script still
+**What this does not relax.** `dotnet run --file eng/DocWords.cs --` still gates, and this table and the script still
 have to agree — a page over its own number is still a red build, so the number moves in the same
 commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
 missing *fact*. What is suspended is the ceremony, not the standard.
@@ -217,8 +217,8 @@ headings), §29 (a heading restated in the first sentence) and §31 (dramatic fr
 Then:
 
 ```bash
-eng/docs-serve.sh --build              # mkdocs build --strict: a broken link fails the build
-py eng/doc-words.py --all --budget     # prose words against the budgets above; exit 1 if over
+dotnet run --file eng/DocsServe.cs -- --build              # mkdocs build --strict: a broken link fails the build
+dotnet run --file eng/DocWords.cs -- --all --budget     # prose words against the budgets above; exit 1 if over
 grep -c "—" <file>                     # must be 0
 ```
 

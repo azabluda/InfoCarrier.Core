@@ -17,13 +17,13 @@ more than the run would have.
 1. **Clean tree.** `git status --short`. If dirty, stop and ask — a measurement against
    uncommitted state cannot be attributed.
 
-2. **Baseline.** `eng/measure.sh baseline`. Quote the printed line. If a `baseline` snapshot from
+2. **Baseline.** `dotnet run --file eng/Measure.cs -- baseline`. Quote the printed line. If a `baseline` snapshot from
    this session already exists and HEAD has not moved, reuse it rather than re-running.
 
 3. **One change.** Apply only the change described. No opportunistic cleanups, no second idea
    "while I'm here" — a run that measures two changes measures neither.
 
-4. **Measure.** `eng/measure.sh <name> baseline`. This prints `FAILING`/`TOTAL` and the exact
+4. **Measure.** `dotnet run --file eng/Measure.cs -- <name> baseline`. This prints `FAILING`/`TOTAL` and the exact
    FIXED and BROKEN lists.
 
 5. **Verdict, from the lists and not from the count.**

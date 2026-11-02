@@ -1,4 +1,4 @@
-# Trim-warning ratchet baseline — see eng/trim-ratchet.sh and the M8-17 entry in
+# Trim-warning ratchet baseline — see eng/TrimRatchet.cs and the M8-17 entry in
 # docs/plans/v10/implementation-plan.md.
 #
 # `ours` counts UNIQUE IL2xxx diagnostics whose declaring member is an InfoCarrier.Core type, from

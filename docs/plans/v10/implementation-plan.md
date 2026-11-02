@@ -16,6 +16,24 @@ it lands in is decided on the issue, not here.
 | M9 — provider neutrality (Phase J) | [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md) |
 | Post-10.0, issue-driven (Phases Q, R, V, S, T, U, Y, Z, X and H) | [`archive/implementation-plan-post-10.0.md`](archive/implementation-plan-post-10.0.md) |
 
+## Phase E — engineering script migration ([#264](https://github.com/azabluda/InfoCarrier.Core/issues/264))
+
+- [x] **E1. Convert the wire-contract runner to a .NET file-based application.** Preserve protected
+      baseline selection, historical defaults, recording restrictions, and release comparisons.
+      Keep the existing inspector and committed descriptions. Replace the Python runner tests with
+      a shared engineering test project. Validate child processes and file-based commands on
+      Windows and Linux, with SDK 10.0.201 and the rolling SDK. Update active internal commands and
+      inspect user-facing documentation. [Migration notes](../../engineering-scripts.md) record
+      inherited build settings and remaining Python/Bash uses. The initial migration matrix passed;
+      ongoing checks use the existing build job. The owner expanded the same pull request to E2.
+- [x] **E2. Convert all remaining engineering commands in the same pull request.** Preserve counters,
+      badges, trimming limits, output formats, and third-party prerequisites. Use PascalCase files,
+      top-level entry statements, testable script-specific implementations under `eng/commands/`,
+      and genuinely reusable process handling under `eng/shared/`. SDK 10.0.300 is the new minimum
+      for `#:include`, selected by the owner. Update active workflow, skill, contributor, and website
+      instructions. Remove superseded scripts after equivalence checks and audit remaining Python
+      references; preserve dated records and report third-party and hook dependencies accurately.
+
 ## Phase I — ordinary type-descriptor complexity ([#211](https://github.com/azabluda/InfoCarrier.Core/issues/211))
 
 - [x] **I1. Bound descriptor complexity before runtime type construction.** Independent delivery

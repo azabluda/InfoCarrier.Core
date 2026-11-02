@@ -67,7 +67,7 @@ decision revising the promise.
 
 ### Changing the wire contract
 
-Run `python eng/wire-contract.py --base-ref <target>` before merging serialization changes.
+Run `dotnet run --file eng/WireContract.cs -- --base-ref <target>` before merging serialization changes.
 Without a target, the local check compares uncommitted work with the description at HEAD.
 Compatible additions can retain the current wire integer. A known structural break under an unchanged integer fails;
 unclassified changes need investigation rather than an automatic increase.
@@ -122,8 +122,8 @@ meaning, or changing a flag's promised effect.
    result for a known length. Verify explicit refusal of unsupported old contracts. If older
    contracts must remain supported, test their preserved behavior separately; refusal is insufficient.
    These tests document the deliberate change, rather than automatically discover its meaning.
-5. Run `python eng/wire-contract.py --base-ref origin/main --record`, review the description diff,
-   then run `python eng/wire-contract.py --base-ref origin/main`, admission tests, and the applicable
+5. Run `dotnet run --file eng/WireContract.cs -- --base-ref origin/main --record`, review the description diff,
+   then run `dotnet run --file eng/WireContract.cs -- --base-ref origin/main`, admission tests, and the applicable
    repository checks. Commit the implementation, tests, allocation, explanation, and description
    together. A semantic-only increase needs no fabricated field or schema-shape change.
 
@@ -444,7 +444,7 @@ Both procedures below end at the same place, so the shared tail is written once.
    review the separate migration story against actual contract changes; an untested mechanism
    must not be described as validated.
 2. Update `website/docs/limitations.md` if the failure set moved, and write the suite's figure
-   there: the `Total tests: …` line of `eng/measure.sh`'s own summary, then
+   there: the `Total tests: …` line of `dotnet run --file eng/Measure.cs --`'s own summary, then
    ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing
    between two releases edits it** (2026-09-21): refreshed by hand after each run, the counts
    drifted, and the landing page and this page disagreed. The new release-notes page gives the

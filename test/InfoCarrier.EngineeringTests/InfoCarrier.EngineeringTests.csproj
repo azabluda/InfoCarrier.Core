@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- One harness for engineering scripts; it does not contribute to the specification badge. -->
+    <OutputType>Exe</OutputType>
+    <StartupObject>InfoCarrier.EngineeringTests.ChildProcess</StartupObject>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../eng/shared/*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../../eng/commands/*.cs" Link="%(Filename)%(Extension)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+  </ItemGroup>
+</Project>

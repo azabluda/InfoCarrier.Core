@@ -2,8 +2,8 @@
   CONTRIBUTING.md has the build and test commands. Two gates decide whether a change can land, and
   which of them applies depends only on what the change touches:
 
-    src/           both eng/measure.sh and eng/trim-ratchet.sh
-    test/ only     eng/measure.sh
+    src/           both dotnet run --file eng/Measure.cs -- and dotnet run --file eng/TrimRatchet.cs --
+    test/ only     dotnet run --file eng/Measure.cs --
     docs or text   neither
 
   A change to src/ also has to survive `CI=true dotnet build InfoCarrier.Core.slnx --configuration
@@ -17,9 +17,9 @@
 <!--
   For a change to src/ or test/, paste the numbers rather than describing them: the failure count,
   and what the run fixed and broke. A count that did not move cannot tell "fixed four, broke four"
-  from "changed nothing", which is why eng/measure.sh prints all three levels.
+  from "changed nothing", which is why dotnet run --file eng/Measure.cs -- prints all three levels.
 -->
 
-- [ ] `eng/measure.sh` run, and the fixed/broken lists read, not just the count
-- [ ] `eng/trim-ratchet.sh` green, if `src/` changed
+- [ ] `dotnet run --file eng/Measure.cs --` run, and the fixed/broken lists read, not just the count
+- [ ] `dotnet run --file eng/TrimRatchet.cs --` green, if `src/` changed
 - [ ] The plan checkbox in `docs/plans/v10/implementation-plan.md` updated in this same commit

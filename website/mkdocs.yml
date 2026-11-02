@@ -5,8 +5,8 @@
 # audiences, two sets of files, and mixing them is what makes internal documents read as promises.
 #
 # Build it locally the way CI does:
-#     python -m venv .venv && .venv/Scripts/pip install -r website/requirements.txt
-#     .venv/Scripts/mkdocs build --strict --config-file website/mkdocs.yml
+#     dotnet run --file eng/DocsServe.cs -- --build
+# The wrapper installs MkDocs in .venv when needed; MkDocs requires its Python runtime.
 #
 # `--strict` is not optional: it turns a broken internal link or a page missing from the nav into
 # a failed build, which is the only automated check a documentation site can have.
@@ -35,7 +35,7 @@ theme:
   # A three-frame .ico (16/32/48), which is the whole favicon story: one request, and the tab, the
   # bookmark bar and a pinned taskbar tile each get pixels rendered for their size. Separate
   # 16/32/48 PNGs alongside it would be three more `<link>` tags for pixels this file already has.
-  # Every icon under assets/icons/ is generated -- `py eng/make-icons.py`, never edited by hand.
+  # Generate icons with `dotnet run --file eng/MakeIcons.cs`; do not edit the outputs by hand.
   favicon: assets/icons/favicon.ico
   # NO `logo:`, AND THAT IS DELIBERATE -- the mark belongs on the tab, not in the header. Material
   # does not fall back to the favicon when this is absent: it draws its own `material/library`
