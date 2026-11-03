@@ -424,6 +424,36 @@ Because historical versions map directly to the live model, an incompatible live
 still require changes to historical mappings. This separation does not promise immutable adapters
 or semantic compatibility for arbitrary future changes.
 
+### Amendment 2026-11-03: abandon both single-representation trials
+
+The owner grouped and abandoned both attempts to retain only one contract representation:
+
+1. **Drop JSON, keep frozen C#.** Mapping compilation checks C# assignments, not serialized names,
+   discriminator values, enum numeric assignments, optional-member omissions, defaults, or positional
+   codec layout. Attributes need a checker; they do not extend ordinary compiler coverage. Frozen V3
+   types also do not replace a protected reference for successive releases sharing live V4. This was
+   a design/source review, not a runtime trial. No replacement checker was implemented.
+2. **Drop frozen C#, keep JSON.** NJsonSchema 11.6.1 did not generate equivalent V3 contracts from
+   the existing catalogue. The measured failures and remaining customization costs are recorded below.
+
+Keep complete committed historical C# definitions, handwritten mappings, and protected JSON
+descriptions with the existing structural checker. C# remains the authored contract; JSON records
+covered effective serialization facts for historical comparison. Neither replaces semantic testing.
+The [evaluation record](plans/v11/wire-migration-research.md#15-abandoned-single-representation-trials-2026-11-03)
+preserves each proposal's evidence level, failure reasons, limitations, and conditions for reconsideration.
+
+The trial did not produce equivalent V3 contracts. Definition/union handling failed or lost typed
+variants; generated request types changed byte validation, nullable enums, defaults, and handling of
+unknown fields. A conventional inheritance control generated string discriminator `"0"` where V3
+requires numeric `0`. Enabling C# `required` corrected missing-field checks but did not address those
+other differences. Compilation and a simple round-trip were therefore insufficient acceptance tests.
+
+Remove the experiment command, probe, and package reference rather than retaining unused tooling.
+Reconsider either approach only with a concrete replacement addressing its recorded counterexamples
+and a demonstrated reduction in maintenance cost. Strong typing, attributes, a new generator release,
+or a generic source-generation claim alone does not justify repeating these trials. This amendment
+does not abandon the validated protocol 3-to-4 migration.
+
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 
 **Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and

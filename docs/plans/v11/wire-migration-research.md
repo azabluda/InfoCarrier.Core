@@ -263,7 +263,9 @@ discriminators, positional frames, custom annotations, and generated serializer 
 
 Schema-first generation remains credible if a broader requirement justifies that work. The
 existing standard schema alone is insufficient evidence for selecting NJsonSchema or a custom
-generator. No schema-to-contract generation was tested in this research.
+generator. No schema-to-contract generation was tested during the initial research. The later
+[bounded evaluations and abandonment](#15-abandoned-single-representation-trials-2026-11-03) record
+the actual generation failures and the owner's decision not to pursue this approach.
 
 ## 7. Mapping libraries: verified capabilities and execution paths
 
@@ -837,3 +839,165 @@ errors; and metadata isolation between containers. The selector has only its enu
 There is no standalone codec factory or global default selector. Built-in codec implementations use
 ordinary `TryAddEnumerable` singleton registrations. The compatibility probe's measurements also
 resolve their selector from a service provider.
+
+## 15. Abandoned single-representation trials, 2026-11-03
+
+**Status: both abandoned by the owner, 2026-11-03.** These trials attempted to remove one of the
+two committed representations: keep only frozen C#, or keep only JSON descriptions. Retain both.
+Frozen C# provides the historical reader/writer types; the JSON catalogue records covered effective
+serialization facts for comparison against protected Git history. The catalogue is derived checking
+evidence, not a second independently authored contract or verified generation input.
+
+The common failure was treating these representations as interchangeable because both describe
+the contract. Successful C# compilation does not establish wire compatibility, and successful
+schema-to-C# generation does not establish equivalence with the historical implementation.
+Neither representation alone proves semantic compatibility. The validated protocol 3-to-4 migration
+and its handwritten mappings are not abandoned.
+
+### Trial A: drop JSON descriptions and keep only frozen C#
+
+**Proposal.** Delete committed schema descriptions, express any missing metadata through C#
+attributes, and let compilation of handwritten mappings expose incompatible contract changes.
+
+**Evidence level.** This was a design and source review, not a completed runtime experiment.
+No schema descriptions were removed and no custom analyzer was implemented. The counterexamples
+below invalidate compiler-only coverage; they are not reported as measured test results.
+
+**Why it failed.** The ordinary compiler checks C# type/member usage, not the effective serialized
+contract. These changes can leave mapping code compiling:
+
+| Change | Why mapping compilation misses it |
+|---|---|
+| Change a property's `JsonPropertyName` | The C# member and assignment remain unchanged |
+| Change a discriminator tag or enum numeric assignment | The referenced type and enum member still exist |
+| Add an optional destination property without mapping it | Object initializers need not initialize optional members |
+| Change `JsonRequired`, ignore rules, serializer options, or a codec | Those changes do not necessarily alter C# assignment compatibility |
+| Exchange two integer frame positions | Both values remain valid integer expressions |
+| Change defaults, units, or same-typed field meaning | Assignment type compatibility does not check meaning |
+
+C# `required` can detect omitted required destination members, but cannot detect wrong values or
+prove every source member was handled. Custom attributes are metadata; a checker or analyzer must
+interpret them. Adding attributes alone does not extend the ordinary compiler's checks.
+
+Frozen V3 classes also do not provide a protected reference for all later releases using live V4.
+Several package releases may share wire version 4 without creating another complete frozen copy.
+Rebuilding descriptions from candidate source alone can reproduce the same accidental change on
+both sides of a comparison. Deleting the committed descriptions without another protected reference
+would therefore remove existing historical comparison coverage.
+
+**Decision and reconsideration.** Keep protected JSON descriptions and the bounded structural
+checker alongside frozen C#. Do not repeat the compiler-only proposal as though attributes or
+strong typing solve these counterexamples. A future alternative must identify its protected
+historical reference and demonstrate equivalent covered serialization checks, including live
+same-version releases. An analyzer or source/artifact comparison could form part of that alternative,
+but would be a separate mechanism requiring evidence. Existing schema checks still do not prove
+arbitrary converter behavior or semantic compatibility; unchanged-client acceptance remains separate.
+
+### Trial B: drop frozen C# and keep only JSON descriptions
+
+**Proposal.** Generate historical classes from committed JSON Schema during the build and omit
+the generated classes from Git. This was tested with NJsonSchema 11.6.1 and failed to produce an
+equivalent historical contract set. Do not repeat the same generation trial merely because a
+package advertises C# or System.Text.Json support.
+
+The owner authorized a bounded NJsonSchema evaluation after discussing whether historical C#
+declarations could be generated during the build. This experiment does not replace the frozen V3
+classes, change production registration, or supersede the physical-copy decision. Generated files
+remain ignored local artifacts. After abandonment, the experiment entry, implementation, probe,
+and package reference were removed. No generator dependency remains in repository configuration.
+
+#### Package and reproducibility
+
+The evaluated package is
+[NJsonSchema.CodeGeneration.CSharp 11.6.1](https://www.nuget.org/packages/NJsonSchema.CodeGeneration.CSharp/11.6.1),
+under the MIT license. It is the C# generation library used within the NSwag ecosystem, not a package
+that automatically wires historical-class generation into this project's build. The inspected
+[versioned settings](https://github.com/RicoSuter/NJsonSchema/blob/v11.6.1/src/NJsonSchema.CodeGeneration.CSharp/CSharpGeneratorSettings.cs)
+mark System.Text.Json and its native polymorphism support experimental/incomplete.
+
+The now-removed engineering command read `docs/wire-contracts/protocol3.json`, selected a query
+request and the expression graph, generated code under `artifacts/schema-generation-experiment`,
+then compiled an isolated Release probe referencing the unchanged product. The probe disabled
+serializer reflection fallback and used System.Text.Json source-generated metadata for both the
+existing and generated classes. No generated source or generated schema was committed. This note
+preserves the inputs, settings, counterexamples, and conclusions instead of retaining abandoned tooling.
+
+Generation settings explicitly select System.Text.Json 10, its native polymorphism attributes,
+nullable reference annotations, and nullable optional properties. Data annotations are disabled.
+A second request variant enables `UseRequiredKeyword`. This is a configured evaluation, not a claim
+about every possible generator setting.
+
+#### Observations
+
+| Case | Observed result |
+|---|---|
+| Existing request catalogue selected through `$defs` | Generation fails with an unresolved property reference |
+| Existing expression catalogue selected through `$defs` | Generates an extension-data container without typed variants |
+| Request after reference/dialect adaptation | Generates compilable classes; simple valid request JSON round-trips |
+| Expression after the same adaptation | Generation fails resolving the recursive expression definition |
+| Required request fields with ordinary generated properties | Missing fields are accepted, whereas V3 rejects them |
+| Same fields with `UseRequiredKeyword` | Missing fields are rejected through source-generated serializer metadata |
+| Encoded query bytes | Generates `string`, losing byte-array typing and invalid-base64 rejection |
+| Numeric tracking enum | Generates `int`, losing the named enum vocabulary |
+| Nullable split-query enum | Generates an object class; a valid numeric V3 value is rejected |
+| Omitted optional protocol integer | Generated value is null; existing V3 value is zero |
+| Unknown request field | Generated extension data retains it; existing V3 skips it |
+| Unknown expression discriminator | Raw generated container accepts it; existing V3 rejects it |
+
+The adaptation extracts the reachable definition closure, converts `$defs` references to
+`definitions`, changes the declared dialect, and assigns safe definition names. It deliberately
+does not translate InfoCarrier extensions or claim semantic equivalence between schema drafts.
+These failures describe this input and adapter; they do not prove that all recursive schemas fail.
+
+A separate, explicitly synthetic control uses conventional inheritance definitions and the library's
+discriminator mapping representation. It produces a typed base class and derived class. However,
+its native System.Text.Json output registers discriminator `"0"` as a string. The compiled probe
+accepts `{"$kind":"0","value":42}` and rejects `{"$kind":0,"value":42}`. V3 uses numeric tags.
+The [versioned class template](https://github.com/RicoSuter/NJsonSchema/blob/v11.6.1/src/NJsonSchema.CodeGeneration.CSharp/Templates/Class.liquid)
+confirms that the native discriminator argument is emitted as a quoted string. Thus, conventional
+inheritance input alone does not preserve the V3 discriminator representation.
+
+The probe reports `Passed: 17, Failed: 0, Total: 17`. These are checks that reproduce the observations,
+including incompatibilities; they are not seventeen successful compatibility cases. Reflection
+fallback reports false. No unchanged earlier client was run against a server using generated
+contracts, because no equivalent generated contract set exists yet. Earlier unchanged-client
+acceptance in section 14 applies only to the committed physical classes.
+
+#### Assessment and recommendation
+
+**Why this failed.** Compilable classes were not equivalent V3 contracts. The generator did not
+understand the current catalogue's definition/union representation and InfoCarrier-specific metadata
+well enough to restore the byte, enum, default, and polymorphic behavior. Even the conventional
+inheritance control changed numeric discriminator `0` into string discriminator `"0"`. Successful
+ordinary-property generation and a successful simple JSON round-trip therefore gave insufficient
+evidence. The result would require an additional adapter/template maintenance mechanism to preserve
+historical behavior, rather than removing maintenance by replacing copied source.
+
+NJsonSchema is viable as a code-emission component, but is not a direct replacement for the V3
+snapshot with the current catalogue. A production experiment would first need a generation-input
+adapter for nullable unions, byte formats, enum assignments, inheritance, and context-specific
+settings. Numeric polymorphic tags require custom generation or another verified technique.
+Defaults and unknown-property behavior also need explicit decisions. Settings such as
+`UseRequiredKeyword` resolve some differences without custom templates.
+
+The existing catalogue describes effective serializer metadata, not every C# declaration. It cannot
+by itself restore methods, ignored implementation members, constructor choices, or interface
+relationships. Equivalent wire behavior may allow different source structures, but then existing
+handwritten mappings and codec assumptions must be checked against those structures.
+
+**Decision.** Abandon schema-to-class generation for this implementation and retain committed V3
+declarations. This is a project decision about the tested input and maintenance cost, not a claim
+that NJsonSchema cannot generate useful classes or that every observed difference is unfixable.
+`UseRequiredKeyword` already fixed missing-field presence checks; that setting did not fix the
+other differences.
+
+**Revisit only with new evidence.** Identify a specific generator, input adapter, or template change
+that addresses the recorded mismatches before proposing another trial. First demonstrate numeric
+discriminator preservation, byte validation, nullable enums, defaults, and unknown-field behavior.
+Then require complete mapping compilation and unchanged-client acceptance. A new package version,
+a successful build, or a source-generation label alone is not sufficient reason to repeat this trial.
+
+Validation: the experiment passes with `CI=true`; the Release solution build succeeds with five
+documented framework Razor warnings and zero errors. Documentation links, file hygiene, and
+`git diff --check` pass. The functional and transport suites were not repeated because production
+code was unchanged.
