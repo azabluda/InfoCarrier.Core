@@ -69,7 +69,7 @@ internal static class ContractInspector
         {
             string key = Key(context, type);
             // Faults are carried only in responses, despite being an envelope property.
-            if (type == typeof(InfoCarrierFault))
+            if (type == typeof(InfoCarrierFault) || type == typeof(InfoCarrier.Core.Wire.V3.Common.InfoCarrierFault))
             {
                 direction = WireDirection.Response;
             }
@@ -87,7 +87,9 @@ internal static class ContractInspector
             {
                 Walk(context, child, direction);
             }
-            if (type == typeof(object) && context == typeof(ExpressionJsonContext))
+            if (type == typeof(object) && (context == typeof(ExpressionJsonContext)
+                || context == typeof(InfoCarrierJsonContext)
+                || context == typeof(InfoCarrier.Core.Wire.V3.Expressions.Protocol3ExpressionJsonContext)))
             {
                 foreach (Type primitive in Coverage.PrimitiveValues)
                 {

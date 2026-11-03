@@ -13,26 +13,25 @@ public interface IInfoCarrierTransport
 }
 ```
 
-An `InfoCarrierEnvelope` is a serializable record. Get one to the server, get the answer back, and
-you have a transport. HTTP is the default adapter. Another protocol needs its own client transport
-and corresponding server hosting.
+An `InfoCarrierEnvelope` is a serializable record exchanged by client and server.
+HTTP is the default adapter. Another protocol needs a client transport and server hosting.
 
 ## Compatibility
 
-Compatible optional fields can share a wire version. Changes to field meanings can require a new
-version even when their types stay the same. The repository checks the default serialization
-contracts for structural changes; this does not validate your application models or custom
-serializers. Keep those contracts compatible across your supported deployments.
+Compatible optional fields can share a wire version. Meaning changes can require a new version
+despite unchanged types. Structural checks cover default serialization contracts. They exclude
+application models and custom serializers. Keep those contracts compatible across supported deployments.
+Advanced hosts can replace protocol codecs through dependency injection.
 
 Version 11 supports clients from its current and previous minor releases. The first release,
 11.0, supports only 11.0 clients. Version 10 and earlier version 11 development contracts are not
 supported. The support window is measured in releases, not elapsed time.
 
-The wire contract uses an independent integer, currently 3. Several package releases can share
-that contract. Older packages outside the support window may still work when they use the same
-contract, but are not covered by the compatibility promise. The server checks the wire contract,
-not a package version supplied by the caller. Current code accepts only wire contract 3 and does
-not convert older contracts.
+The wire contract uses an independent integer, currently 4. Several package releases can share
+it. Packages outside the support window may still work with the same contract, without a compatibility
+promise. The server checks the wire contract, not the caller's package version.
+It also accepts contract 3 through explicit request and response conversion.
+This does not extend the published package support window.
 
 Custom envelope transports must preserve `ProtocolVersion`. Missing identification is zero and is
 rejected. For `IInfoCarrierStreamTransport`, the query body carries `QueryDataRequest.ProtocolVersion`.
@@ -121,8 +120,10 @@ channel dependencies through host services.
 
 Registration limits wrap custom deserialization too. Selected server limits also guard decoded query
 expressions, including custom hosting. Streamed response limits include all framing.
-Expression nodes, query rows, and stream frames retain JSON encoding; replacing the envelope/payload
-serializer does not replace those formats. A different streaming format needs a separate adapter.
+Protocol 4 query bodies contain typed expression objects, and buffered results contain typed rows.
+A custom serializer encodes those objects with its operation payload. Serving contract 3 also
+requires its historical request and response types. Stream frames retain JSON encoding; a different
+streaming format needs a separate adapter.
 Set `MediaType` in the client and server options for custom envelope/payload encoding.
 Its default is `application/json`. Stream response frames retain their JSON content type.
 
@@ -185,7 +186,7 @@ Resolve the complete selected pair from the host:
 
 ```csharp
 InfoCarrierServerEndpoint selected = app.Services.GetInfoCarrierServerEndpoint("orders");
-var dispatcher = new InfoCarrierEnvelopeServer(selected.Server, selected.Serializer);
+var dispatcher = selected.CreateEnvelopeServer();
 ```
 
 The same resolver accepts a retained server builder, a unique context type through

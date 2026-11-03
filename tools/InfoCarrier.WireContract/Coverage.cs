@@ -24,6 +24,7 @@ internal static class Coverage
         Type expressions = typeof(ExpressionJsonContext);
         yield return (transport, typeof(InfoCarrierEnvelope), WireDirection.Request | WireDirection.Response);
         yield return (transport, typeof(QueryDataRequest), WireDirection.Request);
+        yield return (transport, typeof(InfoCarrier.Core.Wire.QueryRequestIdentification), WireDirection.Request);
         yield return (transport, typeof(QueryDataResult), WireDirection.Response);
         yield return (transport, typeof(SaveChangesRequest), WireDirection.Request);
         yield return (transport, typeof(SaveChangesResult), WireDirection.Response);
@@ -43,16 +44,41 @@ internal static class Coverage
         yield return (expressions, typeof(DynamicValueNode), WireDirection.Request | WireDirection.Response);
         // Kind is ignored as a property; its numeric assignments still define the node vocabulary.
         yield return (expressions, typeof(NodeKind), WireDirection.Request);
+        Type oldTransport = typeof(InfoCarrier.Core.Wire.V3.Protocol3JsonContext);
+        Type oldExpressions = typeof(InfoCarrier.Core.Wire.V3.Expressions.Protocol3ExpressionJsonContext);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.InfoCarrierEnvelope), WireDirection.Request | WireDirection.Response);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.QueryDataRequest), WireDirection.Request);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.QueryDataResult), WireDirection.Response);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.SaveChangesRequest), WireDirection.Request);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.SaveChangesResult), WireDirection.Response);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.SavepointRequest), WireDirection.Request);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.TransactionResult), WireDirection.Response);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.InfoCarrierFault), WireDirection.Response);
+        yield return (oldTransport, typeof(InfoCarrier.Core.Wire.V3.Common.ServerLogEvent), WireDirection.Response);
+        yield return (oldTransport, typeof(string), WireDirection.Request);
+        yield return (oldTransport, typeof(bool), WireDirection.Response);
+        yield return (oldTransport, typeof(object), WireDirection.Request | WireDirection.Response);
+        yield return (oldExpressions, typeof(InfoCarrier.Core.Wire.V3.Expressions.ExpressionNode), WireDirection.Request);
+        yield return (oldExpressions, typeof(List<InfoCarrier.Core.Wire.V3.Expressions.DynamicValueNode>), WireDirection.Response);
+        yield return (oldExpressions, typeof(InfoCarrier.Core.Wire.V3.Expressions.DynamicValueNode), WireDirection.Request | WireDirection.Response);
+        yield return (oldExpressions, typeof(InfoCarrier.Core.Wire.V3.Expressions.NodeKind), WireDirection.Request);
     }
 
     internal static Dictionary<string, string> Inventory() => new(StringComparer.Ordinal)
     {
-        ["nested:QueryDataRequest.SerializedQuery"] = "ExpressionJsonContext/ExpressionNode;Request",
-        ["nested:QueryDataResult.SerializedResults"] = "ExpressionJsonContext/List<DynamicValueNode>;Response",
+        ["inline:QueryDataRequest.Query"] = "InfoCarrierJsonContext/ExpressionNode;Request",
+        ["inline:QueryDataResult.Rows"] = "InfoCarrierJsonContext/IReadOnlyList<DynamicValueNode>;Response",
+        ["nested:V3.QueryDataRequest.SerializedQuery"] = "Protocol3ExpressionJsonContext/ExpressionNode;Request",
+        ["nested:V3.QueryDataResult.SerializedResults"] = "Protocol3ExpressionJsonContext/List<DynamicValueNode>;Response",
+        ["nested:V3.ChangeEntry.SerializedValues"] = "Protocol3ExpressionJsonContext/DynamicValueNode;Request",
+        ["nested:V3.ChangeEntry.SerializedOriginalValues"] = "Protocol3ExpressionJsonContext/DynamicValueNode;Request",
+        ["nested:V3.GeneratedValues.SerializedValues"] = "Protocol3ExpressionJsonContext/DynamicValueNode;Response",
         ["nested:ChangeEntry.SerializedValues"] = "ExpressionJsonContext/DynamicValueNode;Request",
         ["nested:ChangeEntry.SerializedOriginalValues"] = "ExpressionJsonContext/DynamicValueNode;Request",
         ["nested:GeneratedValues.SerializedValues"] = "ExpressionJsonContext/DynamicValueNode;Response",
-        ["runtime:InfoCarrierJsonContext.Object"] = "null",
+        ["runtime:InfoCarrierJsonContext.Object"] = "null," + string.Join(",", PrimitiveValues.Select(t => t.ToString()).Order()),
+        ["runtime:Protocol3JsonContext.Object"] = "null",
+        ["runtime:Protocol3ExpressionJsonContext.Object"] = string.Join(",", PrimitiveValues.Select(t => t.ToString()).Order()),
         ["runtime:ExpressionJsonContext.Object"] = string.Join(",", PrimitiveValues.Select(t => t.ToString()).Order()),
         ["exclusion:JsonElement"] = "Application-supplied JSON content; only its outer JSON representation is covered.",
     };

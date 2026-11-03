@@ -50,6 +50,10 @@ internal static class FrameContracts
         var layouts = new Dictionary<string, string[]>(StringComparer.Ordinal);
         await InspectSequenceAsync(success, "scalar", layouts).ConfigureAwait(false);
         await InspectSequenceAsync(failure, "entity", layouts).ConfigureAwait(false);
+        foreach ((string name, string[] layout) in await Protocol3FrameContracts.InspectAsync().ConfigureAwait(false))
+        {
+            layouts.Add(name, layout);
+        }
         return layouts;
     }
 

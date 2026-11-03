@@ -19,7 +19,7 @@ public sealed record InfoCarrierEnvelope : IInfoCarrierRequest
     /// <summary>
     ///     The current wire contract version, independent of package versions.
     /// </summary>
-    public const int CurrentProtocolVersion = 3;
+    public const int CurrentProtocolVersion = 4;
 
     /// <summary>
     ///     The wire contract version. Unsupported versions are refused before operation execution.

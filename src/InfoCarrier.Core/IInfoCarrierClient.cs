@@ -56,7 +56,7 @@ public interface IInfoCarrierClient
         QueryDataResult result = await QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
         yield return new QueryStartFrame(
             QueryStreamFrameCodec.Version, 0, result.IsEntityResult, result.ElementTypeName);
-        List<DynamicValueNode> rows = BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults);
+        List<DynamicValueNode> rows = result.Rows.ToList();
         foreach (DynamicValueNode row in rows)
         {
             yield return new QueryRowFrame(row);

@@ -18,6 +18,7 @@
     <Project Path="test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/InfoCarrier.CompatibilityProbe/InfoCarrier.CompatibilityProbe.csproj" />
     <Project Path="tools/InfoCarrier.WireContract/InfoCarrier.WireContract.csproj" />
   </Folder>
 </Solution>

@@ -1,5 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Text.Json.Serialization;
+
 namespace InfoCarrier.Core.Expressions;
 
 /// <summary>
@@ -7,6 +9,7 @@ namespace InfoCarrier.Core.Expressions;
 ///     System↔remote boundary — never an int-cast ABI (expression-serialization §3.7).
 ///     Minimal set per research-findings §5: only nodes LINQ-to-EF produces.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<NodeKind>))]
 public enum NodeKind
 {
     /// <summary>A constant value.</summary>

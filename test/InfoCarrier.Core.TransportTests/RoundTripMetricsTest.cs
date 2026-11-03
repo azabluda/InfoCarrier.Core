@@ -32,7 +32,7 @@ public class RoundTripMetricsTest
             await client.QueryDataAsync(
                 new QueryDataRequest
                 {
-                    SerializedQuery = [],
+                    Query = new Expressions.ConstantNode { Type = new Expressions.TypeNode { Name = "System.Int32" }, PrimitiveValue = 1 },
                     TrackingBehavior = QueryTrackingBehavior.NoTracking,
                     IsAsync = true,
                     ReturnsSingleResult = false,
@@ -178,7 +178,7 @@ public class RoundTripMetricsTest
             Payload = request.Operation switch
             {
                 InfoCarrierOperation.Query => Serializer.Serialize(
-                    new QueryDataResult { SerializedResults = [], IsEntityResult = false }),
+                    new QueryDataResult { Rows = [], IsEntityResult = false }),
                 InfoCarrierOperation.SaveChanges => Serializer.Serialize(
                     new SaveChangesResult { Count = 0, GeneratedValues = [] }),
                 InfoCarrierOperation.BeginTransaction => Serializer.Serialize(

@@ -1,5 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using InfoCarrier.Core.Expressions;
+
 namespace InfoCarrier.Core.Common;
 
 /// <summary>
@@ -14,11 +18,27 @@ namespace InfoCarrier.Core.Common;
 /// </remarks>
 public sealed record QueryDataResult
 {
+    private IReadOnlyList<DynamicValueNode>? _rows;
+    private byte[]? _serializedResults;
+
+    /// <summary>The typed result graph carried by protocol 4.</summary>
+    [JsonRequired]
+    public IReadOnlyList<DynamicValueNode> Rows
+    {
+        get => _rows ?? (_serializedResults is null ? []
+            : JsonSerializer.Deserialize(_serializedResults, ExpressionJsonContext.Default.ListDynamicValueNode)!);
+        init { _rows = value; _serializedResults = null; }
+    }
     /// <summary>
-    ///     The serialized result rows. The shape is defined by the result-mapping
-    ///     contract (identity-keyed entity rows, or columnar projection rows).
+    ///     An in-process source compatibility accessor for adapters using encoded rows.
+    ///     Protocol 4 serializes <see cref="Rows" /> instead; this accessor is excluded from wire metadata.
     /// </summary>
-    public required byte[] SerializedResults { get; init; }
+    [JsonIgnore]
+    public byte[] SerializedResults
+    {
+        get => _serializedResults ?? JsonSerializer.SerializeToUtf8Bytes(_rows?.ToList() ?? [], ExpressionJsonContext.Default.ListDynamicValueNode);
+        init { _serializedResults = value; _rows = null; }
+    }
 
     /// <summary>
     ///     Whether the result element type is an entity type the server's model knows.

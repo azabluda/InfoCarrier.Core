@@ -59,7 +59,7 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
 
     [Theory]
     [InlineData(0)]
-    [InlineData(4)]
+    [InlineData(5)]
     public async Task Stream_identification_is_checked_before_deserializing_an_unknown_body(int version)
     {
         IInfoCarrierServer server = DispatchProxy.Create<IInfoCarrierServer, CountingServer>();
@@ -160,7 +160,7 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
-    [InlineData(4)]
+    [InlineData(5)]
     public async Task Stream_response_version_is_checked_before_rows(int version)
     {
         await using var source = new MemoryStream(System.Text.Encoding.UTF8.GetBytes($"[[0,{version},0,false,null],[3]]"));

@@ -52,7 +52,8 @@ package version. Acceptance alone does not extend the package support promise. S
 semantics must both remain compatible throughout the supported window.
 
 [Issue #50](https://github.com/azabluda/InfoCarrier.Core/issues/50) establishes identification and
-refusal using wire contract 3; it ships no migration mechanism. The
+refusal using wire contract 3; that completed scope shipped no migration mechanism. Protocol 4 now
+embeds typed queries and buffered rows, with explicit protocol 3 request and response conversion. The
 [wire specification](wire-protocol.md) records the checks and evolution rules. The
 [separate migration story](plans/v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes)
 requires actual contract changes to assess correctness, design quality, and flexibility before

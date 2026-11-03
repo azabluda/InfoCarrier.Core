@@ -80,7 +80,7 @@ public class ClientFailureLoggingTest
         Task Invoke() => operation switch
         {
             InfoCarrierOperation.Query => client.QueryDataAsync(new QueryDataRequest
-                { SerializedQuery = [1, 2, 3], TrackingBehavior = QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = false }, context),
+                { Query = new Expressions.ConstantNode { Type = new Expressions.TypeNode { Name = "System.Int32" }, PrimitiveValue = 1 }, TrackingBehavior = QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = false }, context),
             InfoCarrierOperation.SaveChanges => client.SaveChangesAsync(new SaveChangesRequest { Entries = [] }, context),
             InfoCarrierOperation.BeginTransaction => client.BeginTransactionAsync(),
             InfoCarrierOperation.CommitTransaction => client.CommitTransactionAsync("secret-token"),

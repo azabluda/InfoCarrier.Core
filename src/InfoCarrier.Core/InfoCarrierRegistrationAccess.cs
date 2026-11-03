@@ -2,6 +2,8 @@
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace InfoCarrier.Core;
 
@@ -11,12 +13,14 @@ public sealed record InfoCarrierClientSettings(Uri? Endpoint, int? MaxResponseBy
 /// <summary>A selected server and serializer for custom hosting adapters. The host owns both services.</summary>
 public sealed class InfoCarrierServerEndpoint
 {
+    private readonly Wire.InfoCarrierWireProtocol _protocol;
     internal InfoCarrierServerEndpoint(InfoCarrierServerActivation activation, InfoCarrierServerRegistration registration)
     {
         Server = activation.Server;
         Serializer = activation.Serializer;
         MaxRequestBytes = registration.MaxRequestBytes;
         MediaType = registration.MediaType;
+        _protocol = activation.Protocol;
     }
 
     /// <summary>The complete selected server.</summary>
@@ -27,6 +31,10 @@ public sealed class InfoCarrierServerEndpoint
     public int? MaxRequestBytes { get; }
     /// <summary>The configured envelope and payload media type. Stream frames remain JSON.</summary>
     public string MediaType { get; }
+
+    /// <summary>Creates an envelope dispatcher using this host's protocol codecs and selected components.</summary>
+    public InfoCarrierEnvelopeServer CreateEnvelopeServer(ILogger<InfoCarrierEnvelopeServer>? logger = null)
+        => new(Server, Serializer, logger ?? NullLogger<InfoCarrierEnvelopeServer>.Instance, _protocol);
 }
 
 /// <summary>Resolves complete registrations for advanced clients and custom hosting adapters.</summary>

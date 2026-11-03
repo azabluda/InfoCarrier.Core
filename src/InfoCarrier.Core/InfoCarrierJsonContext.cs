@@ -2,79 +2,32 @@
 
 using System.Text.Json.Serialization;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.Core;
 
 /// <summary>
-///     System.Text.Json source-generation context for the envelope and every operation payload
-///     (requirements §4.5 AOT/trimming).
+///     Generated metadata for live protocol 4 envelopes, operations, and inline query/value graphs.
 /// </summary>
 /// <remarks>
-///     <para>
-///         The sibling of <see cref="Expressions.ExpressionJsonContext" />, which covers the
-///         expression tree. Between them, nothing this provider puts on the wire is serialized
-///         reflectively — which is what a trimmed WebAssembly build requires, because the SDK sets
-///         <c>JsonSerializerIsReflectionEnabledByDefault=false</c> there and reflective
-///         serialization then throws rather than degrading.
-///     </para>
-///     <para>
-///         <b>The type set is closed, and it was read off the call sites rather than guessed.</b>
-///         Every generic argument <see cref="IInfoCarrierSerializer" /> is ever instantiated with
-///         is one of the types below: the six request/response records, the envelope itself,
-///         <see cref="string" /> (a transaction id travels as a bare payload),
-///         <see cref="bool" /> (<c>SupportsSavepoints</c>), and <see cref="object" /> — the last
-///         from <c>Serialize&lt;object?&gt;(null)</c>, which is how both a void operation and a
-///         faulted response fill <see cref="InfoCarrierEnvelope.Payload" />.
-///         <see cref="InfoCarrierFault" />, <see cref="ChangeEntry" /> and
-///         <see cref="GeneratedValues" /> are here because they are reachable as members.
-///     </para>
-///     <para>
-///         <b>A missing type fails loudly, so the spec suite is the proof of closure.</b> Once a
-///         resolver is set, System.Text.Json does not quietly fall back to reflection for a type
-///         the context does not declare — it throws <c>"JsonTypeInfo metadata for type 'X' was not
-///         provided by TypeInfoResolver"</c>, naming the type. That is how the <c>Uri</c> entry in
-///         <see cref="Expressions.ExpressionJsonContext" /> was found, and it means the 22,453-test
-///         suite — which drives this serializer on every hop — cannot pass with the set incomplete.
-///     </para>
-///     <para>
-///         <b><see cref="ReferenceHandler.Preserve" /> is deliberately NOT carried over from the
-///         options this replaced, and that is a wire change.</b> It cannot be: a source generator
-///         cannot call an <c>init</c> accessor after construction, so it sets <c>required</c>/
-///         <c>init</c> members through an object initializer, which System.Text.Json treats as
-///         parameterized construction — and reference handling is unsupported there. The refusal
-///         is structural rather than data-dependent: a round trip of an envelope carrying a fault
-///         fails with <c>"Reference metadata is not supported when deserializing constructor
-///         parameters … Path: $.fault.$ref"</c> even though the document it just wrote contains no
-///         <c>$ref</c> at all, only <c>"fault":{"$id":"2",…}</c>.
-///     </para>
-///     <para>
-///         <b>Dropping it costs nothing, because nothing at this layer was using it.</b> Every
-///         nested graph — the expression tree, dynamic values, query results — is serialized
-///         through <see cref="Expressions.ExpressionJsonContext" />, whose own options set no
-///         reference handler, and reaches this layer already reduced to a <c>byte[]</c>
-///         (<c>SerializedQuery</c>, <c>SerializedResults</c>, <c>SerializedValues</c>). What this
-///         serializer actually sees is flat records with no repeated instance in them:
-///         <see cref="InfoCarrierFault.Inner" /> is a chain of distinct objects, and
-///         <c>SaveChangesRequest.Entries</c> a list of distinct ones. The node model handles its
-///         own repeats with its own <c>Ref</c> mechanism, not with System.Text.Json's.
-///     </para>
-///     <para>
-///         <see cref="JsonSourceGenerationMode.Metadata" /> rather than the default: the generated
-///         <em>fast path</em> does not support several of the options a context may carry, and the
-///         metadata path is what a resolver-driven serializer needs anyway.
-///     </para>
+///     The admitted primitive vocabulary is closed. Unknown runtime object types fail without
+///     reflection fallback. Node references use explicit Id/Ref values rather than serializer
+///     reference handling. Null omission and named floats match the node encoding. Four extra
+///     depth levels allow operation wrappers around a graph whose standalone limit is 256.
+///     Historical protocol 3 uses independent metadata and retains its original options.
 /// </remarks>
 [JsonSourceGenerationOptions(
-    // These mirror what SystemTextJsonInfoCarrierSerializer configured before this context
-    // existed, minus ReferenceHandler.Preserve -- see the remarks above for why that one cannot
-    // come along and why it was not doing anything. A context carries its own options (the same
-    // reason ExpressionJsonContext gives for MaxDepth and NumberHandling living on it rather than
-    // on the serializer), so changing one of these changes the wire format.
+    // Protocol-specific options belong to their context; do not apply these to protocol 3.
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = false,
+    MaxDepth = 260,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     GenerationMode = JsonSourceGenerationMode.Metadata)]
 [JsonSerializable(typeof(InfoCarrierEnvelope))]
+[JsonSerializable(typeof(Wire.QueryRequestIdentification))]
 [JsonSerializable(typeof(InfoCarrierFault))]
 [JsonSerializable(typeof(InfoCarrierOperation))]
 [JsonSerializable(typeof(QueryDataRequest))]
@@ -94,6 +47,82 @@ namespace InfoCarrier.Core;
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(bool))]
 [JsonSerializable(typeof(object))]
+[JsonSerializable(typeof(ExpressionNode))]
+[JsonSerializable(typeof(ConstantNode))]
+[JsonSerializable(typeof(ParameterNode))]
+[JsonSerializable(typeof(MemberNode))]
+[JsonSerializable(typeof(MethodNode))]
+[JsonSerializable(typeof(MethodCallNode))]
+[JsonSerializable(typeof(LambdaNode))]
+[JsonSerializable(typeof(NewNode))]
+[JsonSerializable(typeof(NewArrayNode))]
+[JsonSerializable(typeof(BinaryNode))]
+[JsonSerializable(typeof(UnaryNode))]
+[JsonSerializable(typeof(TypeBinaryNode))]
+[JsonSerializable(typeof(ConditionalNode))]
+[JsonSerializable(typeof(MemberInitNode))]
+[JsonSerializable(typeof(MemberBindingNode))]
+[JsonSerializable(typeof(ListInitNode))]
+[JsonSerializable(typeof(ElementInitNode))]
+[JsonSerializable(typeof(InvocationNode))]
+[JsonSerializable(typeof(QueryRootStubNode))]
+[JsonSerializable(typeof(FromSqlQueryRootStubNode))]
+[JsonSerializable(typeof(SqlQueryRootStubNode))]
+[JsonSerializable(typeof(ServerContextStubNode))]
+[JsonSerializable(typeof(TypeNode))]
+[JsonSerializable(typeof(DynamicValueNode))]
+[JsonSerializable(typeof(DynamicPropertyValue))]
+[JsonSerializable(typeof(EntityKeyNode))]
+[JsonSerializable(typeof(NodeKind))]
+[JsonSerializable(typeof(MemberKind))]
+
+// ConstantNode.PrimitiveValue is declared `object?`, so System.Text.Json resolves its
+// JsonTypeInfo by the *runtime* type of each value. Under source generation every such type
+// must be registered here or serialization throws NotSupportedException. The set below is
+// exactly what ExpressionToNodeTranslator.IsPrimitive admits. Enums are not listed: they are
+// normalized to their underlying integral value before serialization (a concrete enum type
+// could never be pre-registered) and rebuilt by NodeToExpressionTranslator.CoercePrimitive
+// from the TypeNode.
+//
+// Deliberately NOT solved with a reflection-based fallback resolver: that would silently
+// defeat the AOT/trimming goal (requirements §4.5, ADR-008 constraint 8).
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(byte))]
+[JsonSerializable(typeof(sbyte))]
+[JsonSerializable(typeof(short))]
+[JsonSerializable(typeof(ushort))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(uint))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(ulong))]
+[JsonSerializable(typeof(float))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(decimal))]
+[JsonSerializable(typeof(char))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(DateTimeOffset))]
+[JsonSerializable(typeof(DateOnly))]
+[JsonSerializable(typeof(TimeOnly))]
+[JsonSerializable(typeof(TimeSpan))]
+[JsonSerializable(typeof(Guid))]
+
+// A byte array is not in `IsPrimitive`'s set, but it *is* what a value converter over a binary
+// key produces (`ComparableBytesStructKey` -> `byte[]`), and a key value travels as its provider
+// value (`PrimitiveCoercion.ToWireKey`).
+[JsonSerializable(typeof(byte[]))]
+
+// `Uri` is the same statement for the same reason: `WrappedUriClassKey`'s converter produces one,
+// so a `Uri` lands in `EntityKeyNode.KeyValues`, which is declared `object` and therefore resolved
+// by *runtime* type. Without this the payload failed to serialize at all — "JsonTypeInfo metadata
+// for type 'System.Uri' was not provided ... Path: $.EntityKey.KeyValues".
+//
+// Distinct from the value-mapper seam (ADR-012), which is what stops a `Uri` being *walked*
+// reflectively as an object shape — `Uri.AbsolutePath` throws outright for a relative URI. The two
+// cover different paths: the seam covers property values, this covers key values, and a wrapped
+// `Uri` key needs both.
+[JsonSerializable(typeof(Uri))]
+[JsonSerializable(typeof(JsonElement))]
 public partial class InfoCarrierJsonContext : JsonSerializerContext
 {
 }

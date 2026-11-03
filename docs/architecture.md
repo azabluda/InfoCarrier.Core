@@ -185,6 +185,14 @@ Concrete subclass mapping is an open research task (§6 Q-T1).
 
 ### D1 — `InfoCarrierEnvelope.Payload` is `byte[]`, and the outer envelope is JSON
 
+**Partial resolution, 2026-11-03:** protocol 4 removes the inner encoded query and buffered-result
+documents. Existing live contracts expose typed `Query` and `Rows`; the outer `Payload` stays
+`byte[]` for arbitrary serializers. A complete frozen protocol 3 copy maps explicitly to and from
+the live classes. The outer base64 cost therefore remains. See
+[the protocol 4 design](wire-protocol.md#protocol-4-typed-query-content-2026-11-03) and
+[the approved contract placement](plans/v11/wire-migration-research.md#complete-physical-copy-scope).
+The original discussion below records both layers before that change.
+
 **Raised 2026-08-11, during the M8 sample-app design. No decision, no action; recorded so it is
 not lost.**
 

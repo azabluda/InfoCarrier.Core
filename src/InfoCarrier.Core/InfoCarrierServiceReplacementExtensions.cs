@@ -113,7 +113,9 @@ internal static class InfoCarrierServiceComponents
     internal static void AddSerializer(IServiceCollection services, InfoCarrierRegistrationIdentity identity,
         InfoCarrierPayloadLimits limits)
     {
-        services.AddKeyedSingleton<SystemTextJsonInfoCarrierSerializer>(identity, (_, _) => new(limits));
+        Wire.InfoCarrierWireProtocolServiceCollectionExtensions.AddInfoCarrierWireProtocols(services);
+        services.AddKeyedSingleton<SystemTextJsonInfoCarrierSerializer>(identity, (provider, _) => new(limits,
+            provider.GetRequiredService<Wire.InfoCarrierWireProtocol>()));
         services.AddKeyedSingleton<IInfoCarrierSerializer>(identity, (provider, _) => new InfoCarrierSerializerBoundary(
             provider.GetRequiredKeyedService<SystemTextJsonInfoCarrierSerializer>(identity), limits));
     }

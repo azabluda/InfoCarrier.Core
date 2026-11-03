@@ -359,6 +359,71 @@ generation requirement is added. Standard validators provide independent format 
 checks. Unknown constraints or inconsistent annotations stop as incomplete analysis, even after
 a version increase. Recording still requires comparison with the protected target description.
 
+### Amendment 2026-11-02: migration experiment ownership and contract copies
+
+For the migration follow-up in [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262),
+the owner selected explicit AI-written C# mappings and complete physical copies of the entire
+contract type set for each supported protocol version. Unchanged contract declarations are copied
+too. No mapping library or contract generator is selected for the initial experiment.
+
+The owner now permits an artificial breaking change for exploratory validation, while preferring
+a useful change that can remain as legitimate protocol version 4. This supersedes the earlier
+real-change-only restriction for the follow-up experiment, not issue 50's completed scope.
+Artificial evidence must remain labelled and cannot establish compatibility with unrelated real
+changes. The reason for requiring representative changes still holds for production claims:
+structural conversion does not prove preservation of meaning, client behavior, or database effects.
+
+Version 10 exclusion, the published previous-minor acceptance obligation from 11.1, protected
+structural descriptions, and independent semantic validation remain unchanged. The selected
+physical copies increase maintenance and code size; their benefit is isolation of historical
+definitions from current edits. The [research note](plans/v11/wire-migration-research.md) records
+the alternatives and the candidate change assessment. No protocol integer is allocated by this
+decision, and no production migration mechanism is approved merely by documenting the experiment.
+
+### Amendment 2026-11-03: live protocol 4 contracts and implementation approval
+
+The owner approved implementing the typed-query candidate: replace the inner encoded query and
+buffered row payloads with typed objects while retaining the serializer-independent outer bytes.
+
+There are two complete contract sets in total. The existing data classes become the live protocol 4
+contracts and the initial canonical representation. Only protocol 3 gets an additional frozen
+physical copy. Do not create a redundant protocol 4 copy or a third complete canonical model.
+Explicit handwritten mappings connect frozen protocol 3 definitions to the live data classes in
+both directions. The frozen set includes nested definitions, enums, serializer contexts, and its
+frame codec. When a later protocol is introduced, the outgoing live set can be frozen in turn.
+
+The earlier folder suggestion containing both `Wire/V3` and `Wire/V4` is superseded. Implementation
+uses `Wire/V3` for historical definitions and the existing locations for the live classes.
+
+### Amendment 2026-11-03: dependency-injected protocol codecs
+
+The owner rejected version-specific branches accumulating in `InfoCarrierWireProtocol` and selected
+ordinary dependency injection for protocol implementations. Each `IWireProtocolCodec` owns its
+version's message encoding, operation vocabulary, and stream framing. Historical codecs call
+handwritten mapping helpers to convert historical data to the live representation and back.
+The current codec uses the live classes directly and needs no separate mapper.
+
+Client and server role registration adds the built-in singleton codec services and an injectable
+`InfoCarrierWireProtocol`. The selector receives the host's codec collection through its constructor.
+Hosts can replace that collection using ordinary service registrations. Duplicate versions and a
+missing current codec fail as configuration errors. There is no static codec registry, assembly
+scan, or runtime mapper discovery. A lookup inside the selector indexes its injected services;
+it does not construct another dependency injection container.
+
+Default serializers use the same host selector, with metadata caches scoped to that selector.
+Metadata selected in one host cannot authorize types in another host. Custom hosting adapters use
+`InfoCarrierServerEndpoint.CreateEnvelopeServer` to retain the selected server, serializer, and
+host codec services. There is no parameterless selector, codec factory, or global default selector.
+Built-in codecs use ordinary `TryAddEnumerable` singleton registrations and are constructed by the
+container. Existing direct serializer and dispatcher constructors retain their current-contract-only
+behavior; multi-version hosting requires the injected selector.
+
+Adding a supported contract requires its codec, frozen definitions when applicable, mappings, and
+one built-in registration entry. Shared dispatch does not acquire another version branch.
+Because historical versions map directly to the live model, an incompatible live-model change can
+still require changes to historical mappings. This separation does not promise immutable adapters
+or semantic compatibility for arbitrary future changes.
+
 ## ADR-009 — Test backends: SQLite in-memory as the relational tier — LOCKED (2026-08-01)
 
 **Context.** [`ci-cd.md`](ci-cd.md) mandated Docker SQL Server as *the* realistic backend and

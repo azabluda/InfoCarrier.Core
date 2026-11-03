@@ -268,7 +268,7 @@ public class RegistrationMetricsTest
 
     private static QueryDataRequest Request() => new()
     {
-        SerializedQuery = [], TrackingBehavior = QueryTrackingBehavior.NoTracking,
+        Query = new Expressions.ConstantNode { Type = new Expressions.TypeNode { Name = "System.Int32" }, PrimitiveValue = 1 }, TrackingBehavior = QueryTrackingBehavior.NoTracking,
         IsAsync = true, ReturnsSingleResult = false,
     };
 
