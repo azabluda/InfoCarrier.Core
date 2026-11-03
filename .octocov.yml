@@ -1,4 +1,5 @@
 repository: azabluda/InfoCarrier.Core
+timeout: 2min
 coverage:
   paths:
     - artifacts/coverage/report/merged.cobertura.xml
