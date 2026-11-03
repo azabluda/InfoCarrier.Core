@@ -33,17 +33,18 @@ namespace InfoCarrier.Core.Query;
 ///     </para>
 ///     <para>
 ///         <b>What it does not touch.</b> A key of a type the caller declared (a class of their own,
-///         with its own <c>Equals</c>) is not data and cannot be rewritten; that join still runs on
-///         the client. So does a key of more than seven members, which <c>Tuple</c> cannot express
-///         without nesting. Both are rare, and both keep today's behaviour rather than gaining a new
-///         one.
+///         with its own <c>Equals</c>) cannot be rewritten by this visitor. Neither can a key of
+///         more than seven members, which <c>Tuple</c> cannot express without nesting. Version 10
+///         permitted some such joins locally. The 2026-11-03 version 11 amendment supersedes that
+///         behavior: registration or another safe server rewrite is required; remaining implicit
+///         local joins are refused.
 ///     </para>
 ///     <para>
 ///         <b>Where it runs.</b> On the captured tree, before the boundary analysis, so that the
 ///         analyzer sees a key it can ship. The rewrite is semantics-preserving on either side of
 ///         the boundary: <c>Tuple</c> equality is structural and compares members with
-///         <c>EqualityComparer&lt;T&gt;.Default</c>, exactly as an anonymous type does, so a query
-///         that ends up running on the client answers the same.
+///         <c>EqualityComparer&lt;T&gt;.Default</c>, exactly as an anonymous type does. Version 11
+///         checks the resulting execution boundary and requires the join to remain on the server.
 ///     </para>
 /// </remarks>
 internal sealed class JoinKeyRewriter : ExpressionVisitor

@@ -36,7 +36,7 @@ public class ClientProjectionSetOperationTest
         await using SetContext client = new(new DbContextOptionsBuilder<SetContext>().UseInfoCarrier(store,
             options => options.AddAllowedTypes(registered ? [typeof(ClientProjectionSetOperationTest)] : [])).Options);
 
-        // Unregistered private helpers characterize ICC alone, not the backend's contract.
+        // Registered helpers reach the backend. Version 11 refuses implicit local union.
         foreach (DbContext context in registered ? new DbContext[] { server, client } : [client])
         {
             IQueryable<Row> rows = context.Set<Row>();
@@ -47,12 +47,13 @@ public class ClientProjectionSetOperationTest
             store.ServerSql.Clear();
             if (!registered)
             {
-                Row? result = async ? await query.FirstOrDefaultAsync() : query.FirstOrDefault();
-                Assert.NotNull(result);
-                Assert.Equal("alpha", result.Name);
-                Assert.Equal(2, store.ServerSql.Statements.Count);
-                Assert.All(store.ServerSql.Statements, statement =>
-                    Assert.DoesNotContain("UNION", statement, StringComparison.Ordinal));
+                var localError = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    if (async) { await query.FirstOrDefaultAsync(); }
+                    else { query.FirstOrDefault(); }
+                });
+                Assert.Contains("implicit client execution of 'Union'", localError.Message, StringComparison.Ordinal);
+                Assert.Empty(store.ServerSql.Statements);
                 continue;
             }
 

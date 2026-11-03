@@ -6,7 +6,7 @@ using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
-/// <summary>Registered constructor ordering reaches the backend; unregistered ordering stays local.</summary>
+/// <summary>Registered constructor ordering reaches the backend; implicit local ordering is refused.</summary>
 public class ConstructedOrderingSqlTest
 {
     [ConditionalTheory]
@@ -16,7 +16,7 @@ public class ConstructedOrderingSqlTest
     [InlineData(true, true, true)]
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]
-    public async Task Constructor_ordering_separates_registered_refusal_from_unregistered_local_ordering(bool async, bool constructor, bool registered)
+    public async Task Constructor_ordering_preserves_backend_refusal_and_rejects_implicit_local_ordering(bool async, bool constructor, bool registered)
     {
         await using SqliteInfoCarrierBackendTestStore store = new(
             Guid.NewGuid().ToString(),
@@ -72,9 +72,9 @@ public class ConstructedOrderingSqlTest
         }
         else if (constructor)
         {
-            Assert.Equal(new string?[] { null, "alpha", "beta" }, await Execute(client));
-            string statement = Assert.Single(store.ServerSql.Statements);
-            Assert.DoesNotContain("ORDER BY", statement, StringComparison.Ordinal);
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Execute(client));
+            Assert.Contains("implicit client execution of 'OrderBy'", error.Message, StringComparison.Ordinal);
+            Assert.Empty(store.ServerSql.Statements);
         }
         else
         {

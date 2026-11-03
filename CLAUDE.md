@@ -443,6 +443,10 @@ API still warns, which is the tripwire that keeps "prefer public API where one e
 only.
 
 **Client-side work is allowed only where it is a projection reassembly, and everything else throws.**
+Version 11 applies this to unregistered types too: implicit local filtering, ordering, grouping,
+joins and equality are refused after safe carrier rewrites. Preserve final construction and explicit
+local execution after `AsEnumerable`; registration permits transport, while the backend decides
+translation or refusal. ADR-010's 2026-11-03 amendment supersedes the older type-only exceptions.
 `QuerySplitter.RejectClientEvaluation` raises EF's own `TranslationFailed` /
 `TranslationFailedWithDetails`, so an untranslatable `Where` behaves here exactly as it does on every
 other EF provider. **This was got wrong once by reading the design document and the analyzer and

@@ -941,6 +941,36 @@ helpers as observed local behavior, not promises to match a backend that cannot 
 helpers. Registered public equivalents follow the existing server path and the actual provider's
 decision. No new server expression vocabulary or security exception is introduced.
 
+### Amendment 2026-11-03 — explicit client evaluation in version 11
+
+The owner selected [issue #220](https://github.com/azabluda/InfoCarrier.Core/issues/220),
+superseding the 2026-10-06 exception for implicit local row decisions. Version 10 behavior stays
+on its release line. Version 11 rejects implicit local filtering, ordering, grouping, joins,
+distinctness and equality, including set operations. Eligible final projection construction,
+safe internal carriers that keep operators on the server, and explicit execution after
+`AsEnumerable` remain supported.
+
+The earlier reasons were reviewed. Client-only types still cannot cross the transport boundary;
+that requires registration or explicit local execution rather than a hidden execution-location
+change. Avoiding blanket rejection before carrier rewriting remains necessary: safe tuple rewrites
+and projection pushdown must finish before checking the remaining client operators. The previous
+235-test regression explains that placement, not a continuing permission for implicit local grouping.
+Backend parity for registered shared types remains binding, including ordinary translation refusals.
+There is still no automatic local retry after server refusal and no wider allowlist inference.
+
+The focused SQLite null-component group-join control returns counts `[0, 1]`. The version 10-style
+local path returned `[1, 1]` after two source reads, including an unused column. Registration
+preserves the backend counts and excludes that column. Version 11 rejects the implicit path before
+database work; explicit local execution retains .NET equality. Existing whole-table grouping and
+two-source join tests were observed passing with their former transfer expectations before changing
+them to assert refusal without database commands.
+
+The migration diagnostic identifies the operator and names `AddAllowedTypes`, `AddAnonymousShapes`,
+shared client/server configuration through `ConfigureShared`, query rewriting, and `AsEnumerable`.
+Registration permits transport; the backend decides translation. This is a client planning change
+and requires no new wire contract. A converter cannot repair arbitrary work an older client has
+already executed locally.
+
 ## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
 
 **Context.** `from c in cs from o in c.Orders … select c` contains no anonymous type that the
