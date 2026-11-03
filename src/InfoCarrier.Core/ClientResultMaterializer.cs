@@ -288,8 +288,7 @@ public class ClientResultMaterializer(
     }
 
     private static List<DynamicValueNode> DeserializeRows(QueryDataResult result)
-        => System.Text.Json.JsonSerializer.Deserialize(
-            result.SerializedResults, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
+        => result.Rows.ToList();
 
     /// <summary>
     ///     Materializes one entity row: identity resolution first, then scalars, then

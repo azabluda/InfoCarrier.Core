@@ -1,0 +1,188 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+namespace InfoCarrier.Core.Wire.V3.Common;
+
+/// <summary>
+///     A single change-tracker entry for the SaveChanges pipeline (wire-protocol §2.2).
+///     Carries entity identity (type + key), state, modified values, and original
+///     concurrency tokens. M2M join entries are included as ordinary entries.
+/// </summary>
+public sealed record ChangeEntry
+{
+    /// <summary>
+    ///     A client-assigned correlation id (position in the submitted list) used to key
+    ///     store-generated values back to this entry (research-findings §9 / wire-protocol W2).
+    /// </summary>
+    public required int CorrelationId { get; init; }
+
+    /// <summary>
+    ///     The EF entity-type name (the distinguishing key for shared-type entities).
+    /// </summary>
+    public required string EntityTypeName { get; init; }
+
+    /// <summary>
+    ///     The CLR type name of the entity (shared-assembly type), for resolution.
+    /// </summary>
+    public required string ClrTypeName { get; init; }
+
+    /// <summary>
+    ///     The entity state: <c>Added</c>, <c>Modified</c>, or <c>Deleted</c>.
+    /// </summary>
+    public required string State { get; init; }
+
+    /// <summary>
+    ///     Current property values (including key values), serialized per the entity-mapper
+    ///     contract. For <c>Modified</c>, only changed values plus keys are required.
+    /// </summary>
+    public required byte[] SerializedValues { get; init; }
+
+    /// <summary>
+    ///     Original values of concurrency tokens, for optimistic-concurrency checks.
+    ///     Null when the entity has no concurrency tokens.
+    /// </summary>
+    public byte[]? SerializedOriginalValues { get; init; }
+
+
+    /// <summary>
+    ///     Names of properties whose value is <em>temporary</em> — the client's placeholder for a
+    ///     key the store has not generated yet.
+    /// </summary>
+    /// <remarks>
+    ///     These values do travel, and the server marks them temporary on its own entries. That
+    ///     is what makes EF's ordinary machinery connect the graph: a principal and its dependents
+    ///     share the same temporary key value, and EF replaces every occurrence with the real one
+    ///     during <c>SaveChanges</c>. It is also the only thing that works for a many-to-many join
+    ///     entity, which has foreign keys but no navigations to link through.
+    /// </remarks>
+    public IReadOnlyList<string>? TemporaryProperties { get; init; }
+
+    /// <summary>
+    ///     Names of the properties a <c>Modified</c> entry actually changed, or
+    ///     <see langword="null" /> when the whole row is being written.
+    /// </summary>
+    /// <remarks>
+    ///     A <em>partial</em> update is an ordinary EF operation: attach a stub carrying only the
+    ///     key, set one property, mark that one modified, save. Which properties are modified is
+    ///     change-tracker state and does not follow from the values — every property's value is on
+    ///     the wire either way — so it has to be named. Without it the server set
+    ///     <c>State = Modified</c>, EF marked *every* property modified, and the row's untouched
+    ///     columns were written from the stub: `Save_partial_update` watched "Apple Cider" become
+    ///     <see langword="null" />.
+    /// </remarks>
+    public IReadOnlyList<string>? ModifiedProperties { get; init; }
+
+    /// <summary>
+    ///     The members of complex properties that a <c>Modified</c> entry actually changed, as
+    ///     dotted paths from the entity (<c>Destination.City</c>), with a complex collection named
+    ///     as a whole; or <see langword="null" /> when the sender does not say.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <see cref="ModifiedProperties" /> names what <c>GetProperties()</c> returns, and a
+    ///         complex property's members are not in it. So the server set <c>State = Modified</c>,
+    ///         put the scalars right from that list, and left every complex member and every JSON
+    ///         column modified: a change to one scalar wrote <c>SET "Stops", "Name",
+    ///         "Destination_City", "Destination_Street"</c>, where EF's own client writes
+    ///         <c>SET "Name"</c>, and a concurrent change to those columns was overwritten with the
+    ///         values this client had loaded (2026-09-15).
+    ///     </para>
+    ///     <para>
+    ///         <b>A separate field and not more names in <see cref="ModifiedProperties" /></b>, so that
+    ///         <see langword="null" /> can mean "not said": a server reading a request from a client
+    ///         that predates this field keeps writing every complex member, which loses nothing that
+    ///         client changed, where reading an empty list as "nothing changed" would.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<string>? ModifiedComplexProperties { get; init; }
+
+    /// <summary>
+    ///     Names of the properties nobody set — the ones whose value is EF's <em>sentinel</em>, so
+    ///     the store supplies its own.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         "Nobody set this" is not a value and cannot be read off one. EF decides it by
+    ///         comparing against <c>IProperty.Sentinel</c>, which is the default of the CLR
+    ///         <em>member</em> the property is read through — which is why the spec's
+    ///         <c>WithNullableBackingFields</c> backs a <c>bool</c> property with a <c>bool?</c>
+    ///         field. The field's <see langword="null" /> is the sentinel; the property still reads
+    ///         <c>false</c>. So the value on the wire is <c>false</c> either way, and only the flag
+    ///         distinguishes the two.
+    ///     </para>
+    ///     <para>
+    ///         Change-tracker state that does not follow from the values, exactly like
+    ///         <see cref="ModifiedProperties" /> and <see cref="TemporaryProperties" />, and named
+    ///         for the same reason. Without it the server rebuilt the entity by writing every value
+    ///         through its CLR member, the sentinel became a real <c>false</c>, and the
+    ///         <c>INSERT</c> stated the value the column default was supposed to supply.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<string>? SentinelProperties { get; init; }
+}
+
+
+/// <summary>
+///     A SaveChanges request: the serialized change-tracker entries (wire-protocol §2.2).
+/// </summary>
+public sealed record SaveChangesRequest : IInfoCarrierRequest
+{
+    /// <summary>
+    ///     The change entries, in submission order. The server replays them in order.
+    /// </summary>
+    public required IReadOnlyList<ChangeEntry> Entries { get; init; }
+
+    /// <summary>
+    ///     The open server transaction this save belongs to, or <see langword="null" /> to run
+    ///     on its own (wire-protocol W3).
+    /// </summary>
+    /// <remarks>
+    ///     The token from <see cref="TransactionResult.TransactionId" />. A transport may be
+    ///     stateless and a server may serve many clients, so an open transaction cannot be
+    ///     implied by the connection: it has to be named on every request that belongs to it.
+    /// </remarks>
+    public string? TransactionId { get; init; }
+}
+
+/// <summary>
+///     Store-generated values for one entry, keyed back by <see cref="ChangeEntry.CorrelationId" />.
+/// </summary>
+public sealed record GeneratedValues
+{
+    /// <summary>
+    ///     The correlation id of the originating <see cref="ChangeEntry" />.
+    /// </summary>
+    public required int CorrelationId { get; init; }
+
+    /// <summary>
+    ///     The store-generated property values (identity keys, computed columns,
+    ///     concurrency tokens, defaults), serialized per the entity-mapper contract.
+    /// </summary>
+    public required byte[] SerializedValues { get; init; }
+}
+
+/// <summary>
+///     A SaveChanges result: store-generated values per entry (wire-protocol §2.2).
+/// </summary>
+public sealed record SaveChangesResult
+{
+    /// <summary>
+    ///     The number of state entries persisted.
+    /// </summary>
+    public required int Count { get; init; }
+
+    /// <summary>
+    ///     Store-generated values, keyed back to entries by correlation id.
+    /// </summary>
+    public required IReadOnlyList<GeneratedValues> GeneratedValues { get; init; }
+
+    /// <summary>
+    ///     What the server logged while saving, or <see langword="null" /> when the server does
+    ///     not forward its log (the default) or logged nothing.
+    /// </summary>
+    /// <remarks>
+    ///     This is the half a caller most often wants: EF raises its write-time warnings from the
+    ///     update pipeline, which runs on the server. See
+    ///     <see cref="InfoCarrierServerOptions.LogForwarding" /> for the grant and what it discloses.
+    /// </remarks>
+    public IReadOnlyList<ServerLogEvent>? ServerLog { get; init; }
+}

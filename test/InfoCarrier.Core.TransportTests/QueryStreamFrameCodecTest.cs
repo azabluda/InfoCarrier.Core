@@ -87,9 +87,9 @@ public class QueryStreamFrameCodecTest
     [Theory]
     [InlineData("[]", "empty")]
     [InlineData("[[1,{}],[3]]", "start")]
-    [InlineData("[[0,3,0,false,null]]", "terminal")]
-    [InlineData("[[0,3,0,false,null],[3],[3]]", "after")]
-    [InlineData("[[0,3,0,false,null],[99]]", "tag")]
+    [InlineData("[[0,4,0,false,null]]", "terminal")]
+    [InlineData("[[0,4,0,false,null],[3],[3]]", "after")]
+    [InlineData("[[0,4,0,false,null],[99]]", "tag")]
     public async Task Malformed_streams_are_rejected(string json, string expected)
     {
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));

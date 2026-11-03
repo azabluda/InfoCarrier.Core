@@ -1,6 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using System.Text.Json;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
@@ -40,7 +39,7 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
                 .ConfigureAwait(false);
             yield return new QueryStartFrame(
                 QueryStreamFrameCodec.Version, 0, buffered.IsEntityResult, buffered.ElementTypeName);
-            List<DynamicValueNode> rows = BufferedQueryFrameAdapter.DeserializeRows(buffered.SerializedResults);
+            List<DynamicValueNode> rows = buffered.Rows.ToList();
             foreach (DynamicValueNode row in rows)
             {
                 yield return new QueryRowFrame(row);
@@ -130,8 +129,7 @@ public sealed class TransportInfoCarrierClient(IInfoCarrierTransport transport, 
 
         return new QueryDataResult
         {
-            SerializedResults = JsonSerializer.SerializeToUtf8Bytes(
-                rows, ExpressionJsonContext.Default.ListDynamicValueNode),
+            Rows = rows,
             IsEntityResult = start?.IsEntityResult ?? false,
             ElementTypeName = start?.ElementTypeName,
             ServerLog = logs.Count == 0 ? null : logs,

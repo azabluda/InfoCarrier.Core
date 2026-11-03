@@ -89,10 +89,12 @@ internal sealed class InfoCarrierServerActivation
     {
         Serializer = provider.GetRequiredKeyedService<IInfoCarrierSerializer>(registration.Identity);
         Server = provider.GetRequiredKeyedService<IInfoCarrierServer>(registration.Identity);
+        Protocol = provider.GetRequiredService<Wire.InfoCarrierWireProtocol>();
     }
 
     internal IInfoCarrierServer Server { get; }
     internal IInfoCarrierSerializer Serializer { get; }
+    internal Wire.InfoCarrierWireProtocol Protocol { get; }
 
 }
 
@@ -111,7 +113,7 @@ internal sealed class DefaultInfoCarrierServer(IInfoCarrierServer server) : IInf
         }
         QueryDataResult result = await Server.QueryDataAsync(request, cancellationToken).ConfigureAwait(false);
         yield return new Query.QueryStartFrame(Query.QueryStreamFrameCodec.Version, 0, result.IsEntityResult, result.ElementTypeName);
-        foreach (Expressions.DynamicValueNode row in BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults))
+        foreach (Expressions.DynamicValueNode row in result.Rows.ToList())
         { yield return new Query.QueryRowFrame(row); }
         foreach (ServerLogEvent log in result.ServerLog ?? []) { yield return new Query.QueryLogFrame(log); }
         yield return new Query.QueryCompleteFrame();

@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Wire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -37,10 +38,12 @@ namespace InfoCarrier.Core;
 ///     The serializer for payloads. This is the deserializing side of a remote caller's bytes,
 ///     so it is where <see cref="InfoCarrierPayloadLimits" /> earns its keep.
 /// </param>
+/// <remarks>Direct construction handles the current contract only. Inject protocol services for multi-version hosting.</remarks>
 public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCarrierSerializer serializer)
 {
     private readonly IInfoCarrierServer _server = server;
     private readonly IInfoCarrierSerializer _serializer = serializer;
+    private readonly InfoCarrierWireProtocol? _protocols;
     private readonly ILogger<InfoCarrierEnvelopeServer> _logger = NullLogger<InfoCarrierEnvelopeServer>.Instance;
 
     /// <summary>Creates a dispatcher with the host's class logger.</summary>
@@ -53,13 +56,21 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         _logger = logger;
     }
 
+    /// <summary>Creates a dispatcher with the host's logger and protocol codec services.</summary>
+    public InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCarrierSerializer serializer,
+        ILogger<InfoCarrierEnvelopeServer> logger, InfoCarrierWireProtocol protocols) : this(server, serializer, logger)
+    {
+        ArgumentNullException.ThrowIfNull(protocols);
+        _protocols = protocols;
+    }
+
     /// <summary>Handles one request through the synchronous server contract.</summary>
     public InfoCarrierEnvelope Dispatch(InfoCarrierEnvelope request)
     {
         ArgumentNullException.ThrowIfNull(request);
         string phase = "operation execution";
         string operation = Enum.IsDefined(request.Operation) ? request.Operation.ToString() : "Unknown";
-        if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+        if (!SupportsProtocol(request.ProtocolVersion))
         {
             Log(LogLevel.Warning, 35002,
                 "InfoCarrier {Operation} was rejected because its protocol version is unsupported.", operation);
@@ -68,6 +79,10 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
 
         try
         {
+            if (!DefinesOperation(request.ProtocolVersion, request.Operation))
+            {
+                throw new NotSupportedException($"InfoCarrier operation '{request.Operation}' is not supported by this server.");
+            }
             return request.Operation switch
             {
                 InfoCarrierOperation.Query
@@ -115,7 +130,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         T Payload<T>(InfoCarrierEnvelope envelope)
         {
             phase = "request payload deserialization";
-            T payload = _serializer.Deserialize<T>(envelope.Payload)
+            T payload = DeserializePayload<T>(envelope.Payload, envelope.ProtocolVersion)
                 ?? throw new InvalidOperationException(
                     $"The {envelope.Operation} envelope carried no {typeof(T).Name} payload.");
             phase = "operation execution";
@@ -125,7 +140,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         InfoCarrierEnvelope Respond<TResult>(InfoCarrierEnvelope envelope, TResult result)
         {
             phase = "result serialization after operation completion";
-            return envelope with { Payload = _serializer.Serialize(result) };
+            return envelope with { Payload = SerializePayload(result, request.ProtocolVersion) };
         }
 
         InfoCarrierEnvelope Acknowledge(InfoCarrierEnvelope envelope, Action action)
@@ -156,7 +171,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         string phase = "operation execution";
         string operation = Enum.IsDefined(request.Operation) ? request.Operation.ToString() : "Unknown";
 
-        if (request.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+        if (!SupportsProtocol(request.ProtocolVersion))
         {
             Log(LogLevel.Warning, 35002, "InfoCarrier {Operation} was rejected because its protocol version is unsupported.", operation);
             throw new InfoCarrierProtocolException(request.ProtocolVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
@@ -220,6 +235,10 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
             CancellationToken cancellationToken)
         {
             phase = "operation execution";
+            if (!DefinesOperation(request.ProtocolVersion, request.Operation))
+            {
+                throw new NotSupportedException($"InfoCarrier operation '{request.Operation}' is not supported by this server.");
+            }
             return request.Operation switch
             {
                 InfoCarrierOperation.Query
@@ -276,7 +295,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         T Payload<T>(InfoCarrierEnvelope request)
         {
             phase = "request payload deserialization";
-            T payload = _serializer.Deserialize<T>(request.Payload)
+            T payload = DeserializePayload<T>(request.Payload, request.ProtocolVersion)
                 ?? throw new InvalidOperationException($"The {request.Operation} envelope carried no {typeof(T).Name} payload.");
             phase = "operation execution";
             return payload;
@@ -287,7 +306,7 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
         {
             TResult result = await operation.ConfigureAwait(false);
             phase = "result serialization after operation completion";
-            return request with { Payload = _serializer.Serialize(result) };
+            return request with { Payload = SerializePayload(result, request.ProtocolVersion) };
         }
 
         // <summary>
@@ -311,6 +330,20 @@ public sealed class InfoCarrierEnvelopeServer(IInfoCarrierServer server, IInfoCa
                 request, operation(savepoint.TransactionId, savepoint.Name, cancellationToken));
         }
     }
+
+    // Legacy direct constructors retain their original current-contract-only behavior.
+    // Multi-version dispatch always uses the selector supplied by dependency injection.
+    private bool SupportsProtocol(int version)
+        => _protocols?.IsSupported(version) ?? version == InfoCarrierEnvelope.CurrentProtocolVersion;
+
+    private bool DefinesOperation(int version, InfoCarrierOperation operation)
+        => _protocols?.IsKnownOperation(version, operation) ?? Enum.IsDefined(operation);
+
+    private T? DeserializePayload<T>(byte[] payload, int version)
+        => _protocols is { } protocols ? protocols.Deserialize<T>(_serializer, payload, version) : _serializer.Deserialize<T>(payload);
+
+    private byte[] SerializePayload<T>(T value, int version)
+        => _protocols is { } protocols ? protocols.Serialize(_serializer, value, version) : _serializer.Serialize(value);
 
     private void Log(LogLevel level, int eventId, string message, params object?[] values)
     {

@@ -1,6 +1,9 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using InfoCarrier.Core.Expressions;
 
 namespace InfoCarrier.Core.Common;
 
@@ -11,6 +14,17 @@ namespace InfoCarrier.Core.Common;
 /// </summary>
 public sealed record QueryDataRequest : IInfoCarrierRequest
 {
+    private ExpressionNode? _query;
+    private byte[]? _serializedQuery;
+
+    /// <summary>The typed expression graph carried by protocol 4.</summary>
+    [JsonRequired]
+    public ExpressionNode Query
+    {
+        get => _query ?? (_serializedQuery is null ? null!
+            : JsonSerializer.Deserialize(_serializedQuery, ExpressionJsonContext.Default.ExpressionNode)!);
+        init { _query = value; _serializedQuery = null; }
+    }
     /// <summary>
     ///     The streamed request's wire contract version. Zero means identification is absent.
     ///     Buffered requests use their enclosing envelope's version instead.
@@ -18,11 +32,16 @@ public sealed record QueryDataRequest : IInfoCarrierRequest
     public int ProtocolVersion { get; init; }
 
     /// <summary>
-    ///     The serialized expression tree payload (the serialized query expression DTO).
-    ///     Produced by the client's expression serializer; consumed by the server's
-    ///     rebind-and-execute pipeline.
+    ///     An in-process source compatibility accessor for adapters using encoded nodes.
+    ///     Protocol 4 serializes <see cref="Query" /> instead. The protocol 3 boundary owns
+    ///     historical byte decoding; this accessor is excluded from wire metadata.
     /// </summary>
-    public required byte[] SerializedQuery { get; init; }
+    [JsonIgnore]
+    public byte[] SerializedQuery
+    {
+        get => _serializedQuery ?? JsonSerializer.SerializeToUtf8Bytes(_query, ExpressionJsonContext.Default.ExpressionNode);
+        init { _serializedQuery = value; _query = null; }
+    }
 
     /// <summary>
     ///     The <see cref="QueryTrackingBehavior" /> of the client-side context, which the

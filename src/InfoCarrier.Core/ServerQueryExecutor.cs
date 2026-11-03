@@ -150,7 +150,7 @@ public class ServerQueryExecutor(
         _expressionSerializer.ValueMapper.ResetReferenceScope();
         _expressionSerializer.UseServerContext(_context);
 
-        Expression query = Rebind(DeserializeNode(request.SerializedQuery));
+        Expression query = Rebind(ValidateNode(request.Query));
         query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
         query = CollectionParameterMark.ToServerMode(query, _context);
         ProjectionShape? shape = ProjectionShape.Of(query);
@@ -169,7 +169,7 @@ public class ServerQueryExecutor(
         _expressionSerializer.ValueMapper.ResetReferenceScope();
         _expressionSerializer.UseServerContext(_context);
 
-        Expression query = Rebind(DeserializeNode(request.SerializedQuery));
+        Expression query = Rebind(ValidateNode(request.Query));
         query = ApplySplitQueryBehavior(query, request.SplitQueryBehavior);
         query = CollectionParameterMark.ToServerMode(query, _context);
         ProjectionShape? shape = ProjectionShape.Of(query);
@@ -603,9 +603,7 @@ public class ServerQueryExecutor(
 
         return new QueryDataResult
         {
-            SerializedResults = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-                MapRows(rows, elementType, shape).ToList(),
-                ExpressionJsonContext.Default.ListDynamicValueNode),
+            Rows = MapRows(rows, elementType, shape).ToList(),
             IsEntityResult = isEntityResult,
             ElementTypeName = elementType?.FullName,
         };
@@ -815,9 +813,9 @@ public class ServerQueryExecutor(
     }
 
     /// <summary>
-    ///     The query tree as it arrives from a remote client — the one deserialization on the
-    ///     server that is entirely caller-controlled, and so the one the size bound most needs to
-    ///     be on (milestone M5).
+    ///     Checks a decoded graph before translation. Network codecs bound input bytes before
+    ///     decoding; this additional check enforces the selected server's limit for custom
+    ///     adapters that supply typed objects directly, and keeps the standalone depth limit.
     /// </summary>
     /// <remarks>
     ///     The selected server supplies its request limit independently of the envelope codec.
@@ -825,12 +823,14 @@ public class ServerQueryExecutor(
     ///     Corrected 2026-10-26: this previously used the global default because the executor
     ///     had no registration settings. Direct construction retains that safe default.
     /// </remarks>
-    private ExpressionNode DeserializeNode(byte[] payload)
+    private ExpressionNode ValidateNode(ExpressionNode node)
     {
-        PayloadLimits.GuardRequest(payload.Length, "serialized query");
-        return System.Text.Json.JsonSerializer.Deserialize<ExpressionNode>(
-            payload, ExpressionJsonContext.Default.ExpressionNode)!;
+        ArgumentNullException.ThrowIfNull(node);
+        byte[] bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(node, ExpressionJsonContext.Default.ExpressionNode);
+        PayloadLimits.GuardRequest(bytes.Length, "query graph");
+        return node;
     }
+
     /// <summary>
     ///     Creates an executor that refuses a payload carrying raw SQL.
     /// </summary>

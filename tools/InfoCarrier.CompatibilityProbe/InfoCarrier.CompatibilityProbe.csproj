@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+</Project>

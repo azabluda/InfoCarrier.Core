@@ -109,7 +109,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
             Operation = InfoCarrierOperation.Query,
             CorrelationId = "secret-correlation\n",
-            Payload = scenario == "inner" ? Encoding.UTF8.GetBytes("secret-invalid-inner") : serializer.Serialize(new QueryDataRequest
+            Payload = scenario == "inner" ? Encoding.UTF8.GetBytes("secret-invalid-inner")
+                : scenario == "query" ? Encoding.UTF8.GetBytes("""{"query":"secret-invalid-query","trackingBehavior":1,"isAsync":true,"returnsSingleResult":true}""")
+                : serializer.Serialize(new QueryDataRequest
             {
                 SerializedQuery = query, TrackingBehavior = QueryTrackingBehavior.NoTracking,
                 IsAsync = true, ReturnsSingleResult = true,

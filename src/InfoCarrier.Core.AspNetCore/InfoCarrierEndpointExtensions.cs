@@ -1,8 +1,8 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Text;
-using System.Text.Json;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Wire;
 using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.AspNetCore.Builder;
@@ -133,6 +133,7 @@ public static class InfoCarrierEndpointExtensions
     {
         // Validate the complete selected pair during endpoint setup, before requests arrive.
         _ = resolve(endpoints.ServiceProvider);
+        InfoCarrierWireProtocol protocols = endpoints.ServiceProvider.GetRequiredService<InfoCarrierWireProtocol>();
 
         // Fail trusted catalog construction during endpoint setup, before requests arrive.
         _ = endpoints.ServiceProvider.GetServices<Expressions.AnonymousShapeCatalog>().ToArray();
@@ -161,14 +162,14 @@ public static class InfoCarrierEndpointExtensions
                     _ = int.TryParse(http.Request.Headers["InfoCarrier-Protocol-Version"].ToString(),
                         System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture,
                         out int streamVersion);
-                    if (streamVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+                    if (!protocols.IsSupported(streamVersion))
                     {
                         throw new InfoCarrierProtocolException(streamVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
                     }
-                    QueryDataRequest streamRequest = await serializer.DeserializeAsync<QueryDataRequest>(
-                            http.Request.Body, http.RequestAborted).ConfigureAwait(false)
+                    QueryDataRequest streamRequest = await protocols.ReadQueryAsync(serializer,
+                            http.Request.Body, streamVersion, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not a query request.");
-                    if (streamRequest.ProtocolVersion != InfoCarrierEnvelope.CurrentProtocolVersion)
+                    if (streamRequest.ProtocolVersion != streamVersion)
                     {
                         throw new InfoCarrierProtocolException(
                             streamRequest.ProtocolVersion, InfoCarrierEnvelope.CurrentProtocolVersion);
@@ -178,10 +179,10 @@ public static class InfoCarrierEndpointExtensions
                     IAsyncEnumerable<QueryStreamFrame> frames = streamServer is IInfoCarrierStreamServer inProcess
                         ? inProcess.QueryFramesAsync(streamRequest, http.RequestAborted)
                         : BufferedFrames(streamServer, streamRequest, logger, http.RequestAborted);
-                    await QueryStreamFrameCodec.WriteAsync(
+                    await protocols.WriteFramesAsync(
                         http.Response.Body,
                         FaultFrames(frames, logger, measurement, http.RequestAborted),
-                        http.RequestAborted).ConfigureAwait(false);
+                        streamVersion, http.RequestAborted).ConfigureAwait(false);
                     measurement?.Complete();
                     return;
                 }
@@ -189,10 +190,10 @@ public static class InfoCarrierEndpointExtensions
                 InfoCarrierEnvelope request;
                 try
                 {
-                    request = await serializer.DeserializeAsync<InfoCarrierEnvelope>(http.Request.Body, http.RequestAborted).ConfigureAwait(false)
+                    request = await protocols.ReadEnvelopeAsync(serializer, http.Request.Body, http.RequestAborted).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The request body is not an InfoCarrier envelope.");
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException)
+                catch (Exception exception) when (exception is not OperationCanceledException and not InfoCarrierProtocolException)
                 {
                     measurement?.Fail(exception, http.RequestAborted);
                     Log(logger, LogLevel.Warning, 35010, "InfoCarrier request was rejected because its envelope could not be read.");
@@ -203,7 +204,7 @@ public static class InfoCarrierEndpointExtensions
 
                 var server = new InfoCarrierEnvelopeServer(
                     selectedServer, serializer,
-                    http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>());
+                    http.RequestServices.GetRequiredService<ILogger<InfoCarrierEnvelopeServer>>(), protocols);
                 InfoCarrierEnvelope response;
                 if (measurement is not null) { measurement.Operation = request.Operation; }
                 try
@@ -227,7 +228,7 @@ public static class InfoCarrierEndpointExtensions
                 }
                 http.Response.ContentType = mediaType;
                 phase = "response envelope serialization";
-                byte[] bytes = serializer.Serialize(response);
+                byte[] bytes = protocols.Serialize(serializer, response, response.ProtocolVersion);
                 phase = "response body writing";
                 await http.Response.Body.WriteAsync(bytes, http.RequestAborted).ConfigureAwait(false);
                 measurement?.Complete();
@@ -236,7 +237,7 @@ public static class InfoCarrierEndpointExtensions
             {
                 measurement?.Fail(exception, http.RequestAborted);
                 Log(logger, LogLevel.Warning, 35002,
-                    "InfoCarrier Query was rejected because its protocol version is unsupported.");
+                    "InfoCarrier request was rejected because its protocol version is unsupported.");
                 await WriteProtocolRefusalAsync(http, exception).ConfigureAwait(false);
             }
             catch (Exception exception)
@@ -332,8 +333,7 @@ public static class InfoCarrierEndpointExtensions
         yield return new QueryStartFrame(
             QueryStreamFrameCodec.Version, 0, result!.IsEntityResult, result.ElementTypeName);
 
-        List<DynamicValueNode> rows = JsonSerializer.Deserialize(
-            result.SerializedResults, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
+        List<DynamicValueNode> rows = result.Rows.ToList();
         foreach (DynamicValueNode row in rows)
         {
             cancellationToken.ThrowIfCancellationRequested();

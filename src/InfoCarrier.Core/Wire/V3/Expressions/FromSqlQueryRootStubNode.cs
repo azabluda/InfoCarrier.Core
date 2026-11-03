@@ -1,0 +1,68 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+using System.Text.Json.Serialization;
+
+namespace InfoCarrier.Core.Wire.V3.Expressions;
+
+/// <summary>
+///     A query-root stub carrying the caller's raw SQL (#60), standing in for EF Core's relational
+///     <c>FromSqlQueryRootExpression</c>.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>Named by shape rather than by type, and the reason is the wire rather than a
+///         missing reference (corrected 2026-09-09).</b> This said
+///         <c>Microsoft.EntityFrameworkCore.Relational</c> is a package <c>InfoCarrier.Core</c>
+///         "deliberately does not reference"; it has referenced it since 2026-09-03. The shape is
+///         right anyway: this is a serializable wire node, and an EF expression type cannot travel
+///         on a wire whatever this assembly references. What <c>FromSqlQueryRootExpression</c>
+///         adds to a plain entity root is exactly two things - a SQL string and one argument
+///         expression - and those are what this node carries. See
+///         <see cref="Metadata.IInfoCarrierRelationalQueryRoots" />.
+///     </para>
+///     <para>
+///         <b>This node is a grant, not a translation.</b> A payload carrying one asks the server
+///         to run a string it did not write. <c>Sqlite/RawSqlExecutionProbeTest</c> (R94) measures
+///         what that means: one <c>CommandText</c> runs every statement it contains, and an
+///         uncomposed <c>FromSqlRaw</c> reaches the store unwrapped - so this is arbitrary SQL
+///         execution and there is no read-only subset of it. A server rebuilds this node only if
+///         it registered
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />,
+///         and a client sends one only if it called
+///         <see cref="InfoCarrierDeploymentBuilderExtensions.AllowArbitrarySqlExecution" />. Both
+///         default to refusing. Read <c>docs/security-review.md</c> section 5a.
+///     </para>
+/// </remarks>
+public sealed record FromSqlQueryRootStubNode : QueryRootStubNode
+{
+    /// <inheritdoc />
+    public override NodeKind Kind => NodeKind.FromSqlQueryRootStub;
+
+    /// <summary>
+    ///     The caller's SQL text, verbatim.
+    /// </summary>
+    public required string Sql { get; init; }
+
+    /// <summary>
+    ///     Whether EF created an ad hoc result type for Database.SqlQuery rather than using
+    ///     the mapped entity type. A mapped CLR type can also have an independent ad hoc root.
+    /// </summary>
+    /// <remarks>
+    ///     Missing or false retains mapped-root resolution. False is omitted from JSON so
+    ///     ordinary FromSql roots retain their existing payload shape.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsAdHoc { get; init; }
+
+    /// <summary>
+    ///     The arguments EF collected for the SQL, preserving whether it extracted a parameter
+    ///     or kept the array constant for a compiled query.
+    /// </summary>
+    /// <remarks>
+    ///     Carried as a node rather than as a value list so the values keep their types across the
+    ///     wire. The server hands the expression back to EF, which binds parameters or formats
+    ///     constants through the store's type mapping. This node does not interpolate values into
+    ///     <see cref="Sql" /> itself.
+    /// </remarks>
+    public required ExpressionNode Arguments { get; init; }
+}

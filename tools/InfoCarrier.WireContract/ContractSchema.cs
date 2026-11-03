@@ -89,7 +89,18 @@ internal static class ContractSchema
                 {
                     case "Tag": item["const"] = JsonNode.Parse(encoding); break;
                     case "Payload":
-                        string target = contract.Types.Keys.Single(k => k.EndsWith('/' + encoding, StringComparison.Ordinal));
+                        // Frames use their own codec contexts, not every context that also
+                        // happens to register the same payload after typed query embedding.
+                        string context = encoding switch
+                        {
+                            "InfoCarrier.Core.Expressions.DynamicValueNode" => "InfoCarrier.Core.Expressions.ExpressionJsonContext",
+                            "InfoCarrier.Core.Wire.V3.Expressions.DynamicValueNode" => "InfoCarrier.Core.Wire.V3.Expressions.Protocol3ExpressionJsonContext",
+                            _ when encoding.StartsWith("InfoCarrier.Core.Wire.V3.Common.", StringComparison.Ordinal) => "InfoCarrier.Core.Wire.V3.Protocol3JsonContext",
+                            _ => "InfoCarrier.Core.InfoCarrierJsonContext",
+                        };
+                        string target = context + '/' + encoding;
+                        if (!contract.Types.ContainsKey(target))
+                            throw Incomplete("frames/" + name, "Frame payload has no metadata in its codec context: " + target);
                         item["$ref"] = Reference("type:" + target);
                         break;
                     default:

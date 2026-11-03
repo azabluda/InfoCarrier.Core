@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Common;
 using System.Text.Json;
@@ -36,7 +36,7 @@ public class EnvelopeProtocolTest
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
-    [InlineData(4)]
+    [InlineData(5)]
     [InlineData(99)]
     [InlineData(-1)]
     public async Task An_unsupported_protocol_version_is_refused_by_number(int version)
@@ -301,7 +301,7 @@ public class EnvelopeProtocolTest
         await envelopeServer.DispatchAsync(Envelope(
             InfoCarrierOperation.Query, new QueryDataRequest
             {
-                SerializedQuery = Serializer.Serialize(1),
+                Query = new global::InfoCarrier.Core.Expressions.ConstantNode { Type = new global::InfoCarrier.Core.Expressions.TypeNode { Name = "System.Int32" }, PrimitiveValue = 1 },
                 TrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.TrackAll,
                 IsAsync = false,
                 ReturnsSingleResult = false,
@@ -374,7 +374,7 @@ public class EnvelopeProtocolTest
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
         {
             Calls.Add("Query");
-            return Task.FromResult(new QueryDataResult { SerializedResults = [], IsEntityResult = false });
+            return Task.FromResult(new QueryDataResult { Rows = [], IsEntityResult = false });
         }
 
         public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)

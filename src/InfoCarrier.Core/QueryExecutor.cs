@@ -517,8 +517,7 @@ internal sealed class QueryExecutor<TElement>
                 // recognises one. Two lookups can disagree, and when they did the root crossed with
                 // its SQL dropped -- `FromSql_arguments_cross_as_values...` answered 2 where 1 is
                 // correct, silently.
-                SerializedQuery = SerializeNode(
-                    _expressionSerializer.ToNode(serverQuery.Query, _relationalRoots)),
+                Query = _expressionSerializer.ToNode(serverQuery.Query, _relationalRoots),
                 TrackingBehavior = _trackingBehavior,
                 IsAsync = async,
                 ReturnsSingleResult = serverQuery.ReturnsSingleResult,
@@ -811,9 +810,6 @@ internal sealed class QueryExecutor<TElement>
         }
     }
 
-    private static byte[] SerializeNode(Expressions.ExpressionNode node)
-        => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            node, ExpressionJsonContext.Default.ExpressionNode);
 
     private static async Task<TElement> FirstOrDefaultAsync(IAsyncEnumerable<TElement> asyncEnum)
     {

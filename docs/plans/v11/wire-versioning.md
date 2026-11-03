@@ -1,8 +1,10 @@
 # Wire versioning: issue 50 completion and migration follow-up
 
 Owner decisions recorded 2026-10-26. This document defines the scope of
-[issue #50](https://github.com/azabluda/InfoCarrier.Core/issues/50). Implementation uses wire
-contract 3; verification evidence is recorded in the [implementation plan](../v10/implementation-plan.md).
+[issue #50](https://github.com/azabluda/InfoCarrier.Core/issues/50). That completed implementation used wire
+contract 3; its verification evidence is recorded in the [implementation plan](../v10/implementation-plan.md).
+The migration follow-up introduces contract 4 with explicit contract 3 conversion. Its design and
+bounded experiment are recorded in the [research note](wire-migration-research.md#14-implementation-experiment-2026-11-03).
 
 ## Accepted completion boundary for issue 50
 
@@ -116,9 +118,12 @@ Version checks and refusal tests do not establish that future conversions will b
 
 ## Follow-up story: design and validate migration against real contract changes
 
-Status: planned, not implemented; tracked in [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262),
-created at the owner's request on 2026-10-29. This is separate work after issue 50, to be evaluated
-before the first stable version 11 publication.
+Status, 2026-11-03: the approved protocol 3-to-4 experiment is implemented and locally validated.
+The broader follow-up is tracked in [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262),
+created at the owner's request on 2026-10-29. The
+[experiment record](wire-migration-research.md#14-implementation-experiment-2026-11-03) states the
+evidence and remaining limits. This is separate work after issue 50, to be reviewed before the
+first stable version 11 publication.
 
 **User story:** As a maintainer supporting the approved client window, I need a migration design
 tested against actual contract changes, so that older supported clients retain their promised
@@ -126,12 +131,46 @@ behavior and impossible conversions are identified explicitly.
 
 ### Entry condition and dependencies
 
+**Owner amendment, 2026-11-02:** start the migration experiment with explicit AI-written C#
+mappings and a complete physical copy of the entire contract type set for each supported protocol
+version. This includes unchanged contract types; sharing those declarations across versions is
+not the selected approach. Mapping libraries and generators are not initial dependencies.
+
+The owner also permits an artificial change for an experiment, superseding the earlier real-change-only
+entry condition for exploratory work. Prefer a useful change that could remain as legitimate
+protocol version 4. An artificial experiment alone does not justify retaining a production change,
+claim semantic compatibility for unrelated changes, or replace published-client acceptance.
+The completed issue 50 scope remains unchanged. See the
+[research and candidate assessment](wire-migration-research.md).
+
+**Owner clarification and implementation approval, 2026-11-03:** the existing data classes are
+the live protocol 4 contracts and initial canonical representation. Add only the frozen protocol 3
+physical copy, with explicit mappings to and from those live classes. There are two complete sets
+in total, not two additional copies and a third canonical model. The owner approved implementing
+typed inline query requests and buffered result rows as the protocol 4 change.
+
+**Implementation validation, 2026-11-03:** the bounded protocol 3-to-4 experiment is implemented
+and locally validated. See the [experiment evidence and limits](wire-migration-research.md#14-implementation-experiment-2026-11-03)
+for separate-process acceptance, measurements, retirement rehearsal, and the exact test results.
+Published previous-minor acceptance remains a release obligation from 11.1.
+
+### WM1: typed protocol 4 and protocol 3 conversion
+
+- [x] Preserve the complete physical protocol 3 definitions and use existing data classes for live protocol 4.
+- [x] Convert historical requests and responses through handwritten mappings and dependency-injected protocol codecs.
+- [x] Validate unchanged earlier and current clients in separate processes, including writes, streaming, and rollback.
+- [x] Pass local functional, document-store, transport, engineering, build, package, trim, structural, and documentation checks.
+
+The [experiment record](wire-migration-research.md#14-implementation-experiment-2026-11-03) documents
+the evidence, retirement rehearsal, and remaining limits. Published previous-minor acceptance is
+required from 11.1; the development-client experiment does not replace it.
+
 A concrete change from [Entity Framework Core 11 adoption, issue #99](https://github.com/azabluda/InfoCarrier.Core/issues/99),
 [stricter client evaluation, issue #220](https://github.com/azabluda/InfoCarrier.Core/issues/220),
-or another owner-approved change must expose a real compatibility problem. Neither named issue
-is assumed to require wire changes, nor is either assumed migratable. Start once a representative
-change is available; completion of both issues is not required. Investigation and sequencing can
-be planned earlier, but mechanism design and implementation need the concrete change.
+or another useful change remains the preferred basis for retained production migration work.
+Neither named issue is assumed to require wire changes, nor is either assumed migratable.
+Completion of both issues is not required. Mechanism selection still needs a concrete change,
+which may now be artificial for the experiment under the amendment above.
 
 Identify the pre-change source commit so that the earlier client can be rebuilt when needed;
 there is no requirement to preserve build artifacts in advance. Use separate client and server
@@ -145,8 +184,9 @@ prerelease compatibility promise. Version 10 support remains excluded.
    behavior performed on the client. Determine what can be converted, what needs retained execution
    behavior, and what cannot be preserved. A server converter cannot repair arbitrary work already
    performed locally by an older client.
-2. Design and implement only the mechanism the real change requires. Locate responsibility using
-   the measured change; do not assume generic adapters or migration chains are the answer.
+2. Design and implement only the mechanism the selected change requires, using the complete physical
+   contract copies and explicit mappings selected on 2026-11-02. Locate responsibility using the
+   measured change; do not assume generic adapters or migration chains are the answer.
 3. Run the unchanged earlier client against the changed server. Verify results, database effects,
    errors, transaction guarantees, and applicable streaming behavior. Include a case that would fail
    if changed semantics were silently interpreted as the current contract.

@@ -65,7 +65,7 @@ public class CancellationTest
                 InfoCarrierOperation.Query,
                 new QueryDataRequest
                 {
-                    SerializedQuery = Serializer.Serialize(1),
+                    Query = new global::InfoCarrier.Core.Expressions.ConstantNode { Type = new global::InfoCarrier.Core.Expressions.TypeNode { Name = "System.Int32" }, PrimitiveValue = 1 },
                     TrackingBehavior = QueryTrackingBehavior.TrackAll,
                     IsAsync = true,
                     ReturnsSingleResult = false,
@@ -292,7 +292,7 @@ public class CancellationTest
         public Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, CancellationToken cancellationToken = default)
         {
             Tokens.Add(cancellationToken);
-            return Task.FromResult(new QueryDataResult { SerializedResults = [], IsEntityResult = false });
+            return Task.FromResult(new QueryDataResult { Rows = [], IsEntityResult = false });
         }
 
         public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, CancellationToken cancellationToken = default)

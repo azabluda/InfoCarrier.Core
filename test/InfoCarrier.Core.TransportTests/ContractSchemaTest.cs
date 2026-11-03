@@ -35,8 +35,8 @@ public class ContractSchemaTest
     }
 
     [Theory]
-    [InlineData("{\"serializedQuery\":\"AA==\",\"trackingBehavior\":0,\"isAsync\":false,\"returnsSingleResult\":false}", true)]
-    [InlineData("{\"serializedQuery\":\"AA==\",\"trackingBehavior\":\"zero\",\"isAsync\":false,\"returnsSingleResult\":false}", false)]
+    [InlineData("{\"query\":{\"$kind\":0,\"type\":{\"name\":\"System.Int32\"},\"primitiveValue\":1},\"trackingBehavior\":0,\"isAsync\":false,\"returnsSingleResult\":false}", true)]
+    [InlineData("{\"query\":{\"$kind\":0,\"type\":{\"name\":\"System.Int32\"}},\"trackingBehavior\":\"zero\",\"isAsync\":false,\"returnsSingleResult\":false}", false)]
     public async Task Standard_properties_and_shared_references_validate_real_request_shapes(string instance, bool valid)
     {
         JsonObject catalogue = ContractSchema.Write(await Inspect());
@@ -107,7 +107,7 @@ public class ContractSchemaTest
     public async Task Strict_polymorphic_base_or_derived_reader_needs_explicit_schema_coverage(bool changeBase)
     {
         var contract = await Inspect();
-        string baseKey = contract.Types.Keys.Single(k => k.EndsWith("/InfoCarrier.Core.Expressions.ExpressionNode", StringComparison.Ordinal));
+        string baseKey = "InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode";
         string changed = changeBase ? baseKey : contract.Types[baseKey].Mappings.First(p => p.Key.StartsWith("kind:", StringComparison.Ordinal)).Value;
         contract.Types[changed] = contract.Types[changed] with { SkipUnknown = false };
 
@@ -131,8 +131,8 @@ public class ContractSchemaTest
         Assert.False(result.Passed);
         Assert.Contains(result.Changes, c => c.Path.EndsWith("/protocolVersion", StringComparison.Ordinal)
             && c.Kind == ChangeKind.Incompatible);
-        schema[ContractSchema.Extension]!["protocolVersion"] = 4;
-        schema[ContractSchema.Extension]!["allocatedVersions"] = new JsonArray(3, 4);
+        schema[ContractSchema.Extension]!["protocolVersion"] = 5;
+        schema[ContractSchema.Extension]!["allocatedVersions"] = new JsonArray(InfoCarrierEnvelope.CurrentProtocolVersion, 5);
         Assert.True(ContractComparer.Compare(original, ContractSchema.Read(schema), "protected-target").Passed);
     }
 
@@ -156,7 +156,7 @@ public class ContractSchemaTest
     {
         var catalogue = ContractSchema.Write(await Inspect());
         string key = catalogue["$defs"]!.AsObject().Select(d => d.Key)
-            .Single(k => k.EndsWith("/InfoCarrier.Core.Expressions.ExpressionNode", StringComparison.Ordinal));
+            .Single(k => k == "type:InfoCarrier.Core.Expressions.ExpressionJsonContext/InfoCarrier.Core.Expressions.ExpressionNode");
         ExpressionNode expression = new ConstantNode { Type = new TypeNode { Name = "System.Int32" }, PrimitiveValue = 7 };
         string encoded = JsonSerializer.Serialize(expression, ExpressionJsonContext.Default.ExpressionNode);
         Assert.True(Evaluate(catalogue, key, encoded));

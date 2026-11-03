@@ -1,13 +1,13 @@
 # Wire protocol contract
 
-Status: implemented contract 3 on the version 11 development line. Package support policy and
+Status: implemented contract 4 with protocol 3 conversion on the version 11 development line. Package support policy and
 migration follow-up: [issue 50 scope](plans/v11/wire-versioning.md).
 
 ## 1. Version identification and admission
 
 The wire version is an independent integer, not a package version or a schema revision alone.
 It identifies structure, field meanings, defaults, and execution guarantees. The current value is
-`InfoCarrierEnvelope.CurrentProtocolVersion`, 3. `QueryStreamFrameCodec.Version` uses that same
+`InfoCarrierEnvelope.CurrentProtocolVersion`, 4. `QueryStreamFrameCodec.Version` uses that same
 constant. There is no protocol minor number and no implicit negotiation.
 
 | Path | Request identification | Response identification |
@@ -15,8 +15,8 @@ constant. There is no protocol minor number and no implicit negotiation.
 | Buffered, synchronous or asynchronous | `InfoCarrierEnvelope.ProtocolVersion` | `InfoCarrierEnvelope.ProtocolVersion` |
 | Streamed query | `QueryDataRequest.ProtocolVersion`; HTTP also checks `InfoCarrier-Protocol-Version` before body parsing | Version in `QueryStartFrame` |
 
-Missing request identification is zero. The server accepts only contract 3. It rejects older,
-newer, and unidentified contracts before calling the operation server. Old buffered contracts 1
+Missing request identification is zero. The server accepts contracts 3 and 4. It rejects unsupported
+and unidentified contracts before calling the operation server. Old buffered contracts 1
 and 2 and pre-policy unversioned streamed requests are rejected. Clients validate the response
 contract before reading its payload, rehydrating faults, or yielding rows. Internal in-process
 operation calls without a wire exchange are not a separate wire admission boundary.
@@ -59,11 +59,12 @@ window is release-based, not time-based. Product releases may share a wire versi
 an older or newer package using the same contract does not extend the support promise. Admission
 checks the contract and does not infer or require the caller's package version.
 
-**Issue 50 ships no migration mechanism.** Its [completion criteria and follow-up story](plans/v11/wire-versioning.md)
-separate admission and refusal tests from migration design. Real changes, potentially from
-[issue #99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
-[issue #220](https://github.com/azabluda/InfoCarrier.Core/issues/220), are needed to assess conversion
-correctness, software design quality, and flexibility. Neither issue is assumed migratable.
+Issue 50 established contract 3 admission without migration. The follow-up now converts protocol 3
+requests to the live protocol 4 data classes and converts responses back. Complete historical
+classes, metadata, enums, and the frame codec live under `Wire/V3`; current classes remain the live
+representation. There is no third complete canonical model or runtime mapping library. The
+[migration research and experiment](plans/v11/wire-migration-research.md) record scope and limits.
+Acceptance of the selected development client does not create a published prerelease support promise.
 
 ### Contract evolution
 
@@ -108,7 +109,7 @@ the annotations below; a standard validator alone does not determine wire compat
 `x-infocarrier` contains the supplementary information: coverage directions, serializer settings,
 numeric enum identities, named frame positions, nested-payload inventory, allocation history, and
 inspection inputs. Ordinary field names, requiredness, and references are not duplicated there.
-The description format is 2, independently of wire version 3. Historical format-1 descriptions
+The description format is 2, independently of wire version 4. Historical format-1 descriptions
 remain readable without rewriting their Git revisions or building old source.
 
 After an accepted contract change, run:
@@ -148,7 +149,8 @@ older clients can read current responses. They do not promise newer clients work
 | Removed or renamed field | Fail under the conservative field-preservation rule, even if parsing could succeed |
 | Reassigned enum/discriminator or changed frame layout | Fail with the unchanged version |
 | New variant | Compatible for older requests; incompatible for older response readers unless explicitly classified |
-| Unsupported encoding, options change, or incomplete inventory | Fail as incomplete analysis; a version increase does not resolve it |
+| Covered depth, null-omission, or strict/named-number option change | Conservatively incompatible; require a fresh contract |
+| Unsupported encoding, other options change, or incomplete inventory | Fail as incomplete analysis; a version increase does not resolve it |
 
 Numeric widening and equivalent CLR type replacements are not inferred. They can require explicit
 classification even when a reader would accept them. Failures identify the path, reference revision,
@@ -247,6 +249,51 @@ client. Named application types require explicit registration. See the
 [descriptor decision](decisions.md#amendment-2026-10-07-bounded-anonymous-data-descriptors) and its
 [trusted-catalog amendment](decisions.md#amendment-2026-10-08-trusted-structural-catalogs).
 
+### Protocol 4: typed query content (2026-11-03)
+
+Protocol 3 query bodies contain `serializedQuery`, a base64 string containing expression JSON.
+Its buffered responses contain `serializedResults`, another encoded JSON document. Protocol 4
+replaces these with the typed `query` object and `rows` array. The outer `payload` remains arbitrary
+serializer-produced bytes. Save-value blobs retain their encoding. Binary application values
+remain binary values; they are not interpreted as embedded JSON.
+
+The live context includes the node vocabulary, null omission, named floating-point literals, and
+depth 260 for operation wrappers. The standalone node context retains depth 256 and its reference
+identifiers. Selected server limits still guard decoded graphs before translation. Envelope and streamed
+request bytes are bounded before buffering; a metadata projection reads body identification before
+selecting the full decoder. Streamed requests reject a header/body mismatch before decoding the graph.
+Unsupported envelope versions retain operation identity for diagnostics and are refused by dispatch
+before opening their opaque payload. Streamed response rows remain incremental and use the existing frame vocabulary.
+
+Protocol 3 decoding uses its own contexts, then explicit mappings of every node and value shape.
+Mappings preserve enum meanings, parameter/reference identifiers, null markers, tracking and navigation
+state, original concurrency values, generated values, transaction tokens, faults, and logs. Converted
+descriptors still pass current type and method admission. A protocol 3 request receives protocol 3
+responses and start frames. The original effective description is retained in
+[protocol3.json](wire-contracts/protocol3.json); its types and exercised frames are checked independently
+of increases to the live integer. The protected Git comparison also verifies the first physical copy.
+
+Custom serializers must handle the historical request/result types when serving protocol 3, as well
+as the live classes and streamed identification projection. The default serializer selects generated
+metadata explicitly. The prefix-serializer tests exercise non-JSON operation bytes; no decoder assumes
+the outer payload is JSON. A custom serializer owns how typed graphs are encoded inside its payload.
+
+`InfoCarrierWireProtocol` receives the host's singleton `IWireProtocolCodec` services through its
+constructor. Each implementation owns one protocol's message encoding and frame handling; historical
+implementations call explicit mapping helpers. Role registration supplies current and protocol 3 codecs.
+Advanced hosts can replace the collection through ordinary dependency injection registrations.
+Duplicate version identities or a missing current codec are configuration errors. Metadata selection
+is cached per host selector, without assembly scanning or reflection fallback. The selector requires
+its injected collection. Legacy direct serializer and dispatcher constructors handle the current
+contract only. Custom adapters use the selected endpoint's `CreateEnvelopeServer` method to
+retain host codec selection. See the
+[codec decision](decisions.md#amendment-2026-11-03-dependency-injected-protocol-codecs).
+
+`SerializedQuery` and `SerializedResults` remain ignored source-compatibility accessors for custom
+in-process adapters. They are absent from protocol 4 metadata and normal query execution uses typed
+graphs directly. Decoded-graph size verification currently serializes a graph once before translation;
+the experiment does not claim that all encoding or allocations disappeared.
+
 ## 2. Operations and responses
 
 Buffered envelopes contain `operation`, serialized `payload`, optional `correlationId`, and an
@@ -273,7 +320,7 @@ their codec live in `Query/`.
 Refusal tests use small fixed old payloads and applicable headers. They assert explicit diagnostics
 and zero operation-server calls, rather than a generic parsing failure. Current-client acceptance,
 response version checks, frame decoding, and the regular functional and transport suites exercise
-contract 3. No older client build must be preserved to test rejection.
+contracts 3 and 4. No older client build must be preserved merely to test rejection.
 
 From 11.1, acceptance evidence must use a real published previous-minor client package against the
 current sample server in a separate process. Refusal fixtures are not that evidence. Committed

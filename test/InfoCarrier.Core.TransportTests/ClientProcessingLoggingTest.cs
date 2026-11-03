@@ -262,7 +262,7 @@ public class ClientProcessingLoggingTest
         using var fixture = new Fixture();
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         fixture.Transform = response => response with { Payload = serializer.Serialize(
-            serializer.Deserialize<QueryDataResult>(response.Payload)! with { SerializedResults = [255] }) };
+            serializer.Deserialize<QueryDataResult>(response.Payload)! with { Rows = [new Expressions.DynamicValueNode { Type = new Expressions.TypeNode { Name = "Missing.Materialized.Type" } }] }) };
         using var context = fixture.CreateClient();
         Assert.NotNull(await Record.ExceptionAsync(async () =>
         {

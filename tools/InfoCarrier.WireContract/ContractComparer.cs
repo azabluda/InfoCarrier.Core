@@ -37,7 +37,12 @@ internal static class ContractComparer
             if (before != after)
             {
                 Add("inventory/" + key, WireDirection.Request | WireDirection.Response,
-                    key.StartsWith("runtime:System.", StringComparison.Ordinal) ? ChangeKind.Compatible : ChangeKind.Unclassified,
+                    key.StartsWith("runtime:System.", StringComparison.Ordinal)
+                        || before is null && key.StartsWith("context:", StringComparison.Ordinal)
+                        ? ChangeKind.Compatible
+                        : key.StartsWith("nested:", StringComparison.Ordinal) || key.StartsWith("inline:", StringComparison.Ordinal)
+                            || key.StartsWith("runtime:", StringComparison.Ordinal)
+                            ? ChangeKind.Incompatible : ChangeKind.Unclassified,
                     before, after, "Inventory changed. Runtime version changes trigger inspection, not an automatic wire increase.");
             }
         }
@@ -60,15 +65,20 @@ internal static class ContractComparer
             WireDirection direction = before.Direction | after.Direction;
             if (before.Direction != after.Direction || before.Kind != after.Kind || before.Encoding != after.Encoding)
             {
-                Add(key, direction, ChangeKind.Unclassified,
+                bool addedDirection = before.Kind == after.Kind && before.Encoding == after.Encoding
+                    && (after.Direction & before.Direction) == before.Direction;
+                Add(key, direction, addedDirection ? ChangeKind.Compatible : ChangeKind.Unclassified,
                     new { before.Kind, before.Encoding, before.Direction }, new { after.Kind, after.Encoding, after.Direction },
-                    "Type representation or covered direction changed; classify it explicitly.");
+                    addedDirection ? "An existing representation gained an explicitly covered direction; its properties and uses are compared separately."
+                        : "Type representation or covered direction changed; classify it explicitly.");
             }
             if (!Equal(before.Settings, after.Settings) || before.SkipUnknown != after.SkipUnknown)
             {
-                Add(key + "/reader-writer-options", direction, ChangeKind.Unclassified,
+                Add(key + "/reader-writer-options", direction,
+                    before.SkipUnknown == after.SkipUnknown && KnownOptions(before.Settings, after.Settings)
+                        ? ChangeKind.Incompatible : ChangeKind.Unclassified,
                     new { before.Settings, before.SkipUnknown }, new { after.Settings, after.SkipUnknown },
-                    "Changed serializer options require an explicit reader/writer compatibility rule.");
+                    "Supported depth, null-omission, or named-number option changes conservatively require a fresh contract; other changes remain incomplete.");
             }
             foreach (string mapping in before.Mappings.Keys.Union(after.Mappings.Keys).Order())
             {
@@ -131,7 +141,10 @@ internal static class ContractComparer
                 if (oldProperty.Readable != newProperty.Readable || oldProperty.Writable != newProperty.Writable
                     || oldProperty.Type == newProperty.Type && !Equal(oldProperty.Settings, newProperty.Settings))
                 {
-                    Add(path + "/access-and-options", direction, ChangeKind.Unclassified, oldProperty, newProperty,
+                    Add(path + "/access-and-options", direction,
+                        oldProperty.Readable == newProperty.Readable && oldProperty.Writable == newProperty.Writable
+                            && KnownOptions(oldProperty.Settings, newProperty.Settings)
+                            ? ChangeKind.Incompatible : ChangeKind.Unclassified, oldProperty, newProperty,
                         "Property access or encoding options changed; complete their classification.");
                 }
             }
@@ -150,6 +163,17 @@ internal static class ContractComparer
             {
                 Add("frames/" + frame, WireDirection.Response, ChangeKind.Incompatible, before, after,
                     "The exercised frame tag, length, payload identity, or position changed.");
+            }
+        }
+        if (current.Types.Keys.Any(k => k.StartsWith("InfoCarrier.Core.Wire.V3.", StringComparison.Ordinal)))
+        {
+            foreach (ContractChange change in changes.Where(c => c.Kind == ChangeKind.Incompatible))
+            {
+                bool existingHistorical = change.Path.StartsWith("frames/V3/", StringComparison.Ordinal)
+                    ? previous.Frames.ContainsKey(change.Path[7..])
+                    : change.Path.StartsWith("InfoCarrier.Core.Wire.V3.", StringComparison.Ordinal)
+                        && previous.Types.Keys.Any(k => change.Path == k || change.Path.StartsWith(k + '/', StringComparison.Ordinal));
+                if (existingHistorical) { errors.Add("Supported protocol 3 cannot change behind a live-version increase: " + change.Path); }
             }
         }
         return new(reference, previous.Version, current.Version, changes, errors);
@@ -181,6 +205,28 @@ internal static class ContractComparer
 
     private static bool Equal(Dictionary<string, string> left, Dictionary<string, string> right)
         => left.Count == right.Count && left.All(p => right.TryGetValue(p.Key, out string? value) && value == p.Value);
+
+    // These are covered settings, not arbitrary converter or callback changes. Classifying them
+    // as incompatible preserves the unchanged-version gate and release compatibility checks.
+    private static bool KnownOptions(Dictionary<string, string> left, Dictionary<string, string> right)
+    {
+        foreach (string key in left.Keys.Union(right.Keys))
+        {
+            string? before = left.GetValueOrDefault(key), after = right.GetValueOrDefault(key);
+            if (before == after) { continue; }
+            bool supported = key switch
+            {
+                "maxDepth" => int.TryParse(before, out int oldDepth) && oldDepth > 0
+                    && int.TryParse(after, out int newDepth) && newDepth > 0,
+                "defaultIgnore" => before is "Never" or "WhenWritingNull" && after is "Never" or "WhenWritingNull",
+                "numberHandling" => before is "Strict" or "AllowNamedFloatingPointLiterals"
+                    && after is "Strict" or "AllowNamedFloatingPointLiterals",
+                _ => false,
+            };
+            if (!supported) { return false; }
+        }
+        return true;
+    }
 
     private static string? Token(string? encoding) => encoding switch
     {

@@ -200,6 +200,33 @@ public class WireContractGuardTest
         Assert.False(ContractComparer.Compare(before, before, "").Passed);
     }
 
+    [Theory]
+    [InlineData("maxDepth", "260")]
+    [InlineData("defaultIgnore", "WhenWritingNull")]
+    [InlineData("numberHandling", "AllowNamedFloatingPointLiterals")]
+    public void Covered_option_changes_need_a_fresh_integer_and_do_not_waive_release_compatibility(string option, string value)
+    {
+        var before = Describe(GuardJsonContext.Default.OriginalMessage);
+        var after = Describe(GuardJsonContext.Default.OriginalMessage);
+        after.Types["message"].Settings[option] = value;
+        ComparisonResult unchanged = Compare(before, after);
+        Assert.False(unchanged.Passed);
+        Assert.Contains(unchanged.Changes, c => c.Kind == ChangeKind.Incompatible);
+        Assert.DoesNotContain(unchanged.Changes, c => c.Kind == ChangeKind.Unclassified);
+        Assert.True(Compare(before, after with { Version = 4, AllocatedVersions = [1, 2, 3, 4] }).Passed);
+    }
+
+    [Fact]
+    public void Unknown_option_changes_remain_incomplete_after_a_fresh_integer()
+    {
+        var before = Describe(GuardJsonContext.Default.OriginalMessage);
+        var after = Describe(GuardJsonContext.Default.OriginalMessage);
+        after.Types["message"].Settings["converter"] = "Unknown.Application.Converter";
+        ComparisonResult result = Compare(before, after with { Version = 4, AllocatedVersions = [1, 2, 3, 4] });
+        Assert.False(result.Passed);
+        Assert.Contains(result.Changes, c => c.Kind == ChangeKind.Unclassified);
+    }
+
     private static ContractDescription Describe(JsonTypeInfo metadata)
     {
         string Key(Type type) => type == metadata.Type ? "message" : type.ToString();
