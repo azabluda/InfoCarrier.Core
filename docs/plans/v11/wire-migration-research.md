@@ -728,6 +728,25 @@ effective protocol 3 description. It does not prove arbitrary behavioral equival
 
 ### Separate-process evidence
 
+Permanent codec execution coverage was added after the coverage review on 2026-11-04.
+`Protocol3ExpressionTest` checks expression meaning after historical conversion, including calls,
+conditions, arithmetic, type tests, field/property initializers, collection construction, generic
+method descriptors and invocation. `Protocol3ExecutionTest` sends protocol 3 HTTP envelopes to
+the ordinary SQLite host and checks database results, generated-key correlation, writes,
+transactions, savepoints, rollback, failure atomicity and backend refusal. Streamed results use
+the historical header and frozen frame reader. Historical conversion must not grant server raw
+query permission; its refusal must issue no database read.
+
+The test client uses a current client shell with a test-only serializer and buffered transport
+adapter. Every exchanged envelope is checked as protocol 3; only the shell's local envelope
+admission is adjusted. This covers the shipped codecs, not the behavior of an unchanged published
+client. The separate-process evidence below and the published-client obligation remain distinct.
+
+The full transport coverage run on 2026-11-04 exercises 170 of 178 `Protocol3Mapping` lines
+(95.5%), up from 92 of 178 in the migration report (51.7%). Historical-codec coverage is
+84 of 86 lines (97.7%), up from 60 of 86 (69.8%). Frozen V3 coverage is 264 of 297 lines,
+up from 161 of 297. These are dated line observations, not branch-completeness claims.
+
 Before changing product sources, the probe was built against product revision
 `a91c364915ca9c05c860e507bd77ea7caf448ca1` and preserved under
 `artifacts/compatibility/protocol3`. That earlier executable was not rebuilt after the protocol change.
