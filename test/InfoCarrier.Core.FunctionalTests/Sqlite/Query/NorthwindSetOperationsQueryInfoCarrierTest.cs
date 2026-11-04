@@ -3,6 +3,7 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -16,9 +17,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 ///         members, two of which assert that the provider <em>refuses</em> a query.
 ///     </para>
 ///     <para>
-///         The private client-projection helper remains local, outside the owner's shared public
-///         helper parity goal. Its measured answer is attributed, while own tests pin that behavior
-///         and registered public equivalents exercise the actual backend's decision.
+///         The private projection helper cannot reach the server. Version 11 refuses the local
+///         union before database execution; registered public equivalents retain backend behavior.
 ///     </para>
 /// </remarks>
 public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
@@ -27,10 +27,12 @@ public class NorthwindSetOperationsQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindSetOperationsQuerySqliteTest.cs", 20, 24,
         Justification = "Client evaluation in projection. Issue #16243.")]
-    [InfoCarrierDesign(8,
-        Justification = "The upstream helper is private and cannot be admitted on the server. Public shared helpers require registration on both ends.",
-        Deviation = DeviationKind.AnswerNotRefusal,
-        DeviationNote = "The private projection and UNION run locally over materialized rows; own tests pin this behavior.")]
-    public override Task Client_eval_Union_FirstOrDefault(bool async)
-        => base.Client_eval_Union_FirstOrDefault(async);
+    [InfoCarrierDesign(10,
+        Justification = "Version 11 rejects implicit local equality operations after safe projection rewrites.",
+        Deviation = DeviationKind.RefusedEarlier,
+        DeviationNote = "The private upstream helper cannot be registered. Local union is refused during client planning rather than backend translation.")]
+    public override async Task Client_eval_Union_FirstOrDefault(bool async)
+        => Assert.Contains("implicit client execution of 'Union'",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => base.Client_eval_Union_FirstOrDefault(async))).Message,
+            StringComparison.Ordinal);
 }

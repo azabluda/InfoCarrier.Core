@@ -96,9 +96,10 @@ and the query reaches the server, which rejects it as every other provider does.
 A test suite you port will expect the exception, and LINQ that relies on the answer will not run
 unchanged elsewhere.
 
-Private or client-only helpers can produce the same difference. Examples include choosing a JSON
-collection element with a private index helper and applying UNION to a private helper's projection.
-InfoCarrier can compute these locally where plain SQLite EF refuses them.
+Private or client-only helpers in a final projection can produce the same difference, such as
+choosing a JSON collection element with a private index helper. Implicit local filtering, ordering,
+grouping, joins and equality operations are refused. Call `AsEnumerable` before such an operator
+to choose local execution explicitly.
 
 For backend parity, use public shared helpers and register their types on both ends. The server's
 provider then decides whether the query is supported. Registration never admits private methods.
@@ -112,7 +113,7 @@ These are not defects. They follow from where the client sits.
 |---|---|
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
 | Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
-| The client never sees the server's provider, so it assumes a relational store and refuses three queries relational providers refuse. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
+| The client assumes relational collection projection rules. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store. Implicit local row decisions remain refused | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
 | The server's provider writes the SQL, so how a query is translated is settled there, not on the client. `EF.Constant` and `EF.Parameter` are part of your query, so they cross the wire and the server honours them | |
 | `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](guide/querying.md#round-trips-and-result-size) |
 | Asynchronous non-tracking queries stream rows. Tracked queries, single-result operations, and operators needing complete input remain buffered. Page large buffered results. | [Querying](guide/querying.md#streaming-results) |

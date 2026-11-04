@@ -12,7 +12,6 @@ namespace InfoCarrier.Core;
 public class InfoCarrierLoggingDefinitions : LoggingDefinitions
 {
     private EventDefinitionBase? _logQuerySplitClientOperators;
-    private EventDefinitionBase? _logQuerySplitUnregisteredKeyTypes;
     private EventDefinitionBase? _clientQueryError;
     private EventDefinitionBase? _clientQueryInformation;
     private EventDefinitionBase? _clientQueryDebug;
@@ -80,34 +79,4 @@ public class InfoCarrierLoggingDefinitions : LoggingDefinitions
                 "Part of the query cannot be sent to the server. The server runs {serverQueryCount} "
                     + "query/queries and this client runs the rest over the rows returned. "
                     + "{clientOperators}")));
-
-    /// <summary>
-    ///     The definition for <see cref="InfoCarrierEventId.QuerySplit" /> that also names the key
-    ///     types the server was not told about.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>A second definition for the same event.</b>
-    ///         <see cref="LogQuerySplitClientOperators" /> is public, so it cannot grow a
-    ///         parameter. The id is unchanged, so <c>ConfigureWarnings</c> and <c>LogTo</c> treat
-    ///         both definitions as one event.
-    ///     </para>
-    ///     <para>
-    ///         <b>Used only when there is a type to name.</b> A split with none logs through
-    ///         <see cref="LogQuerySplitClientOperators" />, so its message is what it was.
-    ///     </para>
-    /// </remarks>
-    /// <param name="logger">The logger whose options supply the warnings configuration.</param>
-    public virtual EventDefinition<int, string, string> LogQuerySplitUnregisteredKeyTypes(IDiagnosticsLogger logger)
-        => (EventDefinition<int, string, string>)(_logQuerySplitUnregisteredKeyTypes ??= new EventDefinition<int, string, string>(
-            logger.Options,
-            InfoCarrierEventId.QuerySplit,
-            LogLevel.Information,
-            "InfoCarrierEventId.QuerySplit",
-            level => LoggerMessage.Define<int, string, string>(
-                level,
-                InfoCarrierEventId.QuerySplit,
-                "Part of the query cannot be sent to the server. The server runs {serverQueryCount} "
-                    + "query/queries and this client runs the rest over the rows returned. "
-                    + "{clientOperators} {unregisteredKeyTypes}")));
 }

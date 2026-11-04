@@ -16,6 +16,49 @@ it lands in is decided on the issue, not here.
 | M9 — provider neutrality (Phase J) | [`archive/implementation-plan-m9-phase-j.md`](archive/implementation-plan-m9-phase-j.md) |
 | Post-10.0, issue-driven (Phases Q, R, V, S, T, U, Y, Z, X and H) | [`archive/implementation-plan-post-10.0.md`](archive/implementation-plan-post-10.0.md) |
 
+## Phase CE: explicit client evaluation ([#220](https://github.com/azabluda/InfoCarrier.Core/issues/220))
+
+- [x] **CE1. Reject implicit local row decisions in version 11.** Reproduce the null-component
+      group-join discrepancy, whole-table grouping and two-source joins before changing their
+      expectations. Reject remaining local filtering, ordering, grouping, joins and equality after
+      safe structural rewrites. Preserve final construction, registered backend outcomes and
+      explicit local execution. Add actionable registration and migration diagnostics through the
+      existing role options; update maintained query guidance. Validate focused tests, the complete
+      measurement, transport tests, Release compilation, trimming and documentation checks.
+
+      Validated 2026-11-03: functional **Passed: 29706, Failed: 0, Total: 29940** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `Measure.cs` reported
+      **FAILING: 0, TOTAL: 30177** with no newly broken cases; the five former expectations were
+      corrected and their failure reasons disappeared. Focused final boundary tests
+      **Passed: 73, Failed: 0, Total: 73**; transport **Passed: 377, Failed: 0, Total: 377**.
+      The changed specification override passed its audit and live comparison with plain Entity
+      Framework Core. Release rebuild passed with five existing framework warnings and zero errors;
+      trimming remained **115 <= 115**. Strict documentation, links and word budgets passed.
+      The console sample completed against an isolated published server. Published browser checks
+      covered customer sorting/paging, customer and line loading, an order quantity save with fresh
+      readback, transfer commit and rollback after the expected foreign-key refusal. The connected
+      browser could not navigate, so these checks used a separate headless browser without user
+      profile state. Native database and Windows logging checks required an unrestricted test process.
+
+- [x] **CE2. Remove obsolete diagnostics and cover surviving residual paths.** Remove the
+      unregistered-key collector, logging definition and event metadata superseded by refusal.
+      Preserve ordinary split diagnostics. Exercise deferred identity reuse, descending composite
+      ordering under bounded `Last`, paging before `First`, a terminal over two projected sources,
+      and instance receiver diagnostics.
+      Confirm all eight surviving newly uncovered lines execute. Validate the full measurement,
+      transport tests, strict Release rebuild, trimming, packages and changed documentation.
+
+      Validated 2026-11-04: functional **Passed: 29711, Failed: 0, Total: 29945** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `Measure.cs` reported
+      **FAILING: 0, TOTAL: 30182**, with no broken cases and unchanged failure reasons.
+      Focused residual tests **Passed: 7, Failed: 0, Total: 7**; their coverage executes all
+      eight retained lines that lost coverage. The full measurement started before the final
+      two paging cases were added; the focused run includes both. Transport
+      **Passed: 377, Failed: 0, Total: 377**. Strict Release rebuild, package creation, changed
+      documentation links and file hygiene passed; trimming remained **115 <= 115**.
+      The full slow comparison suite was not run. CE1's changed inherited Union test passed
+      its focused slow comparison in both execution modes.
+
 ## Phase E — engineering script migration ([#264](https://github.com/azabluda/InfoCarrier.Core/issues/264))
 
 - [x] **E1. Convert the wire-contract runner to a .NET file-based application.** Preserve protected

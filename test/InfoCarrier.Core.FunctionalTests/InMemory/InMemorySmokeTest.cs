@@ -237,13 +237,13 @@ public class InMemorySmokeTest
         Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("ElementAt"));
     }
 
-    [ConditionalFact]
-    public async Task A_split_over_an_unregistered_key_names_the_type()
+    [ConditionalTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_unregistered_group_key_is_refused_independently_of_store_rules(bool relationalRules)
     {
-        // THE EVENT NAMES WHAT TO REGISTER. A `GroupBy` keyed on a type the application declared
-        // stays on this client while the type is not registered, and the server sends every row.
-        // The query succeeds, so this event is the only report, and until it named the type the
-        // caller had to find it by reading the query. The name is what `AllowTypes` takes.
+        // Version 11 supersedes the earlier successful split and its informational event.
+        // A missing registration now produces a migration diagnostic before query execution.
         await using InMemoryInfoCarrierBackendTestStore store = CreateStore();
 
         await using (SmokeContext seed = CreateClient(store))
@@ -259,21 +259,20 @@ public class InMemorySmokeTest
 
         await using (var context = new SmokeContext(
             new DbContextOptionsBuilder<SmokeContext>()
-                .UseInfoCarrier(store)
+                .UseInfoCarrier(store, options => options.ServerUsesRelationalQueryRules = relationalRules)
                 .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
                 .Options))
         {
-            List<int> counts = await context.Blogs
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Blogs
                 .GroupBy(b => new TitleKey(b.Title))
                 .Select(g => g.Count())
-                .ToListAsync();
+                .ToListAsync());
 
-            Assert.Equal(new[] { 1, 2 }, counts.Order());
+            Assert.Contains("AddAllowedTypes", error.Message, StringComparison.Ordinal);
+            Assert.Contains(nameof(TitleKey), error.Message, StringComparison.Ordinal);
         }
 
-        string split = Assert.Single(log, line => line.Contains("Part of the query cannot be sent to the server"));
-        Assert.Contains("AllowTypes", split);
-        Assert.Contains(nameof(TitleKey), split);
+        Assert.Empty(log);
     }
 
     [ConditionalFact]

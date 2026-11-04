@@ -88,21 +88,15 @@ Registration does not make a method translatable or admit private methods. Regis
 types, as [Security](../security.md) describes.
 
 A private or genuinely client-only helper can remain in the local projection. Such a query may
-answer where plain EF Core refuses it. Missing registration can also leave work on the client.
+answer where plain EF Core refuses the projection. Operators that decide rows, order, groups,
+joins or equality must reach the server, or follow an explicit `AsEnumerable` boundary.
 Do not rely on those answers when porting queries to another provider.
 
 ### Rules that come from the server's store
 
-The client never sees the server's provider, so it assumes the store is relational and refuses
-three queries that every relational provider refuses:
-
-| Query | Why |
-|---|---|
-| An `OrderBy` key of a type the wire cannot carry | No store can sort by it, and answering here means sorting the whole table on the client |
-| `new Layout() ?? fallback` in a predicate or an ordering | The same, and the coalesce does nothing, because `new` never returns null |
-| `Distinct`, `Union`, `Concat`, `Except` or `Intersect` over a projection that carries a collection | The columns that identify a row do not survive it |
-
-If your server's store is not relational, say so once and the three go away:
+The client assumes the store is relational when validating collection projections. It refuses
+`Distinct`, `Union`, `Concat`, `Except` or `Intersect` over a projection that loses the columns
+needed to identify collection rows. For another store, disable these relational checks:
 
 ```csharp
 services.AddInfoCarrierClient(o => o
@@ -110,8 +104,8 @@ services.AddInfoCarrierClient(o => o
     .WithServerUsesRelationalQueryRules(false));
 ```
 
-That tells the client something it cannot work out for itself. It does not make the query work
-against a relational server; it only removes the refusal here.
+The backend still decides whether the query works. This setting does not permit implicit local
+filtering, ordering, grouping, joins or equality operations.
 
 ## Tracking
 
@@ -139,9 +133,8 @@ Stopping enumeration disposes the response, cancels the server producer, and rel
 database context. `ToListAsync()` still receives the streamed rows, but the list itself is complete
 only after enumeration finishes.
 
-The client can apply `Where`, `Select`, `Skip`, `Take`, and `Distinct` incrementally after a query
-split. A concatenated query also preserves progressive delivery. Operations that need the complete
-input remain buffered.
+The client can reconstruct projections incrementally after a query split. A concatenated query
+also preserves progressive delivery. Operations that need the complete input remain buffered.
 
 Tracked queries are buffered before client materialization. Entity identity and navigation fix-up
 can depend on later rows, so the client preserves the complete result graph before yielding it.
@@ -169,9 +162,7 @@ List<Customer> page = await query
 int matching = await query.CountAsync();
 ```
 
-1. Order before you page, and order on the entity. Sort a client-side projection instead and the
-   server pages an unordered set while the client sorts the page: one page of the wrong rows, in
-   the right order.
+1. Order before you page. Ordering must reach the server; implicit local sorting is refused.
 
 `Skip` and `Take` written after the `Select` run in the database too, even when the projection
 calls a method of your own.
@@ -218,19 +209,16 @@ a type this package cannot name, so add it through `AddAllowedTypes(...)` in you
 
 ## Keys of your own types
 
-`GroupBy`, `Join`, `GroupJoin` and `DistinctBy` each take a key. When that key is a type you
-declared and have not named on both halves, this client cannot ask the server to group or join by
-it, so the server sends the rows and the grouping happens here. The answer is correct and the
-response is as large as the table.
+`GroupBy`, `Join`, `GroupJoin` and `DistinctBy` each take a key. Register named key types on both
+client and server. Version 11 rejects implicit local filtering, ordering, grouping, joins,
+distinctness and equality before reading database rows. Final client projections remain supported.
 
 ```csharp
-// The server reads every row of Orders, and this client groups them.
+// Requires PeriodKey registration on both roles.
 orders.GroupBy(o => new PeriodKey(o.Placed.Year, o.Placed.Month))
 ```
 
-The query succeeds either way, so only the `InfoCarrierEventId.QuerySplit` log event reports it,
-and that event names the type. See [Logging](../configuration/client.md#logging). Name the type on
-both halves and the same query runs in the database:
+Use the same registration method for both roles:
 
 ```csharp
 services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureSharedContract));
@@ -245,12 +233,13 @@ public static class ShopDeployment
 }
 ```
 
-An anonymous key such as `new { o.Year, o.Month }` needs no registration.
+Safe internal rewrites, such as anonymous composite join keys carried as tuples, keep operators
+on the server. Other transported anonymous structures need `AddAnonymousShapes` on both roles.
 
-Naming a type moves the operator to the database, which is where EF Core decides whether it can
-translate it. A query this client answers locally can start to fail once the type is named, with
-the error EF Core gives for it without this provider. A named type means the query behaves as it
-would if you had written it against the server.
+Registration permits transport. The backend still decides translation, results or refusal;
+InfoCarrier never retries a server refusal through local evaluation. To choose local execution,
+call `AsEnumerable` before the operator. For example, `orders.AsEnumerable().GroupBy(...)` groups
+locally and transfers every selected order. Apply server filters and select needed columns first.
 
 ## Round trips and result size
 

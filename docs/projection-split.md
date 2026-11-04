@@ -1,6 +1,13 @@
 # Projection split — design spec (milestone M2)
 
 Status: implemented; anonymous data representation amended 2026-10-07.
+
+Version 11 amendment, 2026-11-03: the historical local-operator exceptions below are superseded by
+[explicit client evaluation](decisions.md#amendment-2026-11-03-explicit-client-evaluation-in-version-11).
+After safe carrier rewrites and projection pushdown, remaining implicit local filtering, ordering,
+grouping, joins, distinctness and equality are rejected. Final projection reconstruction and explicit
+local execution after `AsEnumerable` remain supported. Registration on both roles permits transport;
+the backend still decides translation or refusal.
 Authority for requirements §3. Recorded as [ADR-010](decisions.md#adr-010-projection-split-boundary-computed-on-the-client-locked-2026-08-01).
 
 Companion docs: [`result-wire-format.md`](result-wire-format.md) (how rows travel),

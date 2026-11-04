@@ -226,8 +226,9 @@ optionsBuilder
 
 At `Information` this provider adds one event of its own, `InfoCarrierEventId.QuerySplit`, raised
 when part of a query stays on the client. It names how many queries the server ran, which
-operators stayed here, and which unregistered key types kept them here. A `Where`, a `Skip` or a
-`Take` among them means the server sent more rows than your query asked for.
+projection reconstruction stayed here, and how the query was split. Implicit local operators that
+decide rows, order, groups, joins or equality are refused before database execution. Register their
+types on both roles or use [explicit local execution](../guide/querying.md#keys-of-your-own-types).
 
 To see the payloads themselves, decorate the transport. That is what the sample's wire inspector is.
 See [Custom transports](transports.md).

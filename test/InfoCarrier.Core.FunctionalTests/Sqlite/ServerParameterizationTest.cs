@@ -52,8 +52,8 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         carries the predicate, limit or join its name is about. The three statements with no
 ///         predicate are the query's own — a projection over every blog, a <c>GroupJoin</c> whose
 ///         result selector discards the group so EF itself writes <c>SELECT "Id" FROM "Blogs"</c>,
-///         and the <c>An_unregistered_…</c> family, whose names say they read the table and whose
-///         assertions already say so.
+///         and the then-local unregistered-key family. The 2026-11-03 version 11 amendment
+///         replaces that family's table reads with refusal before database work.
 ///     </para>
 ///     <para>
 ///         <b>That reading needed a fix first.</b> This class was invisible to the server SQL
@@ -1921,8 +1921,8 @@ public partial class ServerParameterizationTest
     ///     a query EF refuses. This records it rather than fixing it.
     /// </summary>
     /// <remarks>
-    ///     The same decision as <see cref="An_unregistered_group_key_reads_the_whole_table" />: a
-    ///     type the application has not named keeps the operator on this client.
+    ///     Eligible final construction remains local in version 11. This projection reconstructs
+    ///     values from a converted column; it does not move row selection or grouping locally.
     ///     <see cref="A_projection_over_a_converted_list_of_a_registered_type_fails_where_EF_fails" />
     ///     is the other half.
     /// </remarks>
@@ -1981,24 +1981,18 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
-    ///     An <em>unregistered</em> grouping key reads the whole table here, and this records the
-    ///     cost rather than fixing it.
+    ///     Version 11 refuses an unregistered grouping key before reading the table.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>There is no error, and that is deliberate.</b>
-    ///         <c>QuerySplitter.RejectClientEvaluation</c> throws EF's <c>TranslationFailed</c> for
-    ///         client CODE in a row-deciding argument, and says in its own remarks why it does not
-    ///         throw for a client TYPE: a <c>GroupBy</c> keyed on one is perfectly translatable and
-    ///         lands here only because of this provider's type boundary, and refusing it cost 235
-    ///         passing tests. So the answer is right, the payload is the whole table, and nothing
-    ///         says so.
+    ///         Version 10 permitted local grouping when only its key type prevented transport.
+    ///         The 2026-11-03 version 11 decision supersedes that exception: registration permits
+    ///         transport, while missing registration must not cause a hidden full-table transfer.
     ///     </para>
     ///     <para>
     ///         <b>The caller's fix is one line</b>, and
     ///         <see cref="A_registered_group_key_matches_the_direct_query" /> is the measurement:
-    ///         name the type on both halves and the statement becomes EF's own. This test exists so
-    ///         the untreated case cannot change silently, and so the pair reads as one decision.
+    ///         name the type on both halves and the statement becomes EF's own.
     ///     </para>
     ///     <para>
     ///         <b>An anonymous key already ships and is not in this class</b> — measured
@@ -2008,7 +2002,7 @@ public partial class ServerParameterizationTest
     ///     </para>
     /// </remarks>
     [ConditionalFact]
-    public async Task An_unregistered_group_key_reads_the_whole_table()
+    public async Task An_unregistered_group_key_is_refused_before_reading_the_table()
     {
         Run wire = await RunBothWays(
             allowedTypes: null,
@@ -2016,13 +2010,13 @@ public partial class ServerParameterizationTest
 
         Assert.Contains("GROUP BY", Assert.Single(wire.Directly), StringComparison.Ordinal);
 
-        string statement = Assert.Single(wire.OverTheWire);
-        Assert.DoesNotContain("GROUP BY", statement, StringComparison.Ordinal);
-        Assert.DoesNotContain("COUNT(", statement, StringComparison.Ordinal);
+        Assert.NotNull(wire.WireError);
+        Assert.Contains("implicit client execution of 'GroupBy'", wire.WireError.Message, StringComparison.Ordinal);
+        Assert.Empty(wire.OverTheWire);
     }
 
     /// <summary>
-    ///     An unregistered <em>join</em> key reads BOTH tables whole, and joins them here.
+    ///     Version 11 refuses an unregistered join key before reading either source.
     /// </summary>
     /// <remarks>
     ///     <b>The same cause as the grouping key above, and the one #120 found by comparing the
@@ -2032,13 +2026,14 @@ public partial class ServerParameterizationTest
     ///     data. Registering it is what closes this one.
     /// </remarks>
     [ConditionalFact]
-    public async Task An_unregistered_join_key_reads_both_tables()
+    public async Task An_unregistered_join_key_is_refused_before_reading_either_table()
     {
         Run wire = await RunBothWays(allowedTypes: null, JoinOnTitle);
 
         Assert.Contains("INNER JOIN", Assert.Single(wire.Directly), StringComparison.Ordinal);
-        Assert.Equal(2, wire.OverTheWire.Length);
-        Assert.All(wire.OverTheWire, s => Assert.DoesNotContain("JOIN", s, StringComparison.Ordinal));
+        Assert.NotNull(wire.WireError);
+        Assert.Contains("implicit client execution of 'Join'", wire.WireError.Message, StringComparison.Ordinal);
+        Assert.Empty(wire.OverTheWire);
     }
 
     /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
@@ -2051,14 +2046,16 @@ public partial class ServerParameterizationTest
         Assert.Contains("INNER JOIN", Assert.Single(wire.OverTheWire), StringComparison.Ordinal);
     }
 
-    /// <inheritdoc cref="An_unregistered_join_key_reads_both_tables" />
+    /// <inheritdoc cref="An_unregistered_join_key_is_refused_before_reading_either_table" />
     [ConditionalFact]
-    public async Task An_unregistered_group_join_key_reads_both_tables()
+    public async Task An_unregistered_group_join_key_is_refused_before_reading_either_table()
     {
         Run wire = await RunBothWays(allowedTypes: null, GroupJoinOnTitle);
 
         Assert.Single(wire.Directly);
-        Assert.Equal(2, wire.OverTheWire.Length);
+        Assert.NotNull(wire.WireError);
+        Assert.Contains("implicit client execution of 'GroupJoin'", wire.WireError.Message, StringComparison.Ordinal);
+        Assert.Empty(wire.OverTheWire);
     }
 
     /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
@@ -2071,24 +2068,17 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
-    ///     Registering a key type can turn an answer into EF's own refusal, and that is the
-    ///     behaviour to expect rather than a regression.
+    ///     Registration preserves backend refusal without retrying locally.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>The most surprising half of "a registered type matches plain EF Core", and the
-    ///         reason to state it as a promise.</b> <c>DistinctBy</c> keyed on a declared type is
-    ///         one EF itself cannot translate: run directly against the server it raises
-    ///         <c>TranslationFailed</c>. Unregistered, the key keeps the operator on this client,
-    ///         the server sends every row and the caller gets an answer EF would have refused —
-    ///         the <c>limitations.md</c> category of queries this provider answers that other EF
-    ///         providers reject.
+    ///         <c>DistinctBy</c> keyed on a declared type is one EF cannot translate. Version 10
+    ///         answered the unregistered query locally after reading the whole table. The
+    ///         2026-11-03 version 11 amendment supersedes that behavior with a planning refusal.
     ///     </para>
     ///     <para>
-    ///         <b>Registering the type moves the operator to the server, where EF refuses it.</b>
-    ///         So the registration that removes a whole-table read also removes the answer. Both
-    ///         halves are "match plain EF Core", and a caller who registers a type needs to know
-    ///         that is what they asked for.
+    ///         Registering the type moves the operator to the server, where EF refuses it.
+    ///         Registration permits transport, not translation, and refusal triggers no local retry.
     ///     </para>
     /// </remarks>
     [ConditionalFact]
@@ -2097,8 +2087,9 @@ public partial class ServerParameterizationTest
         Run unregistered = await RunBothWays(allowedTypes: null, DistinctByTitle);
 
         Assert.NotNull(unregistered.DirectError);
-        Assert.Null(unregistered.WireError);
-        Assert.DoesNotContain("DISTINCT", Assert.Single(unregistered.OverTheWire), StringComparison.Ordinal);
+        Assert.NotNull(unregistered.WireError);
+        Assert.Contains("implicit client execution of 'DistinctBy'", unregistered.WireError.Message, StringComparison.Ordinal);
+        Assert.Empty(unregistered.OverTheWire);
 
         Run registered = await RunBothWays([typeof(TitleKey)], DistinctByTitle);
 

@@ -82,8 +82,8 @@ internal static class UpstreamKeyTypes
             ?? throw new InvalidOperationException(
                 $"{declaringDefinition.Name} no longer declares a non-public nested '{name}'. "
                 + "An EF version bump has moved or renamed it. Find its replacement and name that "
-                + "instead; leaving it unregistered is not the same behaviour, it sends the whole "
-                + "table (see UpstreamKeyTypes).");
+                + "instead; leaving it unregistered does not preserve backend execution and "
+                + "version 11 refuses implicit local row decisions (see UpstreamKeyTypes).");
 
         // A type nested in a generic type carries the enclosing type's parameters, so what
         // reflection hands back is a definition and the expression tree holds the closed type.

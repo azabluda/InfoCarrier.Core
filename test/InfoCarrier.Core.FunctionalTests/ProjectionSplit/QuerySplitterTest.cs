@@ -645,17 +645,16 @@ public class QuerySplitterTest : IDisposable
     }
 
     /// <summary>
-    ///     And the same projection is allowed under operators that read only cardinality or
-    ///     position — which is what `Count_on_projection_with_client_eval` and
-    ///     `Client_eval_Union_FirstOrDefault` assert, and what C59's blunter rule broke.
+    ///     Projection reconstruction and row limiting remain supported. Version 11 refuses
+    ///     implicit local union because its equality comparison decides the returned rows.
     /// </summary>
     [Fact]
     public void A_client_method_nothing_reads_is_allowed()
     {
         Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a))).ServerQueries);
         Assert.NotEmpty(Split(_context.Authors.Select(a => Rename(a)).Take(2)).ServerQueries);
-        Assert.NotEmpty(
-            Split(_context.Authors.Select(a => Rename(a)).Union(_context.Authors)).ServerQueries);
+        Assert.Throws<InvalidOperationException>(() =>
+            Split(_context.Authors.Select(a => Rename(a)).Union(_context.Authors)));
     }
 
     private static Author Rename(Author author)

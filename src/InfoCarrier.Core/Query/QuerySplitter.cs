@@ -318,11 +318,11 @@ public sealed class QuerySplitter
         }
 
         RejectOpenFragments(analysis);
-        RejectClientEvaluation(query, analysis, reassemblies, _allowlist, ServerStoreIsRelational);
         if (ServerStoreIsRelational)
         {
             RejectIdentityLosingCollectionProjection(query, collectionReassemblies);
         }
+        RejectClientEvaluation(query, analysis, reassemblies, _allowlist, ServerStoreIsRelational);
 
         // Substitute each shipped subtree with a parameter the caller binds to its results.
         var parameters = new List<ParameterExpression>(analysis.Shippable.Count);
@@ -377,9 +377,7 @@ public sealed class QuerySplitter
         // The residual goes with the count, so the event can say whether the split cost anything:
         // a residual that only reshapes rows carried what the caller asked for, and one that
         // drops them means the server sent more. It is walked inside the log guards, never here.
-        // The allowlist goes too, so the event can name a key type the server was not told about:
-        // that name is what the caller passes to `AllowTypes` to move the operator to the server.
-        _queryLogger?.QuerySplit(augmented.Count, residualBody, _allowlist);
+        _queryLogger?.QuerySplit(augmented.Count, residualBody);
 
         return new SplitQuery(
             [.. augmented.Select(ToServerQuery)],
@@ -1082,12 +1080,11 @@ public sealed class QuerySplitter
     ///         (<c>AssertTranslationFailed</c>), which is the clearest statement of the contract.
     ///     </para>
     ///     <para>
-    ///         The distinction that matters is <em>why</em> the operator stayed behind. A
-    ///         <c>GroupBy</c> keyed on an anonymous type is perfectly translatable — EF does it
-    ///         every day — and lands on the client only because this provider has a type boundary
-    ///         EF does not. That is not a translation failure, and treating it as one cost 235
-    ///         passing tests when this guard was first written the blunt way. A call to a method
-    ///         the server has no way to run is a translation failure, in EF and here alike.
+    ///         Version 10 distinguished client code from client-only types and permitted some
+    ///         grouping, joins and comparisons locally. The version 11 decision of 2026-11-03
+    ///         supersedes that exception. After safe structural rewrites, any remaining local
+    ///         row decision is refused, even when a missing type registration caused the split.
+    ///         Eligible final projection construction remains local.
     ///     </para>
     /// </remarks>
     private static void RejectClientEvaluation(
@@ -1771,6 +1768,37 @@ public sealed class QuerySplitter
                 RejectLambdaOverClientProjection(node);
             }
 
+            // Version 11 no longer treats an untransportable type as permission to execute
+            // row-deciding operators locally. Check the execution boundary after all safe
+            // carrier and projection rewrites, so operators that reached the server stay legal.
+            if (_found is null
+                && !serverSide.Contains(node)
+                && !reassemblies.Contains(node)
+                && node.Method.DeclaringType is { } queryOperator
+                && (queryOperator == typeof(Queryable) || queryOperator == typeof(Enumerable))
+                && (node.Method.Name is nameof(Queryable.Where)
+                    or nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                    or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending)
+                    or nameof(Queryable.Order) or nameof(Queryable.OrderDescending) or nameof(Queryable.Reverse)
+                    or nameof(Queryable.GroupBy) or nameof(Queryable.Join) or nameof(Queryable.GroupJoin)
+                    or nameof(Queryable.LeftJoin) or nameof(Queryable.RightJoin)
+                    or nameof(Queryable.SelectMany)
+                    or nameof(Queryable.Distinct) or nameof(Queryable.DistinctBy)
+                    or nameof(Queryable.Union) or nameof(Queryable.UnionBy)
+                    or nameof(Queryable.Intersect) or nameof(Queryable.IntersectBy)
+                    or nameof(Queryable.Except) or nameof(Queryable.ExceptBy)
+                    or nameof(Queryable.Contains) or nameof(Queryable.SequenceEqual)
+                    || RowDecidingArguments(node).Any(argument => StripQuotes(argument) is LambdaExpression)))
+            {
+                _found = (node,
+                    $"InfoCarrier version 11 does not permit implicit client execution of '{node.Method.Name}'. "
+                    + "Register required types with AddAllowedTypes or anonymous structures with AddAnonymousShapes "
+                    + "on both client and server, preferably through ConfigureShared. Registration permits transport; "
+                    + "the backend still decides translation. Rewrite the query, or call AsEnumerable before "
+                    + "this operator to request local execution explicitly.");
+                return node;
+            }
+
             return _found is null ? base.VisitMethodCall(node) : node;
         }
 
@@ -1877,12 +1905,9 @@ public sealed class QuerySplitter
         ///         pins for a <c>Where</c>.
         ///     </para>
         ///     <para>
-        ///         <b>Ordering only, and not <c>GroupBy</c>.</b> A <c>GroupBy</c> keyed on an
-        ///         anonymous type is perfectly translatable and lands here only because of this
-        ///         provider's type boundary; refusing that is what cost 235 tests once. An
-        ///         ordering key, by contrast, is a scalar in every query that works: the allowlist
-        ///         admits every primitive and every mapped type, so a key it rejects is one no
-        ///         store could sort by.
+        ///         This preserves the existing relational ordering diagnostic. Since the
+        ///         2026-11-03 version 11 amendment, the general execution-boundary check also
+        ///         rejects local grouping and ordering caused only by unregistered types.
         ///     </para>
         /// </remarks>
         private void RejectUnshippableOrderingKey(MethodCallExpression node)
@@ -2025,24 +2050,15 @@ public sealed class QuerySplitter
         /// </summary>
         /// <remarks>
         ///     <para>
-        ///         **This is EF's rule, read off its own tests rather than off its prose** (C68).
-        ///         "Client evaluation is legal only in the final projection" is what the docs say
-        ///         and it is not implementable — C59 measured that reading at 6 fixed and
-        ///         <b>18 broken</b>. The eighteen say what the real line is:
+        ///         Version 10's C68 rule inspected lambdas over client-computed values rather
+        ///         than rejecting all composition. Count and bounded terminal operations do not
+        ///         need to inspect the projection. Joins that read its values do.
         ///     </para>
-        ///     <list type="bullet">
-        ///         <item><c>Select(c =&gt; Client(c)).Union(…)</c> then <c>FirstOrDefault</c> — <b>allowed</b></item>
-        ///         <item><c>Select(o =&gt; Client(o)).Count()</c> — <b>allowed</b></item>
-        ///         <item><c>… select Client(l1_inner)).Count() &gt; 7</c> inside a <c>Where</c> — <b>allowed</b></item>
-        ///         <item><c>Join(root, Orders.Select(o =&gt; Client(o)), c =&gt; c.CustomerID, o =&gt; o.CustomerID, …)</c> — <b>refused</b></item>
-        ///         <item><c>(… select Client(l1)).Take(2).LeftJoin(root, x =&gt; x.Id, …)</c> — <b>refused</b></item>
-        ///     </list>
         ///     <para>
-        ///         `Union`, `Count` and `FirstOrDefault` take **no lambda over the projected
-        ///         element**; the two refusals apply a **join key** to it. So the line is not
-        ///         whether something composes over the projection but whether it *reads* it, and
-        ///         "reads it" is already this class's own <see cref="RowDecidingArguments" />
-        ///         concept, applied one level up.
+        ///         The 2026-11-03 version 11 amendment supersedes the earlier permission for
+        ///         local Union and other comparisons without lambdas. The general boundary
+        ///         check now rejects those separately. This check retains the existing
+        ///         diagnostic for lambdas that consume client-computed values.
         ///     </para>
         ///     <para>
         ///         <b>And it explains C59's failure exactly.</b> That attempt marked every
@@ -2063,9 +2079,8 @@ public sealed class QuerySplitter
             }
 
             // No row-deciding lambda means this guard does not inspect a projected value:
-            // cardinality, UNION and row limiting retain their projection path. The earlier
-            // claim that EF allows all of them was corrected on 2026-10-06: registered public
-            // helpers reach the actual backend, which decides translation or refusal.
+            // cardinality and row limiting retain their projection path. Version 11's general
+            // boundary check separately refuses local UNION and other equality operations.
             if (!RowDecidingArguments(node).Any(a => StripQuotes(a) is LambdaExpression))
             {
                 return;
@@ -2142,13 +2157,12 @@ public sealed class QuerySplitter
     ///         <em>which</em> rows, so evaluating it locally means fetching all of them first.
     ///     </para>
     ///     <para>
-    ///         Two readers, and that is why it is here rather than in
-    ///         <see cref="ClientEvaluationFinder" />: that class refuses client code in these
-    ///         arguments, and <see cref="UnregisteredKeyTypes" /> names the key types in them for
-    ///         the split event. One definition keeps the two from disagreeing about what a key is.
+    ///         The client guards share this definition when inspecting predicates, keys and
+    ///         other arguments that decide rows. Version 11 rejects unregistered row decisions
+    ///         before split logging, so the former key-type collector is no longer needed.
     ///     </para>
     /// </remarks>
-    internal static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
+    private static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
     {
         // A result selector runs after the rows are chosen, so client code in it costs
         // nothing extra and EF allows it. Everything else -- predicates, join keys, ordering
@@ -2356,12 +2370,10 @@ public sealed class QuerySplitter
         ///         like data.
         ///     </para>
         ///     <para>
-        ///         An anonymous type in the same position is fine and stays allowed — the compiler
-        ///         gives it structural <c>Equals</c>, so the client comparison means what the query
-        ///         said. That is the whole distinction, and it is why this tests the type's
-        ///         equality rather than its origin: <em>constructing</em> a client-only type is the
-        ///         type boundary, this milestone's subject, and refusing that outright cost 235
-        ///         tests once.
+        ///         Version 10 permitted anonymous and other value-equality keys locally. Since
+        ///         the 2026-11-03 version 11 amendment, the execution-boundary check refuses those
+        ///         joins too unless a safe rewrite keeps them on the server. This earlier check
+        ///         retains the existing diagnostic for a reference-equality key.
         ///     </para>
         /// </remarks>
         protected override Expression VisitMemberInit(MemberInitExpression node)
