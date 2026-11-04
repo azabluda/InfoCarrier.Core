@@ -1020,3 +1020,163 @@ Validation: the experiment passes with `CI=true`; the Release solution build suc
 documented framework Razor warnings and zero errors. Documentation links, file hygiene, and
 `git diff --check` pass. The functional and transport suites were not repeated because production
 code was unchanged.
+
+## 16. Closure evidence follow-up, 2026-11-04
+
+The owner requested execution of the remaining closure evidence after the migration and protocol 3
+coverage pull requests merged. This follow-up extends the existing probe and transport tests; it
+does not allocate another protocol or manufacture a new production semantic change.
+
+### Acceptance boundary
+
+The latest published release observed on 2026-11-04 was version 10.3.0. There is no published
+version 11.0 client for previous-minor acceptance yet. Version 10 is outside the chosen support
+window. Published previous-minor testing remains pending for 11.1 and must cover the promised
+patch range. Creating a release just to obtain evidence is not part of this work.
+
+Three distinct applications provide development evidence:
+
+1. The unchanged preserved protocol 3 executable identified in section 14.
+2. The expanded probe application, compiled against those same unchanged protocol 3 product
+   assemblies. Its application code is new; its historical product assembly is not rebuilt.
+3. The expanded probe compiled against current project references, using protocol 4.
+
+The expanded applications run in separate processes against one current server and an isolated
+SQLite database. Both verify 64 generated keys and their correlation, values from an independent
+database snapshot endpoint, buffered and streamed filtering/order/paging/arithmetic, tracking
+identity, backend translation refusal, explicit local grouping, savepoint rollback and commit,
+transaction rollback, duplicate-key failed-entry identity, failed-save atomicity, early stream
+disposal, cancellation before execution, recovery with another query, and deletion observed
+through an independent database snapshot. The snapshot endpoint belongs only to this local probe.
+
+The historical application still executes an unregistered named grouping locally. The current
+application refuses it. This directly exercises the limit exposed by stricter client evaluation:
+the old client sends source queries, not the grouping operator. The server converter therefore
+cannot impose the new client rule. Retain this distinction when assessing a later semantic change;
+an older client's successful execution does not prove current client semantics.
+
+Permanent tests additionally preserve nullable arithmetic and checked-overflow meaning, reject
+unknown tracking/splitting vocabularies and malformed/null historical expressions before any
+operation-server call, enforce the historical inner byte limit before graph parsing, and preserve
+rows followed by a terminal stream fault, including nested failure data and correlation identities.
+These test known meanings and refusal boundaries; they cannot discover an unspecified future
+semantic change automatically.
+
+Build the expanded historical application without replacing the preserved executable:
+
+```powershell
+dotnet build tools/InfoCarrier.CompatibilityProbe --configuration Release `
+  -p:HistoricalProductDirectory=C:/absolute/path/to/preserved/protocol3 `
+  -p:BaseIntermediateOutputPath=obj/historical/ `
+  -p:OutputPath=C:/absolute/path/to/expanded-protocol3/
+dotnet build tools/InfoCarrier.CompatibilityProbe --configuration Release
+dotnet run --file eng/Compatibility.cs -- `
+  --previous-client artifacts/compatibility/protocol3/InfoCarrier.CompatibilityProbe.dll `
+  --historical-client artifacts/compatibility/expanded-protocol3/InfoCarrier.CompatibilityProbe.dll
+```
+
+The historical output directory must differ from the preserved input and the current output.
+The historical product hashes remain those recorded in section 14. Historical request/response
+codecs are not substituted into a current client shell for this separate-process experiment.
+
+### Conversion measurements
+
+The metrics command measures encode/decode cycles, including parsing and mapping, independently
+of the database and HTTP. It covers real balanced query expressions with 1, 64 and 1,024 equality
+leaves and buffered results with 1, 64 and 1,024 strings of 256 characters plus an index. Five
+warm rounds report operation bytes, iterations, allocated bytes, elapsed time, managed heap size
+and process peak working set. Each protocol runs in its own process. This is a bounded diagnostic
+benchmark, not an end-to-end throughput or latency guarantee.
+
+```powershell
+dotnet tools/InfoCarrier.CompatibilityProbe/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll metrics 3
+dotnet tools/InfoCarrier.CompatibilityProbe/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll metrics 4
+```
+
+Allocation counts cover the measured cycles. Managed heap readings include the process's other
+managed objects, and peak working set is the process high-water mark across earlier cases too.
+Neither is an isolated per-operation peak or proof of bounded streaming memory. Runtime tiering,
+garbage collection, machine activity and shape all matter when interpreting timing.
+
+The controlled warm comparison ran after other validation processes finished, with
+`DOTNET_TieredCompilation=0` for both metric processes. Initial runs with tiered compilation
+reversed the relative timing of the largest query case, so those readings do not establish a
+performance regression or improvement. The fixed-code comparison produced these largest-case
+observations on SDK 10.0.401; time is the median per cycle across five rounds:
+
+```powershell
+$savedTiering = $env:DOTNET_TieredCompilation
+try {
+  $env:DOTNET_TieredCompilation = '0'
+  dotnet tools/InfoCarrier.CompatibilityProbe/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll metrics 3
+  dotnet tools/InfoCarrier.CompatibilityProbe/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll metrics 4
+} finally { $env:DOTNET_TieredCompilation = $savedTiering }
+```
+
+| Shape, size 1,024 | V3 bytes | V4 bytes | V3 allocated bytes/cycle | V4 allocated bytes/cycle | V3 milliseconds | V4 milliseconds |
+|---|---:|---:|---:|---:|---:|---:|
+| Balanced query | 1,300,709 | 975,511 | 9,072,987 | 4,761,367 | 30.2203 | 26.6751 |
+| Buffered rows | 678,547 | 508,875 | 3,920,448 | 2,136,388 | 6.2444 | 5.5040 |
+
+For these warm cases, current conversion used fewer bytes and allocations. Smaller measured
+cases also had lower allocations; timing ranges overlapped for the 64-leaf query. The final
+process peak working sets were 144,035,840 bytes for V3 and 116,477,952 for V4. These are the
+process high-water readings described above, not per-query peaks or streaming bounds. No product
+optimization was justified by this bounded measurement. End-to-end performance under deployment
+load and arbitrary future migration costs remain separate questions.
+
+### Physical retirement rehearsal
+
+The rehearsal physically deleted all 38 files under `src/InfoCarrier.Core/Wire/V3/`,
+`Protocol3Mapping.cs`, `Protocol3WireProtocolCodec.cs`, the historical frame inspector and four
+active historical test files. It removed the historical registration, inspector roots and inventory,
+historical frame inspection, and two direct historical type references in `ContractInspector`.
+The first full rebuild exposed those last two references; removing them completed the active
+inspection cleanup. Shared dispatch and current execution needed no historical-version branches.
+
+The resulting complete solution passed a strict non-incremental Release rebuild with five existing
+framework warnings and zero errors. Runtime assembly inspection confirmed no historical definitions,
+mapping or codec remained. Both historical applications were refused with
+`InfoCarrierProtocolException` identifying client 3 and server 4, before any stored rows appeared.
+The current client passed its original workflow and the expanded 64-row workflow. A historical
+stream header with a malformed body received explicit version refusal before graph decoding.
+The remaining transport tests reported **Passed: 364, Failed: 0, Total: 364**.
+
+Run the same acceptance command with `--retired` only after performing that physical removal.
+The command checks the runtime type inventory, verifies specific compatibility diagnostics rather
+than arbitrary process failure, checks the fresh database after each refusal, runs current
+acceptance, and checks streamed refusal. A normal build must fail the retired-inventory check.
+
+All deleted files and temporary edits were restored after the rehearsal. Product and inspector
+sources match the starting commit; no historical production support was retired. Protected contract
+descriptions and version allocation history were not deleted or regenerated. Real retirement still
+requires proving that no supported release needs the contract and explicitly reviewing active
+description changes against protected history. This experiment does not authorize that decision.
+
+### Validation record
+
+Validated 2026-11-04 after restoring historical support:
+
+| Check | Result |
+|---|---|
+| Focused semantic and migration tests | Passed: 19, Failed: 0, Total: 19 |
+| Complete transport suite | Passed: 394, Failed: 0, Total: 394 |
+| Engineering suite | Passed: 63, Failed: 0, Total: 63 |
+| Functional measurement | Passed: 29,713, Failed: 0, Total: 29,947; Skipped: 234 |
+| Document-store measurement | Passed: 237, Failed: 0, Total: 237 |
+| Combined measurement | FAILING: 0, TOTAL: 30,184; no fixed/broken cases, reasons unchanged |
+| Final strict non-incremental Release rebuild | Five existing framework warnings, zero errors |
+| Separate-process acceptance after restoration | Preserved historical executable, expanded historical application, original and expanded current workflows passed |
+
+The final expanded historical application uses conditional project-file inclusion of a current-only
+partial `Program` implementation and metrics file. It has no conditional compilation directives.
+Cached historical restore metadata reported NU1900 for unavailable vulnerability information;
+successful compilation does not establish a fresh dependency vulnerability audit.
+
+### Remaining closure decision
+
+Published-client acceptance remains pending until the required packages exist. The selected
+structural migration preserves meaning and does not prove arbitrary semantic conversion. Each
+future incompatible change still needs its own old/new meaning, applicable client-local behavior,
+database effects, failures and support-window decision. Keep issue 262 open while that acceptance
+obligation remains; this follow-up does not authorize closing it or retiring production support.

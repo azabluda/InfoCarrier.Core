@@ -117,6 +117,95 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
         Assert.Equal(0, ((ProtocolCompatibilityTest.CountingServer)server).Calls);
     }
 
+    [Theory]
+    [InlineData("tracking")]
+    [InlineData("splitting")]
+    [InlineData("null-expression")]
+    [InlineData("malformed-expression")]
+    public async Task Invalid_historical_meanings_are_refused_before_execution(string mutation)
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits.Default, Protocol);
+        IInfoCarrierServer server = DispatchProxy.Create<IInfoCarrierServer, ProtocolCompatibilityTest.CountingServer>();
+        var old = new Old.QueryDataRequest
+        {
+            ProtocolVersion = 3,
+            SerializedQuery = JsonSerializer.SerializeToUtf8Bytes<OldNodes.ExpressionNode>(new OldNodes.ConstantNode
+            {
+                Type = new OldNodes.TypeNode { Name = typeof(int).AssemblyQualifiedName! }, PrimitiveValue = 1,
+            }, OldNodes.Protocol3ExpressionJsonContext.Default.ExpressionNode),
+            TrackingBehavior = Old.QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = false,
+        };
+        old = mutation switch
+        {
+            "tracking" => old with { TrackingBehavior = (Old.QueryTrackingBehavior)999 },
+            "splitting" => old with { SplitQueryBehavior = (Old.QuerySplittingBehavior)999 },
+            "null-expression" => old with { SerializedQuery = "null"u8.ToArray() },
+            _ => old with { SerializedQuery = "{"u8.ToArray() },
+        };
+        InfoCarrierEnvelope response = await Dispatcher(server, serializer).DispatchAsync(new InfoCarrierEnvelope
+        {
+            ProtocolVersion = 3, Operation = InfoCarrierOperation.Query, Payload = serializer.Serialize(old),
+            CorrelationId = "invalid-historical-meaning",
+        });
+        Assert.Equal(3, response.ProtocolVersion);
+        Assert.Equal("invalid-historical-meaning", response.CorrelationId);
+        Assert.NotNull(response.Fault);
+        Assert.Contains("JsonException", response.Fault.TypeName, StringComparison.Ordinal);
+        Assert.Equal(0, ((ProtocolCompatibilityTest.CountingServer)server).Calls);
+    }
+
+    [Fact]
+    public void Historical_inner_graph_limit_is_checked_before_parsing()
+    {
+        var serializer = new SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits.Default, Protocol);
+        var old = new Old.QueryDataRequest
+        {
+            ProtocolVersion = 3, SerializedQuery = Enumerable.Repeat((byte)'x', 257).ToArray(),
+            TrackingBehavior = Old.QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = false,
+        };
+        var codec = new Protocol3WireProtocolCodec();
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            codec.Deserialize<QueryDataRequest>(serializer, serializer.Serialize(old), new InfoCarrierPayloadLimits(maxRequestBytes: 256)));
+        Assert.Contains("protocol 3 expression", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("257", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Historical_stream_keeps_rows_before_a_terminal_fault()
+    {
+        using var destination = new MemoryStream();
+        var codec = new Protocol3WireProtocolCodec();
+        await codec.WriteFramesAsync(destination, Frames(), default);
+        destination.Position = 0;
+        var frames = new List<Wire.V3.Query.QueryStreamFrame>();
+        await foreach (Wire.V3.Query.QueryStreamFrame frame in Wire.V3.Query.QueryStreamFrameCodec.ReadAsync(destination))
+        {
+            frames.Add(frame);
+        }
+        Assert.Equal(3, Assert.IsType<Wire.V3.Query.QueryStartFrame>(frames[0]).Version);
+        Assert.Equal(37, Assert.IsType<JsonElement>(Assert.IsType<Wire.V3.Query.QueryRowFrame>(frames[1]).Value.PrimitiveValue).GetInt32());
+        Old.InfoCarrierFault fault = Assert.IsType<Wire.V3.Query.QueryFaultFrame>(frames[2]).Fault;
+        Assert.Equal("partial failure", fault.Message);
+        Assert.Equal("inner failure", fault.Inner!.Message);
+        Assert.Equal(new[] { 19 }, fault.FailedCorrelationIds);
+        Assert.Equal(3, frames.Count);
+
+        static async IAsyncEnumerable<Query.QueryStreamFrame> Frames()
+        {
+            yield return new Query.QueryStartFrame(4, 0, false, null);
+            yield return new Query.QueryRowFrame(new DynamicValueNode
+            {
+                Type = new TypeNode { Name = typeof(int).AssemblyQualifiedName! }, PrimitiveValue = 37,
+            });
+            await Task.Yield();
+            yield return new Query.QueryFaultFrame(new InfoCarrierFault
+            {
+                TypeName = typeof(InvalidOperationException).FullName!, Message = "partial failure", FailedCorrelationIds = [19],
+                Inner = new InfoCarrierFault { TypeName = typeof(Exception).FullName!, Message = "inner failure" },
+            });
+        }
+    }
+
     [Fact]
     public async Task Unknown_old_operation_is_echoed_as_fault_without_execution()
     {

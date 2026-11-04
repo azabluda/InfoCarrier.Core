@@ -777,6 +777,35 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       changed documentation links, file hygiene and whitespace checks passed. Product source,
       public signatures and wire descriptions were unchanged.
 
+- [x] **WVP6. Extend migration acceptance and rehearse physical retirement.** Run the preserved
+      development client and the same expanded application against unchanged historical product
+      assemblies and current references, in separate processes. Verify database snapshots,
+      generated-key correlation, transaction and savepoint effects, failed-save atomicity,
+      historical local grouping, backend refusals, streaming disposal and cancellation.
+      Cover malformed historical input and semantic invariants permanently. Measure query and
+      result conversion over larger graphs. Temporarily delete the historical product sources,
+      registration and active inspection/test targets; rebuild and verify current acceptance,
+      historical refusal and absence of effects, then restore all historical support.
+
+      Validated 2026-11-04: focused semantic/migration tests **Passed: 19, Failed: 0, Total: 19**;
+      final transport **Passed: 394, Failed: 0, Total: 394**; engineering **Passed: 63,
+      Failed: 0, Total: 63**. Functional **Passed: 29713, Failed: 0, Total: 29947**
+      (234 skipped); document-store **Passed: 237, Failed: 0, Total: 237**.
+      `Measure.cs` reported **FAILING: 0, TOTAL: 30184**, with no broken cases and unchanged
+      failure reasons. The physically retired tree compiled and its remaining transport suite
+      reported **Passed: 364, Failed: 0, Total: 364**. Both historical applications received explicit
+      protocol refusals before database effects; current acceptance passed. Historical support
+      was restored, then both historical applications and current acceptance passed again.
+      Both strict Release rebuilds passed with five existing framework warnings and zero errors.
+      The [dated evidence and limits](../v11/wire-migration-research.md#16-closure-evidence-follow-up-2026-11-04)
+      record measurements and the deferred published-client obligation.
+
+- [ ] **WVP7. Published previous-minor acceptance.** Deferred until version 11.1 has actual
+      published version 11.0 client packages. Run supported previous-minor packages in separate
+      processes against the candidate server, including the promised patch range. Version 10
+      packages and rebuilt development applications do not satisfy this obligation. Do not
+      create a release merely to manufacture this evidence.
+
 - [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
       with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
       Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
