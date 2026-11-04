@@ -377,9 +377,7 @@ public sealed class QuerySplitter
         // The residual goes with the count, so the event can say whether the split cost anything:
         // a residual that only reshapes rows carried what the caller asked for, and one that
         // drops them means the server sent more. It is walked inside the log guards, never here.
-        // The allowlist goes too, so the event can name a key type the server was not told about:
-        // that name is what the caller passes to `AllowTypes` to move the operator to the server.
-        _queryLogger?.QuerySplit(augmented.Count, residualBody, _allowlist);
+        _queryLogger?.QuerySplit(augmented.Count, residualBody);
 
         return new SplitQuery(
             [.. augmented.Select(ToServerQuery)],
@@ -2159,13 +2157,12 @@ public sealed class QuerySplitter
     ///         <em>which</em> rows, so evaluating it locally means fetching all of them first.
     ///     </para>
     ///     <para>
-    ///         Two readers, and that is why it is here rather than in
-    ///         <see cref="ClientEvaluationFinder" />: that class refuses client code in these
-    ///         arguments, and <see cref="UnregisteredKeyTypes" /> names the key types in them for
-    ///         the split event. One definition keeps the two from disagreeing about what a key is.
+    ///         The client guards share this definition when inspecting predicates, keys and
+    ///         other arguments that decide rows. Version 11 rejects unregistered row decisions
+    ///         before split logging, so the former key-type collector is no longer needed.
     ///     </para>
     /// </remarks>
-    internal static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
+    private static IEnumerable<Expression> RowDecidingArguments(MethodCallExpression node)
     {
         // A result selector runs after the rows are chosen, so client code in it costs
         // nothing extra and EF allows it. Everything else -- predicates, join keys, ordering

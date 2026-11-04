@@ -40,6 +40,25 @@ it lands in is decided on the issue, not here.
       browser could not navigate, so these checks used a separate headless browser without user
       profile state. Native database and Windows logging checks required an unrestricted test process.
 
+- [x] **CE2. Remove obsolete diagnostics and cover surviving residual paths.** Remove the
+      unregistered-key collector, logging definition and event metadata superseded by refusal.
+      Preserve ordinary split diagnostics. Exercise deferred identity reuse, descending composite
+      ordering under bounded `Last`, paging before `First`, a terminal over two projected sources,
+      and instance receiver diagnostics.
+      Confirm all eight surviving newly uncovered lines execute. Validate the full measurement,
+      transport tests, strict Release rebuild, trimming, packages and changed documentation.
+
+      Validated 2026-11-04: functional **Passed: 29711, Failed: 0, Total: 29945** (234 skipped);
+      document-store **Passed: 237, Failed: 0, Total: 237**. `Measure.cs` reported
+      **FAILING: 0, TOTAL: 30182**, with no broken cases and unchanged failure reasons.
+      Focused residual tests **Passed: 7, Failed: 0, Total: 7**; their coverage executes all
+      eight retained lines that lost coverage. The full measurement started before the final
+      two paging cases were added; the focused run includes both. Transport
+      **Passed: 377, Failed: 0, Total: 377**. Strict Release rebuild, package creation, changed
+      documentation links and file hygiene passed; trimming remained **115 <= 115**.
+      The full slow comparison suite was not run. CE1's changed inherited Union test passed
+      its focused slow comparison in both execution modes.
+
 ## Phase E — engineering script migration ([#264](https://github.com/azabluda/InfoCarrier.Core/issues/264))
 
 - [x] **E1. Convert the wire-contract runner to a .NET file-based application.** Preserve protected

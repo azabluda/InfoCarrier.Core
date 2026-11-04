@@ -971,6 +971,19 @@ Registration permits transport; the backend decides translation. This is a clien
 and requires no new wire contract. A converter cannot repair arbitrary work an older client has
 already executed locally.
 
+Coverage review on 2026-11-04 identified obsolete success-path diagnostics for unregistered
+grouping and join keys. Those operators now fail before split logging. Remove the collector,
+its logging definition and its event metadata; keep the ordinary split event for eligible
+client work. This also removes the allowlist parameter from the logging extension. These are
+version 11 diagnostic API changes, not changes to the version 10 release line.
+
+The remaining coverage losses were reachable paths. Focused SQLite tests exercise deferred
+entity identity reuse across two overlapping projected sources, descending composite ordering
+under `Last` with a final client projection, paging before `First`, a terminal over two
+projected sources, and client code inside an instance receiver.
+They check identity, backend results, server ordering and row limits, unused-column exclusion,
+and the specific translation diagnostic without database work. Keep these paths.
+
 ## ADR-011 — Transparent identifiers are re-carried, not reassembled — LOCKED (2026-08-02)
 
 **Context.** `from c in cs from o in c.Orders … select c` contains no anonymous type that the
