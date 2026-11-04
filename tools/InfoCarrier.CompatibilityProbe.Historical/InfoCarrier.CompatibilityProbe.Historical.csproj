@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Keep the shared model's assembly identity identical to the current server's model. -->
+    <AssemblyName>InfoCarrier.CompatibilityProbe</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../InfoCarrier.CompatibilityProbe/Program.cs" Link="Program.cs" />
+    <Compile Include="../InfoCarrier.CompatibilityProbe/Acceptance.cs" Link="Acceptance.cs" />
+    <Reference Include="InfoCarrier.Core" HintPath="../../artifacts/compatibility/protocol3/InfoCarrier.Core.dll" />
+    <Reference Include="InfoCarrier.Core.Abstractions" HintPath="../../artifacts/compatibility/protocol3/InfoCarrier.Core.Abstractions.dll" />
+    <Reference Include="InfoCarrier.Core.AspNetCore" HintPath="../../artifacts/compatibility/protocol3/InfoCarrier.Core.AspNetCore.dll" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+</Project>

@@ -154,6 +154,12 @@ and locally validated. See the [experiment evidence and limits](wire-migration-r
 for separate-process acceptance, measurements, retirement rehearsal, and the exact test results.
 Published previous-minor acceptance remains a release obligation from 11.1.
 
+The [2026-11-04 closure evidence](wire-migration-research.md#16-closure-evidence-follow-up-2026-11-04)
+extends separate-process development-client acceptance, pins historical semantic and refusal
+behavior, measures larger query/result conversions and completes a physical source-retirement
+rehearsal. Historical support was restored afterward. Published previous-minor testing remains
+pending until the required version 11 packages exist; the experiment does not replace it.
+
 ### WM1: typed protocol 4 and protocol 3 conversion
 
 - [x] Preserve the complete physical protocol 3 definitions and use existing data classes for live protocol 4.

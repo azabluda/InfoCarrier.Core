@@ -12,6 +12,18 @@ namespace InfoCarrier.Core.TransportTests;
 public class Protocol3ExpressionTest
 {
     [Fact]
+    public void Nullable_arithmetic_and_checked_overflow_keep_historical_meanings()
+    {
+        Func<int?, int?, int?> add = RoundTrip<Func<int?, int?, int?>>((left, right) => left + right);
+        Assert.Null(add(null, 7));
+        Assert.Null(add(7, null));
+        Assert.Equal(12, add(5, 7));
+        Func<int, int> increment = RoundTrip<Func<int, int>>(value => checked(value + 1));
+        Assert.Equal(2, increment(1));
+        Assert.Throws<OverflowException>(() => increment(int.MaxValue));
+    }
+
+    [Fact]
     public void Conditions_calls_arithmetic_and_type_tests_keep_their_meaning()
     {
         Func<object, int, int> read = RoundTrip<Func<object, int, int>>((value, amount) =>

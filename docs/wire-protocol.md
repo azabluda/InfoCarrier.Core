@@ -326,3 +326,8 @@ From 11.1, acceptance evidence must use a real published previous-minor client p
 current sample server in a separate process. Refusal fixtures are not that evidence. Committed
 traffic replay does not substitute for acceptance or migration tests. The separate migration
 story must use real contract changes and record both supported conversions and impossible cases.
+
+The [dated migration acceptance evidence](plans/v11/wire-migration-research.md#16-closure-evidence-follow-up-2026-11-04)
+records expanded separate-process development-client checks, malformed-input and semantic tests,
+conversion measurements, and a physical source-retirement rehearsal. Historical support was
+restored after that rehearsal. These checks do not replace published previous-minor acceptance.

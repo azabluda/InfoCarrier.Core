@@ -3,21 +3,24 @@
 using InfoCarrier.Core;
 using InfoCarrier.Core.AspNetCore;
 using InfoCarrier.Core.Common;
-using InfoCarrier.Core.Wire;
-using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 
 namespace InfoCarrier.CompatibilityProbe;
 
-internal static class Program
+internal static partial class Program
 {
+    static partial void RunCurrentCommand(string[] args, ref bool handled);
+
     private static async Task Main(string[] args)
     {
-        if (args is ["metrics", string number] && int.TryParse(number, out int measuredVersion) && measuredVersion is 3 or 4)
+        if (args is ["acceptance", string acceptanceEndpoint])
         {
-            Measure(measuredVersion);
+            await Acceptance.Run(acceptanceEndpoint);
             return;
         }
+        bool handled = false;
+        RunCurrentCommand(args, ref handled);
+        if (handled) { return; }
         if (args is ["verify-empty", string databasePath])
         {
             await using var stored = new ProbeContext(new DbContextOptionsBuilder<ProbeContext>().UseSqlite("Data Source=" + databasePath).Options);
@@ -39,6 +42,8 @@ internal static class Program
             }
             app.MapInfoCarrier();
             app.MapGet("/ready", () => "ready");
+            app.MapGet("/snapshot", async (ProbeContext context) =>
+                await context.Items.AsNoTracking().OrderBy(item => item.Id).ToArrayAsync());
             await app.RunAsync();
             return;
         }
@@ -84,41 +89,6 @@ internal static class Program
         Console.WriteLine($"PASS protocol={InfoCarrierEnvelope.CurrentProtocolVersion}; buffered; streaming; generated-key; rollback; delete");
     }
 
-    private static void Measure(int selectedVersion)
-    {
-        using ServiceProvider services = new ServiceCollection().AddInfoCarrierWireProtocols().BuildServiceProvider();
-        InfoCarrierWireProtocol protocol = services.GetRequiredService<InfoCarrierWireProtocol>();
-        using var model = new ProbeContext(new DbContextOptionsBuilder<ProbeContext>().UseSqlite("Data Source=:memory:").Options);
-        var request = new QueryDataRequest
-        {
-            Query = ExpressionSerializer.CreateForModel(model.Model).ToNode(model.Items.Where(item => item.Number > 42).Expression),
-            TrackingBehavior = QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = false,
-        };
-        var serializer = new SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits.Default, protocol);
-        foreach (int version in new[] { selectedVersion })
-        {
-            request = request with { ProtocolVersion = version };
-            long initial = GC.GetAllocatedBytesForCurrentThread();
-            var timer = Stopwatch.StartNew();
-            byte[] first = Cycle();
-            timer.Stop();
-            Console.WriteLine($"Protocol {version}: request bytes={first.Length}; first encode/decode allocated={GC.GetAllocatedBytesForCurrentThread() - initial}; elapsed={timer.Elapsed.TotalMilliseconds:F2} ms.");
-            initial = GC.GetAllocatedBytesForCurrentThread();
-            timer.Restart();
-            for (int index = 0; index < 1000; index++) { GC.KeepAlive(Cycle()); }
-            timer.Stop();
-            Console.WriteLine($"Protocol {version}: 1000 warm encode/decode cycles allocated={GC.GetAllocatedBytesForCurrentThread() - initial}; elapsed={timer.Elapsed.TotalMilliseconds:F2} ms.");
-
-            byte[] Cycle()
-            {
-                byte[] bytes = protocol.Serialize(serializer, request, version);
-                QueryDataRequest decoded = protocol.Deserialize<QueryDataRequest>(serializer, bytes, version)
-                    ?? throw new InvalidOperationException("The measured request disappeared.");
-                GC.KeepAlive(decoded.Query);
-                return bytes;
-            }
-        }
-    }
 }
 
 /// <summary>Shared model used by the separate-process compatibility probe.</summary>
