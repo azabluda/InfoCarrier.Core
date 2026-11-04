@@ -1065,19 +1065,21 @@ semantic change automatically.
 Build the expanded historical application without replacing the preserved executable:
 
 ```powershell
-dotnet build tools/InfoCarrier.CompatibilityProbe --configuration Release `
-  -p:HistoricalProductDirectory=C:/absolute/path/to/preserved/protocol3 `
-  -p:BaseIntermediateOutputPath=obj/historical/ `
-  -p:OutputPath=C:/absolute/path/to/expanded-protocol3/
+dotnet build tools/InfoCarrier.CompatibilityProbe.Historical --configuration Release
 dotnet build tools/InfoCarrier.CompatibilityProbe --configuration Release
 dotnet run --file eng/Compatibility.cs -- `
   --previous-client artifacts/compatibility/protocol3/InfoCarrier.CompatibilityProbe.dll `
-  --historical-client artifacts/compatibility/expanded-protocol3/InfoCarrier.CompatibilityProbe.dll
+  --historical-client tools/InfoCarrier.CompatibilityProbe.Historical/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll
 ```
 
-The historical output directory must differ from the preserved input and the current output.
-The historical product hashes remain those recorded in section 14. Historical request/response
-codecs are not substituted into a current client shell for this separate-process experiment.
+The historical project explicitly references the preserved assemblies under
+`artifacts/compatibility/protocol3` and links the shared application files. Its own directory gives
+it separate normal `obj` and `bin` directories. Its assembly name preserves the model identity
+used by the server. It is outside the normal solution because it requires locally preserved
+historical assemblies; build it explicitly after obtaining those recorded inputs. The current
+project retains its ordinary project reference. The historical product hashes remain those
+recorded in section 14. Historical request/response codecs are not substituted into a current
+client shell for this separate-process experiment.
 
 ### Conversion measurements
 
@@ -1168,10 +1170,15 @@ Validated 2026-11-04 after restoring historical support:
 | Final strict non-incremental Release rebuild | Five existing framework warnings, zero errors |
 | Separate-process acceptance after restoration | Preserved historical executable, expanded historical application, original and expanded current workflows passed |
 
-The final expanded historical application uses conditional project-file inclusion of a current-only
-partial `Program` implementation and metrics file. It has no conditional compilation directives.
-Cached historical restore metadata reported NU1900 for unavailable vulnerability information;
-successful compilation does not establish a fresh dependency vulnerability audit.
+The expanded historical application has its own project with explicit historical references and
+shared source links. Only the current project includes the current-only partial `Program`
+implementation and metrics file. Neither project switches dependencies or intermediate directories
+through build properties, and there are no conditional compilation directives. After this project
+split, the historical project rebuilt with zero warnings and zero errors; the strict solution
+build passed with five existing framework warnings and zero errors. Separate-process acceptance
+passed again with the preserved executable, the separate historical project and current clients.
+Earlier historical restore metadata reported NU1900 for unavailable vulnerability information;
+that earlier successful compilation did not establish a fresh dependency vulnerability audit.
 
 ### Remaining closure decision
 

@@ -4,7 +4,7 @@ using InfoCarrier.Core.Common;
 
 namespace InfoCarrier.CompatibilityProbe;
 
-// Excluded by the project when compiling against preserved historical product assemblies.
+// Only the current probe includes this part; the historical project links the shared files explicitly.
 internal static partial class Program
 {
     static partial void RunCurrentCommand(string[] args, ref bool handled)

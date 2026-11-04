@@ -799,6 +799,8 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       Both strict Release rebuilds passed with five existing framework warnings and zero errors.
       The [dated evidence and limits](../v11/wire-migration-research.md#16-closure-evidence-follow-up-2026-11-04)
       record measurements and the deferred published-client obligation.
+      The historical application has a separate opt-in project with explicit preserved-binary
+      references and linked shared source; the current probe retains an ordinary project reference.
 
 - [ ] **WVP7. Published previous-minor acceptance.** Deferred until version 11.1 has actual
       published version 11.0 client packages. Run supported previous-minor packages in separate

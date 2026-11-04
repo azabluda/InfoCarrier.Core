@@ -1,16 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" Condition="'$(HistoricalProductDirectory)' == ''" />
+    <ProjectReference Include="../../src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(HistoricalProductDirectory)' != ''">
-    <Compile Remove="Program.Current.cs;Metrics.cs" />
-    <Reference Include="InfoCarrier.Core" HintPath="$(HistoricalProductDirectory)/InfoCarrier.Core.dll" />
-    <Reference Include="InfoCarrier.Core.Abstractions" HintPath="$(HistoricalProductDirectory)/InfoCarrier.Core.Abstractions.dll" />
-    <Reference Include="InfoCarrier.Core.AspNetCore" HintPath="$(HistoricalProductDirectory)/InfoCarrier.Core.AspNetCore.dll" />
   </ItemGroup>
 </Project>
