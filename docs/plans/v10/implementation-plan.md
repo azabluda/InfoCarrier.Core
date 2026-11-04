@@ -716,6 +716,24 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       accepted all 94 definition examples and rejected the tested token, discriminator, tag,
       length, and positional-type errors. The Release rebuild with continuous-integration warning
       rules passed with zero errors and existing dependency/framework trimming warnings.
+- [x] **WVP5. Cover historical protocol 3 execution after the migration.** Follow up the
+      coverage review of [pull request #274](https://github.com/azabluda/InfoCarrier.Core/pull/274).
+      Exercise expression meaning, real buffered and streamed database queries, generated-key
+      correlation, updates, deletes, savepoints, commit, rollback, failed-save atomicity and
+      backend refusal. Check that historical conversion preserves server admission. Use the
+      shipped historical codecs with explicit historical wire checks, and keep this evidence
+      distinct from unchanged published-client acceptance. Run focused coverage, transport tests,
+      the required full measurement and strict Release build.
+
+      Validated 2026-11-04: focused **Passed: 10, Failed: 0, Total: 10**; transport
+      **Passed: 387, Failed: 0, Total: 387**. Transport coverage exercises **170/178** mapping
+      lines and **84/86** historical-codec lines. Functional **Passed: 29698, Failed: 0,
+      Total: 29932** (234 skipped); document-store **Passed: 237, Failed: 0, Total: 237**.
+      `Measure.cs` reported **FAILING: 0, TOTAL: 30169**, with no broken cases and unchanged
+      failure reasons. Strict Release rebuild passed with five existing framework warnings;
+      changed documentation links, file hygiene and whitespace checks passed. Product source,
+      public signatures and wire descriptions were unchanged.
+
 - [ ] **WVP-FOLLOWUP. Design migration against a real contract change.** Separate post-50 story,
       with [entry conditions and acceptance criteria](../v11/wire-versioning.md#follow-up-story-design-and-validate-migration-against-real-contract-changes).
       Changes from [#99](https://github.com/azabluda/InfoCarrier.Core/issues/99) or
