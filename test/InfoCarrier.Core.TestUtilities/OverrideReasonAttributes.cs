@@ -419,15 +419,15 @@ public static class Decisions
     public const string UnmappedMembers =
         "the-boundary-analyzer-does-not-consult-the-client-model-for-member-mappability-r138-2026-09-03";
 
-    /// <summary><c>website/docs/limitations.md</c>, which tells a consumer what is not supported.</summary>
-    public const string Limitations = "website/docs/limitations.md";
+    /// <summary><c>website/docs/reference/limitations.md</c>, which tells a consumer what is not supported.</summary>
+    public const string Limitations = "website/docs/reference/limitations.md";
 
     /// <summary>
     ///     A concurrency exception suppressed by an interceptor on the client: the server has rolled
     ///     the save back, so nothing is written and <c>SaveChanges</c> reports 0 (the owner,
     ///     2026-09-27: documented as a limitation, and the interceptor belongs on the server).
     /// </summary>
-    public const string ClientSuppressedConcurrency = "suppressing-a-concurrency-exception-in-an-interceptor-on-the-client";
+    public const string ClientSuppressedConcurrency = "a-client-concurrency-interceptor-cannot-suppress-a-server-save-failure";
 }
 
 /// <summary>

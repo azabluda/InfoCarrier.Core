@@ -1477,8 +1477,8 @@ policy or change protocol version 1. The owner deferred that policy to issue #50
 
 ### D9 — a concurrency conflict is decided on the server, and a client-side suppression cannot complete the save (2026-09-27)
 
-**The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/limitations.md`,
-"Suppressing a concurrency exception in an interceptor on the client"), with an interceptor on the
+**The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/reference/limitations.md`,
+"A client concurrency interceptor cannot suppress a server save failure"), with an interceptor on the
 server as the workaround. It was found when `SaveChangesInterceptionTestBase` moved to Tier B for
 #167's slow run and ran the concurrency tests Tier A had never run.
 

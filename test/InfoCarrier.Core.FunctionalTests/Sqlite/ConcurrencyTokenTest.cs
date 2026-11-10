@@ -179,7 +179,7 @@ public class ConcurrencyTokenTest
     ///     the rest of the save is written, as plain EF Core writes it.
     /// </summary>
     /// <remarks>
-    ///     The configuration <c>website/docs/limitations.md</c> recommends, and the owner's
+    ///     The configuration <c>website/docs/reference/limitations.md</c> recommends, and the owner's
     ///     (2026-09-27). Plain EF Core on the same store, measured on 2026-09-27: <c>SaveChanges</c>
     ///     returns 2, the insert is written, and the stale update is not.
     /// </remarks>
@@ -202,7 +202,7 @@ public class ConcurrencyTokenTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         What <c>website/docs/limitations.md</c> tells a reader they would observe, pinned here
+    ///         What <c>website/docs/reference/limitations.md</c> tells a reader they would observe, pinned here
     ///         for that page and so that the page changes when the behaviour does. The server's EF has
     ///         thrown and rolled the save back by the time the client's interceptor is asked, so the
     ///         insert beside the conflict is lost, and EF then accepts every change in the client's

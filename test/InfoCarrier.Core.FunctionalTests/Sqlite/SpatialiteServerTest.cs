@@ -24,7 +24,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///     </para>
 ///     <para>
 ///         Each test compares with plain EF Core on the same store, or states what it would do.
-///         The client is built as <c>website/docs/configuration/value-mappers.md</c> describes: its
+///         The client is built as <c>website/docs/extending/value-mappers.md</c> describes: its
 ///         own service provider, with the geometry mapper the test utilities carry.
 ///     </para>
 /// </remarks>

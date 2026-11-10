@@ -209,7 +209,7 @@ public class OwnedJsonProjectionQueryInfoCarrierTest(
 ///         that is, <em>EF expects a wrong answer here</em>. This provider returns the right one,
 ///         so no <c>EqualException</c> is thrown and the wrapper is what fails. That is the
 ///         category R21 and R22 each found once: a query this provider answers that other EF
-///         providers get wrong, and <c>website/docs/limitations.md</c> already has a section for
+///         providers get wrong, and <c>website/docs/reference/limitations.md</c> already has a section for
 ///         it. <b>Left failing rather than papered over, because the red is the evidence.</b>
 ///     </para>
 /// </remarks>
