@@ -23,4 +23,4 @@ existing builder and preserves the surrounding client or server chain. Shared me
 other ordinary methods. Existing ordering rules apply; later matching mappers do not override
 earlier ones. Sharing a function does not prove agreement between separately deployed applications.
 
-See the [InfoCarrier.Core documentation](https://infocarrier.dev/) for setup and examples.
+See the [InfoCarrier.Core documentation](https://azabluda.github.io/InfoCarrier.Core/) for setup and examples.

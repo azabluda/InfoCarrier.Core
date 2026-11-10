@@ -86,6 +86,12 @@ It distinguishes compatible additions, manual semantic version changes, and cust
 
 ## Rules
 
+Owner direction, November 10, 2026: use plain language throughout the documentation overhaul.
+Explain what the reader does and what happens. Define technical terms when they are needed.
+Prefer concrete examples over compressed phrases such as "wire admission" or "registration-local
+ownership". Keep exact method names, but explain them in ordinary words. This also applies to
+the overhaul proposal and progress reports.
+
 1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an
    Entity Framework Core provider for the client side of a multi-tier application." Not "serves
    as", not "represents", not "brings the power of".
