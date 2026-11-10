@@ -221,7 +221,7 @@ The evidence column names the code or tests inspected. It does not mean those te
 | Next: database setup | Tell readers to create tables and check database connectivity through the server context. Client calls no longer return success without doing the work. | Database-creator removal and current refusal |
 | Later: samples | Select a release tag for stable examples. Update the inspector explanation, which assumes older encoded query content. | Northwind startup and protocol 4 |
 | Later: example model | Use `PlacedOn` consistently, define `Order.Lines` before using it, and supply or replace the missing `Money.Parse`. | Existing example pages |
-| Later: word checks | Include the Abstractions readme and make the written budgets match the checker. | Existing DocWords command |
+| Completed: word checks | Removed the checker and page budgets at the owner's request on November 10. | Separate maintenance commit |
 
 Some claims still need checking: spatial operations described as local, the exact browser failure
 for synchronous calls, document stores beyond the tested MongoDB setup, and custom-model trimming
@@ -439,7 +439,7 @@ and `IgnoreQueryFilters`. A sample must not claim to solve every application's a
 Separate serialization and service replacement from custom transports.
 Keep one example of testing without a network.
 Finish settings, errors, events, measurements, compatibility, and upgrade instructions.
-Correct package links and include all three package pages in the word checker.
+Correct package links and review all three package readmes.
 
 The check: compile complete custom-component examples and exercise synchronous and asynchronous calls,
 service disposal, server selection, and custom serialization.
@@ -453,8 +453,6 @@ Publishing and merging require separate authorization.
 - Apply the humanizer skill to user-facing prose.
 - Build the site strictly: `dotnet run --file eng/DocsServe.cs -- --build`.
 - Check links and headings: `dotnet run --file eng/DocLinks.cs --`.
-- Check word budgets: `dotnet run --file eng/DocWords.cs -- --all --budget`.
-  Keep its page list and limits consistent with the written rules.
 - Check public links separately.
 - Compile complete examples with their models and setup, using the version they describe.
   Temporary example projects and existing tests are enough; do not build a new testing framework.
@@ -462,7 +460,7 @@ Publishing and merging require separate authorization.
 - Check desktop and mobile navigation, keyboard use, and searches for common tasks.
 - Run `.claude/hooks/file-hygiene.py` on changed files before committing.
 
-Remove repetition before adjusting page budgets. Do not split pages merely to meet a word count.
+Review clarity and completeness without word limits. Split pages by reader task.
 
 ## Review evidence and limits
 
@@ -489,7 +487,8 @@ and Reference. Release notes are inside Reference, contrary to the handoff descr
 The November 4 word check measured server configuration at 1,945 prose words, transports at 1,392,
 client configuration at 1,290, and querying at 1,150. Code was excluded.
 Their mixed purposes, not length alone, justify splitting them.
-The checker omitted Abstractions and allowed 350 words for Core while the written general limit said 300.
+The old checker omitted Abstractions and disagreed with the written Core limit.
+The owner requested removal of all word-count checks and budgets on November 10.
 
 The public site responded successfully and its search data included transaction, security,
 and shared-configuration headings. Its modification date matched the deployment.

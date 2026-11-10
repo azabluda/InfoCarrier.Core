@@ -1,4 +1,4 @@
-﻿# Documentation style
+# Documentation style
 
 The rules for every document written for someone outside this repository: the README, the two
 package readmes under `src/`, the site under `website/`, the GitHub release bodies, and the package
@@ -21,68 +21,11 @@ longer than any of them.
 | Serilog | `serilog/serilog`: README |
 | NuGet | `NuGet/docs.microsoft.com-nuget`: the published package-readme guidance and template |
 
-The numbers below come from those files, not from memory. Re-measure before changing a budget.
+## Length
 
-## Budgets
-
-| Document | Words | Reference |
-|---|---|---|
-| Package readme (`src/*/PACKAGE.md`) | 300 | EF Core providers: 106 to 160. Npgsql: 230. |
-| Repository README | 450 | Npgsql: about 400. EF Core: about 700 for two products. |
-| A site page | 620 | The default |
-| A site page that points | 400 | `api-surface.md` only |
-| The deepest pages | 700 | `upgrading-from-3-1`, `release-notes`, `blazor-webassembly`, `multi-tenancy` |
-| Six pages, provisionally | 750 | `security` and `guide/errors`, raised after the verification read of 2026-08-24; `limitations`, raised 2026-08-31 when Phase R's newly adopted spec bases found two more scenarios the page has to name; `configuration/server`, raised 2026-09-04 when server-side log forwarding shipped and the page had to say what crosses and why sensitive logging is a second grant; `configuration/client`, raised 2026-09-07 for the split event's new detail and the round-trip meter; `guide/querying`, raised 2026-09-04 when the residual audit measured that paging above a rebuilt projection runs on the client and again 2026-09-07 when the client began answering EF's relational model API |
-| Four pages, for the 10.1 release | 460 to 950 | Raised 2026-09-09, when the relational half became a documented capability rather than an internal one. `api-surface` 460, four more rows in the wiring table. `configuration/server` 880 and `configuration/client` 900, for the two server grants and the three things the client is told about the server. `guide/querying` 950, for the three queries the client refuses because it assumes a relational store, the switch that turns them off, and how a store's own `EF.Functions` family is named on both halves. `security` 800, because the server page now sends a reader there about `AddInfoCarrierAllowedTypes` and the page did not name that seam |
-| One page | 800 | `release-notes/10.1`, set 2026-09-09 when it was written. It carries more subjects than `10.0` did, and one of them is a behaviour change a reader has to act on, which costs a table naming the three query shapes rather than a sentence naming none |
-| Two pages, for the 10.1 release read | 740 and 760 | Raised 2026-09-09 during the prose read. `release-notes/10.0` 740, because it opened by calling `10.0.1` the current release and a reader lands there and believes it. `multi-tenancy` 760, and that one is a security fact: the page recommends a server-side query interceptor and says the client cannot reach it, and a granted `FromSql` goes around it because such a query never passes through `OnModelCreating` |
-| Four pages, for the transaction idle timeout | 470 to 960 | Raised 2026-09-09 for #54. `configuration/server` 960, the section that configures it and the seven facts it carries, one of which is that a commit after an eviction fails rather than reporting success. `security` 840, a correction: the page understated what a stolen token buys (its holder queries and saves *inside* that transaction, not only ends it) and claimed nothing reaps an abandoned one. `guide/transactions` 640, two sentences giving the existing warning a resolution. `api-surface` 470, one row for the new registration |
-| One page, after the projection family | 800 | Raised 2026-09-22. `limitations` lost a scenario that week and had to explain another: the inline collection of parameters now meets EF's refusal and is deleted, and the converted list meets it too once the element type is named on both halves. The page cannot simply drop the second, because it is still true unregistered, so it has to say what makes the difference |
-| Two pages, for the transaction caller binding | 490 and 1090 | Raised 2026-09-10 for #54 part 2, the grant that binds a transaction token to the caller that opened it. `configuration/server` 1090, a fourth server-side grant and the first that closes a security gap rather than a resource one; it is now the longest page on the site, which is a signal about its structure rather than about the number. `api-surface` 490, one row, and the first entry that comes from the ASP.NET Core package rather than the core one |
-| Three pages, for the document-store grant | 520, 910 and 1300 | Raised 2026-09-11 for #102, the grant that stops a change set which does not mention the whole document from erasing the rest of it. `configuration/server` 1300, a fifth server-side grant and the first that prevents silent data loss rather than a refusal; the section has to say that the client's own switch does not make it unnecessary, because a deployment that reads only the client page will believe it is covered. `api-surface` 520, one row, a sentence longer than its neighbours because the member's name says where it goes and not what it prevents. **The server page is now a third longer than the next one and wants splitting**; `eng/doc-words.py` says so at the number and says why that is a separate change |
-| Two pages, for a key of the caller's own type | 950 and 1080 | Raised 2026-09-21, when measuring `AllowTypes` showed it decides where a query runs and not only whether one is refused. `guide/querying` 1080, a section naming the four operators that take a key, the registration on both halves, and the consequence a caller has to know before reaching for it: naming a type moves the operator to the database, so a query this client used to answer can start to raise EF Core's own refusal. `configuration/client` 950, two sentences and a link on the row that had described the `EF.Functions` case alone |
-| One page, for a client-side concurrency suppression | 950 | Raised 2026-09-27. `limitations` names a second unsupported scenario: an interceptor on the client that suppresses a concurrency exception writes nothing and reports the save as done. The page has to say where the interceptor goes instead, and that costs an example |
-| One page, for error recovery and compatibility | 950 | Raised 2026-10-26. `guide/errors` distinguishes permanent protocol refusals from connection failures and documents the version 11 compatibility boundary. Its marker-row pattern remains the guidance for uncertain writes |
-| One page, for shared helpers | 1200 | Raised 2026-10-06. `guide/querying` names the public shared helper requirement, registration on both ends, backend translation or refusal, and the different behavior of private or client-only helpers. |
-| Three pages, for trusted anonymous-shape catalogs | 540, 920 and 1580 | Raised 2026-10-08. `api-surface` 540 names the catalog API. `security` 920 explains trusted admission and the remaining execution risks. `configuration/server` 1580 explains structural prototype registration, recursive limits, model binding, and missing-registration or conflicting-identity failures. |
-| Whole site | not gated | 11,659 on 2026-08-26 across 23 files |
-
-The whole-site figure is a reading, not a gate. `dotnet run --file eng/DocWords.cs --` checks each file against its own
-budget and nothing against the total, so a site-wide number here can only ever be a record of where
-the set stood the last time somebody measured it. It read 9,473 across 19 pages when this table was
-written and now reads 11,609 across 23, and the growth is four new pages plus the corrections the
-cold reads asked for.
-
-**`dotnet run --file eng/DocWords.cs -- --all --budget` is the measurement, not `wc -w`.** `wc -w` counts fenced
-code, mermaid diagrams and the URL inside every link, so a page can be well inside its budget in
-prose and double it under `wc -w`. The script holds the same budgets as this table. Keep the two in
-step.
-
-**These numbers have been recalibrated twice, and the second time is the finding.** They started at
-400, inferred from package readmes. Both times a page went over, the cause was the same: a reader
-with no context wanted a fact the page did not have, and facts cost words. Shaving a sentence per
-page to defend a number nobody chose on evidence is optimising the ruler.
-
-The order is the part that survives, and it is not negotiable: **cut the padding a reader named,
-then move the number. Never the reverse.** A budget yields to a missing fact; it never yields to a
-paragraph that could have been shorter.
-
-**RELAXED UNTIL THE RELEASE PASS (owner's decision, 2026-09-04).** Move a budget when a page needs
-the room, without arguing for it first. The whole set gets one thorough read before release, and
-that read is where the numbers are set on evidence; defending them one page at a time until then
-buys nothing and costs the fact the page was trying to carry.
-
-**What this does not relax.** `dotnet run --file eng/DocWords.cs --` still gates, and this table and the script still
-have to agree — a page over its own number is still a red build, so the number moves in the same
-commit as the words. Nor is it licence to pad: the rule above still says a budget yields to a
-missing *fact*. What is suspended is the ceremony, not the standard.
-
-The 2026-10-26 registration extension pass sets `configuration/transports` to 1,350 words and
-`api-surface` to 750. The added material explains role replacement, model-aware pipeline ownership,
-custom hosting selection, endpoint-free transports, and media types.
-
-The 2026-10-29 structural compatibility explanation raises `configuration/transports` to 1,400 words.
-It distinguishes compatible additions, manual semantic version changes, and custom serializer responsibilities.
+The owner removed word-count checks and page budgets on November 10, 2026.
+Use enough detail to complete the reader's task. Remove repetition and unnecessary explanation.
+Review clarity, working examples, and links instead of enforcing a word limit.
 
 ## Rules
 
@@ -175,7 +118,7 @@ reader on a release page either already knows what the package is or is one clic
 documentation. One clause of identity is the budget, and then the news.
 
 The shape is one clause of identity, then **six lines at most, one per major change**, then the
-install command and the links. About 150 words. No group headings and no bold lead-in on the list
+install command and the links. No group headings and no bold lead-in on the list
 items: with six lines there is nothing to group, and rule 3 applies here too. Each line ends with the
 pull requests it came from, as `(#115, #109)`, which GitHub links; an issue stands in where the
 work reached `main` without one. The owner asked for them on 2026-09-28, for the 10.2 body. They
@@ -199,21 +142,6 @@ page of a new version is a 404 until that version's line is published. `docs/ver
 the body after the site for this reason. This said the site publishes from `main` until 2026-09-28,
 which stopped being true on 2026-09-09.
 
-The client configuration page has a 1,000-word budget from 2026-10-24 to cover `ConfigureShared`
-execution, composition, ordering, and agreement limits.
-Raised to 1,150 on 2026-10-25 for named client selection, failure rules, transport ownership,
-and independent factories using the same context type.
-On 2026-10-25, the server configuration budget rose to 1,800 for endpoint selection and scoped
-custom context resolution. The API surface budget rose to 560 for the corresponding overloads.
-Later that day, the client budget rose to 1,200 and the server budget to 1,850 for streamed payload
-limits, partial enumeration, and per-registration enforcement.
-The metrics increment later that day raised the client budget to 1,250 and server budget to 1,950
-for registration labels, instrument names, and streamed measurement outcomes.
-The post-implementation cleanup raised the client budget to 1,300 for the removed low-level
-options mutation methods and their supported callback replacement.
-The component-replacement increment raised the API reference budget to 600 and the transport page
-to 750 for typed replacement, ownership, inherited-key injection, and the fixed streaming-format boundary.
-
 ## Before committing
 
 Run the file through the `humanizer` skill in file mode. Its patterns and this list overlap; the
@@ -224,7 +152,6 @@ Then:
 
 ```bash
 dotnet run --file eng/DocsServe.cs -- --build              # mkdocs build --strict: a broken link fails the build
-dotnet run --file eng/DocWords.cs -- --all --budget     # prose words against the budgets above; exit 1 if over
 grep -c "—" <file>                     # must be 0
 ```
 

@@ -12,7 +12,6 @@ Run from the repository root unless noted otherwise. Put application arguments a
 |---|---|---|
 | `eng/WireContract.cs` | `[--base-ref revision] [--record] [--release-ref revision ...]` | Inspect the candidate and compare protected Git descriptions. |
 | `eng/DocLinks.cs` | `[file ...]` | Validate local Markdown pages and heading anchors; exit 1 for broken links. |
-| `eng/DocWords.cs` | `[--all] [--budget] [file ...]` | Count prose with existing budgets; `--budget` fails if exceeded. |
 | `eng/TrxFailures.cs` | `<results.trx> [more.trx ...]` | Stream XML, union failed names, and sort by Unicode code point. |
 | `eng/SpecParity.cs` | `<reasons.tsv ...> -- <results.trx ...>` | Write badge values to stdout and the parity table to stderr. |
 | `eng/SuiteSummary.cs` | `<results.trx> [more.trx ...]` | Write counters, failed names, parity, and the workflow summary beside the first TRX. |
@@ -23,7 +22,6 @@ Run from the repository root unless noted otherwise. Put application arguments a
 
 ```text
 dotnet run --file eng/Measure.cs -- change-label baseline-label
-dotnet run --file eng/DocWords.cs -- --all --budget
 dotnet run --file eng/WireContract.cs -- --base-ref origin/main
 dotnet run --file eng/DocsServe.cs -- --build
 dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --configuration Release

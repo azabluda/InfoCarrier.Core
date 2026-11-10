@@ -37,18 +37,6 @@ public sealed class ScriptBehaviorTest : IDisposable
         Assert.DoesNotContain("gone.md", output.ToString());
     }
 
-    [Fact]
-    public void Word_count_excludes_markup_targets_code_html_and_icons()
-        => Assert.Equal(4, DocWords.Prose("One [two](https://example.test) `code here`\n```cs\nignored words\n```\n<three>four</three> :material-icon: https://other.test five"));
-
-    [Fact]
-    public void Existing_word_budgets_remain_unchanged()
-    {
-        Assert.Equal(450, DocWords.Budgets["README.md"]);
-        Assert.Equal(1950, DocWords.Budgets["website/docs/configuration/server.md"]);
-        Assert.Equal(1400, DocWords.Budgets["website/docs/configuration/transports.md"]);
-    }
-
     private const string Ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
 
     [Fact]
