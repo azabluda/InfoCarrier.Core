@@ -11,16 +11,10 @@ resolved, and the library loads no assembly to satisfy a payload. The allowlist 
 members that would turn a resolved `Type` back into a call, the classic route from "a tree can name
 a type" to "a tree can invoke anything".
 
-The review behind that is published, including the weaknesses accepted rather than solved and
-the reasoning for each: [security-review.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/docs/security-review.md).
-It is written for someone auditing this, not for someone adopting it. Read §2 first: the boundary
-is a conjunction across several clauses, and the clause-by-clause argument is what makes the claim
-above checkable rather than a promise.
-
 There is a size limit too, applied before parsing begins and defaulting to 64 MiB on requests
 towards the server. A flat array of a hundred million constants is only three levels deep, so a
 depth limit alone does not cap the memory a parse costs. See
-[server configuration](configuration/server.md#payload-limits).
+[server configuration](../reference/options.md#byte-limits).
 
 A client also cannot name a type the server's model does not have. The query runs against the
 server's `DbContext`, so the entity types in your shared model are the whole of what a client can
@@ -28,15 +22,14 @@ compose over. That surface is a boundary until a server grants `FromSql`, becaus
 own tables. A query filter is not one either, for the reason below.
 
 `AddAllowedTypes(...)` widens that surface by the types you name, and the usual reason
-to need it is your provider's `EF.Functions` family. Read §2 of the review before you name anything
-else: the boundary holds as a conjunction, and `Binder`, `MethodInfo` and `Activator` each break it
+to need it is your provider's `EF.Functions` family. Do not register arbitrary reflection or runtime-invocation types: `Binder`, `MethodInfo` and `Activator` each break it
 on their own, none of them looking dangerous alone.
 
 Anonymous projections require a finite trusted server catalog. The server matches complete
 descriptors and actual component types against replacements constructed during trusted configuration.
 Unknown requests cannot emit new types or use another catalog's cached entries. Component permissions
 are checked again on every execution. See
-[server configuration](configuration/server.md#registering-anonymous-projections).
+[shared configuration](../applications/configuration/shared.md#register-anonymous-structures).
 
 This prevents client-driven exhaustion of generated-shape capacity. The 4,096-attempt process limit
 still applies to trusted configuration. It does not limit every permitted method's execution cost;
@@ -46,8 +39,8 @@ for example, descriptor limits do not inspect strings passed to runtime `Type.Ge
 
 !!! danger "Authentication and authorization are out of scope"
 
-    No identity travels in the envelope. The library has no concept of a user, a role or a
-    permission, and it will execute a query for anyone who can reach the endpoint.
+    The envelope does not establish caller identity. Configure authentication and access rules
+    in your application. An unprotected endpoint accepts queries and writes from anyone who can reach it.
 
 Two things to do, both required.
 
@@ -61,7 +54,7 @@ app.MapInfoCarrier()
 ```
 
 On the client, authenticate the `HttpClient`. See
-[client configuration](configuration/client.md#the-http-transport).
+[client configuration](../applications/configuration/client.md#configure-http).
 
 ### 2. Decide what a caller may see, on the server's model
 
@@ -78,8 +71,8 @@ interceptor on the server for reads, and the server's `SaveChanges` override or 
 for writes. Everything a client's `SaveChanges` sends is replayed through that override or
 interceptor, and the client can name neither.
 
-[Multi-tenancy](multi-tenancy.md) is the worked version, including the scope trap that makes a
-correct-looking tenant filter read the wrong tenant.
+[Tenant isolation](tenants.md) gives a database-per-tenant example and explains the separate
+checks needed when tenants share tables.
 
 ## The shape of the exposure
 
@@ -108,8 +101,8 @@ builder.Services.AddInfoCarrierServer<ShopContext>()
     .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
 ```
 
-See [Binding a transaction to its caller](configuration/server.md#binding-a-transaction-to-its-caller)
-and [Evicting an abandoned transaction](configuration/server.md#evicting-an-abandoned-transaction).
+See [Binding a transaction to its caller](transactions.md#binding-a-transaction-to-its-caller)
+and [Evicting an abandoned transaction](transactions.md#evicting-an-abandoned-transaction).
 
 ## Transport security
 
@@ -121,3 +114,7 @@ can be modified, and TLS terminating at a gateway leaves the hop behind it unpro
 Report it privately: [open a draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new).
 GitHub notifies the maintainer without making the report public.
 [SECURITY.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/SECURITY.md) states the scope.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

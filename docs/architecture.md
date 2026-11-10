@@ -1,4 +1,4 @@
-﻿# Architecture — InfoCarrier.Core v2
+# Architecture — InfoCarrier.Core v2
 
 Status: **PRE-IMPLEMENTATION (structure + strategy defined; internal seams provisional)**
 · Decisions: [`decisions.md`](decisions.md) · Serializer: [`expression-serialization.md`](expression-serialization.md)
@@ -17,7 +17,7 @@ Historical entries below retain their original configuration names. Version 11 r
 configuration builder, marker interfaces, and service-registration helpers with client/server options
 and `ConfigureShared`. Server policy comes from its immutable registration snapshot. Standard value
 mappers are automatic. See the [current configuration design](plans/v11/configuration-api-design.md)
-and [server configuration](../website/docs/configuration/server.md) for the maintained public surface.
+and [server configuration](../website/docs/applications/configuration/server.md) for the maintained public surface.
 
 ## 1. System overview
 

@@ -33,9 +33,9 @@ dependency in the package for a type most callers never use. Spatial types are f
 you supply the mapper, which is about thirty lines. There is a worked one in the repository's test
 utilities.
 
-A spatial aggregate such as `UnaryUnionOp.Union(g.Select(s => s.Location))` names a NetTopologySuite
-class that your model never mentions. Add that class to the shared deployment builder. Without it,
-the query still answers, but the server sends every row and the client computes the aggregate.
+Register any extra helper types needed by spatial queries on both sides.
+The server's provider decides translation. InfoCarrier does not silently download all rows to run
+a refused grouping or aggregate locally. Choose local execution explicitly when that is intended.
 
 ## Writing one
 
@@ -106,12 +106,12 @@ Register the mapper on both halves, or a value that crosses in both directions i
 direction only. Put the mapper in the same application-owned deployment method:
 
 ```csharp
-// Client role
+// Client application
 builder.Services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
     .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
-// Server role
+// Server application
 builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 public static class ShopDeployment
@@ -128,17 +128,23 @@ registering one is never overridden.
 
 ## A converter in the model is usually enough
 
-If the model already declares a value converter for the type, the wire uses it and you need no
-mapper:
+If a model value converter handles the value, a separate mapper is usually unnecessary.
+For example, extend Customer with a Money Balance property before adding this mapping.
+Use the Money type and System.Globalization import from the example above:
 
 ```csharp
 modelBuilder.Entity<Customer>()
     .Property(c => c.Balance)
     .HasConversion(
-        m => $"{m.Amount} {m.Currency}",
-        s => Money.Parse(s));
+        m => m.Amount.ToString(CultureInfo.InvariantCulture) + " " + m.Currency,
+        s => new Money(decimal.Parse(s.Substring(0, s.IndexOf(' ')), CultureInfo.InvariantCulture),
+            s.Substring(s.IndexOf(' ') + 1)));
 ```
 
 Both halves build the model from the same source, so both derive the same conversion. Reach for a
 mapper when there is no converter, or when the CLR type is dangerous to walk regardless of how it is
 stored.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

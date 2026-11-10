@@ -1,68 +1,71 @@
 # Run the samples
 
-The repository carries a Northwind sample: one shared model, one SQLite-backed server, and the
-same client twice, as a browser app and as a console app. Neither client has a connection string.
+Northwind contains one shared model, a SQLite server, a browser client, and a console client.
+The Northwind model is larger than the Shop model used in the tutorial.
 
-```bash
+## Choose the source version
+
+These instructions use the development checkout:
+
+```powershell
 git clone https://github.com/azabluda/InfoCarrier.Core.git
 cd InfoCarrier.Core
 ```
 
-## In a browser
+For published 10.3 behavior, clone its tag instead in a separate working location you choose:
 
-One terminal, one command. The server hosts the client's files, so there is one origin and no CORS.
+```powershell
+git clone --branch v10.3.0 https://github.com/azabluda/InfoCarrier.Core.git InfoCarrier-10.3
+```
 
-```bash
+Do not combine an older sample with new setup instructions.
+The [installation page](installation.md) explains development and published packages.
+
+## Browser
+
+```powershell
 dotnet run --project samples/Northwind.Server
 ```
 
-Open <http://localhost:5199>. A wire inspector down the right-hand side shows every round trip:
-the operation, the size each way, how long it took, and the decoded payload, including the
-expression tree unpacked out of the base64 it travels in.
+Open <http://localhost:5199>. The server serves the browser files from the same origin.
 
-Three ordinary pages:
+| Page | What to try |
+|---|---|
+| Customers | Filter, sort, and page. Inspect the query sent for each action. |
+| Order | Load details, change quantities, and save several edits in one request. |
+| Transfer | Move an order and change stock inside a transaction. Select the failure option to observe rollback. |
 
-*Customers* is a grid you sort, filter and page. There is no *Run* button, because the sort, the
-filter and the paging are already part of the expression tree the page sends. Filtering `Country`
-for *Germany* takes 65 rows to 8, and the panel shows the `Where` crossing the wire.
+The request inspector shows operations, byte counts, elapsed time, and decoded payloads.
+Current queries contain typed expression data; do not assume every query is an embedded base64 string.
+Inspect private data only in a development environment.
 
-*Order* is master-detail. Several quantity edits accumulate in one change tracker and leave as one
-`SaveChanges`, and the master list is a projection over a join the server performs.
+## Console
 
-*Transfer* moves an order to another customer and takes a unit off a product's stock inside one
-transaction. A tickbox makes the second save fail on the server's database, so you can watch the
-rollback, and both figures are read back through a fresh context afterwards.
+Keep the server running. In another terminal:
 
-## In a console
-
-Two terminals.
-
-```bash
-# terminal 1: the server. Creates and seeds northwind.db beside the binary.
-dotnet run --project samples/Northwind.Server
-
-# terminal 2: the client. This process has no connection string.
+```powershell
 dotnet run --project samples/Northwind.Demo
 ```
 
-It walks through a filtered query, a projection, an aggregate, lazy loading, a unit of work and a
-rolled-back transaction, printing the running round-trip count as it goes. The counts are the
-interesting part: a navigation costs a request at the moment you touch it, and two edits cost one
-save. Delete `northwind.db` first if you want those counts to start from a clean store.
+The console prints queries, projections, aggregates, relationship loads, saves, and a rolled-back transaction.
+It also counts requests. A navigation load costs another request; a batch of edits can use one save.
 
-This client lazy-loads normally, unlike the browser one. It is not WebAssembly, so a synchronous
-navigation getter can block on the round trip. See
-[Blazor WebAssembly](../platforms/blazor-webassembly.md) for the other side of that.
+The server creates and seeds `northwind.db` beside its binary.
+Browser edits persist and change later console output.
+Stop the server before deleting that sample database to reset it.
 
-## What the sample projects are
+## Project roles
 
-| Project | What it is |
+| Project | Purpose |
 |---|---|
-| `Northwind.Shared` | The model and one `NorthwindContext`, used by both halves. |
-| `Northwind.Server` | ASP.NET Core and SQLite. `app.MapInfoCarrier()` is the one route it owns, and it also serves the browser client's files. |
-| `Northwind.Client` | The Blazor WebAssembly client: three pages and the wire inspector. |
-| `Northwind.Demo` | The console client. |
+| `Northwind.Shared` | Entity classes, context, and shared settings |
+| `Northwind.Server` | ASP.NET Core hosting, SQLite, and database setup |
+| `Northwind.Client` | Blazor WebAssembly pages and request inspector |
+| `Northwind.Demo` | Console client |
 
-The wire inspector is worth reading as code. It is an `IInfoCarrierTransport` decorator of about
-thirty lines, which is all it takes to log, retry, compress or authenticate every request. See
-[Custom transports](../configuration/transports.md).
+[Open in Codespaces](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) for the repository's
+development environment. See [browser constraints](blazor-webassembly.md) before adapting the browser client.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

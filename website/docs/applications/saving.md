@@ -81,7 +81,7 @@ await context.SaveChangesAsync();
 ```
 
 To delete without loading the row first, use `ExecuteDeleteAsync`. See
-[Querying](querying.md#bulk-operations).
+[Bulk operations](#bulk-operations).
 
 ## Concurrency
 
@@ -113,9 +113,9 @@ them: which entity type, which key, which properties changed, and their values. 
 queried and did not touch stay on the client.
 
 The server's context is not your context. It replays your changes against a fresh `DbContext` on
-its own model, then discards it. Server-side query filters, interceptors and `SaveChanges` overrides
-are applied there, which is also what stops a client from writing anything the server's model does
-not expose.
+its own model, then discards it. Server interceptors and `SaveChanges` overrides run there. Query filters do not authorize these
+writes. Check permissions using stored values on the server; do not trust tenant or ownership values
+submitted by the client. See [tenant isolation](../operations/tenants.md).
 
 ## Errors
 
@@ -129,5 +129,26 @@ may have died on the way out, or the answer on the way back. Retrying it can wri
 save was one of several inside a transaction, that transaction is still open on the server and only
 the instance that began it can end it.
 
-[Handling errors](errors.md) has what is safe to retry and what is not, and
+[Handling errors](../operations/errors.md) has what is safe to retry and what is not, and
 [Transactions](transactions.md) has what an abandoned transaction costs.
+
+## Bulk operations
+
+`ExecuteUpdate` and `ExecuteDelete` run on the server and never load the rows.
+
+```csharp
+int updated = await context.Orders
+    .Where(o => o.CustomerId == "AROUT")
+    .ExecuteUpdateAsync(s => s.SetProperty(o => o.Freight, o => o.Freight + 1m));
+
+int deleted = await context.Orders
+    .Where(o => o.PlacedOn < cutoff)
+    .ExecuteDeleteAsync();
+```
+
+Both return the number of rows affected and, as with any EF Core provider, neither updates your
+local change tracker.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

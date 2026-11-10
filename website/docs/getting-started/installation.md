@@ -1,97 +1,73 @@
-# Installation
+# Install packages
 
-## Two packages
+These pages describe the version 11 development branch. It currently uses .NET 10 and
+Entity Framework Core 10. Version 11 is not yet a published stable package.
+For published version 10.3, use the [public documentation](https://azabluda.github.io/InfoCarrier.Core/).
 
-| Package | Reference it from |
+## Choose the packages
+
+| Package | Where it belongs |
 |---|---|
-| `InfoCarrier.Core` | your client, and your server |
-| `InfoCarrier.Core.AspNetCore` | your server only |
+| `InfoCarrier.Core` | The client; also available to the server through the endpoint package |
+| `InfoCarrier.Core.AspNetCore` | An ASP.NET Core server exposing the HTTP endpoint |
+| `InfoCarrier.Core.Abstractions` | A shared configuration project that should not depend on Entity Framework Core |
 
-A client references `InfoCarrier.Core` alone. It adds two dependencies,
-`Microsoft.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Relational`, and the HTTP
-transport is inside it. The second is what lets the client model answer relational questions such
-as `GetTableName()`; it brings no database driver and no connection. The server endpoint is a
-second package because it carries a framework reference to `Microsoft.AspNetCore.App`, which a WPF,
-MAUI or WebAssembly client should not have to satisfy to restore a data-access library.
+Core depends on Abstractions and Entity Framework Core's core and relational libraries.
+The relational library lets the client understand model information; it does not add a database driver.
+AspNetCore depends on Core and the ASP.NET Core shared framework.
+Only the server needs a database provider such as SQLite.
 
-A typical solution has three projects:
+Share entity classes and the context model between both applications.
+Put settings that must agree on both sides in a [shared method](../applications/configuration/shared.md).
 
-```text
-Shop.Shared     the entity classes and the DbContext        → InfoCarrier.Core
-Shop.Client     WPF / Blazor / MAUI / console               → Shop.Shared
-Shop.Server     ASP.NET Core and a real EF Core provider    → Shop.Shared,
-                                                              InfoCarrier.Core.AspNetCore
-```
+## Use the development source
 
-The `DbContext` and the entity classes are shared source. Both halves build the same model from the
-same code, which is what makes the wire format meaningful. See
-[Your first client and server](first-app.md).
+Install the .NET SDK required by `global.json`, then clone the repository:
 
-## Installing
-
-These examples target the version 11 prerelease API. Install matching prerelease packages on both ends.
-
-=== "dotnet CLI"
-
-    ```bash
-    # In the client project, and in the server project too.
-    dotnet add package InfoCarrier.Core --prerelease
-
-    # In the server project only.
-    dotnet add package InfoCarrier.Core.AspNetCore --prerelease
-    ```
-
-=== "PackageReference"
-
-    ```xml
-    <ItemGroup>
-      <PackageReference Include="InfoCarrier.Core" Version="11.0.0-*" />
-      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="11.0.0-*" />
-    </ItemGroup>
-    ```
-
-=== "Package Manager"
-
-    ```powershell
-    Install-Package InfoCarrier.Core -IncludePrerelease
-    Install-Package InfoCarrier.Core.AspNetCore -IncludePrerelease
-    ```
-
-With Central Package Management, pin the version in `Directory.Packages.props` and give both
-packages the same one.
-Replace floating versions with the selected published prerelease when pinning packages.
-
-If you are moving an application off `3.1.1`, read [Upgrading from 3.1](upgrading-from-3-1.md).
-Your model carries over; the wiring around it does not.
-
-Both packages ship symbol packages and SourceLink, so you can step into the provider from a debugger
-with no extra configuration.
-
-### Building from source instead
-
-To build from source, use .NET SDK 10.0.300 or later and Git:
-
-```bash
+```powershell
 git clone https://github.com/azabluda/InfoCarrier.Core.git
 cd InfoCarrier.Core
+dotnet build InfoCarrier.Core.slnx
+```
+
+The [first application](first-app.md) uses project references to this checkout.
+This avoids accidentally installing stable 10.3 packages and then calling version 11 methods.
+
+To build local packages instead:
+
+```powershell
 dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
 ```
 
-Both packages land in `artifacts/pack`. Every other project in the solution opts out of packing.
+All three packages are written to `artifacts/pack`. Select matching versions from that folder.
+Add it as a local NuGet source in your application. Keep the same InfoCarrier version on both sides.
+
+## Use development packages from GitHub
+
+The repository's Packages workflow publishes development packages to
+`https://nuget.pkg.github.com/azabluda/index.json`.
+GitHub Packages requires authentication. Follow
+[GitHub's NuGet authentication instructions](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry)
+and keep credentials outside source control.
+
+Select a version that exists in that feed and use the same version for Core, AspNetCore,
+and any direct Abstractions reference. Adding `--prerelease` without configuring this feed
+does not install version 11 from nuget.org.
 
 ## Requirements
 
-| | |
+| Item | Development requirement |
 |---|---|
 | Runtime | .NET 10 |
-| EF Core | 10.0.1 or later |
-| Server-side provider | any: SQL Server, PostgreSQL, SQLite, InMemory … |
-| Client platforms | anywhere .NET 10 runs, including Blazor WebAssembly |
+| Entity Framework Core | At least 10.0.1, below 11.0 |
+| Server database | A provider supported by the server application; test the queries your application uses |
+| Client | A .NET 10 application; browsers have [additional restrictions](blazor-webassembly.md) |
 
-The server's provider is your choice. The server is an ordinary EF Core application and
-InfoCarrier.Core never sees the connection. The one platform with constraints of its own is the
-browser: see [Blazor WebAssembly](../platforms/blazor-webassembly.md).
+Entity Framework Core 11 adoption is pending. The
+[11.0 draft notes](../release-notes/11.0.md) reserve a section for verified support.
 
-## Versioning
+For an existing application, start with [upgrade instructions](../upgrades/index.md).
 
-The version tracks EF Core's major, as every EF Core provider does. `10.x` targets EF Core 10.
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

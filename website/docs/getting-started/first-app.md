@@ -1,16 +1,40 @@
-# Your first client and server
+# Build your first client and server
 
-A working pair, start to finish. Every snippet on this page is taken from a project that compiles
-and runs.
+This tutorial creates a console client, an ASP.NET Core server, and a shared model.
+The server creates a SQLite database and seeds one customer. The client reads that customer,
+updates it, and reads it again through a fresh context.
 
-## 1. The shared model
+These instructions use the version 11 development source described in [installation](installation.md).
+They are for local development. Secure a deployed endpoint using the [security guide](../operations/security.md).
 
-Put the entity classes and the `DbContext` in a project both halves reference. This is what makes
-the wire format work: the payload names entity types and properties, the two ends resolve those
-names against their own models, and sharing the source makes the two models agree by
-construction.
+## 1. Create three projects
 
-```csharp title="Shop.Shared/Model.cs"
+Run these commands in PowerShell. Start in your InfoCarrier repository checkout:
+
+```powershell
+$iccSource = (Get-Location).Path
+Set-Location ..
+New-Item -ItemType Directory -Name ShopTutorial
+Set-Location ShopTutorial
+
+dotnet new classlib -n Shop.Shared -f net10.0
+dotnet new web -n Shop.Server -f net10.0
+dotnet new console -n Shop.Client -f net10.0
+
+dotnet add Shop.Shared reference "$iccSource/src/InfoCarrier.Core/InfoCarrier.Core.csproj"
+dotnet add Shop.Server reference Shop.Shared "$iccSource/src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj"
+dotnet add Shop.Client reference Shop.Shared
+dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 10.0.1
+```
+
+The provider version is pinned here to match the current development dependency.
+Delete `Shop.Shared/Class1.cs`. Keep this terminal in `ShopTutorial`.
+
+## 2. Add the shared model
+
+Create `Shop.Shared/Model.cs`:
+
+```csharp
 using Microsoft.EntityFrameworkCore;
 
 namespace Shop;
@@ -48,151 +72,111 @@ public class ShopContext(DbContextOptions options) : DbContext(options)
 }
 ```
 
-The constructor takes the non-generic `DbContextOptions` on purpose. The client builds its options
-with `UseInfoCarrier` and the server with `UseSqlServer`, and the non-generic form accepts both, so
-one context class serves both halves.
+Both applications use this model. The server selects SQLite; the client selects InfoCarrier.
 
-## 2. The server
+## 3. Create and seed the server database
 
-An ordinary ASP.NET Core application with an ordinary EF Core provider, one role registration, and
-one endpoint.
+Replace `Shop.Server/Program.cs`:
 
-```csharp title="Shop.Server/Program.cs"
+```csharp
 using InfoCarrier.Core;
 using InfoCarrier.Core.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Shop;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-string connectionString = builder.Configuration.GetConnectionString("Shop")!;
-
-// Your real database. Nothing about this line is InfoCarrier's business.
-builder.Services.AddDbContext<ShopContext>(o => o.UseSqlServer(connectionString));
-
+builder.Services.AddDbContext<ShopContext>(o => o.UseSqlite("Data Source=shop.db"));
 builder.Services.AddInfoCarrierServer<ShopContext>();
 
-WebApplication app = builder.Build();
+var app = builder.Build();
 
-// One endpoint. It defaults to the route "infocarrier"; the client defaults to the same.
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ShopContext>();
+    await db.Database.EnsureCreatedAsync();
+    if (!await db.Customers.AnyAsync())
+    {
+        db.Customers.Add(new Customer
+        {
+            Id = "ALFKI", Company = "Example Shop", Country = "Germany",
+            Orders = [new Order { PlacedOn = new DateTime(2026, 1, 1), Freight = 5m }]
+        });
+        await db.SaveChangesAsync();
+    }
+}
+
 app.MapInfoCarrier();
-
-app.Run();
+await app.RunAsync();
 ```
 
-`AddInfoCarrierServer<ShopContext>` registers the default serializer and in-process server. It
-resolves `ShopContext` directly, so no base `DbContext` alias is required.
+Database creation runs on the server's SQLite context.
+Client calls such as `EnsureCreated` and `CanConnect` are unsupported.
 
-## 3. The client
+Start the server:
 
-Four lines of wiring, and then it is EF Core.
+```powershell
+dotnet run --project Shop.Server --no-launch-profile -- --urls http://localhost:5180
+```
 
-```csharp title="Shop.Client/Program.cs"
+Wait for `Now listening on: http://localhost:5180`.
+The database file is `shop.db` in the server's working directory.
+
+## 4. Read and save from the client
+
+Replace `Shop.Client/Program.cs`:
+
+```csharp
 using InfoCarrier.Core;
 using Microsoft.EntityFrameworkCore;
 using Shop;
 
 using var http = new HttpClient();
-IInfoCarrierClient client = InfoCarrierClient.Create(http, options =>
-    options.WithEndpoint("https://your-app-server/infocarrier"));
+IInfoCarrierClient client = InfoCarrierClient.Create(http, o =>
+    o.WithEndpoint("http://localhost:5180/infocarrier"));
 
-DbContextOptions options = new DbContextOptionsBuilder<ShopContext>()
-    .UseInfoCarrier(client)
-    .Options;
-```
+var options = new DbContextOptionsBuilder<ShopContext>()
+    .UseInfoCarrier(client).Options;
 
-`InfoCarrierClient.Create` assembles the default serializer, HTTP transport, and client. The caller
-owns the supplied `HttpClient`. These low-level parts remain replaceable:
-
-| | |
-|---|---|
-| `SystemTextJsonInfoCarrierSerializer` | turns envelopes into bytes. Source-generated, so it works in a trimmed build. |
-| `HttpInfoCarrierTransport` | posts the bytes and reads the answer. One method: see [Custom transports](../configuration/transports.md). |
-| `TransportInfoCarrierClient` | the client the provider talks to. |
-
-In a dependency injection application, register the complete client role instead:
-
-```csharp
-builder.Services.AddInfoCarrierClient(options =>
-    options.WithEndpoint("https://your-app-server/infocarrier"));
-
-builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
-```
-
-!!! tip "A factory, not a context"
-
-    `AddDbContextFactory` gives each screen or operation its own change tracker. A single
-    long-lived client `DbContext` accumulates tracked entities for the life of the application,
-    which makes "several edits, one `SaveChanges`" mean nothing.
-
-## 4. Use it
-
-From here there is no InfoCarrier API to learn. It is EF Core:
-
-```csharp
-await using var context = new ShopContext(options);
-
-List<Order> recent = await context.Orders
-    .Include(o => o.Customer)
-    .Where(o => o.Customer!.Country == "Germany" && o.Freight > 50m)
-    .OrderByDescending(o => o.PlacedOn)
-    .Take(20)
-    .ToListAsync();
-
-recent[0].Freight = 0m;
-context.Orders.Add(new Order { CustomerId = "AROUT", PlacedOn = DateTime.UtcNow, Freight = 5m });
-
-await context.SaveChangesAsync();   // one round trip, two rows
-```
-
-Read on:
-
-- [Querying](../guide/querying.md): what runs where, and how to tell.
-- [Saving changes](../guide/saving-changes.md): units of work, graphs, generated keys.
-- [Transactions](../guide/transactions.md): including one transaction across two contexts.
-- [Handling errors](../guide/errors.md): what a failed server and a failed network look like, and
-  why they are different exception types.
-
-## Testing without a network
-
-`IInfoCarrierTransport` has one method, so a test can send the request straight to the server. This
-transport serializes both ways, so nothing travels by reference that would not survive HTTP:
-
-```csharp
-using InfoCarrier.Core;
-using InfoCarrier.Core.Common;
-
-public sealed class LoopbackTransport(IInfoCarrierServer server, IInfoCarrierSerializer serializer)
-    : IInfoCarrierTransport
+await using (var db = new ShopContext(options))
 {
-    private readonly InfoCarrierEnvelopeServer _endpoint = new(server, serializer);
+    var customer = await db.Customers.SingleAsync(c => c.Id == "ALFKI");
+    Console.WriteLine($"Before: {customer.Company}");
+    customer.Company = "Updated Shop";
+    await db.SaveChangesAsync();
+}
 
-    public async Task<InfoCarrierEnvelope> SendAsync(
-        InfoCarrierEnvelope request,
-        CancellationToken cancellationToken = default)
-    {
-        byte[] payload = serializer.Serialize(request);
-        InfoCarrierEnvelope onTheWire = serializer.Deserialize<InfoCarrierEnvelope>(payload)!;
-
-        InfoCarrierEnvelope response = await _endpoint.DispatchAsync(onTheWire, cancellationToken);
-
-        return serializer.Deserialize<InfoCarrierEnvelope>(serializer.Serialize(response))!;
-    }
+await using (var db = new ShopContext(options))
+{
+    var customer = await db.Customers.AsNoTracking().SingleAsync(c => c.Id == "ALFKI");
+    Console.WriteLine($"After: {customer.Company}");
 }
 ```
 
-Wire it exactly as the HTTP one, with a server built over an in-memory or file-backed store:
+In another PowerShell terminal, go to `ShopTutorial` and run:
 
-```csharp
-var services = new ServiceCollection()
-    .AddLogging()
-    .AddDbContext<ShopContext>(o => o.UseSqlite("Filename=test.db"));
-services.AddInfoCarrierServer<ShopContext>();
-ServiceProvider serverServices = services.BuildServiceProvider();
-
-var serializer = new SystemTextJsonInfoCarrierSerializer();
-
-IInfoCarrierClient client = new TransportInfoCarrierClient(
-    new LoopbackTransport(serverServices.GetRequiredService<IInfoCarrierServer>(), serializer),
-    serializer);
+```powershell
+dotnet run --project Shop.Client
 ```
+
+On the first run, the output is:
+
+```text
+Before: Example Shop
+After: Updated Shop
+```
+
+Later runs start with `Before: Updated Shop`. The database keeps your changes.
+The second context confirms the saved value came back from the server.
+
+## Continue
+
+- [Configure a client](../applications/configuration/client.md) with a context factory.
+- [Query data](../applications/querying.md), [save changes](../applications/saving.md),
+  and [load relationships](../applications/related-data.md).
+- [Use transactions](../applications/transactions.md) for work spanning several requests.
+- [Handle errors](../operations/errors.md) before adding retries.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

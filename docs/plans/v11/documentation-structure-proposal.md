@@ -2,6 +2,16 @@
 
 Reviewed November 4, 2026. Updated November 10, 2026.
 
+## Implementation status
+
+All three approved content batches are implemented in this checkout. The site has 38 pages,
+with the approved menu, new page paths, and the complete SQLite tutorial. README, all package
+readmes, sample instructions, upgrades, and internal links have been updated.
+
+The original review and decisions below remain as the record of why this work was done.
+The verification results at the end replace the earlier statement that examples had not been run.
+Publishing, pushing, and merging have not been performed.
+
 ## What I recommend
 
 Arrange the site around what readers want to do: understand the product, start an application,
@@ -411,6 +421,8 @@ them. Publishing and merging remain outside this authorization.
 
 ### 1. Fix installation and the first application
 
+Status: implemented and checked locally.
+
 Update README, the three package pages, Home, installation, samples, and upgrade entry pages.
 Correct incompatible method names wherever they occur.
 
@@ -424,6 +436,8 @@ Keep published-version fixes separate from development-only instructions using t
 
 ### 2. Split and reorganize the guides
 
+Status: implemented and checked locally. Interactive browser checks remain unavailable.
+
 Apply the proposed menu. Separate shared settings, multiple endpoints, document databases,
 streaming, transaction deployment, logs, and write recovery.
 Use the new paths and useful heading names. Update all links within the documentation.
@@ -435,6 +449,8 @@ Security examples need two tenants and separate checks for reads, ordinary saves
 and `IgnoreQueryFilters`. A sample must not claim to solve every application's authorization needs.
 
 ### 3. Finish customization and reference
+
+Status: implemented and checked locally.
 
 Separate serialization and service replacement from custom transports.
 Keep one example of testing without a network.
@@ -500,3 +516,40 @@ No application example was compiled or run during this analysis.
 Code and test inspection supported the findings, but did not replace execution.
 At the original post-merge check, Packages had passed; Build & Test and Coverage were still running.
 This documentation review neither waited for them nor changed those workflows.
+
+## Implementation verification, November 10, 2026
+
+- The exact SQLite tutorial code built in temporary projects outside the repository.
+  Its HTTP client printed `Before: Example Shop` and `After: Updated Shop`.
+  The second value was read through a new client context.
+- The loopback transport, logging transport, logging serializer, and Money mapper were copied
+  from their code blocks into a temporary project and compiled. The loopback example ran against SQLite.
+- A published 10.3.0 setup and an asynchronous-only transport compiled against the published package.
+  The new tutorial and custom transports compiled against the current development projects.
+- The tenant database-selection code compiled and ran with temporary test authentication.
+  Checks covered `IgnoreQueryFilters`, a guessed foreign tenant key in `SaveChanges`, bulk updates,
+  bulk deletes, concurrent database selection, and refusing another tenant's transaction.
+  The temporary authentication handler was not added to the documentation or repository.
+- Transport tests: Passed: 394, Failed: 0, Total: 394. This includes existing tests for streaming,
+  registrations, replacement, protocol conversion, transaction behavior, and diagnostics.
+- Incomplete-document tests: Passed: 5, Failed: 0, Total: 5. The sandboxed attempt could not locate
+  MongoDB binaries. The same tests passed with access to the package binaries outside the sandbox.
+- Query smoke tests: Passed: 12, Failed: 0, Total: 12. These include the refusal of implicit local
+  row evaluation described by the updated querying guidance.
+- All three packages packed locally. Each packed `README.md` matched its source `PACKAGE.md`.
+  No package was published.
+- The strict documentation build passed. The link checker included new, untracked pages explicitly
+  and reported no broken links in 116 Markdown files.
+- Generated HTML contained all seven navigation sections. Search data included transaction,
+  shared configuration, streaming, upgrade, and SQL sections. These checks do not establish search ranking.
+- No browser was connected. Desktop/mobile appearance, keyboard interaction, and interactive search
+  remain unchecked. The existing theme and stylesheet were kept; a development-version notice was added.
+
+Temporary example restores reported NU1900 because the sandbox could not retrieve package
+vulnerability data over TLS. The examples still compiled and ran. No product code, new testing
+framework, or word-count check was introduced.
+
+Historical release examples retain their version-specific syntax. Their detail links now point
+to source pages at the corresponding release tags. The 11.0 draft links to the new guides.
+Retired public addresses and anchors are intentionally not preserved with redirects.
+Previously published package readmes and release bodies are unchanged.

@@ -1,6 +1,6 @@
 # Documentation style
 
-The rules for every document written for someone outside this repository: the README, the two
+The rules for every document written for someone outside this repository: the README, the three
 package readmes under `src/`, the site under `website/`, the GitHub release bodies, and the package
 metadata in `Directory.Build.props`.
 
@@ -86,7 +86,7 @@ the overhaul proposal and progress reports.
 9. **Headings in sentence case.**
 
 10. **One sample model across every document.** `ShopContext`, with `Customer` and `Order`, matching
-    the `Shop.Shared` project in the installation page. EF Core uses Blog and Post everywhere,
+    the `Shop.Shared` project in the first-application tutorial. EF Core uses Blog and Post everywhere,
     Npgsql uses Blog, MongoDB uses Planet. A reader who moves between pages should not have to
     re-learn the entities.
 

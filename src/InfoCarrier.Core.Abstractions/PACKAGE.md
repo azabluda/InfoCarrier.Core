@@ -1,26 +1,39 @@
 # InfoCarrier.Core.Abstractions
 
-Shared deployment configuration contracts for InfoCarrier.Core applications.
+InfoCarrier.Core.Abstractions is a package for shared deployment configuration.
+It has no Entity Framework Core dependency.
+Reference it from shared application code that both client and server can use.
 
-Use this package from application code referenced by both the client and server. It contains only
-`InfoCarrierDeploymentBuilder`, its shared fluent extensions, and `IInfoCarrierValueMapper`. It has no Entity Framework Core
-dependency.
+## Usage
 
-An existing shared model project is usually the simplest home for deployment configuration. You
-can instead use a separate shared deployment project when the model must not know about
-InfoCarrier. A small application can also link one source file into both application projects.
+For version 11 development code:
 
 ```csharp
+using InfoCarrier.Core;
+
 public static class ShopDeployment
 {
     public static void ConfigureInfoCarrier(InfoCarrierDeploymentBuilder builder)
-        => builder.AddAnonymousShapes(new { Id = 0, CustomerId = (string?)null });
+        => builder.AddAnonymousShapes(new { Id = 0, CustomerId = "" });
 }
 ```
 
-Apply the method through `ConfigureShared` in each role callback. It executes immediately on the
-existing builder and preserves the surrounding client or server chain. Shared methods can compose
-other ordinary methods. Existing ordering rules apply; later matching mappers do not override
-earlier ones. Sharing a function does not prove agreement between separately deployed applications.
+Call this method through `ConfigureShared` in both client and server callbacks.
+Use the same definitions on both sides.
+Shared source does not verify that separately deployed applications use matching settings.
 
-See the [InfoCarrier.Core documentation](https://azabluda.github.io/InfoCarrier.Core/) for setup and examples.
+## Getting started
+
+See [shared configuration](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/applications/configuration/shared.md).
+Core already depends on this package. Add a direct reference when a shared project needs only
+the configuration builder and value-mapper interface.
+
+## Additional documentation
+
+Use the [development installation guide](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/installation.md)
+for matching package versions.
+The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
+
+## Feedback
+
+[Open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new) for questions or problems.

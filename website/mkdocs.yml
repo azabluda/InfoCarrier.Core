@@ -115,35 +115,57 @@ markdown_extensions:
 extra_css:
   - assets/stylesheets/documentation.css
 
+extra:
+  development_docs: true
+
 plugins:
   - search
 
 nav:
-  - Home: index.md
-  - Getting started:
-      - Installation: getting-started/installation.md
-      - Your first client and server: getting-started/first-app.md
+  - Overview:
+      - What InfoCarrier does: index.md
+      - Capabilities and limitations: overview/limitations.md
+  - Get started:
+      - Install packages: getting-started/installation.md
+      - Build your first client and server: getting-started/first-app.md
       - Run the samples: getting-started/samples.md
-      - Upgrading from 3.1: getting-started/upgrading-from-3-1.md
-  - Using it:
-      - Querying: guide/querying.md
-      - Saving changes: guide/saving-changes.md
-      - Transactions: guide/transactions.md
-      - Loading related data: guide/loading-related-data.md
-      - Handling errors: guide/errors.md
-  - Configuration:
-      - The client: configuration/client.md
-      - The server: configuration/server.md
-      - Value mappers: configuration/value-mappers.md
-      - Custom transports: configuration/transports.md
+      - Use Blazor WebAssembly: getting-started/blazor-webassembly.md
+  - Build applications:
+      - Configuration:
+          - Share model and deployment settings: applications/configuration/shared.md
+          - Configure a client: applications/configuration/client.md
+          - Configure a server: applications/configuration/server.md
+          - Use multiple clients and endpoints: applications/configuration/multiple-endpoints.md
+          - Use a document database: applications/configuration/document-stores.md
+      - Query data and control execution: applications/querying.md
+      - Stream query results: applications/streaming.md
+      - Load related data: applications/related-data.md
+      - Save and bulk-update data: applications/saving.md
+      - Use transactions and savepoints: applications/transactions.md
+  - Deploy and operate:
+      - Secure the deployment: operations/security.md
+      - Isolate tenants: operations/tenants.md
+      - Operate transactions across requests: operations/transactions.md
+      - Diagnose requests and execution: operations/diagnostics.md
+      - Handle errors: operations/errors.md
+      - Recover an uncertain write: operations/write-recovery.md
+  - Extend:
+      - Write transports and custom hosts: extending/transports.md
+      - Replace serialization: extending/serialization.md
+      - Replace services and pipelines: extending/services.md
+      - Map custom values: extending/value-mappers.md
+      - Test without a network: extending/testing.md
   - Reference:
-      - Blazor WebAssembly: platforms/blazor-webassembly.md
-      - Security: security.md
-      - Multi-tenancy: multi-tenancy.md
-      - Limitations: limitations.md
-      - Public API: api-surface.md
-      - Release notes 11.0 (draft): release-notes/11.0.md
-      - Release notes 10.3: release-notes/10.3.md
-      - Release notes 10.2: release-notes/10.2.md
-      - Release notes 10.1: release-notes/10.1.md
-      - Release notes 10.0: release-notes/10.0.md
+      - Public API index: reference/api.md
+      - Configuration options and limits: reference/options.md
+      - Client/server compatibility: reference/compatibility.md
+  - What's new:
+      - Choose an upgrade path: upgrades/index.md
+      - Upgrade from 10.3 to 11: upgrades/from-10-to-11.md
+      - Upgrade from 3.1 to 10: upgrades/from-3-to-10.md
+      - Release notes:
+          - 11.0 (draft): release-notes/11.0.md
+          - '10.3': release-notes/10.3.md
+          - '10.2': release-notes/10.2.md
+          - '10.1': release-notes/10.1.md
+          - '10.0': release-notes/10.0.md

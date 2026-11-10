@@ -15,12 +15,11 @@ List<Order> orders = await context.Orders
 // orders[0].Customer is populated. No further request.
 ```
 
-`ThenInclude` and filtered includes work the same way:
+Filtered includes work too. This uses the tutorial's existing Customer and Order model:
 
 ```csharp
 List<Customer> customers = await context.Customers
     .Include(c => c.Orders.Where(o => o.PlacedOn > cutoff))
-        .ThenInclude(o => o.Lines)   // an OrderLine collection on Order
     .ToListAsync();
 ```
 
@@ -52,7 +51,9 @@ int count = await context.Entry(customer)
 
 ## Lazy loading, a round trip per touch
 
-Lazy loading works, through EF Core's proxies package as usual:
+Lazy loading requires the Entity Framework Core proxies package, proxy-compatible entity classes,
+and virtual navigation properties. The basic tutorial model does not enable proxies.
+Apply these changes on both sides before using this example:
 
 ```csharp
 // Client and server, both.
@@ -63,11 +64,10 @@ optionsBuilder.UseLazyLoadingProxies();
 Order order = await context.Orders.SingleAsync(o => o.Id == 1);
 
 string company = order.Customer!.Company;   // fetches the customer now
-int lines = order.Lines.Count;              // and its lines now
+
 ```
 
-Every touched navigation is a request, so a loop over 100 orders that reads `order.Customer` makes
-100 requests: the classic N+1, and much more expensive over a network than against a local database.
+Every touched navigation is a request, so a loop over orders can issue a separate request for each unloaded customer: the classic N+1, and much more expensive over a network than against a local database.
 A navigation getter is also synchronous, so a lazy load blocks the calling thread on the round trip.
 In a UI application that means loading off the UI thread, or accepting the freeze.
 
@@ -76,10 +76,10 @@ proxies add a model convention.
 
 !!! danger "Not in Blazor WebAssembly"
 
-    Automatic lazy loading is impossible in a browser: WebAssembly is single-threaded and cannot
-    block, so the synchronous getter throws *after* the request has already gone out. Use
+    Automatic lazy loading is impossible in a browser: browser HTTP does not support the required synchronous request.
+    Do not depend on when a platform exception occurs. Use
     `LoadAsync`. The whole story is on the
-    [Blazor WebAssembly](../platforms/blazor-webassembly.md) page.
+    [Blazor WebAssembly](../getting-started/blazor-webassembly.md) page.
 
 ## Choosing
 
@@ -103,3 +103,7 @@ var summary = await context.Orders
 
 The join happens on the server, and what comes back is three values per row rather than two whole
 entities. For a read-only grid this is usually the right shape. Combine it with `AsNoTracking`.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

@@ -6,40 +6,23 @@ WebAssembly, trimmed.
 
 Three things work differently here. The first two are the browser's rather than this provider's,
 and a console or desktop client has neither. Everything else on this page assumes a working server,
-which is [Configuring the server](../configuration/server.md), and the sample referred to
+which is [Configuring the server](../applications/configuration/server.md), and the sample referred to
 throughout is [Run the samples](../getting-started/samples.md).
 
-## Automatic lazy loading is impossible
+## Use asynchronous loading
 
-```csharp
-string company = order.Customer!.Company;
-// PlatformNotSupportedException: Cannot wait on monitors on this runtime
-```
-
-A navigation property getter is synchronous, so a lazy load has to block on the round trip, and a
-single-threaded WebAssembly runtime cannot block. It throws after the request has already gone out,
-so you see the traffic while the value never arrives. `ILazyLoader.Load()` is synchronous too, so
-injecting it instead does not help.
-
-Do not call `UseLazyLoadingProxies()` in a browser client. Leaving it off means an unloaded
-navigation is `null`. Load explicitly:
+Browser HTTP cannot make synchronous requests. Use asynchronous queries, saves, and navigation loads.
+Do not enable lazy-loading proxies in the browser client, because a property getter cannot await HTTP.
 
 ```csharp
 await context.Entry(order).Reference(o => o.Customer).LoadAsync();
-await context.Entry(order).Collection(o => o.Lines).LoadAsync();
+await context.Entry(customer).Collection(c => c.Orders).LoadAsync();
 ```
 
-The round-trip count is unchanged, but every call site that touches a navigation becomes `async`,
-so a component cannot reach one from markup.
+Your server can still use lazy-loading proxies. The connection carries mapped entity names rather
+than generated proxy types. Test the model configuration on both sides.
 
-!!! note "The asymmetry with the server is safe"
-
-    Your server may still call `UseLazyLoadingProxies()`. Proxies change how an entity is
-    constructed on the side that enables them, and the wire carries entity type names rather than
-    proxy types, so the two halves stay in step. It is the one deliberate exception to enabling
-    model-shaping options on both halves.
-
-## A compiled model is more trouble than it is worth here
+## Compiled models
 
 `dotnet ef dbcontext optimize` output cannot be loaded in WebAssembly as generated. EF initializes
 the model on a `new Thread(…, 10 MB)` to avoid stack overflow on large models
@@ -51,7 +34,7 @@ it inline instead, and works:
 AppContext.SetSwitch("Microsoft.EntityFrameworkCore.Issue31751", true);
 ```
 
-The second reason to skip it is better. The tooling needs a startup project it can load, and a
+Also check how the model is generated. The tooling needs a startup project it can load, and a
 Blazor WebAssembly project emits no `deps.json`, so your server becomes the startup project. EF then
 takes its configuration from the server's service provider and ignores an
 `IDesignTimeDbContextFactory` in the client. What you get is a client compiled model annotated with
@@ -100,17 +83,23 @@ Serialization is source-generated, so it survives trimming where reflection-base
 
 A grid's items provider may ask for a page before the previous answer lands, and a `DbContext` is
 not thread-safe. Take a fresh context per page, and order on the `IQueryable` before `Skip` and
-`Take` rather than through the grid's sorting of the projected row. Otherwise the server pages an
-unordered set and the client sorts the page.
+`Take` rather than through the grid's sorting of the projected row. Otherwise the query can fail or return incorrectly ordered pages.
+
+This method assumes an injected `IDbContextFactory<ShopContext>` named `Contexts`.
+Connect it to the paging callback of your chosen grid:
 
 ```csharp
-private async ValueTask<GridItemsProviderResult<CustomerRow>> LoadAsync(
-    GridItemsProviderRequest<CustomerRow> request)
+private async Task<List<Customer>> LoadPageAsync(
+    int pageIndex, int pageSize, CancellationToken cancellationToken)
 {
     await using ShopContext context = await Contexts.CreateDbContextAsync();
-
-    IQueryable<Customer> query = context.Customers;
-    // filter, then order on the entity, then page
-    ...
+    return await context.Customers.AsNoTracking()
+        .OrderBy(c => c.Company).ThenBy(c => c.Id)
+        .Skip(pageIndex * pageSize).Take(pageSize)
+        .ToListAsync(cancellationToken);
 }
 ```
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

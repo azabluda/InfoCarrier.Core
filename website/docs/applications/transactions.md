@@ -22,23 +22,8 @@ Six round trips, one transaction: the begin, two queries, two saves and the comm
 request, because each is an operation the server has to perform. If the second save fails,
 `CommitAsync` is never reached and disposing the transaction rolls the first one back.
 
-!!! warning "A transaction holds a server-side connection open"
-
-    Between `BeginTransaction` and the commit, the server keeps a `DbContext` and its connection
-    pinned to your token. Keep transactions short, and never let one span a user thinking about a
-    dialog.
-
-    **A client that vanishes mid-transaction pins the context, the connection and the token
-    until your server rolls it back.** `DisposeAsync` on the client covers every ordinary path
-    including exceptions; it cannot cover a client that never runs again. Once such a transaction
-    has written, it holds the store's write lock.
-
-    Your server decides how long to wait, and waits for ever until it does. See
-    [Evicting an abandoned transaction](../configuration/server.md#evicting-an-abandoned-transaction).
-
-    **The token only resolves on the server instance that minted it.** The registry is
-    process-local, so a load-balanced deployment needs session affinity for the life of a
-    transaction. A restart is a different instance; the refusal says so.
+A transaction holds a server context and database connection between requests.
+Configure [routing, expiry, and caller identity](../operations/transactions.md) before deployment.
 
 ## Savepoints
 
@@ -119,16 +104,15 @@ await strategy.ExecuteAsync(async () =>
 ```
 
 This provider ships no retrying strategy. `CreateExecutionStrategy()` returns EF Core's default,
-which runs your work once and gives up on the first failure. Write the shape above anyway: it is
-what a retrying strategy needs, and it is where one goes when you have it.
+which runs your work once and gives up on the first failure. Only add a retrying strategy when the complete operation can safely be repeated.
 
 To supply one, replace `IExecutionStrategyFactory` in EF's internal service provider. The
 `optionsBuilder.ExecutionStrategy(...)` overload you may know from SQL Server is a relational
 option, and a client's options are not relational. See
-[the internal service provider](../configuration/client.md#the-internal-service-provider).
+[the internal service provider](../extending/services.md#entity-framework-provider-services).
 
 A retry re-runs everything inside the block, the `BeginTransaction` included, so the work has to be
-repeatable. Read [Handling errors](errors.md) first: a request that failed in transport leaves the
+repeatable. Read [Handling errors](../operations/errors.md) first: a request that failed in transport leaves the
 outcome unknown, so retrying a `SaveChanges` can write the same row twice.
 
 ## What is not available
@@ -137,3 +121,7 @@ outcome unknown, so retrying a `SaveChanges` can write the same row twice.
 relational APIs, and there is no local connection to hand out. Ambient `TransactionScope` is
 likewise not part of this provider's surface. The server's token is the whole of what can be shared,
 which is what `UseInfoCarrierTransaction` takes.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

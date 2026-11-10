@@ -1,23 +1,12 @@
 # Limitations
 
 InfoCarrier.Core runs Microsoft's own Entity Framework Core specification suite, the same suite the
-SQL Server, SQLite and InMemory providers run. This page lists every scenario in that suite which
-does not behave the way a normal EF Core provider behaves, so you can judge whether any of them
+SQL Server, SQLite and InMemory providers run. This page explains important observable differences and unsupported operations, so you can judge whether any of them
 affects your application.
 
-It is complete for what a caller can observe as a limitation. The suite's other differences ask
-the client for something only a database has, assert a refusal this provider does not need to make,
-or are EF Core defects that every provider hits and this one reports with a different exception
-type.
-
-```
-Total tests: 30148, Failed: 0
-```
-
-Measured against `10.3.0`. No test fails. Where this provider answers differently from EF Core, the
-test that covers it says so, and this page names the differences you can observe. The skipped tests
-are EF Core's own: EF skips them itself for the store behind them, and none is a suppression added
-here.
+The previous published release, 10.3.0, was measured with 30,148 tests and no failures.
+That is historical evidence, not a new measurement of this development checkout.
+Check your database provider and application model as well as these documented differences.
 
 ## Not supported
 
@@ -58,7 +47,7 @@ Core does. The message text may differ. Two examples:
 ```csharp
 // (a) a method call where ExecuteUpdate expects a property
 context.Orders
-    .Where(o => o.Total > 100m)
+    .Where(o => o.Freight > 100m)
     .ExecuteUpdate(s => s.SetProperty(o => Math.Round(o.Total), 0m));
 
 // (b) a cast to a type no mapped entity implements
@@ -90,7 +79,7 @@ context.Dashboards
 
 The inner lambda names `Layout`, which the model does not imply, so this client keeps that part of
 the query and the server sends the whole column. Name `Layout` on both halves, as
-[Keys of your own types](guide/querying.md#keys-of-your-own-types) describes for a `GroupBy` key,
+[Keys of your own types](../applications/querying.md#keys-of-your-own-types) describes for a `GroupBy` key,
 and the query reaches the server, which rejects it as every other provider does.
 
 A test suite you port will expect the exception, and LINQ that relies on the answer will not run
@@ -103,7 +92,7 @@ to choose local execution explicitly.
 
 For backend parity, use public shared helpers and register their types on both ends. The server's
 provider then decides whether the query is supported. Registration never admits private methods.
-See [Helpers of your own](guide/querying.md#helpers-of-your-own).
+See [Helpers of your own](../applications/querying.md#helpers-of-your-own).
 
 ## Consequences of the client having no database
 
@@ -111,21 +100,24 @@ These are not defects. They follow from where the client sits.
 
 | | |
 |---|---|
-| Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](guide/querying.md#what-is-not-part-of-the-surface) |
-| Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](platforms/blazor-webassembly.md) |
-| The client assumes relational collection projection rules. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store. Implicit local row decisions remain refused | [Querying](guide/querying.md#rules-that-come-from-the-servers-store) |
+| Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](../applications/querying.md#what-is-not-part-of-the-surface) |
+| Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](../getting-started/blazor-webassembly.md) |
+| The client assumes relational collection projection rules. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store. Implicit local row decisions remain refused | [Querying](../applications/querying.md#rules-that-come-from-the-servers-store) |
 | The server's provider writes the SQL, so how a query is translated is settled there, not on the client. `EF.Constant` and `EF.Parameter` are part of your query, so they cross the wire and the server honours them | |
-| `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](guide/querying.md#round-trips-and-result-size) |
-| Asynchronous non-tracking queries stream rows. Tracked queries, single-result operations, and operators needing complete input remain buffered. Page large buffered results. | [Querying](guide/querying.md#streaming-results) |
-| Authentication and authorization are yours | [Security](security.md) |
-| Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](platforms/blazor-webassembly.md#trimming) |
+| `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](../applications/querying.md#round-trips-and-result-size) |
+| Asynchronous non-tracking queries stream rows. Tracked queries, single-result operations, and operators needing complete input remain buffered. Page large buffered results. | [Querying](../applications/streaming.md) |
+| Authentication and authorization are yours | [Security](../operations/security.md) |
+| Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](../getting-started/blazor-webassembly.md#trimming) |
 
-## What this page cannot tell you
+## Check your application
 
-Every entry above corresponds to tests in EF Core's specification suite that run on every build.
-A failing test breaks the build, so a new entry cannot appear unnoticed. When an entry is fixed,
-or a new one appears, this page changes with it.
+The specification suite checks behavior on the repository's test providers. It does not establish
+performance, request sizes, or behavior under production load. Run representative queries and writes
+against the database provider your server actually uses.
 
-What the suite measures bounds what this page can promise. A conformance suite says nothing about
-performance, payload size or concurrency under load. A scenario it never exercises is outside what
-this page claims at the top.
+Ambient transactions and local database connections are unsupported. There is no built-in retrying
+execution strategy. See [transactions](../applications/transactions.md).
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

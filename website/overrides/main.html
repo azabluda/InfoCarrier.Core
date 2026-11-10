@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 
+{% block announce %}
+  {% if config.extra.development_docs %}
+    Version 11 development documentation. Currently uses Entity Framework Core 10.
+    <a href="https://azabluda.github.io/InfoCarrier.Core/">Published version 10.3 documentation</a>
+  {% endif %}
+{% endblock %}
+
 {% block content %}
   <div class="ic-docs">
     {{ super() }}

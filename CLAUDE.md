@@ -584,7 +584,7 @@ projection split, `SaveChanges` and lazy loading all work end-to-end.
 ### What may and may not be claimed
 
 **The consumer-facing statement of what is missing is
-[`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
+[`website/docs/limitations.md`](website/docs/overview/limitations.md)**, and that is the document to keep
 true. It names one unsupported scenario, message-text differences on a refused query, and queries
 this provider *answers* that other EF providers reject. **It no longer claims a count of any of
 them**: a count was wrong twice, once because the suite grew under it and once because the honest
