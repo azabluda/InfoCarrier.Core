@@ -36,6 +36,13 @@ and how to check the loaded solution first:
 
 @.claude/roslyn-codelens.md
 
+## EF Core 11 adoption
+
+Before adoption work, read [the adoption checklist](docs/plans/v11/adoption-checklist.md).
+Complete its documentation review before declaring adoption complete. Framework statements,
+examples, and the reserved release-note section must match verified behavior. Publication remains
+a separate decision; adoption alone does not remove unpublished-package notices.
+
 ## Commands
 
 **Write all new and changed repository-owned engineering automation in C# file-based applications

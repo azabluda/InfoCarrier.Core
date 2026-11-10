@@ -5,6 +5,35 @@ What moves when EF Core 11 is adopted. **Issue
 2026-09-09. This file re-reads it against the repository on 2026-09-21 and adds what it misses. Read
 each line against the repository again when the work starts.
 
+## Documentation follow-up
+
+Added November 10, 2026, for the version 11 documentation overhaul. Complete this review during
+adoption. Package publication and site publication are separate steps; adopting EF Core 11 does
+not make either one complete.
+
+- [ ] Replace the pending-adoption section and drafting comment in
+  `website/docs/release-notes/11.0.md` with features verified through InfoCarrier and links to their guides.
+  Put each feature's usage instructions in the relevant application guide, not only in release notes.
+- [ ] Confirm runtime, SDK, and dependency requirements. Update `website/docs/getting-started/installation.md`
+  and `first-app.md`, including `net10.0` and `10.*` commands where required. Do not infer target
+  framework requirements from the library's version number alone.
+- [ ] Update framework statements in `README.md`, the Core and AspNetCore `src/*/PACKAGE.md` files,
+  `website/docs/upgrades/from-10-to-11.md`, and the announcement in `website/overrides/main.html`.
+  Review the Abstractions package readme too, even though it has no EF dependency.
+- [ ] Search the active guides and entry points for `Entity Framework Core 10`, `EF Core 10`,
+  `net10.0`, `10.*`, and `adoption`. Review each result. Keep historical release notes and the
+  version 3-to-10 upgrade guide tied to their own framework versions.
+- [ ] Compile and run the complete tutorial and affected examples with the adopted dependencies.
+  Recheck provider limits, translation, streaming, browser behavior, and security claims affected
+  by adoption. Review the 10.3-to-11 upgrade instructions against those results.
+- [ ] Before separately authorized publication, review unpublished-package notices in installation,
+  the first tutorial, README, and the upgrade index. Review the draft release-note introduction,
+  the `11.0 (draft)` navigation label, and `extra.development_docs`. Follow `docs/versioning.md`.
+  Keep development notices until the corresponding publication state actually changes.
+
+These are manual review items. The strict site build and link checks do not detect an outdated
+framework statement or an unverified capability.
+
 ## What #99 says that is no longer true
 
 - **"Expect one large, deliberate re-baseline of `test/known-failures.txt`".** The ratchet and both
