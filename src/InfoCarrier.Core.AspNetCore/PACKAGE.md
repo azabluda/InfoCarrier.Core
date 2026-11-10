@@ -1,47 +1,41 @@
-`InfoCarrier.Core.AspNetCore` is the ASP.NET Core server binding for
-[InfoCarrier.Core](https://www.nuget.org/packages/InfoCarrier.Core). It maps one endpoint that
-receives a client's queries and units of work and executes them against a real database.
+# InfoCarrier.Core.AspNetCore
 
-Reference this package from your server only. Your client needs `InfoCarrier.Core` alone.
-
-Both halves need .NET 10 and EF Core 10. Install with
-`dotnet add package InfoCarrier.Core.AspNetCore`, and give both packages the same version.
+InfoCarrier.Core.AspNetCore is the ASP.NET Core HTTP endpoint for InfoCarrier clients.
+It depends on InfoCarrier.Core and the ASP.NET Core shared framework.
+Client applications reference Core without this server package.
 
 ## Usage
 
-Register a `DbContext` on a real EF Core provider, register the InfoCarrier server services, then
-call `MapInfoCarrier`. For example:
+For version 11 development code, register the server context and map its endpoint:
 
 ```csharp
+using InfoCarrier.Core;
+using InfoCarrier.Core.AspNetCore;
+using Microsoft.EntityFrameworkCore;
+
 builder.Services.AddDbContext<ShopContext>(o => o.UseSqlite(connectionString));
 builder.Services.AddInfoCarrierServer<ShopContext>();
 
-var app = builder.Build();
-app.MapInfoCarrier();
+// After building the application:
+app.MapInfoCarrier().RequireAuthorization("DataAccess");
 ```
 
-The endpoint checks the protocol version and answers a mismatch with `400`. A failure in a request
-the server did run comes back inside a normal response, and surfaces on the client as the exception
-EF would have thrown locally. Your server's own model, query filters and interceptors apply, because
-it is an ordinary EF Core application. A client can switch a query filter off, because
-`IgnoreQueryFilters()` travels in the expression tree, so a filter is a default and not an access
-control.
-
-Authentication and authorization are yours. No identity travels in the request, so authenticate the
-transport.
+Configure the named authorization policy and the database provider in the application.
+The endpoint permits queries and writes; enforce access rules on the server.
+The shared model and imports are shown in the complete tutorial.
+This development build still uses Entity Framework Core 10.
 
 ## Getting started
 
-See [Your first client and server](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/),
-which builds a working pair in one page.
+Follow the [version 11 tutorial](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/first-app.md).
+Use a matching InfoCarrier.Core version on the client.
 
 ## Additional documentation
 
-See [The server](https://azabluda.github.io/InfoCarrier.Core/configuration/server/) for the
-services this package expects, and [Security](https://azabluda.github.io/InfoCarrier.Core/security/)
-for what the server will and will not execute.
+See [server setup](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/applications/configuration/server.md)
+and [security](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/operations/security.md).
+The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
 
 ## Feedback
 
-If you encounter a bug, have a question, or would like to request a feature,
-[open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).
+[Open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new) for questions or problems.

@@ -1,97 +1,55 @@
-# Installation
+# Install the packages
 
-## Two packages
+Use NuGet to add InfoCarrier to your application.
+Install the .NET 10 SDK to follow the [first tutorial](first-app.md).
 
-| Package | Reference it from |
-|---|---|
-| `InfoCarrier.Core` | your client, and your server |
-| `InfoCarrier.Core.AspNetCore` | your server only |
+This is the draft installation guide for version 11, whose packages are not published yet.
+The commands below describe installation for that release.
+For available version 10.3 packages, use the [published guide](https://azabluda.github.io/InfoCarrier.Core/getting-started/installation/).
 
-A client references `InfoCarrier.Core` alone. It adds two dependencies,
-`Microsoft.EntityFrameworkCore` and `Microsoft.EntityFrameworkCore.Relational`, and the HTTP
-transport is inside it. The second is what lets the client model answer relational questions such
-as `GetTableName()`; it brings no database driver and no connection. The server endpoint is a
-second package because it carries a framework reference to `Microsoft.AspNetCore.App`, which a WPF,
-MAUI or WebAssembly client should not have to satisfy to restore a data-access library.
+## Client
 
-A typical solution has three projects:
+In the client project:
 
-```text
-Shop.Shared     the entity classes and the DbContext        → InfoCarrier.Core
-Shop.Client     WPF / Blazor / MAUI / console               → Shop.Shared
-Shop.Server     ASP.NET Core and a real EF Core provider    → Shop.Shared,
-                                                              InfoCarrier.Core.AspNetCore
+```sh
+dotnet add package InfoCarrier.Core
 ```
 
-The `DbContext` and the entity classes are shared source. Both halves build the same model from the
-same code, which is what makes the wire format meaningful. See
-[Your first client and server](first-app.md).
+The client uses your shared context model with InfoCarrier as its database provider.
+It does not need a database driver or connection string.
 
-## Installing
+## Server
 
-These examples target the version 11 prerelease API. Install matching prerelease packages on both ends.
+In the ASP.NET Core server project:
 
-=== "dotnet CLI"
-
-    ```bash
-    # In the client project, and in the server project too.
-    dotnet add package InfoCarrier.Core --prerelease
-
-    # In the server project only.
-    dotnet add package InfoCarrier.Core.AspNetCore --prerelease
-    ```
-
-=== "PackageReference"
-
-    ```xml
-    <ItemGroup>
-      <PackageReference Include="InfoCarrier.Core" Version="11.0.0-*" />
-      <PackageReference Include="InfoCarrier.Core.AspNetCore" Version="11.0.0-*" />
-    </ItemGroup>
-    ```
-
-=== "Package Manager"
-
-    ```powershell
-    Install-Package InfoCarrier.Core -IncludePrerelease
-    Install-Package InfoCarrier.Core.AspNetCore -IncludePrerelease
-    ```
-
-With Central Package Management, pin the version in `Directory.Packages.props` and give both
-packages the same one.
-Replace floating versions with the selected published prerelease when pinning packages.
-
-If you are moving an application off `3.1.1`, read [Upgrading from 3.1](upgrading-from-3-1.md).
-Your model carries over; the wiring around it does not.
-
-Both packages ship symbol packages and SourceLink, so you can step into the provider from a debugger
-with no extra configuration.
-
-### Building from source instead
-
-To build from source, use .NET SDK 10.0.300 or later and Git:
-
-```bash
-git clone https://github.com/azabluda/InfoCarrier.Core.git
-cd InfoCarrier.Core
-dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
+```sh
+dotnet add package InfoCarrier.Core.AspNetCore
 ```
 
-Both packages land in `artifacts/pack`. Every other project in the solution opts out of packing.
+This includes Core as a dependency.
+Add the Entity Framework Core provider for the server's database too.
+The tutorial uses SQLite.
 
-## Requirements
+Use matching InfoCarrier versions on client and server.
+The current version 11 draft still targets Entity Framework Core 10; its adoption status is recorded
+in the [11.0 notes](../release-notes/11.0.md).
 
-| | |
-|---|---|
-| Runtime | .NET 10 |
-| EF Core | 10.0.1 or later |
-| Server-side provider | any: SQL Server, PostgreSQL, SQLite, InMemory … |
-| Client platforms | anywhere .NET 10 runs, including Blazor WebAssembly |
+## Shared model
 
-The server's provider is your choice. The server is an ordinary EF Core application and
-InfoCarrier.Core never sees the connection. The one platform with constraints of its own is the
-browser: see [Blazor WebAssembly](../platforms/blazor-webassembly.md).
+Keep your entity classes and context model in an application project referenced by both sides.
+That project needs Entity Framework Core. It does not need InfoCarrier merely to declare the model.
 
-## Versioning
+`InfoCarrier.Core.Abstractions` is optional for a separate project containing additional shared
+InfoCarrier settings. Basic queries and saves do not need that extra project or registration.
 
-The version tracks EF Core's major, as every EF Core provider does. `10.x` targets EF Core 10.
+## Try a complete application
+
+[Build a client and server](first-app.md) from an empty directory.
+It shows every package command, the shared model, one server endpoint, and a client query followed by a save.
+
+For an existing application, see the [upgrade guide](../upgrades/index.md).
+
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

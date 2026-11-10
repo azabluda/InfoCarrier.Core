@@ -179,7 +179,7 @@ jobs:
             API key valid for one hour. No publishing secret is stored in this repository.
 
             Known limitations for this release:
-            https://azabluda.github.io/InfoCarrier.Core/limitations/
+            https://azabluda.github.io/InfoCarrier.Core/reference/limitations/
 
   # ------------------------------------------------------------------------------------------
   # The irreversible step, and the only one in this repository that needs a human.

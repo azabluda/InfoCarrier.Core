@@ -1,17 +1,19 @@
-# Transactions
+# Use transactions
 
-A client transaction is a real transaction on the server's database. `BeginTransaction` opens one
-there and hands the client a token, and every request the client makes afterwards names that token,
-so the server routes it to the same connection.
+Use the Shop model and seeded rows from the [first tutorial](../getting-started/first-app.md).
+A single save is already a unit of work. Add an explicit transaction when several requests must commit together.
+
+Begin a transaction before the related requests and commit after they all succeed.
+The server keeps their database work in one transaction:
 
 ```csharp
 await using var transaction = await context.Database.BeginTransactionAsync();
 
 Order order = await context.Orders.SingleAsync(o => o.Id == 1);
-order.CustomerId = "AROUT";
+order.Freight = 10m;
 await context.SaveChangesAsync();
 
-Customer customer = await context.Customers.SingleAsync(c => c.Id == "AROUT");
+Customer customer = await context.Customers.SingleAsync(c => c.Id == "ALFKI");
 customer.Country = "Ireland";
 await context.SaveChangesAsync();
 
@@ -22,23 +24,8 @@ Six round trips, one transaction: the begin, two queries, two saves and the comm
 request, because each is an operation the server has to perform. If the second save fails,
 `CommitAsync` is never reached and disposing the transaction rolls the first one back.
 
-!!! warning "A transaction holds a server-side connection open"
-
-    Between `BeginTransaction` and the commit, the server keeps a `DbContext` and its connection
-    pinned to your token. Keep transactions short, and never let one span a user thinking about a
-    dialog.
-
-    **A client that vanishes mid-transaction pins the context, the connection and the token
-    until your server rolls it back.** `DisposeAsync` on the client covers every ordinary path
-    including exceptions; it cannot cover a client that never runs again. Once such a transaction
-    has written, it holds the store's write lock.
-
-    Your server decides how long to wait, and waits for ever until it does. See
-    [Evicting an abandoned transaction](../configuration/server.md#evicting-an-abandoned-transaction).
-
-    **The token only resolves on the server instance that minted it.** The registry is
-    process-local, so a load-balanced deployment needs session affinity for the life of a
-    transaction. A restart is a different instance; the refusal says so.
+A transaction holds a server context and database connection between requests.
+Configure [routing, expiry, and caller identity](../operations/transactions.md) before deployment.
 
 ## Savepoints
 
@@ -47,19 +34,26 @@ Where the server's database supports them, savepoints work as they do locally:
 ```csharp
 await using var transaction = await context.Database.BeginTransactionAsync();
 
-await ApplyMandatoryChangesAsync(context);
+Customer customer = await context.Customers.SingleAsync(c => c.Id == "ALFKI");
+customer.Company = "Confirmed Shop";
 await context.SaveChangesAsync();
 
 await transaction.CreateSavepointAsync("mandatory_done");
 
+var optionalOrder = new Order
+{
+    CustomerId = "ALFKI", PlacedOn = DateTime.UtcNow, Freight = 5m
+};
+
 try
 {
-    await ApplyOptionalChangesAsync(context);
+    context.Orders.Add(optionalOrder);
     await context.SaveChangesAsync();
 }
 catch (DbUpdateException)
 {
     await transaction.RollbackToSavepointAsync("mandatory_done");
+    context.Entry(optionalOrder).State = EntityState.Detached;
 }
 
 await transaction.CommitAsync();
@@ -86,26 +80,31 @@ await using IDbContextTransaction transaction = await first.Database.BeginTransa
 
 second.Database.UseInfoCarrierTransaction(transaction);   // (1)
 
-await SaveTheFirstHalfAsync(first);
-await SaveTheSecondHalfAsync(second);
+var customer = await first.Customers.SingleAsync(c => c.Id == "ALFKI");
+customer.Company = "Updated together";
+await first.SaveChangesAsync();
+
+var order = await second.Orders.SingleAsync(o => o.Id == 1);
+order.Freight = 10m;
+await second.SaveChangesAsync();
 
 await transaction.CommitAsync();                          // (2)
 ```
 
-1. `UseInfoCarrierTransaction` is this provider's equivalent of the relational `UseTransaction`.
-   There the shared thing is a `DbTransaction` on a connection; here it is the server's token,
-   which is what makes sharing possible across a transport that may be stateless.
+1. `UseInfoCarrierTransaction` joins the transaction that `first` began.
 2. The joining context does not own the transaction. Ending it detaches `second` and leaves the
    transaction to whoever began it. Commit through the context that began it: two contexts able to
    commit the same transaction would make the outcome depend on disposal order.
 
 `UseInfoCarrierTransaction` is an extension on `DatabaseFacade`, in the `InfoCarrier.Core`
-namespace, and it throws `ArgumentException` if handed a transaction from another provider.
+namespace. Import `Microsoft.EntityFrameworkCore.Storage` for `IDbContextTransaction`.
+It throws `ArgumentException` if handed a transaction from another provider.
 
 ## Execution strategies and retries
 
 The transaction lives on the server, and a retry has to re-run the whole unit of work rather than
-just the failed request. Wrap the work the way you would with any provider:
+just the failed request. The following is a pattern for applications that supply a retrying strategy;
+`DoTheWorkAsync` stands for the complete application operation:
 
 ```csharp
 IExecutionStrategy strategy = context.Database.CreateExecutionStrategy();
@@ -119,16 +118,15 @@ await strategy.ExecuteAsync(async () =>
 ```
 
 This provider ships no retrying strategy. `CreateExecutionStrategy()` returns EF Core's default,
-which runs your work once and gives up on the first failure. Write the shape above anyway: it is
-what a retrying strategy needs, and it is where one goes when you have it.
+which runs your work once and gives up on the first failure. Only add a retrying strategy when the complete operation can safely be repeated.
 
 To supply one, replace `IExecutionStrategyFactory` in EF's internal service provider. The
 `optionsBuilder.ExecutionStrategy(...)` overload you may know from SQL Server is a relational
 option, and a client's options are not relational. See
-[the internal service provider](../configuration/client.md#the-internal-service-provider).
+[the internal service provider](../extending/services.md#entity-framework-provider-services).
 
 A retry re-runs everything inside the block, the `BeginTransaction` included, so the work has to be
-repeatable. Read [Handling errors](errors.md) first: a request that failed in transport leaves the
+repeatable. Read [Handling errors](../operations/errors.md) first: a request that failed in transport leaves the
 outcome unknown, so retrying a `SaveChanges` can write the same row twice.
 
 ## What is not available
@@ -137,3 +135,7 @@ outcome unknown, so retrying a `SaveChanges` can write the same row twice.
 relational APIs, and there is no local connection to hand out. Ambient `TransactionScope` is
 likewise not part of this provider's surface. The server's token is the whole of what can be shared,
 which is what `UseInfoCarrierTransaction` takes.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

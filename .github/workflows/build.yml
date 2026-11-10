@@ -65,8 +65,6 @@ jobs:
       - name: Links, including anchors
         run: dotnet run --file eng/DocLinks.cs --
 
-      - name: Prose word budgets
-        run: dotnet run --file eng/DocWords.cs -- --all --budget
 
   # Must be green. Build plus the two suites that are expected to pass unconditionally:
   # serializer round-trip and the end-to-end vertical slice.

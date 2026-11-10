@@ -28,12 +28,12 @@ vulnerability.
   the server honours it. The documented control is a query interceptor on the server.
 - A transaction token used by a caller who did not open that transaction, on a server that has not
   asked for it to be bound. A holder can query and save inside that transaction as well as end it.
-  `AddInfoCarrierHttpCallerIdentity`, new in `10.2.0`, binds one to its opener; until a server
-  calls it the token is the only credential.
+  `AddHttpCallerIdentity` on the server builder binds a token to its opener. Without that
+  configuration the token is the only credential.
 - Expensive queries from an authenticated caller. Cap them where the caller cannot reach: a rate
   limit, a statement timeout, or a query interceptor.
 
-[Security](https://azabluda.github.io/InfoCarrier.Core/security/) covers all four for the reader who
+[Security](website/docs/operations/security.md) covers all four for the reader who
 has to build against them.
 
 ## Versions

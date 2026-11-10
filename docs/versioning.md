@@ -26,6 +26,12 @@ the branch exists.
 can compile against EF Core 10 while public API cleanup continues. A stable version 11 package
 cannot ship before EF Core 11 adoption is complete.
 
+The rewritten site on `main` is development documentation. `website/mkdocs.yml` sets
+`extra.development_docs: true`, which displays the development notice on every page.
+Before any authorized stable-site publication, verify framework requirements, update the package
+availability notice, and set that flag to false on the release branch. Update `edit_uri`
+to the displayed documentation's source branch. Keep historical release examples tied to their tags.
+
 During this transition, `main` deliberately omits `PackageValidationBaselineVersion`. Comparing
 every approved version 11 removal with version 10.3.0 would reject the work by design. Package
 validation remains enabled for consistency checks within each package.
@@ -444,7 +450,7 @@ Both procedures below end at the same place, so the shared tail is written once.
    11.1, this includes published previous-minor acceptance evidence. Before the first stable 11.0,
    review the separate migration story against actual contract changes; an untested mechanism
    must not be described as validated.
-2. Update `website/docs/limitations.md` if the failure set moved, and write the suite's figure
+2. Update `website/docs/reference/limitations.md` if the failure set moved, and write the suite's figure
    there: the `Total tests: …` line of `dotnet run --file eng/Measure.cs --`'s own summary, then
    ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing
    between two releases edits it** (2026-09-21): refreshed by hand after each run, the counts

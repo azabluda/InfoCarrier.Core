@@ -18,7 +18,7 @@ scope for v10, and requirements §4.5 answered in two halves. That is why this f
 
 The suite stands at `Total tests: 22658, Passed: 22472, Failed: 9, Skipped: 177`. All nine are
 classified in the archived M9 plan and stated for consumers in
-[`limitations.md`](../../../../website/docs/limitations.md).
+[`limitations.md`](../../../../website/docs/reference/limitations.md).
 
 ## What is open, across the whole roadmap
 

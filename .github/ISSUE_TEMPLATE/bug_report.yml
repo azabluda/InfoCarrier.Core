@@ -56,6 +56,7 @@ body:
     attributes:
       label: Checked against the limitations page
       description: >-
-        https://azabluda.github.io/InfoCarrier.Core/limitations/ lists every scenario in EF Core's
-        specification suite that does not behave normally here. If yours is on it, say which entry
-        and what you need beyond what it says.
+        Check the limitations for your package version in the published documentation:
+        https://azabluda.github.io/InfoCarrier.Core/ . For version 11 development, see
+        https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/reference/limitations.md .
+        If your scenario is listed, identify the entry and explain what you need beyond it.

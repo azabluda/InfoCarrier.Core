@@ -1,7 +1,21 @@
 # Handling errors
 
-The server can fail, and so can the trip to it. Those are different exception types, because they
-call for different responses.
+Start with the exception type. A database refusal, an incompatible protocol, and a lost response
+need different responses. For writes, determine whether the work committed before retrying.
+
+## Choose the response
+
+| Exception | Meaning | Sensible response |
+|---|---|---|
+| `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
+| `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
+| `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
+| `InfoCarrierProtocolException` | Client and server wire contracts disagree | Upgrade the indicated side; do not retry |
+| `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](write-recovery.md) |
+
+Catch the type, not the message: message text is not a supported contract on any EF Core provider,
+and a couple of messages here are worded differently from other providers'. See
+[Limitations](../reference/limitations.md).
 
 ## A failure the server reported
 
@@ -63,9 +77,8 @@ The server rejects an incompatible request before executing it. A client also ch
 version before reading results or reported faults.
 
 Version 11 servers support the current and previous minor's clients within version 11.
-Version 11.0 supports 11.0 clients only. Version 10 clients and version 11 development clients
-predating this policy are rejected. The wire version is independent of the package version.
-See [transport compatibility](../configuration/transports.md#compatibility) for custom transports.
+Version 11.0 supports 11.0 clients only. Version 10 clients and earlier development clients are outside the support promise. The wire version is independent of the package version.
+See [transport compatibility](../reference/compatibility.md) for custom transports.
 
 ## A failure of the journey
 
@@ -73,59 +86,17 @@ If the request never reached a server, or what came back was not a valid respons
 `InfoCarrierTransportException`. This is not a database error and must not be handled as one: the
 data is unknown, not wrong.
 
-Retrying a read is safe. **Retrying anything that writes is not**, because the failure does not
-tell you whether the server committed: the request may have died on the way out, or the answer on
-the way back. That covers more than `SaveChanges`. `ExecuteUpdate` and `ExecuteDelete` look like
+A read can usually be retried if it has no application side effects. Verify a write's outcome
+before retrying it. The failure does not tell you whether the server committed: the request may
+have failed on the way out, or the answer on the way back. This covers more than `SaveChanges`.
+`ExecuteUpdate` and `ExecuteDelete` look like
 queries and are writes, and so is a transaction's `Commit`.
 
 ### Knowing whether a write committed
 
-Save a marker row with your changes, and look for it after a transport failure. The server
-runs one `SaveChanges` as one unit, so the marker commits exactly when your changes do, and looking
-for it is a read. EF Core documents the same pattern:
-[manually track the transaction](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#option-4---manually-track-the-transaction).
-`SaveMarker` is one entity with a `Guid` key, mapped in `ShopContext` on both halves.
-
-```csharp
-var marker = new SaveMarker { Id = Guid.NewGuid() };
-context.SaveMarkers.Add(marker);
-context.Orders.Add(order);
-
-try
-{
-    await context.SaveChangesAsync();
-}
-catch (Exception ex) when (ex is InfoCarrierTransportException
-                           || ex.InnerException is InfoCarrierTransportException)
-{
-    if (await context.SaveMarkers.AsNoTracking().AnyAsync(m => m.Id == marker.Id))
-    {
-        context.ChangeTracker.AcceptAllChanges();   // it committed; only the answer was lost
-    }
-    else
-    {
-        await context.SaveChangesAsync();           // it did not; send it again
-    }
-}
-```
-
-Two racing attempts cannot both commit: the second insert of the marker fails on its key and rolls
-back the rest of that save.
-
-This relies on `SaveChanges` being one unit, which it is on a relational database and on MongoDB.
-On Cosmos DB, EF Core 10 writes each document separately, and a marker cannot tell you which changes
-landed.
-
-When the answer is lost, keys the database generated never reach the client: reload the rows, or
-generate keys on the client. Keep the marker's id where it survives a restart of your application,
-such as local storage, until you have looked for it. Delete old markers yourself.
-
-For `ExecuteUpdate`, `ExecuteDelete` and anything else inside a transaction, save the marker inside
-the transaction too. If the commit fails, look for the marker rather than calling `Commit` again.
-
-If a transaction was open when the connection dropped, do not retry into it. The server holds it on
-the instance that began it, and a retry landing anywhere else cannot join it. See
-[Transactions](transactions.md).
+A lost write response requires verification before retrying. Save a durable marker with the changes
+and verify it through a fresh context. Follow the complete [write-recovery procedure](write-recovery.md).
+For open transactions, also check [server routing and expiry](transactions.md).
 
 ```csharp
 try
@@ -150,20 +121,6 @@ catch (Exception ex) when (ex is InfoCarrierTransportException
                            || ex.InnerException is InfoCarrierTransportException)
 ```
 
-## Which is which
-
-| Exception | Meaning | Sensible response |
-|---|---|---|
-| `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
-| `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
-| `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
-| `InfoCarrierProtocolException` | Client and server wire contracts disagree | Upgrade the indicated side; do not retry |
-| `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](#knowing-whether-a-write-committed) |
-
-Catch the type, not the message: message text is not a supported contract on any EF Core provider,
-and a couple of messages here are worded differently from other providers'. See
-[Limitations](../limitations.md).
-
 ## Cancellation
 
 Every async method takes a `CancellationToken`, and it travels to the server, which stops the query
@@ -185,7 +142,11 @@ trace itself holds, which with symbols deployed is your build's source paths.
 **Your own messages travel verbatim**, and a provider's exception is your own message here. A
 `SqlException` names the server instance and the database in its text, and that text reaches the
 client. Catch and rewrite at the server boundary anything a client should not read. See
-[Security](../security.md).
+[Security](security.md).
 
 Resolving a fault's type is also the boundary on the return direction: a fault cannot make the
 client load an assembly, or construct anything that is not an exception.
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

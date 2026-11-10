@@ -1,18 +1,85 @@
-# Querying
+# Query data
 
-You write EF Core LINQ. There is no InfoCarrier query API.
+Use the context from the [first tutorial](../getting-started/first-app.md).
+Write ordinary LINQ and execute the query with an Entity Framework Core method:
 
 ```csharp
-List<Order> recent = await context.Orders
-    .Include(o => o.Customer)
-    .Where(o => o.Customer!.Country == "Germany" && o.Freight > 50m)
-    .OrderByDescending(o => o.PlacedOn)
+List<Customer> customers = await context.Customers
+    .Where(c => c.Country == "Germany")
+    .OrderBy(c => c.Company)
+    .ToListAsync();
+
+foreach (Customer customer in customers)
+{
+    Console.WriteLine(customer.Company);
+}
+```
+
+The server filters and orders the rows before returning them.
+Against the tutorial's seeded database, this finds customer `ALFKI`.
+
+## Filter and page a list
+
+Build an `IQueryable` before executing it. This lets the server apply filters and paging together:
+
+```csharp
+string? country = "Germany";
+int pageIndex = 0;
+int pageSize = 20;
+
+IQueryable<Customer> query = context.Customers;
+if (!string.IsNullOrEmpty(country))
+{
+    query = query.Where(c => c.Country == country);
+}
+
+List<Customer> page = await query
+    .OrderBy(c => c.Company).ThenBy(c => c.Id)
+    .Skip(pageIndex * pageSize)
+    .Take(pageSize)
+    .ToListAsync();
+
+int matching = await query.CountAsync();
+```
+
+The page query returns at most 20 rows. The count is a separate request.
+Use a stable order before paging. The key resolves ties between equal company names.
+Do not load a list and then page it locally when the server can do that work.
+
+## Select the values you need
+
+For a read-only list, select display values instead of loading complete entities and relationships:
+
+```csharp
+var summary = await context.Orders
+    .OrderBy(o => o.Id)
+    .Select(o => new { o.Id, o.PlacedOn, Company = o.Customer!.Company })
     .Take(20)
     .ToListAsync();
 ```
 
-One round trip. The `Where`, the `OrderByDescending` and the `Take` all execute on the server, and
-20 rows come back. Nothing is filtered in the client.
+The server performs the relationship lookup. The result contains the selected values.
+Use [related-data loading](related-data.md) when you need editable entity graphs.
+
+## Tracking and saving
+
+Ordinary entity queries track the returned entities. Change a property and call
+[SaveChangesAsync](saving.md) to save it.
+
+For read-only entity results, add `AsNoTracking()`.
+This avoids keeping change-tracking state for data you will only display.
+Use a fresh context for each independent operation.
+
+## Stream a result
+
+Use [streaming](streaming.md) when the application can process rows as they arrive.
+Tracked queries and some operations buffer their result instead.
+
+## When a query contains application code
+
+Most queries use the database provider's supported operators.
+If a query calls your own helper or constructs a custom result, execution location matters.
+The following sections explain those cases. They are not prerequisites for the queries above.
 
 ## What runs where
 
@@ -62,7 +129,7 @@ because a local function will not compile inside a query.
 An expression sent to the server follows its provider's translation rules, including refusal.
 Client-only projections can differ, as [Helpers of your own](#helpers-of-your-own) explains.
 Catch the exception type rather than matching message text, which is not a supported contract.
-See [Limitations](../limitations.md).
+See [Limitations](../reference/limitations.md).
 
 ### Helpers of your own
 
@@ -85,7 +152,7 @@ public static class ShopDeployment
 The helper must exist on the server too. Registration lets the expression reach that server;
 its provider decides whether to translate it, evaluate a final projection, or refuse it.
 Registration does not make a method translatable or admit private methods. Register only trusted
-types, as [Security](../security.md) describes.
+types, as [Security](../operations/security.md) describes.
 
 A private or genuinely client-only helper can remain in the local projection. Such a query may
 answer where plain EF Core refuses the projection. Operators that decide rows, order, groups,
@@ -106,83 +173,6 @@ services.AddInfoCarrierClient(o => o
 
 The backend still decides whether the query works. This setting does not permit implicit local
 filtering, ordering, grouping, joins or equality operations.
-
-## Tracking
-
-Change tracking works as it does with any provider, identity map and navigation fix-up included.
-For a read-only screen, opt out with `AsNoTracking()`. It is worth more here than in a local
-application: it skips change-tracking state for rows you are only going to display, and it keeps a
-long-lived client context from accumulating entities it will never write.
-
-## Streaming results
-
-Asynchronous, non-tracking queries yield rows while the server is still reading the result. Use
-`AsAsyncEnumerable()` when the caller can process one row at a time:
-
-```csharp
-await foreach (Order order in context.Orders
-    .AsNoTracking()
-    .Where(order => order.Freight > 50m)
-    .AsAsyncEnumerable())
-{
-    Render(order);
-}
-```
-
-Stopping enumeration disposes the response, cancels the server producer, and releases its
-database context. `ToListAsync()` still receives the streamed rows, but the list itself is complete
-only after enumeration finishes.
-
-The client can reconstruct projections incrementally after a query split. A concatenated query
-also preserves progressive delivery. Operations that need the complete input remain buffered.
-
-Tracked queries are buffered before client materialization. Entity identity and navigation fix-up
-can depend on later rows, so the client preserves the complete result graph before yielding it.
-Single-result operations are buffered for the same conservative boundary. Use `AsNoTracking()`
-for read-only queries that should stream.
-
-## Paging
-
-Compose `Skip` and `Take` before materializing:
-
-```csharp
-IQueryable<Customer> query = context.Customers;
-
-if (!string.IsNullOrEmpty(country))
-{
-    query = query.Where(c => c.Country == country);
-}
-
-List<Customer> page = await query
-    .OrderBy(c => c.Company)          // (1)
-    .Skip(pageIndex * pageSize)
-    .Take(pageSize)
-    .ToListAsync();
-
-int matching = await query.CountAsync();
-```
-
-1. Order before you page. Ordering must reach the server; implicit local sorting is refused.
-
-`Skip` and `Take` written after the `Select` run in the database too, even when the projection
-calls a method of your own.
-
-## Bulk operations
-
-`ExecuteUpdate` and `ExecuteDelete` run on the server and never load the rows.
-
-```csharp
-int updated = await context.Orders
-    .Where(o => o.CustomerId == "AROUT")
-    .ExecuteUpdateAsync(s => s.SetProperty(o => o.Freight, o => o.Freight + 1m));
-
-int deleted = await context.Orders
-    .Where(o => o.PlacedOn < cutoff)
-    .ExecuteDeleteAsync();
-```
-
-Both return the number of rows affected and, as with any EF Core provider, neither updates your
-local change tracker.
 
 ## What is not part of the surface
 
@@ -210,12 +200,18 @@ a type this package cannot name, so add it through `AddAllowedTypes(...)` in you
 ## Keys of your own types
 
 `GroupBy`, `Join`, `GroupJoin` and `DistinctBy` each take a key. Register named key types on both
-client and server. Version 11 rejects implicit local filtering, ordering, grouping, joins,
+client and server. InfoCarrier rejects implicit local filtering, ordering, grouping, joins,
 distinctness and equality before reading database rows. Final client projections remain supported.
 
 ```csharp
-// Requires PeriodKey registration on both roles.
-orders.GroupBy(o => new PeriodKey(o.Placed.Year, o.Placed.Month))
+public readonly record struct PeriodKey(int Year, int Month);
+```
+
+After registering that type on both sides, a query can use it as a key:
+
+```csharp
+IQueryable<Order> orders = context.Orders;
+var query = orders.GroupBy(o => new PeriodKey(o.PlacedOn.Year, o.PlacedOn.Month));
 ```
 
 Use the same registration method for both roles:
@@ -245,8 +241,14 @@ locally and transfers every selected order. Apply server filters and select need
 
 Every materialized query is a request, so a loop that queries per item makes one request per item.
 Compose the query instead, or fetch what you need with `Include`. To count what a screen actually
-costs, see [Counting round trips](../configuration/client.md#counting-round-trips).
+costs, see [Counting round trips](../operations/diagnostics.md#counting-round-trips).
 
 Requests towards the server have a default size limit; answers coming back have none, because the
 library has no basis for capping how large an answer your own query may have. To set one, see
-[client configuration](../configuration/client.md#payload-limits).
+[client configuration](../reference/options.md#byte-limits).
+
+For updates or deletes over a filtered set, use [bulk operations](saving.md#bulk-operations).
+
+## Feedback
+
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

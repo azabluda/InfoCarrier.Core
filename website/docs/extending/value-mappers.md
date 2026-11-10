@@ -4,10 +4,43 @@ Most values cross the wire without you thinking about them: numbers, strings, da
 byte arrays, and any type the model declares a value converter for. A few do not, and a value mapper
 is the seam for those.
 
+## Choose a converter or mapper
+
+Most application values already work: numbers, strings, dates, enums, GUIDs, and byte arrays.
+Built-in mappers handle `IPAddress` and `Uri`.
+
+If a value has a model conversion, use that on both sides.
+For example, add this Money type to the shared project:
+
+```csharp
+public readonly record struct Money(decimal Amount, string Currency);
+```
+
+Add the balance property inside Customer:
+
+```csharp
+public Money Balance { get; set; }
+```
+
+In `OnModelCreating`, configure its stored representation.
+This example uses `System.Globalization` and the shared Money type:
+
+```csharp
+modelBuilder.Entity<Customer>()
+    .Property(c => c.Balance)
+    .HasConversion(
+        m => m.Amount.ToString(CultureInfo.InvariantCulture) + " " + m.Currency,
+        s => new Money(decimal.Parse(s.Substring(0, s.IndexOf(' ')), CultureInfo.InvariantCulture),
+            s.Substring(s.IndexOf(' ') + 1)));
+```
+
+A model converter is usually enough for transport too.
+Use a value mapper when no converter is available or the value needs special handling during exchange.
+
 ## When you need one
 
-The wire's default handling of a non-primitive value is to walk its public readable members. That is
-right for an anonymous type, a record or a DTO, and wrong for a type whose members are computed:
+A mapper is useful when inspecting a value's public properties is not a safe representation.
+Examples include:
 
 - `NetTopologySuite.Geometries.Geometry` exposes `Boundary` and `Envelope`, both of which return
   geometries. Walking one recurses until the stack overflows.
@@ -16,9 +49,9 @@ right for an anonymous type, a record or a DTO, and wrong for a type whose membe
 
 A mapper claims such a value and writes it as one wire primitive instead.
 
-## What ships
+## Existing and spatial mappers
 
-`IPAddress` and `Uri`. Both are BCL types whose members throw for perfectly ordinary instances. An
+`IPAddress` and `Uri`. Both are standard .NET types whose members throw for perfectly ordinary instances. An
 application that stores one has chosen nothing unusual, so it should not have to discover this seam
 at all.
 
@@ -28,16 +61,19 @@ They are registered automatically on both roles:
 builder.Services.AddInfoCarrierServer<ShopContext>();
 ```
 
-A geometry mapper is deliberately not in the box, because shipping one would put a NetTopologySuite
-dependency in the package for a type most callers never use. Spatial types are fully supported and
-you supply the mapper, which is about thirty lines. There is a worked one in the repository's test
-utilities.
+For NetTopologySuite geometry values, supply a mapper appropriate to the representation both
+applications use. The repository's test utilities contain a
+[worked mapper](https://github.com/azabluda/InfoCarrier.Core/blob/main/test/InfoCarrier.Core.TestUtilities/InfoCarrierNetTopologySuiteValueMapper.cs).
+Copy and adapt the mapper into your shared application project.
 
-A spatial aggregate such as `UnaryUnionOp.Union(g.Select(s => s.Location))` names a NetTopologySuite
-class that your model never mentions. Add that class to the shared deployment builder. Without it,
-the query still answers, but the server sends every row and the client computes the aggregate.
+Register any extra helper types needed by spatial queries on both sides.
+The server's provider decides translation. InfoCarrier does not silently download all rows to run
+a refused grouping or aggregate locally. Choose local execution explicitly when that is intended.
 
-## Writing one
+## Write a mapper
+
+This is an alternative to the model converter above. The example includes the Money declaration;
+omit it if you already added that type to the shared project.
 
 Two methods, both of which may decline. A value no mapper claims falls through to exactly the
 behaviour it has today, so registering one cannot change how anything else travels.
@@ -106,12 +142,12 @@ Register the mapper on both halves, or a value that crosses in both directions i
 direction only. Put the mapper in the same application-owned deployment method:
 
 ```csharp
-// Client role
+// Client application
 builder.Services.AddInfoCarrierClient(o => o
     .WithEndpoint("https://api.example.com/infocarrier")
     .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
-// Server role
+// Server application
 builder.Services.AddInfoCarrierServer<ShopContext>(o => o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
 
 public static class ShopDeployment
@@ -126,19 +162,6 @@ Custom clients can apply the same callback through `InfoCarrierClient.Configure`
 Your own mappers get first refusal, ahead of anything the library derives from the model, so
 registering one is never overridden.
 
-## A converter in the model is usually enough
+## Feedback
 
-If the model already declares a value converter for the type, the wire uses it and you need no
-mapper:
-
-```csharp
-modelBuilder.Entity<Customer>()
-    .Property(c => c.Balance)
-    .HasConversion(
-        m => $"{m.Amount} {m.Currency}",
-        s => Money.Parse(s));
-```
-
-Both halves build the model from the same source, so both derive the same conversion. Reach for a
-mapper when there is no converter, or when the CLR type is dangerous to walk regardless of how it is
-stored.
+For questions or problems, [open an issue](https://github.com/azabluda/InfoCarrier.Core/issues/new).

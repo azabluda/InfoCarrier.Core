@@ -30,7 +30,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 ///         ran.</b> Two causes were defects of this provider, fixed in <c>InfoCarrierDatabase</c>: a
 ///         synchronous save raised the interceptor's asynchronous concurrency hook, and the event
 ///         carried the server's exception rather than the one the save then throws. The third is
-///         the limitation <c>website/docs/limitations.md</c> names; the override below runs the
+///         the limitation <c>website/docs/reference/limitations.md</c> names; the override below runs the
 ///         configuration that page recommends.
 ///     </para>
 /// </remarks>

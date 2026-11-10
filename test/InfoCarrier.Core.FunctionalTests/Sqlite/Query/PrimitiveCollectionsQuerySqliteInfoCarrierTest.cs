@@ -243,7 +243,7 @@ public class PrimitiveCollectionsQuerySqliteInfoCarrierTest(
     // CLAUDE.md then forbade. V12 overrode them with the core body on the owner's decision, and the
     // rule itself was replaced on 2026-09-15 by an override that says why. They were the R29
     // category (`OwnedJson.Associate_with_parameter_null`): a query this provider answers that other
-    // EF providers refuse, which is `website/docs/limitations.md`'s territory. None of the three is
+    // EF providers refuse, which is `website/docs/reference/limitations.md`'s territory. None of the three is
     // in it since 2026-09-22.
 
     private static async Task AssertApplyNotSupported(Func<Task> query)

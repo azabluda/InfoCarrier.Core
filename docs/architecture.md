@@ -1,4 +1,4 @@
-﻿# Architecture — InfoCarrier.Core v2
+# Architecture — InfoCarrier.Core v2
 
 Status: **PRE-IMPLEMENTATION (structure + strategy defined; internal seams provisional)**
 · Decisions: [`decisions.md`](decisions.md) · Serializer: [`expression-serialization.md`](expression-serialization.md)
@@ -17,7 +17,7 @@ Historical entries below retain their original configuration names. Version 11 r
 configuration builder, marker interfaces, and service-registration helpers with client/server options
 and `ConfigureShared`. Server policy comes from its immutable registration snapshot. Standard value
 mappers are automatic. See the [current configuration design](plans/v11/configuration-api-design.md)
-and [server configuration](../website/docs/configuration/server.md) for the maintained public surface.
+and [server configuration](../website/docs/applications/configuration/server.md) for the maintained public surface.
 
 ## 1. System overview
 
@@ -1477,8 +1477,8 @@ policy or change protocol version 1. The owner deferred that policy to issue #50
 
 ### D9 — a concurrency conflict is decided on the server, and a client-side suppression cannot complete the save (2026-09-27)
 
-**The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/limitations.md`,
-"Suppressing a concurrency exception in an interceptor on the client"), with an interceptor on the
+**The decision, the owner's, 2026-09-27: documented as a limitation** (`website/docs/reference/limitations.md`,
+"A client concurrency interceptor cannot suppress a server save failure"), with an interceptor on the
 server as the workaround. It was found when `SaveChangesInterceptionTestBase` moved to Tier B for
 #167's slow run and ran the concurrency tests Tier A had never run.
 

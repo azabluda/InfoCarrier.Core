@@ -36,6 +36,13 @@ and how to check the loaded solution first:
 
 @.claude/roslyn-codelens.md
 
+## EF Core 11 adoption
+
+Before adoption work, read [the adoption checklist](docs/plans/v11/adoption-checklist.md).
+Complete its documentation review before declaring adoption complete. Framework statements,
+examples, and the reserved release-note section must match verified behavior. Publication remains
+a separate decision; adoption alone does not remove unpublished-package notices.
+
 ## Commands
 
 **Write all new and changed repository-owned engineering automation in C# file-based applications
@@ -246,7 +253,6 @@ helpers in `eng/shared/`, and command data. Each command explains its behavior i
 | `dotnet run --file eng/TrxFailures.cs -- <results.trx> [more.trx ...]` | The failing test names across every TRX given, unioned and sorted, one per line. Uses XML parsing because `>` is legal unescaped in an XML attribute value, so `[^>]*` truncates any test name containing one. |
 | `dotnet run --file eng/DocLinks.cs -- [file...]` | Validates every in-repo Markdown link **including its `#anchor`**. `mkdocs build --strict` checks only that the page exists, so a renamed heading breaks inbound links silently. Exit 1 if any is broken. |
 | `dotnet run --file eng/WireContract.cs -- [--base-ref target] [--record]` | Compares actual default serialization contracts with protected committed descriptions. Records a candidate only after compatibility checks pass. Run for serializer, contract, codec, or dependency changes; see `docs/wire-protocol.md` for coverage and limitations. |
-| `dotnet run --file eng/DocWords.cs -- [--all] [--budget]` | Prose word count against the budgets in `docs/doc-style.md`. Not `wc -w`, which counts fenced code and link URLs. Exit 1 if a file is over. |
 | `dotnet run --file eng/DocsServe.cs -- [--build]` | Serves the documentation site locally with live reload; `--build` runs `mkdocs build --strict` instead. |
 | `dotnet run --file eng/MakeIcons.cs --` | Regenerates every shipped icon from `docs/assets/icon-source.png`. Run it when the artwork changes; none of its outputs is ever edited by hand. |
 
@@ -363,7 +369,7 @@ Each is cheap to avoid, and the account of what it cost is in
 | `docs/security-review.md` | **M5's review of the deserialization path** (C48). Read §2 before adding anything to `TypeAllowlist`: its safety is a conjunction across several clauses, and `Binder`/`MethodInfo`/`Activator` each break it alone. |
 | `docs/build-warnings.md` | **Which warning codes are fatal, which are suppressed, where, and why. Read before adding any `NoWarn`.** **Green is not zero here**: the gate build reports `5 Warning(s), 0 Error(s)`, the five being `IL2110`/`IL2111` from the framework's own Razor output in `samples/Northwind.Client`, downgraded from error on purpose so the trim ratchet can still count them. Debug reports `0 Warning(s)`, which is why "the build is clean" stood uncorrected for five milestones. |
 | `docs/plans/v10/cold-read-findings.md` | **What seven readers with no context found in the user-facing docs**, and what is still open. §1 holds the `IgnoreQueryFilters` design question: the marker crosses the wire and the server honours it, so a global query filter is **not** an authorization boundary today. Read before touching the security or tenancy prose. |
-| `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Word budgets, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
+| `docs/doc-style.md` | **The rules for every document a consumer reads** (README, `src/*/PACKAGE.md`, `website/`, the GitHub release bodies). Plain language, the no-dash and no-rationale rules, and the reference set they were measured against. `docs/` itself is exempt. Read before editing any of those files. |
 | `docs/versioning.md` | **How a version is decided and how a release is shipped**, including the hotfix path off a release line, and a "what has bitten us" list of traps invisible from the code. **Read it before tagging**, and before cutting a release branch. |
 | `docs/test-policy.md` | **What a test of this suite may assert, and why.** The override rule and its typed reasons, the promises this provider makes about the SQL its server runs (`Sqlite/ServerSqlTest.cs`), and the investigation that finds new ones (the slow run of #167). **Read it before overriding a specification test or adding a golden SQL string.** |
 | `docs/upstream-defects.md` | **Defects in somebody else's code, and which ones have been reported.** §1 is what nobody has sent; §2 is what an issue number already covers. **Read it before citing an issue number**: one citation here named a Backlog feature request rather than the defect it was attached to, for two milestones. §1.6-1.10 are `MongoDB.EntityFrameworkCore` defects, whose bugs go to the **Jira `EF` project** rather than GitHub. Each entry says what it blocks, because a defect that blocks nothing needs a report and not a workaround. |
@@ -585,7 +591,7 @@ projection split, `SaveChanges` and lazy loading all work end-to-end.
 ### What may and may not be claimed
 
 **The consumer-facing statement of what is missing is
-[`website/docs/limitations.md`](website/docs/limitations.md)**, and that is the document to keep
+[`website/docs/reference/limitations.md`](website/docs/reference/limitations.md)**, and that is the document to keep
 true. It names one unsupported scenario, message-text differences on a refused query, and queries
 this provider *answers* that other EF providers reject. **It no longer claims a count of any of
 them**: a count was wrong twice, once because the suite grew under it and once because the honest
