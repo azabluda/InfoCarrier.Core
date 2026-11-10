@@ -1,6 +1,16 @@
 # Loading related data
 
-Every way EF Core loads a navigation works here, and each one costs a round trip you can see.
+Use the Shop model from the [first tutorial](../getting-started/first-app.md).
+Load related entities with the original query or request them later when the user needs them.
+
+## Choosing
+
+| You want | Use | Cost |
+|---|---|---|
+| A list plus its related data | `Include` | one request |
+| Detail for the row the user just clicked | `LoadAsync` | one request, when clicked |
+| A count or a filtered subset of a navigation | `.Collection(…).Query()` | one request, small answer |
+| Convenience in a non-UI, non-browser client | lazy loading | one request per touched navigation |
 
 ## Eager loading, one round trip
 
@@ -9,7 +19,7 @@ Every way EF Core loads a navigation works here, and each one costs a round trip
 ```csharp
 List<Order> orders = await context.Orders
     .Include(o => o.Customer)
-    .Where(o => o.Freight > 50m)
+    .Where(o => o.CustomerId == "ALFKI")
     .ToListAsync();
 
 // orders[0].Customer is populated. No further request.
@@ -18,6 +28,7 @@ List<Order> orders = await context.Orders
 Filtered includes work too. This uses the tutorial's existing Customer and Order model:
 
 ```csharp
+DateTime cutoff = new DateTime(2025, 1, 1);
 List<Customer> customers = await context.Customers
     .Include(c => c.Orders.Where(o => o.PlacedOn > cutoff))
     .ToListAsync();
@@ -34,6 +45,7 @@ Load a navigation on an entity you already have:
 Customer customer = await context.Customers.SingleAsync(c => c.Id == "ALFKI");
 
 await context.Entry(customer).Collection(c => c.Orders).LoadAsync();
+Order order = await context.Orders.SingleAsync(o => o.Id == 1);
 await context.Entry(order).Reference(o => o.Customer).LoadAsync();
 ```
 
@@ -79,16 +91,7 @@ proxies add a model convention.
     Automatic lazy loading is impossible in a browser: browser HTTP does not support the required synchronous request.
     Do not depend on when a platform exception occurs. Use
     `LoadAsync`. The whole story is on the
-    [Blazor WebAssembly](../getting-started/blazor-webassembly.md) page.
-
-## Choosing
-
-| You want | Use | Cost |
-|---|---|---|
-| A list plus its related data | `Include` | one request |
-| Detail for the row the user just clicked | `LoadAsync` | one request, when clicked |
-| A count or a filtered subset of a navigation | `.Collection(…).Query()` | one request, small answer |
-| Convenience in a non-UI, non-browser client | lazy loading | one request per touched navigation |
+    [Blazor WebAssembly](blazor-webassembly.md) page.
 
 ## Only what you need
 

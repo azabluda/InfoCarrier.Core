@@ -1,6 +1,8 @@
 # Replace serialization
 
 A serializer converts envelopes and operation payloads to bytes and back.
+The built-in JSON serializer is sufficient for the normal application setup.
+Replace it when your application requires a different message format or serializer behavior.
 Use compatible implementations on the client and server.
 
 `IInfoCarrierSerializer` requires synchronous and asynchronous byte-array methods.

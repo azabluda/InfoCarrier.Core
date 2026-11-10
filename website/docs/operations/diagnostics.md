@@ -4,6 +4,16 @@ Start by checking whether the server reported a failure or the connection failed
 The [error guide](errors.md) lists the exception types.
 For a lost write response, follow [write recovery](write-recovery.md) before retrying.
 
+## Start with the symptom
+
+| Symptom | First check |
+|---|---|
+| A query throws | Read the query failure and exception chain before changing registration or translation. |
+| A save reports a constraint or concurrency failure | Inspect the server-reported exception. Treat a connection failure separately. |
+| A save response is lost | Follow [write recovery](write-recovery.md); do not resend it automatically. |
+| A screen is slow or sends many requests | Count client requests, then inspect queries and navigation loads. |
+| Several endpoints behave differently | Check registration names and labels on both client and server. |
+
 ## Log client execution
 
 ```csharp

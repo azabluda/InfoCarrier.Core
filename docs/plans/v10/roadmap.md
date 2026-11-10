@@ -27,7 +27,7 @@ rather than hidden by the in-process harness.
 
 **The suite is green since 2026-09-15**, across the spec project and ADR-009 Tier D, and every
 override of a specification test says what the store does and where that is shown ([`test-policy.md`](../../test-policy.md)). What is missing is stated for consumers in
-[`limitations.md`](../../../website/docs/overview/limitations.md).
+[`limitations.md`](../../../website/docs/reference/limitations.md).
 
 **This read `Total tests: 29514, Passed: 29237, Failed: 39` (2026-09-07) until then**, with every
 failure classified in `test/known-failures.txt` and `eng/ratchet.sh` gating the failing names on

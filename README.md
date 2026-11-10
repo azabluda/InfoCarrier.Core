@@ -54,7 +54,7 @@ must run on the server unless the application explicitly chooses local execution
 
 HTTP is included. Custom transports implement both `Send` and `SendAsync`.
 The server's database provider determines which queries it can translate.
-Read [limitations](website/docs/overview/limitations.md),
+Read [limitations](website/docs/reference/limitations.md),
 [security](website/docs/operations/security.md), and
 [client/server compatibility](website/docs/reference/compatibility.md) before adopting.
 

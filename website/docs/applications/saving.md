@@ -1,16 +1,19 @@
-# Saving changes
+# Save changes
+
+These examples use the seeded customer and order from the [first tutorial](../getting-started/first-app.md).
+Use a fresh context for each independent operation.
 
 `SaveChanges` is one unit of work and one request. Everything the change tracker holds travels
 together, the server replays it against a real `DbContext`, and it is written in one `SaveChanges`
 there.
 
 ```csharp
-Order order = await context.Orders.SingleAsync(o => o.Id == 2);
+Order order = await context.Orders.SingleAsync(o => o.Id == 1);
 order.Freight = 15m;
 
 context.Orders.Add(new Order
 {
-    CustomerId = "AROUT",
+    CustomerId = "ALFKI",
     PlacedOn = DateTime.UtcNow,
     Freight = 5m,
 });
@@ -28,7 +31,7 @@ The client cannot know the key an identity column will produce, so before the sa
 entity's key is a placeholder. After the save it is the real value:
 
 ```csharp
-var order = new Order { CustomerId = "AROUT", PlacedOn = DateTime.UtcNow, Freight = 5m };
+var order = new Order { CustomerId = "ALFKI", PlacedOn = DateTime.UtcNow, Freight = 5m };
 context.Orders.Add(order);
 
 await context.SaveChangesAsync();
@@ -75,13 +78,30 @@ Many-to-many relationships, including their join rows, work the same way.
 ## Deleting
 
 ```csharp
-Order order = await context.Orders.SingleAsync(o => o.Id == 4);
+Order order = await context.Orders.SingleAsync(o => o.Id == 1);
 context.Orders.Remove(order);
 await context.SaveChangesAsync();
 ```
 
 To delete without loading the row first, use `ExecuteDeleteAsync`. See
 [Bulk operations](#bulk-operations).
+
+## Bulk operations
+
+`ExecuteUpdate` and `ExecuteDelete` run on the server and never load the rows.
+
+```csharp
+int updated = await context.Orders
+    .Where(o => o.CustomerId == "ALFKI")
+    .ExecuteUpdateAsync(s => s.SetProperty(o => o.Freight, o => o.Freight + 1m));
+
+int deleted = await context.Orders
+    .Where(o => o.PlacedOn < new DateTime(2025, 1, 1))
+    .ExecuteDeleteAsync();
+```
+
+Both return the number of rows affected and, as with any EF Core provider, neither updates your
+local change tracker.
 
 ## Concurrency
 
@@ -106,7 +126,7 @@ catch (DbUpdateConcurrencyException ex)
 
 `GetDatabaseValuesAsync` reads through the server like any other query, so it costs a request.
 
-## What the client sends
+## Server-side processing
 
 Only the entries the change tracker considers changed, and only what the server needs to replay
 them: which entity type, which key, which properties changed, and their values. Entities you merely
@@ -131,23 +151,6 @@ the instance that began it can end it.
 
 [Handling errors](../operations/errors.md) has what is safe to retry and what is not, and
 [Transactions](transactions.md) has what an abandoned transaction costs.
-
-## Bulk operations
-
-`ExecuteUpdate` and `ExecuteDelete` run on the server and never load the rows.
-
-```csharp
-int updated = await context.Orders
-    .Where(o => o.CustomerId == "AROUT")
-    .ExecuteUpdateAsync(s => s.SetProperty(o => o.Freight, o => o.Freight + 1m));
-
-int deleted = await context.Orders
-    .Where(o => o.PlacedOn < cutoff)
-    .ExecuteDeleteAsync();
-```
-
-Both return the number of rows affected and, as with any EF Core provider, neither updates your
-local change tracker.
 
 ## Feedback
 

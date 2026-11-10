@@ -10,16 +10,15 @@ using Microsoft.EntityFrameworkCore;
 builder.Services.AddDbContext<ShopContext>(o =>
     o.UseSqlite("Data Source=shop.db"));
 
-builder.Services.AddInfoCarrierServer<ShopContext>(o =>
-    o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+builder.Services.AddInfoCarrierServer<ShopContext>();
 
 var app = builder.Build();
 app.MapInfoCarrier();
 await app.RunAsync();
 ```
 
-This assumes the [shared model](../../getting-started/first-app.md) and
-[shared configuration method](shared.md).
+This uses the [shared model](../../getting-started/first-app.md).
+The first tutorial also shows database creation and seed data.
 The server registration adds the serializer, server implementation, and standard value mappers.
 It does not register your database context or map an endpoint.
 

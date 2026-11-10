@@ -450,7 +450,7 @@ Both procedures below end at the same place, so the shared tail is written once.
    11.1, this includes published previous-minor acceptance evidence. Before the first stable 11.0,
    review the separate migration story against actual contract changes; an untested mechanism
    must not be described as validated.
-2. Update `website/docs/overview/limitations.md` if the failure set moved, and write the suite's figure
+2. Update `website/docs/reference/limitations.md` if the failure set moved, and write the suite's figure
    there: the `Total tests: …` line of `dotnet run --file eng/Measure.cs --`'s own summary, then
    ``Measured against `10.2.0`.``. **It is the only count a published page gives, and nothing
    between two releases edits it** (2026-09-21): refreshed by hand after each run, the counts

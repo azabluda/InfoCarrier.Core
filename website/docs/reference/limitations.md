@@ -1,4 +1,4 @@
-# Limitations
+# Detailed limitations
 
 InfoCarrier.Core runs Microsoft's own Entity Framework Core specification suite, the same suite the
 SQL Server, SQLite and InMemory providers run. This page explains important observable differences and unsupported operations, so you can judge whether any of them
@@ -101,13 +101,13 @@ These are not defects. They follow from where the client sits.
 | | |
 |---|---|
 | Relational-only APIs, such as `ExecuteSqlRaw`, `GetDbTransaction` and migrations, are not part of this provider's surface. Calling one throws. `FromSql` runs only where the server has granted it, and that grant is arbitrary SQL | [Querying](../applications/querying.md#what-is-not-part-of-the-surface) |
-| Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](../getting-started/blazor-webassembly.md) |
+| Automatic lazy loading does not work in Blazor WebAssembly | [Blazor WebAssembly](../applications/blazor-webassembly.md) |
 | The client assumes relational collection projection rules. Set `InfoCarrierClientOptions.ServerUsesRelationalQueryRules` to `false` for another store. Implicit local row decisions remain refused | [Querying](../applications/querying.md#rules-that-come-from-the-servers-store) |
 | The server's provider writes the SQL, so how a query is translated is settled there, not on the client. `EF.Constant` and `EF.Parameter` are part of your query, so they cross the wire and the server honours them | |
 | `EF.CompileQuery` changes nothing about the wire. The server answers a compiled query once per execution, as it answers any other query | [Querying](../applications/querying.md#round-trips-and-result-size) |
 | Asynchronous non-tracking queries stream rows. Tracked queries, single-result operations, and operators needing complete input remain buffered. Page large buffered results. | [Querying](../applications/streaming.md) |
 | Authentication and authorization are yours | [Security](../operations/security.md) |
-| Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming is a separate question, and it works. | [Blazor WebAssembly](../getting-started/blazor-webassembly.md#trimming) |
+| Native AOT is not supported: remoting a query means compiling an expression tree at runtime. Trimming needs application-specific verification. | [Publishing a browser client](../applications/blazor-webassembly.md#publish-the-browser-client) |
 
 ## Check your application
 

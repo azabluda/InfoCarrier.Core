@@ -124,24 +124,24 @@ plugins:
 nav:
   - Overview:
       - What InfoCarrier does: index.md
-      - Capabilities and limitations: overview/limitations.md
+      - Choosing InfoCarrier: overview/choosing-infocarrier.md
   - Get started:
-      - Install packages: getting-started/installation.md
+      - Prepare your environment: getting-started/installation.md
       - Build your first client and server: getting-started/first-app.md
       - Run the samples: getting-started/samples.md
-      - Use Blazor WebAssembly: getting-started/blazor-webassembly.md
   - Build applications:
-      - Configuration:
-          - Share model and deployment settings: applications/configuration/shared.md
+      - Query data: applications/querying.md
+      - Save changes: applications/saving.md
+      - Load related data: applications/related-data.md
+      - Use transactions and savepoints: applications/transactions.md
+      - Stream query results: applications/streaming.md
+      - Build a Blazor WebAssembly client: applications/blazor-webassembly.md
+      - Configure your application:
           - Configure a client: applications/configuration/client.md
           - Configure a server: applications/configuration/server.md
+          - Share additional settings: applications/configuration/shared.md
           - Use multiple clients and endpoints: applications/configuration/multiple-endpoints.md
           - Use a document database: applications/configuration/document-stores.md
-      - Query data and control execution: applications/querying.md
-      - Stream query results: applications/streaming.md
-      - Load related data: applications/related-data.md
-      - Save and bulk-update data: applications/saving.md
-      - Use transactions and savepoints: applications/transactions.md
   - Deploy and operate:
       - Secure the deployment: operations/security.md
       - Isolate tenants: operations/tenants.md
@@ -150,15 +150,16 @@ nav:
       - Handle errors: operations/errors.md
       - Recover an uncertain write: operations/write-recovery.md
   - Extend:
+      - Map custom values: extending/value-mappers.md
       - Write transports and custom hosts: extending/transports.md
       - Replace serialization: extending/serialization.md
       - Replace services and pipelines: extending/services.md
-      - Map custom values: extending/value-mappers.md
       - Test without a network: extending/testing.md
   - Reference:
       - Public API index: reference/api.md
       - Configuration options and limits: reference/options.md
       - Client/server compatibility: reference/compatibility.md
+      - Detailed limitations: reference/limitations.md
   - What's new:
       - Choose an upgrade path: upgrades/index.md
       - Upgrade from 10.3 to 11: upgrades/from-10-to-11.md

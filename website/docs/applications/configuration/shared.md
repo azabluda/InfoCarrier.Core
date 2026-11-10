@@ -1,10 +1,13 @@
 # Share model and deployment settings
 
-Both applications must agree on the entity types and properties used in requests.
+The basic application needs only the shared context and entity model.
+Add shared deployment settings when a query uses extra helper types, anonymous structures, custom
+value conversion, or raw SQL.
 Start with the same [context and entity classes](../../getting-started/first-app.md).
 Enable model-changing options on both sides unless the platform guide documents an exception.
 
-Put additional settings in an ordinary shared method:
+For example, if both applications need the same registered anonymous structure,
+put its prototype in a shared method:
 
 ```csharp
 using InfoCarrier.Core;
@@ -52,7 +55,7 @@ The first matching mapper wins; adding another matching mapper later does not re
 Using shared source helps prevent mistakes. It does not check that separately deployed applications
 use the same build or configuration.
 
-## Register types without promising translation
+## Add a helper or key type
 
 A named key or helper type must exist in both applications.
 Registering it allows the expression to reach the server.

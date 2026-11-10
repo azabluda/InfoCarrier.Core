@@ -64,7 +64,7 @@ Stop the server before deleting that sample database to reset it.
 | `Northwind.Demo` | Console client |
 
 [Open in Codespaces](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) for the repository's
-development environment. See [browser constraints](blazor-webassembly.md) before adapting the browser client.
+development environment. See [browser constraints](../applications/blazor-webassembly.md) before adapting the browser client.
 
 ## Feedback
 

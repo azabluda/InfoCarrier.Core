@@ -9,8 +9,7 @@ Register a name when an application calls several servers:
 
 ```csharp
 builder.Services.AddInfoCarrierClient("orders", options => options
-    .WithEndpoint("https://orders.example.com/infocarrier")
-    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+    .WithEndpoint("https://orders.example.com/infocarrier"));
 
 builder.Services.AddDbContextFactory<ShopContext>(options =>
     options.UseInfoCarrier(clientName: "orders"));
@@ -44,7 +43,8 @@ public sealed class ShopContextFactory(DbContextOptions<ShopContext> options)
 }
 ```
 
-Register both InfoCarrier clients first, including `archive` with its endpoint and shared settings.
+Register both InfoCarrier clients first, including `archive` with its endpoint.
+Apply shared settings separately if the application needs them.
 Resolve these application factories with `GetRequiredKeyedService<IDbContextFactory<ShopContext>>(name)`.
 Calling ordinary `AddDbContextFactory<ShopContext>` twice does not create named factories.
 
@@ -54,10 +54,8 @@ Register separate servers when endpoints need different policies, even when they
 
 ```csharp
 InfoCarrierServerBuilder admin = builder.Services.AddInfoCarrierServer<ShopContext>("admin", o => o
-    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier)
     .AllowArbitrarySqlExecution(true));
 builder.Services.AddInfoCarrierServer<ShopContext>("public", o => o
-    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier)
     .AllowArbitrarySqlExecution(false));
 
 // After building the application
@@ -81,7 +79,9 @@ and disposes their open transactions at shutdown.
 
 ### Selecting a scoped context
 
-For two registrations of one context type with different stores, resolve a host-owned scoped context:
+For two registrations of one context type with different stores, resolve a host-owned scoped context.
+The following fragment assumes `archiveConnection` is your server-side SQL Server connection string
+and that the server references that database provider:
 
 ```csharp
 builder.Services.AddKeyedScoped<ShopContext>("archive", (sp, _) =>
@@ -89,7 +89,7 @@ builder.Services.AddKeyedScoped<ShopContext>("archive", (sp, _) =>
         .UseApplicationServiceProvider(sp).UseSqlServer(archiveConnection).Options));
 
 builder.Services.AddInfoCarrierServer<ShopContext>("archive",
-    configure: o => o.ConfigureShared(ShopDeployment.ConfigureInfoCarrier),
+    configure: null,
     resolveContext: sp => sp.GetRequiredKeyedService<ShopContext>("archive"));
 ```
 

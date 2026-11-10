@@ -35,9 +35,17 @@ Prefer concrete examples over compressed phrases such as "wire admission" or "re
 ownership". Keep exact method names, but explain them in ordinary words. This also applies to
 the overhaul proposal and progress reports.
 
-1. **The first sentence is an identity sentence, and it uses `is`.** "`InfoCarrier.Core` is an
-   Entity Framework Core provider for the client side of a multi-tier application." Not "serves
-   as", not "represents", not "brings the power of".
+Owner review, November 10, 2026: organize explanations around the reader's task and prior knowledge.
+For a task guide, establish a working normal case before optional details or unusual restrictions.
+Introduce a setting or concept when the reader needs it to take the next step. Put deployment
+concerns, tuning, and detailed contracts where their readers need them. Necessary security and
+data-loss instructions must still precede the affected action. A working example and a passing
+build do not establish that a page has a useful teaching order.
+
+1. **Start with what the reader needs.** Product overviews and package readmes start with an
+   identity sentence using `is`: "InfoCarrier.Core is an Entity Framework Core provider...".
+   Task guides start with the task or expected result. Reference pages state what they cover.
+   Do not force a product introduction into every guide.
 
 2. **No em dashes or en dashes.** Use a comma, a colon, a period, or parentheses. EF Core's package
    readmes contain none. Npgsql's README contains none. This repository contained 157 before the

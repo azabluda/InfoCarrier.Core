@@ -4,13 +4,71 @@ Reviewed November 4, 2026. Updated November 10, 2026.
 
 ## Implementation status
 
-All three approved content batches are implemented in this checkout. The site has 38 pages,
-with the approved menu, new page paths, and the complete SQLite tutorial. README, all package
-readmes, sample instructions, upgrades, and internal links have been updated.
+The first implementation pass is committed as `c76062b7`. It reorganized the site into 38 pages
+and added a working SQLite tutorial. It is not the completed editorial overhaul.
+The owner review found that the ordering still gives advanced details too much attention.
+The reader-order pass now addresses that across the site, not only on the Blazor page.
+Its changes and checks are recorded below. Browser interaction still requires a connected browser.
 
 The original review and decisions below remain as the record of why this work was done.
 The verification results at the end replace the earlier statement that examples had not been run.
 Publishing, pushing, and merging have not been performed.
+
+## Revised approach after owner review
+
+The first pass treated the existing material as content to sort into better folders.
+It checked whether examples worked, but did not sufficiently check whether their explanations
+helped a reader make progress. The Blazor page made the problem clear: setup appeared after
+compiled-model and trimming discussion, even though the page was in Getting started.
+
+The organizing question for the next pass is: what does the reader need to accomplish now?
+Begin with a complete normal case. Introduce a choice when the reader reaches that choice.
+Explain a restriction at the point where it changes the reader's action. Put detailed contracts,
+rare failures, and optional tuning in later sections or linked reference pages.
+Necessary security and data-loss instructions still belong before the affected action.
+
+### The reading path
+
+1. Understand what the product does and whether its architecture fits the application.
+2. Run one complete client/server example, read data, save a change, and see the result.
+3. Learn ordinary application work: queries, paging, saves, relationships, and transactions.
+4. Adapt that working application to a platform, another database, or more than one endpoint.
+5. Prepare deployment: authentication, authorization, configuration, observation, and recovery.
+6. Find exact settings or customize components when an actual requirement calls for it.
+
+This is a path through the documentation, not a requirement that everyone read the entire site.
+A returning reader must still be able to go directly to a task or reference entry.
+Existing menu approval does not establish that every page has the right priority or content.
+Change grouping where the reading path requires it. The current page count is not a target.
+
+### Problems to correct across the site
+
+| Area | First-pass problem | Direction for the next pass |
+|---|---|---|
+| Overview | The menu promises capabilities and limitations, but its second page begins with a rare concurrency-interceptor case. | Explain product fit, useful capabilities, and major architectural tradeoffs first. Link to exact unsupported cases. |
+| Getting started | Installation mixes the basic route with source packaging and authenticated development feeds. Blazor leads with advanced restrictions. | Keep one clear route to a first result. Move optional installation alternatives and platform details out of that route. |
+| Application guides | Querying discusses splitting, helper registration, and provider refusals before ordinary paging. Streaming precedes several more common tasks. | Teach everyday query and write tasks first. Explain execution details where they affect a shown query. |
+| Configuration | Shared settings and anonymous structures can look like prerequisites for the simplest application. | Start with minimal client/server setup. Introduce extra registrations only for examples that need them. |
+| Platform guides | Blazor is largely a list of unusual runtime behaviors, rather than a guide to using a browser client. | Start with working setup and a visible result. Follow with normal data loading and UI lifetime. Put publishing and unusual model options later. |
+| Deployment | Security opens with serializer protections before giving the application's deployment steps. | Lead with the actions the application owner must take. Explain protections and their limits in support of those actions. |
+| Customization | Some pages introduce implementation details before helping readers choose whether customization is needed. | Start with the need and the simplest supported solution, then a complete example and its contract. |
+| Reference | Precise details are useful, but introductory pages still repeat much of them. | Keep exact limits, defaults, protocol rules, and full signatures available for lookup. Link from guides at the relevant choice. |
+
+### How to judge each rewritten page
+
+Before editing, state its reader, task, prerequisites, and expected result in the review notes.
+Then read it from the previous page in that journey. Check whether the reader has already learned
+every required concept. For task pages, put a usable example before optional internals.
+Do not force the same template onto product explanations, reference tables, or release notes.
+
+After editing, ask whether the reader can complete the task without visiting unrelated pages.
+Check that warnings change a concrete action, that cross-links answer a current question, and that
+advanced detail does not interrupt the basic path. Compilation, links, and the strict build remain
+technical checks; none proves that this reading order is useful.
+
+First rework the complete Overview-to-first-save journey, including its onward links.
+Then apply the same review to ordinary application work, platform choices, deployment, customization,
+and reference. Treat the work as in progress until these journeys have been reviewed as a whole.
 
 ## What I recommend
 
@@ -78,61 +136,57 @@ An existing address can stay when it already fits. Keeping it is not a requireme
 ```text
 Overview
   What InfoCarrier does                         index.md
-  Capabilities and limitations                  overview/limitations.md
+  Choosing InfoCarrier                          overview/choosing-infocarrier.md
 Get started
-  Install packages                              getting-started/installation.md
+  Prepare your environment                      getting-started/installation.md
   Build your first client and server            getting-started/first-app.md
   Run the samples                               getting-started/samples.md
-  Use Blazor WebAssembly                        getting-started/blazor-webassembly.md
 Build applications
-  Configuration
-    Share model and deployment settings         applications/configuration/shared.md [new]
+  Query data                                    applications/querying.md
+  Save changes                                  applications/saving.md
+  Load related data                             applications/related-data.md
+  Use transactions and savepoints               applications/transactions.md
+  Stream query results                          applications/streaming.md
+  Build a Blazor WebAssembly client              applications/blazor-webassembly.md
+  Configure your application
     Configure a client                          applications/configuration/client.md
     Configure a server                          applications/configuration/server.md
-    Use multiple clients and endpoints          applications/configuration/multiple-endpoints.md [new]
-    Use a document database                     applications/configuration/document-stores.md [new]
-  Query data and control execution               applications/querying.md
-  Stream query results                          applications/streaming.md [new]
-  Load related data                             applications/related-data.md
-  Save and bulk-update data                     applications/saving.md
-  Use transactions and savepoints               applications/transactions.md
+    Share additional settings                   applications/configuration/shared.md
+    Use multiple clients and endpoints          applications/configuration/multiple-endpoints.md
+    Use a document database                     applications/configuration/document-stores.md
 Deploy and operate
   Secure the deployment                         operations/security.md
   Isolate tenants                               operations/tenants.md
-  Operate transactions across requests          operations/transactions.md [new]
-  Diagnose requests and execution               operations/diagnostics.md [new]
+  Operate transactions across requests          operations/transactions.md
+  Diagnose requests and execution               operations/diagnostics.md
   Handle errors                                 operations/errors.md
-  Recover an uncertain write                    operations/write-recovery.md [new]
+  Recover an uncertain write                    operations/write-recovery.md
 Extend
-  Write transports and custom hosts             extending/transports.md
-  Replace serialization                         extending/serialization.md [new]
-  Replace services and pipelines                extending/services.md [new]
   Map custom values                             extending/value-mappers.md
-  Test without a network                        extending/testing.md [new]
+  Write transports and custom hosts             extending/transports.md
+  Replace serialization                         extending/serialization.md
+  Replace services and pipelines                extending/services.md
+  Test without a network                        extending/testing.md
 Reference
   Public API index                              reference/api.md
-  Configuration options and limits               reference/options.md [new]
-  Client/server compatibility                    reference/compatibility.md [new]
-What’s new
-  Choose an upgrade path                        upgrades/index.md [new]
-  Upgrade from 10.3 to 11                        upgrades/from-10-to-11.md [new, development only]
-  Upgrade from 3.1                               upgrades/from-3-to-10.md
-  Release notes
-    11.0 (draft, development only)               release-notes/11.0.md
-    10.3                                        release-notes/10.3.md
-    10.2                                        release-notes/10.2.md
-    10.1                                        release-notes/10.1.md
-    10.0                                        release-notes/10.0.md
+  Configuration options and limits              reference/options.md
+  Client/server compatibility                   reference/compatibility.md
+  Detailed limitations                          reference/limitations.md
+What's new
+  Choose an upgrade path                        upgrades/index.md
+  Upgrade from 10.3 to 11                        upgrades/from-10-to-11.md
+  Upgrade from 3.1 to 10                         upgrades/from-3-to-10.md
+  Release notes                                 release-notes/11.0.md and 10.x pages
 ```
 
-This gives the development site 38 pages. There were 23 in the original review; we then added
+The reader-order pass gives the development site 39 pages. There were 23 in the original review; we then added
 the 11.0 draft. Most proposed additions take material out of long existing pages.
 Do not add empty introduction pages just to fill the menu.
 
 | Section | Who it helps | What belongs there |
 |---|---|---|
 | Overview | Someone evaluating the product | What it does, its limits, and links to security and version support |
-| Get started | Someone using it for the first time | One complete working application, samples, and browser setup |
+| Get started | Someone using it for the first time | One complete working application and samples |
 | Build applications | Someone writing application code | Client/server setup, queries, saves, relationships, and transactions |
 | Deploy and operate | Someone running an application | Security, tenant isolation, logs, transaction expiry, and failure recovery |
 | Extend | Someone replacing a built-in component | Custom transports, serializers, services, value conversion, and testing |
@@ -151,7 +205,7 @@ at the old address. Split material should live with the task it explains.
 | Existing page | Proposed destination | What changes |
 |---|---|---|
 | `index.md` | `index.md` | Keep the diagram. Correct the version and query-execution claims. Put it under Overview. |
-| `limitations.md` | `overview/limitations.md` | Describe limits for the documented version. Label dated test evidence clearly. |
+| `limitations.md` | `reference/limitations.md` | Keep detailed unsupported cases in Reference. The new product-fit page covers major adoption considerations first. |
 | `getting-started/installation.md` | `getting-started/installation.md` | Explain all three packages and distinguish published packages from development builds. |
 | `getting-started/first-app.md` | `getting-started/first-app.md` | Make the application runnable from an empty directory. Move testing without a network to Extend. |
 | `getting-started/samples.md` | `getting-started/samples.md` | Tell readers which release tag or development revision to use. Update the explanation of the request inspector. |
@@ -165,7 +219,7 @@ at the old address. Split material should live with the task it explains.
 | `configuration/server.md` | `applications/configuration/server.md` | Keep context and endpoint setup. Move shared settings, document databases, transaction operation, and logs to their dedicated pages. |
 | `configuration/transports.md` | `extending/transports.md` | Keep custom transports and hosting. Move serialization, service replacement, compatibility, and network-free testing out. |
 | `configuration/value-mappers.md` | `extending/value-mappers.md` | Keep the worked example. Explain mapper order and declared types. Recheck the spatial-query advice. |
-| `platforms/blazor-webassembly.md` | `getting-started/blazor-webassembly.md` | Keep browser setup and trimming requirements. Check what synchronous calls now do in a browser. |
+| `platforms/blazor-webassembly.md` | `applications/blazor-webassembly.md` | Build a customer page against the working tutorial server first. Put publishing and compiled-model options after normal use. |
 | `security.md` | `operations/security.md` | Put it under Deploy and operate. Explain authorization and link to the relevant settings. |
 | `multi-tenancy.md` | `operations/tenants.md` | Put it beside security. Check a complete example for reads, ordinary saves, and bulk writes. |
 | `api-surface.md` | `reference/api.md` | Keep it as an index of the public application programming interface (API). Correct the event list and link to detailed reference pages. |
@@ -553,3 +607,44 @@ Historical release examples retain their version-specific syntax. Their detail l
 to source pages at the corresponding release tags. The 11.0 draft links to the new guides.
 Retired public addresses and anchors are intentionally not preserved with redirects.
 Previously published package readmes and release bodies are unchanged.
+
+## Reader-order pass, November 10, 2026
+
+The owner approved the revised approach. This pass changes teaching order and examples, as well
+as menu placement.
+
+| Reader journey or page group | Result of the review |
+|---|---|
+| Home and product choice | Home explains the application relationship and leads to a working example. A new Choosing InfoCarrier page covers capabilities, model sharing, network requests, and server responsibilities. Rare limitations moved to Reference. |
+| Installation and first application | One source-based route leads directly to the tutorial without building the entire solution. Local packages and authenticated feeds follow as optional alternatives. Project roles and prerequisites are explicit. |
+| Queries | Ordinary filtering, paging, selection, and tracking come first. Helper registration, query splitting, raw SQL, and custom keys follow only after those tasks. |
+| Saves and relationships | Examples use the tutorial's actual seeded customer. Bulk changes sit with normal writes. Relationship-loading choices precede the more specialized proxy case. Missing variables were supplied. |
+| Transactions | The basic transaction explains its purpose before implementation details. Savepoint and shared-transaction examples now contain actual Shop operations instead of undefined helper methods. |
+| Client and server setup | Minimal examples no longer require an unexplained shared helper. Extra shared registrations have their own later task. |
+| Multiple endpoints and document stores | These remain optional configuration tasks, rather than steps on the first-application path. Endpoint examples no longer require an unused shared method. Required document-write protection stays before the affected writes. |
+| Browser client | Moved to Build applications. The page creates a project, configures the endpoint and local cross-origin access, adds a customer component, and gives its address. Publishing, trimming, and compiled models follow the working example. |
+| Security and tenants | Security now starts with deployment actions: authenticate, enforce data permissions, bind transactions, and set transport/resource controls. Serializer protections follow those steps. The tenant page retains its checked database-selection example. |
+| Errors, diagnostics, transaction operation, and recovery | Error and diagnostic pages start with the reader's symptom and response. Transaction operation and write recovery already follow their specific deployment tasks, with required safeguards before retrying writes. |
+| Customization | The pages first help readers choose the appropriate extension point. The mapper guide presents the usual model converter before a custom mapper and special value hazards. |
+| Reference and release history | Exact defaults, limits, signatures, and compatibility stay available for direct lookup. Historical release examples retain their historical meaning. Release notes and upgrades do not become prerequisites for a new application. |
+
+Verification for changed examples:
+
+- A standalone Blazor project created from the installed template compiled with the exact Program
+  and Customers component copied from the guide. Restore needed network access outside the sandbox.
+- The exact server cross-origin snippets compiled. A preflight request from
+  `http://localhost:5182` received HTTP 204 with that allowed origin, POST, and the requested headers.
+- Eleven common-guide code blocks compiled and ran through HTTP against the Shop server:
+  queries, paging, projections, saves, eager/explicit loading, transactions, savepoints, and two
+  contexts sharing a transaction.
+- The first tutorial's model and application code were retained from the prior successful run.
+  This pass changes its introduction and onward route.
+- Full transport and document-store suites were not repeated: this pass changes documentation,
+  and the relevant existing behavior was already checked in the first pass.
+- A compiled browser project is not evidence of rendered browser behavior. A browser later connected,
+  but its navigation and keyboard APIs failed before loading the preview. The documented fallback
+  failed too. Interactive browser execution, desktop/mobile appearance, and keyboard/search
+  interaction remain explicitly unverified.
+
+The remaining review is whether the revised reading journeys work for the owner and other readers.
+Do not describe technical build checks as proof of that editorial result.

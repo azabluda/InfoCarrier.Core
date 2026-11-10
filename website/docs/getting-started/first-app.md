@@ -7,6 +7,17 @@ updates it, and reads it again through a fresh context.
 These instructions use the version 11 development source described in [installation](installation.md).
 They are for local development. Secure a deployed endpoint using the [security guide](../operations/security.md).
 
+## Before you start
+
+Follow [installation](installation.md) to install the SDK and clone the source.
+The commands below use PowerShell and start in that checkout.
+
+| Project | Job |
+|---|---|
+| `Shop.Shared` | Entity classes and the context model used by both applications |
+| `Shop.Server` | SQLite database and HTTP endpoint |
+| `Shop.Client` | Console application that reads and saves through the server |
+
 ## 1. Create three projects
 
 Run these commands in PowerShell. Start in your InfoCarrier repository checkout:
@@ -110,8 +121,7 @@ app.MapInfoCarrier();
 await app.RunAsync();
 ```
 
-Database creation runs on the server's SQLite context.
-Client calls such as `EnsureCreated` and `CanConnect` are unsupported.
+This creates the database through the server's SQLite context and adds the example data once.
 
 Start the server:
 
@@ -171,11 +181,10 @@ The second context confirms the saved value came back from the server.
 
 ## Continue
 
-- [Configure a client](../applications/configuration/client.md) with a context factory.
-- [Query data](../applications/querying.md), [save changes](../applications/saving.md),
-  and [load relationships](../applications/related-data.md).
-- [Use transactions](../applications/transactions.md) for work spanning several requests.
-- [Handle errors](../operations/errors.md) before adding retries.
+- [Query data](../applications/querying.md): filter, select, and page results.
+- [Save changes](../applications/saving.md): insert, update, and delete entities.
+- [Load relationships](../applications/related-data.md) or [use transactions](../applications/transactions.md).
+- [Configure a client](../applications/configuration/client.md) when adding a context factory to an application.
 
 ## Feedback
 

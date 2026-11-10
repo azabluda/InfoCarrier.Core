@@ -7,14 +7,13 @@ using InfoCarrier.Core;
 using Microsoft.EntityFrameworkCore;
 
 builder.Services.AddInfoCarrierClient(o => o
-    .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+    .WithEndpoint("https://api.example.com/infocarrier"));
 
 builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 ```
 
-This example assumes the [shared model](../../getting-started/first-app.md) and
-[shared configuration method](shared.md).
+This example uses the [shared model](../../getting-started/first-app.md).
+No extra type registrations or custom mappers are needed for basic queries and saves.
 Inject `IDbContextFactory<ShopContext>` into the code that needs data.
 Dispose each context after the operation. Contexts are not thread-safe.
 
@@ -47,8 +46,7 @@ For a console application or another application that owns an `HttpClient`:
 ```csharp
 using var http = new HttpClient();
 IInfoCarrierClient client = InfoCarrierClient.Create(http, o => o
-    .WithEndpoint("https://api.example.com/infocarrier")
-    .ConfigureShared(ShopDeployment.ConfigureInfoCarrier));
+    .WithEndpoint("https://api.example.com/infocarrier"));
 
 var options = new DbContextOptionsBuilder<ShopContext>()
     .UseInfoCarrier(client).Options;

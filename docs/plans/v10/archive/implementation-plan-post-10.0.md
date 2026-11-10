@@ -22,7 +22,7 @@ and it may be a 10.0.x patch or a later minor. Closed milestones are archived an
 
 The suite stands at `Total tests: 22662, Passed: 22476, Failed: 9, Skipped: 177`. All nine are
 classified in the archived M9 plan and stated for consumers in
-[`limitations.md`](../../../../website/docs/overview/limitations.md).
+[`limitations.md`](../../../../website/docs/reference/limitations.md).
 
 ## Phase Q — verifying the cancellation path over HTTP
 
@@ -1208,7 +1208,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       **What it does cost is a silent wrong-shaped answer**: a consumer calling `AsSplitQuery` here
       gets correct results from an unsplit query and no diagnostic at all. That is an owner's
       decision on two counts — whether to adopt those bases, and whether
-      [`website/docs/limitations.md`](../../../../website/docs/overview/limitations.md) should name the silent
+      [`website/docs/limitations.md`](../../../../website/docs/reference/limitations.md) should name the silent
       ignore — and **neither is taken here**.
       `test/` only.
 
@@ -1471,7 +1471,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       provider now does what its own `QueryMarkers` list says it does. **What it does not change is
       the consumer-facing question** the owner reserved: a caller who writes `AsSplitQuery` still
       gets correct results from one statement and no diagnostic, and
-      [`limitations.md`](../../../../website/docs/overview/limitations.md) still does not say so.
+      [`limitations.md`](../../../../website/docs/reference/limitations.md) still does not say so.
       Gates: trim ratchet OK (89 ≤ 89), Release build `5 Warning(s), 0 Error(s)`.
 
 - [x] **R60. Five of the six Split bases ADOPTED — 1110 tests, every one green.** Missing bases
@@ -1930,7 +1930,7 @@ re-parents of families already running, because R25–R30 showed that is where t
       `FromSqlRaw` with a filter gets every row of the table and no diagnostic. It is
       consumer-visible, it is undocumented, and **it is not reached by the suite today** - no
       adopted base calls `FromSqlRaw` - which is why 22472 green never saw it. It belongs in
-      [`limitations.md`](../../../../website/docs/overview/limitations.md), and it is the sharpest single input
+      [`limitations.md`](../../../../website/docs/reference/limitations.md), and it is the sharpest single input
       to #60.
 
       **The `RelationalTestStore` cast was hiding the question, and lifting it is what answered

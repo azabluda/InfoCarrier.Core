@@ -1,119 +1,112 @@
-# Security
+# Secure the deployment
 
-Your server executes an expression tree that arrived over the network. That is the product, and the
-thing to think about before deploying it.
+Protect the InfoCarrier endpoint before exposing it to other users.
+It accepts both client-composed queries and writes.
 
-## What the library stops
+This guide assumes a working client/server application and an ASP.NET Core authentication scheme
+configured for your identity provider.
 
-Deserialization is default-deny. The node kinds a payload may contain, the types it may name and the
-methods it may call are each checked against an allowlist; anything not on it is refused rather than
-resolved, and the library loads no assembly to satisfy a payload. The allowlist excludes the
-members that would turn a resolved `Type` back into a call, the classic route from "a tree can name
-a type" to "a tree can invoke anything".
+## 1. Authenticate requests
 
-There is a size limit too, applied before parsing begins and defaulting to 64 MiB on requests
-towards the server. A flat array of a hundred million constants is only three levels deep, so a
-depth limit alone does not cap the memory a parse costs. See
-[server configuration](../reference/options.md#byte-limits).
-
-A client also cannot name a type the server's model does not have. The query runs against the
-server's `DbContext`, so the entity types in your shared model are the whole of what a client can
-compose over. That surface is a boundary until a server grants `FromSql`, because raw SQL names its
-own tables. A query filter is not one either, for the reason below.
-
-`AddAllowedTypes(...)` widens that surface by the types you name, and the usual reason
-to need it is your provider's `EF.Functions` family. Do not register arbitrary reflection or runtime-invocation types: `Binder`, `MethodInfo` and `Activator` each break it
-on their own, none of them looking dangerous alone.
-
-Anonymous projections require a finite trusted server catalog. The server matches complete
-descriptors and actual component types against replacements constructed during trusted configuration.
-Unknown requests cannot emit new types or use another catalog's cached entries. Component permissions
-are checked again on every execution. See
-[shared configuration](../applications/configuration/shared.md#register-anonymous-structures).
-
-This prevents client-driven exhaustion of generated-shape capacity. The 4,096-attempt process limit
-still applies to trusted configuration. It does not limit every permitted method's execution cost;
-for example, descriptor limits do not inspect strings passed to runtime `Type.GetType` calls.
-
-## What is yours
-
-!!! danger "Authentication and authorization are out of scope"
-
-    The envelope does not establish caller identity. Configure authentication and access rules
-    in your application. An unprotected endpoint accepts queries and writes from anyone who can reach it.
-
-Two things to do, both required.
-
-### 1. Authenticate the transport
-
-The endpoint takes ordinary ASP.NET Core conventions:
+Add an authorization policy before building the server application:
 
 ```csharp
-app.MapInfoCarrier()
-   .RequireAuthorization("DataAccess");
+builder.Services.AddAuthorization(options => options.AddPolicy("DataAccess", policy =>
+    policy.RequireAuthenticatedUser()));
 ```
 
-On the client, authenticate the `HttpClient`. See
-[client configuration](../applications/configuration/client.md#configure-http).
+Map the endpoint with that policy:
 
-### 2. Decide what a caller may see, on the server's model
+```csharp
+app.MapInfoCarrier().RequireAuthorization("DataAccess");
+```
 
-A global query filter on the server's model applies to every query by default. A filter declared
-only on the client's model is a convenience, because the client is code you shipped to someone
-else's machine.
+Use the application's authentication middleware and configure the client's HTTP authentication.
+See [client HTTP configuration](../applications/configuration/client.md#configure-http).
+The identity provider, credentials, and refresh behavior belong to your application.
 
-**A filter is a default, not a boundary.** `IgnoreQueryFilters()` is an ordinary EF Core operator
-that travels in the expression tree, and the server honours it. Query filters also do not apply to
-writes, so a client can submit a `SaveChanges` for a row whose key belongs to another tenant.
+Verify that an unauthenticated request receives an authorization failure and cannot query or save.
+A browser cross-origin policy does not establish identity or grant data permissions.
 
-A rule a caller must not be able to switch off goes where the caller cannot reach: a query
-interceptor on the server for reads, and the server's `SaveChanges` override or an EF interceptor
-for writes. Everything a client's `SaveChanges` sends is replayed through that override or
-interceptor, and the client can name neither.
+## 2. Enforce data permissions on the server
 
-[Tenant isolation](tenants.md) gives a database-per-tenant example and explains the separate
-checks needed when tenants share tables.
+Authentication identifies the caller. Your application must also decide which data that caller
+may read or change.
 
-## The shape of the exposure
+| Operation | Where to enforce permission |
+|---|---|
+| Queries | Server-side query enforcement that a client cannot disable |
+| `SaveChanges` | A server save override or interceptor, checking ownership using stored data |
+| `ExecuteUpdate`, `ExecuteDelete` | Query enforcement; these operations do not pass through `SaveChanges` |
 
-A client can compose any query over the entity types your shared model exposes. That is the feature,
-and it has four consequences.
+Keep server query filters as useful defaults, but do not rely on them for authorization.
+A client can send `IgnoreQueryFilters()`.
+Filters also do not protect a save submitted for another caller's key.
 
-Expensive queries are reachable. A caller can ask for a cross join. Cap the cost where the caller
-cannot reach: a rate limit at the gateway, a statement timeout on the database, or a query
-interceptor on the server. A query filter will not do it, for the same reason it is not a boundary
-above.
+For tenant separation, see the [tenant guide](tenants.md).
+It shows a database-per-tenant example and explains the separate controls needed for shared tables.
 
-Exception messages travel, with their stack traces. If yours carry connection strings, file paths or
-internal identifiers, catch and rewrite them at the server boundary.
+Leave arbitrary SQL disabled unless your application's trust model permits it.
+A raw SQL caller can execute commands using the database account's rights, outside ordinary model filtering.
+Restrict that database account as well.
 
-The endpoint is not a read-only API. `SaveChanges` and `ExecuteDelete` are part of it, so do not
-expose it to the public internet without authentication.
+## 3. Bind transactions to callers
 
-A transaction token is a bearer token, and by default it is the only credential. Anyone holding
-one can **query and save inside that transaction**, on its context and its connection, and then
-commit it. Ending someone else's transaction is the smaller half.
-
-Bind it to the caller who opened it. This needs an authenticated transport and no client change:
+A transaction token permits work inside an existing server transaction.
+Bind it to a stable authenticated identity:
 
 ```csharp
 builder.Services.AddInfoCarrierServer<ShopContext>()
     .AddHttpCallerIdentity(http => http.User.FindFirst("sub")?.Value);
 ```
 
-See [Binding a transaction to its caller](transactions.md#binding-a-transaction-to-its-caller)
-and [Evicting an abandoned transaction](transactions.md#evicting-an-abandoned-transaction).
+Require the selected identity claim in your authorization policy.
+If users can change tenants, include tenant identity in the binding too.
+See [transaction deployment](transactions.md#binding-a-transaction-to-its-caller).
 
-## Transport security
+## 4. Protect the transport and resources
 
-Use HTTPS. The envelope is not encrypted or signed by this library, so a request that can be read
-can be modified, and TLS terminating at a gateway leaves the hop behind it unprotected.
+Use HTTPS between client and server, including any sensitive hop behind a reverse proxy.
+The library does not encrypt or sign message content itself.
+
+Set request-size limits at the gateway and server.
+The InfoCarrier server default is 64 MiB per request; choose an application-appropriate value.
+See [options and limits](../reference/options.md#byte-limits).
+
+An authenticated user can still submit an expensive query.
+Apply rate limits, database command timeouts, or server query checks according to your workload.
+Keep transactions short and configure [idle expiry](transactions.md#evicting-an-abandoned-transaction).
+
+## 5. Check returned information
+
+Server exception messages and stack traces can reach the client.
+Review messages for connection details, source paths, and internal identifiers.
+Rewrite sensitive errors at your server boundary.
+
+Log forwarding is off by default.
+Enable only the levels appropriate for the client, and grant sensitive-data forwarding separately.
+See [diagnostics](diagnostics.md#sending-the-servers-log-to-the-client).
+
+## What the library checks
+
+Message decoding checks permitted expression kinds, types, and methods.
+It does not load an assembly just because a request names one.
+The server executes queries against its configured model.
+These checks reduce the accepted request surface; they do not replace the permission rules above.
+
+`AddAllowedTypes` widens type permissions. Register trusted types only.
+Do not register runtime invocation or reflection types such as `Binder`, `MethodInfo`, or `Activator`.
+
+Anonymous structures must match a catalog built from trusted startup configuration.
+Unknown structures cannot request arbitrary type generation.
+The catalog has [size and nesting limits](../reference/options.md#anonymous-structures);
+these do not bound every permitted method's execution cost.
 
 ## Reporting a vulnerability
 
-Report it privately: [open a draft security advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new).
-GitHub notifies the maintainer without making the report public.
-[SECURITY.md](https://github.com/azabluda/InfoCarrier.Core/blob/main/SECURITY.md) states the scope.
+[Open a private advisory](https://github.com/azabluda/InfoCarrier.Core/security/advisories/new)
+rather than publishing sensitive details in an issue.
+See the repository [security policy](https://github.com/azabluda/InfoCarrier.Core/blob/main/SECURITY.md).
 
 ## Feedback
 

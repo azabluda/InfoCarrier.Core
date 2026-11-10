@@ -1,7 +1,21 @@
 # Handling errors
 
-The server can fail, and so can the trip to it. Those are different exception types, because they
-call for different responses.
+Start with the exception type. A database refusal, an incompatible protocol, and a lost response
+need different responses. For writes, determine whether the work committed before retrying.
+
+## Choose the response
+
+| Exception | Meaning | Sensible response |
+|---|---|---|
+| `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
+| `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
+| `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
+| `InfoCarrierProtocolException` | Client and server wire contracts disagree | Upgrade the indicated side; do not retry |
+| `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](write-recovery.md) |
+
+Catch the type, not the message: message text is not a supported contract on any EF Core provider,
+and a couple of messages here are worded differently from other providers'. See
+[Limitations](../reference/limitations.md).
 
 ## A failure the server reported
 
@@ -106,20 +120,6 @@ Depending on where the failure surfaces, EF may wrap the transport exception, so
 catch (Exception ex) when (ex is InfoCarrierTransportException
                            || ex.InnerException is InfoCarrierTransportException)
 ```
-
-## Which is which
-
-| Exception | Meaning | Sensible response |
-|---|---|---|
-| `DbUpdateException`, `DbUpdateConcurrencyException` | The server ran your work and the database refused it | Handle as you would locally |
-| `InvalidOperationException` | The query could not be translated, or the model disagrees | Fix the query; do not retry |
-| `InfoCarrierServerException` | The server's own exception type is not available here | Log `ServerExceptionTypeName`; treat as its outer type |
-| `InfoCarrierProtocolException` | Client and server wire contracts disagree | Upgrade the indicated side; do not retry |
-| `InfoCarrierTransportException` | The request did not complete | Retry a read. For a write, first [find out whether it committed](write-recovery.md) |
-
-Catch the type, not the message: message text is not a supported contract on any EF Core provider,
-and a couple of messages here are worded differently from other providers'. See
-[Limitations](../overview/limitations.md).
 
 ## Cancellation
 

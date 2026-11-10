@@ -1,6 +1,17 @@
 # Replace services and pipelines
 
 Use client and server builders to replace components for a selected registration.
+Choose the extension point that matches the requirement:
+
+| Requirement | Where to start |
+|---|---|
+| Headers, authentication, or HTTP handlers | [Client HTTP configuration](../applications/configuration/client.md#configure-http) |
+| A different application value representation | [Value mappers](value-mappers.md) |
+| A different message format | [Serialization](serialization.md) |
+| A different network protocol | [Transports](transports.md) |
+| Replace an InfoCarrier host component | The builder examples below |
+| Replace Entity Framework provider behavior | [Provider services](#entity-framework-provider-services) |
+
 The complete `LoggingSerializer` example is on the [serialization page](serialization.md).
 
 Replace a serializer for one client without changing other clients:

@@ -1,6 +1,9 @@
 # Write transports and custom hosts
 
-The built-in transport uses HTTP. Another protocol needs both a client transport and a server host.
+Use the built-in HTTP transport for ordinary client/server calls.
+Configure its headers, handlers, and timeout through [client configuration](../applications/configuration/client.md#configure-http).
+Write a transport when you need another protocol or a wrapper around request exchange.
+Another protocol needs both a client transport and a server host.
 A transport moves an envelope, which contains the operation, version, payload, and any reported fault.
 
 ```csharp
