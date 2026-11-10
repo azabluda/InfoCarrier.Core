@@ -7,19 +7,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
 [Published documentation](https://azabluda.github.io/InfoCarrier.Core/) ·
-[Development setup](website/docs/getting-started/installation.md) ·
+[Getting started](website/docs/getting-started/installation.md) ·
 [Samples](samples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 InfoCarrier.Core is an Entity Framework Core provider for client applications that use a database
-through an application server. The client uses LINQ and change tracking without a database driver
-or connection string. The server runs queries and saves with its own database provider.
+through an application server. Write LINQ and save tracked changes through one generic server endpoint, without a controller
+for every entity. The database driver and connection string stay on the server.
 
-This branch contains version 11 development code. It currently targets .NET 10 and Entity Framework
-Core 10. The latest published release identified by this checkout is 10.3.0.
-Use the [development installation guide](website/docs/getting-started/installation.md) for these APIs.
-Stable package installation alone does not provide the version 11 setup shown below.
+This README previews unreleased version 11 APIs, currently targeting .NET 10 and Entity Framework Core 10.
+For available 10.3 packages, use the [published documentation](https://azabluda.github.io/InfoCarrier.Core/).
+The [installation guide](website/docs/getting-started/installation.md) describes package-based setup for version 11.
 
 ## Basic usage
 
@@ -38,6 +37,12 @@ var recent = await context.Orders
     .OrderByDescending(o => o.PlacedOn)
     .Take(20)
     .ToListAsync();
+
+if (recent.Count > 0)
+{
+    recent[0].Freight = 0m;
+    await context.SaveChangesAsync();
+}
 ```
 
 The server registers its real database context, calls `AddInfoCarrierServer<ShopContext>()`,

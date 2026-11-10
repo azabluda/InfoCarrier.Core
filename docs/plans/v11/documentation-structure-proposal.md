@@ -138,9 +138,8 @@ Overview
   What InfoCarrier does                         index.md
   Choosing InfoCarrier                          overview/choosing-infocarrier.md
 Get started
-  Prepare your environment                      getting-started/installation.md
+  Install the packages                          getting-started/installation.md
   Build your first client and server            getting-started/first-app.md
-  Run the samples                               getting-started/samples.md
 Build applications
   Query data                                    applications/querying.md
   Save changes                                  applications/saving.md
@@ -148,6 +147,7 @@ Build applications
   Use transactions and savepoints               applications/transactions.md
   Stream query results                          applications/streaming.md
   Build a Blazor WebAssembly client              applications/blazor-webassembly.md
+  Explore the Northwind example                  applications/northwind-sample.md
   Configure your application
     Configure a client                          applications/configuration/client.md
     Configure a server                          applications/configuration/server.md
@@ -208,7 +208,7 @@ at the old address. Split material should live with the task it explains.
 | `limitations.md` | `reference/limitations.md` | Keep detailed unsupported cases in Reference. The new product-fit page covers major adoption considerations first. |
 | `getting-started/installation.md` | `getting-started/installation.md` | Explain all three packages and distinguish published packages from development builds. |
 | `getting-started/first-app.md` | `getting-started/first-app.md` | Make the application runnable from an empty directory. Move testing without a network to Extend. |
-| `getting-started/samples.md` | `getting-started/samples.md` | Tell readers which release tag or development revision to use. Update the explanation of the request inspector. |
+| `getting-started/samples.md` | `applications/northwind-sample.md` | Optional source exploration after the package tutorial. Identify the sample version and explain the request inspector. |
 | `getting-started/upgrading-from-3-1.md` | `upgrades/from-3-to-10.md` | Move it to What's new. Explain the path from 3.1 to 10, then link to the 10.3-to-11 guide. |
 | `guide/querying.md` | `applications/querying.md` | Explain query behavior and explicit local execution. Move streaming to its own page and bulk writes to saving. |
 | `guide/saving-changes.md` | `applications/saving.md` | Explain ordinary saves and bulk updates together. Link to document-database setup and recovery. |
@@ -616,7 +616,7 @@ as menu placement.
 | Reader journey or page group | Result of the review |
 |---|---|
 | Home and product choice | Home explains the application relationship and leads to a working example. A new Choosing InfoCarrier page covers capabilities, model sharing, network requests, and server responsibilities. Rare limitations moved to Reference. |
-| Installation and first application | One source-based route leads directly to the tutorial without building the entire solution. Local packages and authenticated feeds follow as optional alternatives. Project roles and prerequisites are explicit. |
+| Installation and first application | This pass mistakenly made a source checkout the main route. The consumer-audience correction below replaces it with NuGet packages and the reader's own projects. |
 | Queries | Ordinary filtering, paging, selection, and tracking come first. Helper registration, query splitting, raw SQL, and custom keys follow only after those tasks. |
 | Saves and relationships | Examples use the tutorial's actual seeded customer. Bulk changes sit with normal writes. Relationship-loading choices precede the more specialized proxy case. Missing variables were supplied. |
 | Transactions | The basic transaction explains its purpose before implementation details. Savepoint and shared-transaction examples now contain actual Shop operations instead of undefined helper methods. |
@@ -648,3 +648,48 @@ Verification for changed examples:
 
 The remaining review is whether the revised reading journeys work for the owner and other readers.
 Do not describe technical build checks as proof of that editorial result.
+
+## Consumer-audience correction, November 10, 2026
+
+The previous pass confused documenting unreleased APIs with asking readers to develop InfoCarrier.
+Its source-checkout tutorial was the wrong starting point for a NuGet library. The owner identified
+that error after the reader-order pass. This correction supersedes that pass's onboarding decision.
+
+The primary reader creates an application, installs packages, and tries queries and saves.
+Home now shows those operations in C# before the architecture diagram. Getting started contains
+package installation and a complete application made from an empty directory.
+
+The audience review covered all current site pages, README, the three package readmes, sample
+instructions, and their entry links. It checked who performs each task, prerequisites, repository
+dependencies, and whether a page asks the reader to maintain the library. Release history retains
+its historical scope. The confirmed problems were broader than the first tutorial:
+
+| Location | Problem and correction |
+|---|---|
+| Installation and first application | Removed source checkouts, library project references, local package building, and development-feed setup. The reader installs packages into three application-owned projects. |
+| README and package readmes | Removed links labelled as source/development installation. README shows a query and save; package entry links lead to installation and the version 11 tutorial. |
+| Sample placement | Moved Northwind from Get started to an optional application example. Its page explicitly describes source exploration, with a separate link to the package tutorial. |
+| Upgrade entry and 10.3-to-11 guide | Replaced checkout/source-installation framing with package availability. Verification instructions now concern the reader's applications and custom components. |
+| Compatibility reference | Removed release-maintainer acceptance procedures and fixture requirements. The page now explains supported package combinations, application model agreement, and deployment checks. Custom transport requirements remain an optional section. |
+| Detailed limitations | Removed the opening test-suite measurements and test-porting assumptions. The page describes application operations and behavior. |
+| Blazor and application testing | Added explicit package prerequisites. These examples cannot assume the shared model project references InfoCarrier. |
+| Spatial mapping | Clarified that readers adapt the linked mapper into their own shared project. The test utilities are an example source, rather than an application dependency. |
+
+Configuration, security, diagnostics, transaction operation, and write recovery concern application
+developers and operators. They do not require building InfoCarrier. The extension pages serve readers
+who choose to replace a documented component. Their advanced contracts remain there, outside onboarding.
+IntelliSense and optional source debugging are ordinary package features; neither requires a checkout.
+
+Version 11 packages are not yet published. A draft availability notice states that fact and links
+to the published 10.3 guide. It does not turn source development into the installation procedure.
+The public NuGet index still listed 10.3.0 as its latest version when checked on November 10.
+
+For verification, temporary consumer projects used locally packed version 11 packages. Their only
+project references were to the application's own shared model. This private verification feed is
+not part of the reader instructions and does not establish public package availability.
+With the latest Entity Framework Core 10 dependencies, the client and server built without warnings.
+The tutorial read and saved through HTTP, then printed `Before: Example Shop` and `After: Updated Shop`.
+The exact Home teaser also queried and saved through those packages.
+
+This is an audience and dependency review, not a second verification of every documented behavior.
+Earlier runtime checks remain recorded above. Interactive browser checks remain unavailable.

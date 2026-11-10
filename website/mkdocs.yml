@@ -126,9 +126,8 @@ nav:
       - What InfoCarrier does: index.md
       - Choosing InfoCarrier: overview/choosing-infocarrier.md
   - Get started:
-      - Prepare your environment: getting-started/installation.md
+      - Install the packages: getting-started/installation.md
       - Build your first client and server: getting-started/first-app.md
-      - Run the samples: getting-started/samples.md
   - Build applications:
       - Query data: applications/querying.md
       - Save changes: applications/saving.md
@@ -136,6 +135,7 @@ nav:
       - Use transactions and savepoints: applications/transactions.md
       - Stream query results: applications/streaming.md
       - Build a Blazor WebAssembly client: applications/blazor-webassembly.md
+      - Explore the Northwind example: applications/northwind-sample.md
       - Configure your application:
           - Configure a client: applications/configuration/client.md
           - Configure a server: applications/configuration/server.md

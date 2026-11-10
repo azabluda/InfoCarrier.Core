@@ -1,70 +1,54 @@
-# Prepare for the first application
+# Install the packages
 
-The [first tutorial](first-app.md) uses the version 11 development source.
-Install the .NET 10 SDK, version 10.0.300 or later, and Git.
+Use NuGet to add InfoCarrier to your application.
+Install the .NET 10 SDK to follow the [first tutorial](first-app.md).
 
-This checkout currently uses Entity Framework Core 10.
-For an application using published version 10.3 packages, use the
-[public documentation](https://azabluda.github.io/InfoCarrier.Core/).
+This is the draft installation guide for version 11, whose packages are not published yet.
+The commands below describe installation for that release.
+For available version 10.3 packages, use the [published guide](https://azabluda.github.io/InfoCarrier.Core/getting-started/installation/).
 
-## Get the source
+## Client
 
-Run these commands in PowerShell:
+In the client project:
 
-```powershell
-git clone https://github.com/azabluda/InfoCarrier.Core.git
-cd InfoCarrier.Core
-dotnet --version
+```sh
+dotnet add package InfoCarrier.Core
 ```
 
-Check that the SDK version meets the requirement above.
-You do not need to build the whole repository before starting the tutorial.
-Its project references build the libraries the example needs.
+The client uses your shared context model with InfoCarrier as its database provider.
+It does not need a database driver or connection string.
 
-Continue with [your first client and server](first-app.md).
-It creates the projects, adds references, installs the SQLite provider, and supplies all application code.
+## Server
 
-## Which projects use which package?
+In the ASP.NET Core server project:
 
-| Package | Purpose |
-|---|---|
-| `InfoCarrier.Core` | Client queries and change tracking |
-| `InfoCarrier.Core.AspNetCore` | The server's HTTP endpoint; depends on Core |
-| `InfoCarrier.Core.Abstractions` | Shared deployment settings without an Entity Framework Core dependency |
-
-The first tutorial puts the context and entities in `Shop.Shared`, referenced by both applications.
-Only the server installs a database provider.
-Abstractions is already a dependency of Core. You do not need a separate configuration project
-for the tutorial.
-
-## Other ways to use development builds
-
-These alternatives are for integrating development code into an existing application.
-They are not required for the first tutorial.
-
-### Local packages
-
-From the repository root:
-
-```powershell
-dotnet pack InfoCarrier.Core.slnx -c Release -o artifacts/pack
+```sh
+dotnet add package InfoCarrier.Core.AspNetCore
 ```
 
-All three packages are written to `artifacts/pack`.
-Add that folder as a local NuGet source and select matching package versions on both sides.
+This includes Core as a dependency.
+Add the Entity Framework Core provider for the server's database too.
+The tutorial uses SQLite.
 
-### GitHub Packages
+Use matching InfoCarrier versions on client and server.
+The current version 11 draft still targets Entity Framework Core 10; its adoption status is recorded
+in the [11.0 notes](../release-notes/11.0.md).
 
-The Packages workflow publishes development packages to
-`https://nuget.pkg.github.com/azabluda/index.json`.
-Configure that feed using
-[GitHub's NuGet authentication instructions](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry).
-Keep credentials outside source control.
+## Shared model
 
-Select a version actually present in the feed.
-Adding `--prerelease` without configuring the feed does not install version 11 from nuget.org.
+Keep your entity classes and context model in an application project referenced by both sides.
+That project needs Entity Framework Core. It does not need InfoCarrier merely to declare the model.
 
-For upgrades, use the [upgrade index](../upgrades/index.md).
+`InfoCarrier.Core.Abstractions` is optional for a separate project containing additional shared
+InfoCarrier settings. Basic queries and saves do not need that extra project or registration.
+
+## Try a complete application
+
+[Build a client and server](first-app.md) from an empty directory.
+It shows every package command, the shared model, one server endpoint, and a client query followed by a save.
+
+For an existing application, see the [upgrade guide](../upgrades/index.md).
+
 
 ## Feedback
 

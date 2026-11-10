@@ -27,7 +27,7 @@ This development build still uses Entity Framework Core 10.
 
 ## Getting started
 
-Follow the [source tutorial](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/first-app.md).
+Follow the [version 11 tutorial](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/first-app.md).
 Use a matching InfoCarrier.Core version on the client.
 
 ## Additional documentation

@@ -28,7 +28,7 @@ The console also demonstrates lazy loading, which browser HTTP cannot support sy
 
 ## Read more
 
-- [Sample guide](../website/docs/getting-started/samples.md)
+- [Sample guide](../website/docs/applications/northwind-sample.md)
 - [Browser setup](../website/docs/applications/blazor-webassembly.md)
 - [Custom transports](../website/docs/extending/transports.md)
 - [First application](../website/docs/getting-started/first-app.md), using the smaller Shop model

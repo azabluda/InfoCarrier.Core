@@ -28,8 +28,8 @@ cannot ship before EF Core 11 adoption is complete.
 
 The rewritten site on `main` is development documentation. `website/mkdocs.yml` sets
 `extra.development_docs: true`, which displays the development notice on every page.
-Before any authorized stable-site publication, verify framework requirements, remove development-only
-installation instructions, and set that flag to false on the release branch. Update `edit_uri`
+Before any authorized stable-site publication, verify framework requirements, update the package
+availability notice, and set that flag to false on the release branch. Update `edit_uri`
 to the displayed documentation's source branch. Keep historical release examples tied to their tags.
 
 During this transition, `main` deliberately omits `PackageValidationBaselineVersion`. Comparing

@@ -31,7 +31,7 @@ Serializing both directions prevents the test from sharing objects that would be
 ## Build the server and client
 
 This uses the shared `ShopContext` from the [first tutorial](../getting-started/first-app.md).
-The test project also needs the SQLite provider and dependency injection namespaces.
+The test project needs InfoCarrier.Core and the SQLite provider, plus the dependency injection namespaces.
 
 ```csharp
 using InfoCarrier.Core;

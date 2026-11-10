@@ -30,7 +30,7 @@ the configuration builder and value-mapper interface.
 
 ## Additional documentation
 
-Use the [development installation guide](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/installation.md)
+Use the [package installation guide](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/installation.md)
 for matching package versions.
 The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
 

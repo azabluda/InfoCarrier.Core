@@ -1,13 +1,49 @@
 # InfoCarrier.Core
 
-InfoCarrier.Core is an Entity Framework Core provider for applications that access a database
-through an application server. Write LINQ queries and use change tracking in a desktop, browser,
-or console client. The server runs the database operations.
+InfoCarrier.Core is an Entity Framework Core provider that lets your .NET client query and save
+through one generic server endpoint.
+Use LINQ and change tracking instead of writing a controller for every entity or query.
 
-Both applications share their entity classes and context model.
-The client needs no database driver or connection string.
+## Write the query your screen needs
 
-## How the applications work together
+On the client, use a context configured for your application server:
+
+```csharp
+await using var db = await contexts.CreateDbContextAsync();
+
+var orders = await db.Orders
+    .Where(o => o.Customer!.Country == "Germany")
+    .OrderByDescending(o => o.PlacedOn)
+    .Take(20)
+    .ToListAsync();
+
+if (orders.Count > 0)
+{
+    orders[0].Freight = 0m;
+    await db.SaveChangesAsync();
+}
+```
+
+The server filters, sorts, and pages the orders. The save sends the tracked change back.
+You use the same entity classes and context model on both sides.
+
+On the server, register the context with your database provider, then expose InfoCarrier:
+
+```csharp
+builder.Services.AddInfoCarrierServer<ShopContext>();
+
+// After builder.Build():
+app.MapInfoCarrier();
+```
+
+That endpoint handles queries and saves for the shared model.
+You still control authentication and data permissions on the server.
+
+[Install the NuGet packages](getting-started/installation.md), then
+[build the complete SQLite example](getting-started/first-app.md).
+The tutorial supplies the model, imports, client setup, database seed, and expected output.
+
+## How it fits
 
 ```mermaid
 graph LR
@@ -17,31 +53,17 @@ graph LR
     B -->|"results and saved values"| A
 ```
 
-For example, a client can ask for the latest orders, edit one, and call `SaveChangesAsync`.
-InfoCarrier sends the query and changes to the server over HTTP.
-The server executes them through its own Entity Framework Core context.
+The client has no database driver or connection string.
+The server executes the work using its own Entity Framework Core provider.
 
-## Try it
+## Explore
 
-[Build your first client and server](getting-started/first-app.md) to read and update data using SQLite.
-The tutorial supplies the model, database setup, seed data, and expected output.
+- [Choosing InfoCarrier](overview/choosing-infocarrier.md): application fit and responsibilities.
+- [Queries](applications/querying.md), [saves](applications/saving.md), and [relationships](applications/related-data.md).
+- [Transactions](applications/transactions.md) and [browser clients](applications/blazor-webassembly.md).
+- [The Northwind example](applications/northwind-sample.md): a larger browser and console application.
+- [Deployment security](operations/security.md): authentication, access rules, and resource controls.
 
-Want to see an existing application first?
-[Run the Northwind sample](getting-started/samples.md) in a browser or console.
-
-## Decide whether it fits
-
-Read [Choosing InfoCarrier](overview/choosing-infocarrier.md) for the application architecture,
-common capabilities, and deployment responsibilities.
-
-These pages describe version 11 development code, currently using Entity Framework Core 10.
-The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes published version 10.3.
-
-## Continue building
-
-After the tutorial, learn to [query](applications/querying.md), [save changes](applications/saving.md),
-[load related data](applications/related-data.md), and [use transactions](applications/transactions.md).
-Each guide builds on the same Shop model.
 
 ## Feedback
 

@@ -1,7 +1,7 @@
 # Public API index
 
 This index lists the application programming interface (API) used for setup and customization.
-Use the linked guides for complete examples and the source XML comments for exact signatures.
+Use the linked guides for complete examples and IntelliSense for exact signatures.
 
 All types are in `InfoCarrier.Core` unless stated otherwise.
 

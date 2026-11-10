@@ -1,7 +1,9 @@
-# Run the samples
+# Explore the Northwind example
 
 Northwind contains one shared model, a SQLite server, a browser client, and a console client.
 The Northwind model is larger than the Shop model used in the tutorial.
+Exploring this sample's source is optional. To try InfoCarrier in your own application,
+follow the [NuGet tutorial](../getting-started/first-app.md).
 
 ## Choose the source version
 
@@ -19,7 +21,7 @@ git clone --branch v10.3.0 https://github.com/azabluda/InfoCarrier.Core.git Info
 ```
 
 Do not combine an older sample with new setup instructions.
-The [installation page](installation.md) explains development and published packages.
+The [installation page](../getting-started/installation.md) identifies the documented package version.
 
 ## Browser
 

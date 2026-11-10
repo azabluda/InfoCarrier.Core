@@ -64,6 +64,7 @@ builder.Services.AddInfoCarrierServer<ShopContext>();
 For NetTopologySuite geometry values, supply a mapper appropriate to the representation both
 applications use. The repository's test utilities contain a
 [worked mapper](https://github.com/azabluda/InfoCarrier.Core/blob/main/test/InfoCarrier.Core.TestUtilities/InfoCarrierNetTopologySuiteValueMapper.cs).
+Copy and adapt the mapper into your shared application project.
 
 Register any extra helper types needed by spatial queries on both sides.
 The server's provider decides translation. InfoCarrier does not silently download all rows to run

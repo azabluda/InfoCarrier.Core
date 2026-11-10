@@ -1,7 +1,7 @@
 # Upgrade from 10.3 to 11
 
-This guide targets the version 11 development source. It currently uses Entity Framework Core 10.
-Use the [source installation instructions](../getting-started/installation.md); stable 10.3 packages
+This draft describes upgrading an application to version 11. It currently uses Entity Framework Core 10.
+See [package availability](../getting-started/installation.md); stable 10.3 packages
 do not contain these setup methods.
 
 Keep a working 10.3 application and its data backup while testing the upgrade.
@@ -84,7 +84,7 @@ Create schema and check connectivity through the server's database provider.
 
 For direct constructors and serializer/value-mapper implementations, compare the current signatures
 with your code. A new optional parameter can preserve a source call while changing the compiled signature.
-The [API index](../reference/api.md) and source XML comments identify the current contracts.
+The [API index](../reference/api.md) and IntelliSense identify the current contracts.
 
 ## Check custom serialization and deployment
 
@@ -102,7 +102,7 @@ Build both applications and custom libraries.
 Run representative reads, writes, relationships, transactions, and error recovery against a test database.
 Check effects through a fresh context on the server.
 Verify authentication, tenant restrictions, limits, and disposal.
-Compile the complete configuration and transport examples rather than checking only renamed methods.
+Exercise your application's configuration and any custom transports, rather than checking only renamed methods.
 
 ## Feedback
 

@@ -4,13 +4,13 @@ This tutorial creates a console client, an ASP.NET Core server, and a shared mod
 The server creates a SQLite database and seeds one customer. The client reads that customer,
 updates it, and reads it again through a fresh context.
 
-These instructions use the version 11 development source described in [installation](installation.md).
-They are for local development. Secure a deployed endpoint using the [security guide](../operations/security.md).
+These are the version 11 draft APIs; see [package availability](installation.md).
+The example runs locally. Follow the [security guide](../operations/security.md) before exposing it to other users.
 
 ## Before you start
 
-Follow [installation](installation.md) to install the SDK and clone the source.
-The commands below use PowerShell and start in that checkout.
+Install the .NET 10 SDK. Start in any directory where you create application projects.
+The commands below use PowerShell.
 
 | Project | Job |
 |---|---|
@@ -20,11 +20,9 @@ The commands below use PowerShell and start in that checkout.
 
 ## 1. Create three projects
 
-Run these commands in PowerShell. Start in your InfoCarrier repository checkout:
+Create your own application and install its NuGet dependencies:
 
 ```powershell
-$iccSource = (Get-Location).Path
-Set-Location ..
 New-Item -ItemType Directory -Name ShopTutorial
 Set-Location ShopTutorial
 
@@ -32,13 +30,17 @@ dotnet new classlib -n Shop.Shared -f net10.0
 dotnet new web -n Shop.Server -f net10.0
 dotnet new console -n Shop.Client -f net10.0
 
-dotnet add Shop.Shared reference "$iccSource/src/InfoCarrier.Core/InfoCarrier.Core.csproj"
-dotnet add Shop.Server reference Shop.Shared "$iccSource/src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj"
+dotnet add Shop.Server reference Shop.Shared
 dotnet add Shop.Client reference Shop.Shared
-dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 10.0.1
+
+dotnet add Shop.Shared package Microsoft.EntityFrameworkCore --version 10.*
+dotnet add Shop.Client package InfoCarrier.Core
+dotnet add Shop.Server package InfoCarrier.Core.AspNetCore
+dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 10.*
 ```
 
-The provider version is pinned here to match the current development dependency.
+The Entity Framework Core commands select the latest version 10 packages, matching the current draft.
+Keep InfoCarrier package versions matched on both sides.
 Delete `Shop.Shared/Class1.cs`. Keep this terminal in `ShopTutorial`.
 
 ## 2. Add the shared model

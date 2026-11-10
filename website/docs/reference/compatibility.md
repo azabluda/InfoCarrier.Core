@@ -1,45 +1,62 @@
 # Client and server compatibility
 
-Compatible optional fields can share a wire version. Meaning changes can require a new version
-despite unchanged types. Structural checks cover default serialization contracts. They exclude
-application models and custom serializers. Keep those contracts compatible across supported deployments.
-Advanced hosts can replace protocol codecs through dependency injection.
+For a new application, use matching InfoCarrier package versions on the client and server.
 
-Version 11 supports clients from its current and previous minor releases. The first release,
-11.0, supports only 11.0 clients. Version 10 and earlier version 11 development clients are outside the support promise. The support window is measured in releases, not elapsed time.
+## Which versions work together?
 
-The wire contract uses an independent integer, currently 4. Several package releases can share
-it. Packages outside the support window may still work with the same contract, without a compatibility
-promise. The server checks the wire contract, not the caller's package version.
-It also accepts contract 3 through explicit request and response conversion.
-This does not extend the published package support window.
+| Server | Supported clients |
+|---|---|
+| Version 11.0 | Version 11.0 clients |
+| Later version 11 minor releases | Clients from that minor release and the previous minor release |
+| Version 11 server with a version 10 client | Not supported |
 
-Custom envelope transports must preserve `ProtocolVersion`. Missing identification is zero and is
-rejected. For `IInfoCarrierStreamTransport`, the query body carries `QueryDataRequest.ProtocolVersion`.
-`TransportInfoCarrierClient` supplies it automatically. The response starts with a frame carrying
-the same contract version, which the client checks before reading rows or faults.
+The support window follows minor releases, rather than a fixed number of months.
+Earlier development builds are outside this published-package support promise.
 
-Streamed HTTP requests use `InfoCarrier-Stream-Operation: Query`. The earlier
-`InfoCarrier-Operation` selector is rejected. The new selector also prevents earlier servers from
-silently executing a query while ignoring its added version field.
-The `InfoCarrier-Protocol-Version` request header is checked before the query body is parsed;
-the body version is checked too. The HTTP transport supplies both automatically.
+## Plan an application upgrade
 
-The HTTP endpoint answers a version refusal with status 400 and a plain text explanation. Its
-`InfoCarrier-Protocol-Version` and `InfoCarrier-Client-Protocol-Version` response headers identify
-the server and received client contracts. The HTTP transport raises `InfoCarrierProtocolException`,
-separately from connection failures. An older server without these refusal headers retains its
-existing error behavior. See [handling errors](../operations/errors.md#incompatible-client-and-server).
+Check the [release notes](../release-notes/11.0.md) and [upgrade instructions](../upgrades/index.md)
+before updating either application.
+If client and server updates happen separately, keep the deployed combination inside the supported window.
+Keep their shared entity model and deployment settings compatible too.
+Package support does not check application-specific model changes.
 
-## Before upgrading
+Test the combinations your application will actually deploy.
+Exercise representative queries, saves, transactions, authentication, and any custom components.
+A read that succeeds does not establish that every application operation is compatible.
 
-Use matching client/server packages for a new application.
-For a rolling upgrade, test every package combination promised by the support policy.
-For version 11.1 and later, this includes a real published previous-minor client against the new server.
+## Recognize an incompatible connection
 
-Successful decoding of protocol 3 development fixtures does not establish that package support.
-Message format and package version are different numbers.
-See [upgrade instructions](../upgrades/from-10-to-11.md).
+The built-in transport identifies the message format automatically.
+A refused format raises `InfoCarrierProtocolException`.
+Its `ClientVersion` and `ServerVersion` properties describe message-format versions, not NuGet versions.
+Retrying the same request does not fix the mismatch.
+
+Use [error handling](../operations/errors.md#incompatible-client-and-server) to diagnose it.
+An ordinary connection or malformed-response failure uses `InfoCarrierTransportException` instead.
+
+## If you write a custom transport
+
+The current message format is 4. The server also implements conversion for format 3.
+Accepting a message format does not extend the package-version support window above.
+
+Preserve `InfoCarrierEnvelope.ProtocolVersion`.
+Missing identification is zero and is refused.
+For streaming, preserve `QueryDataRequest.ProtocolVersion` and check the response's opening version message.
+The built-in `TransportInfoCarrierClient` and HTTP transport handle this automatically.
+
+Streamed HTTP queries use `InfoCarrier-Stream-Operation: Query` and the
+`InfoCarrier-Protocol-Version` header. The request body version is checked too.
+The older `InfoCarrier-Operation` selector is rejected.
+
+The HTTP endpoint returns an incompatible-format refusal as status 400 with a plain-text explanation.
+The `InfoCarrier-Protocol-Version` and `InfoCarrier-Client-Protocol-Version` response headers
+identify the server and received client formats.
+Older servers without those refusal headers retain their own error behavior.
+
+If you replace serialization, keep the client and server formats compatible for your deployments.
+See [serialization](../extending/serialization.md) and [custom transports](../extending/transports.md).
+
 
 ## Feedback
 

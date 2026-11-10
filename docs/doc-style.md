@@ -42,6 +42,14 @@ concerns, tuning, and detailed contracts where their readers need them. Necessar
 data-loss instructions must still precede the affected action. A working example and a passing
 build do not establish that a page has a useful teaching order.
 
+The primary reader is an ordinary .NET application developer who wants generic queries and writes
+without hand-written CRUD endpoints. Onboarding installs NuGet packages into the reader's own
+application. It must not require cloning or building InfoCarrier, configuring development feeds,
+or knowing repository layout. Home should show a short C# query-and-save example near the top.
+Keep contributor setup and optional exploration of sample source separate. An unpublished-version
+notice must distinguish draft APIs from available packages without turning the tutorial into
+library-development instructions.
+
 1. **Start with what the reader needs.** Product overviews and package readmes start with an
    identity sentence using `is`: "InfoCarrier.Core is an Entity Framework Core provider...".
    Task guides start with the task or expected result. Reference pages state what they cover.

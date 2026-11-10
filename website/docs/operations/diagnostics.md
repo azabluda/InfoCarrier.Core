@@ -102,7 +102,7 @@ See [Counting round trips](diagnostics.md#counting-round-trips) for collector se
 ## Inspect individual requests
 
 A transport decorator can record operations and elapsed time.
-The [Northwind sample](../getting-started/samples.md) also shows decoded payloads.
+The [Northwind sample](../applications/northwind-sample.md) also shows decoded payloads.
 Do not record credentials, transaction tokens, or private values in production logs.
 A response may contain server exception text and source paths.
 See [custom transports](../extending/transports.md).

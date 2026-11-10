@@ -11,10 +11,11 @@ Run the commands below from the `ShopTutorial` directory.
 ```powershell
 dotnet new blazorwasm -n Shop.Browser -f net10.0
 dotnet add Shop.Browser reference Shop.Shared
+dotnet add Shop.Browser package InfoCarrier.Core
 ```
 
-The shared project already references InfoCarrier.Core.
-The browser does not need the server endpoint package or the SQLite provider.
+The browser references Core and your shared model.
+It does not need the server endpoint package or the SQLite provider.
 
 ## 2. Register the client and context factory
 

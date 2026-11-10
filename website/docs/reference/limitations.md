@@ -1,16 +1,21 @@
 # Detailed limitations
 
-InfoCarrier.Core runs Microsoft's own Entity Framework Core specification suite, the same suite the
-SQL Server, SQLite and InMemory providers run. This page explains important observable differences and unsupported operations, so you can judge whether any of them
-affects your application.
+Use this page to check a particular application requirement.
+The ordinary [query](../applications/querying.md), [save](../applications/saving.md),
+and [transaction](../applications/transactions.md) guides show the supported workflows.
 
-The previous published release, 10.3.0, was measured with 30,148 tests and no failures.
-That is historical evidence, not a new measurement of this development checkout.
-Check your database provider and application model as well as these documented differences.
+## Check the operation you need
 
-## Not supported
+| Requirement | What to use |
+|---|---|
+| Create tables, run migrations, or access a database connection | The server's database provider; these operations are not available through the client context |
+| Load relationships in a browser | `Include` or `LoadAsync`; synchronous browser HTTP and automatic lazy loading are unsupported |
+| Share a transaction between client contexts | `UseInfoCarrierTransaction`; ambient `TransactionScope` and local `DbTransaction` access are unsupported |
+| Retry after a connection failure | Application recovery logic; no retrying execution strategy is included |
+| Publish with Native AOT | Unsupported; expression execution requires runtime code generation |
+| Publish a trimmed browser client | Verify your application's published output; see [browser publishing](../applications/blazor-webassembly.md#publish-the-browser-client) |
 
-### Suppressing a concurrency exception in an interceptor on the client
+## A client concurrency interceptor cannot suppress a server save failure
 
 Affects you if an `ISaveChangesInterceptor` registered on the client returns
 `InterceptionResult.Suppress()` from `ThrowingConcurrencyException` or
@@ -48,7 +53,7 @@ Core does. The message text may differ. Two examples:
 // (a) a method call where ExecuteUpdate expects a property
 context.Orders
     .Where(o => o.Freight > 100m)
-    .ExecuteUpdate(s => s.SetProperty(o => Math.Round(o.Total), 0m));
+    .ExecuteUpdate(s => s.SetProperty(o => Math.Round(o.Freight), 0m));
 
 // (b) a cast to a type no mapped entity implements
 IQueryable orders = context.Orders;
@@ -62,6 +67,9 @@ EF Core provider.
 
 A local projection can answer a query that another EF Core provider refuses. For example, composing
 LINQ over a collection stored through a value converter:
+
+This fragment assumes your application declares Dashboard and Layout types, with a Layouts
+collection stored through a value converter and matching comparison/conversion helpers:
 
 ```csharp
 modelBuilder.Entity<Dashboard>()
@@ -82,8 +90,8 @@ the query and the server sends the whole column. Name `Layout` on both halves, a
 [Keys of your own types](../applications/querying.md#keys-of-your-own-types) describes for a `GroupBy` key,
 and the query reaches the server, which rejects it as every other provider does.
 
-A test suite you port will expect the exception, and LINQ that relies on the answer will not run
-unchanged elsewhere.
+When moving that query to another provider, check whether it supports the converted collection
+operation. Do not assume local result construction makes the same query portable.
 
 Private or client-only helpers in a final projection can produce the same difference, such as
 choosing a JSON collection element with a private index helper. Implicit local filtering, ordering,
@@ -111,9 +119,8 @@ These are not defects. They follow from where the client sits.
 
 ## Check your application
 
-The specification suite checks behavior on the repository's test providers. It does not establish
-performance, request sizes, or behavior under production load. Run representative queries and writes
-against the database provider your server actually uses.
+Run representative queries and writes against your actual server provider.
+Measure request sizes, response times, and behavior under the load your application expects.
 
 Ambient transactions and local database connections are unsupported. There is no built-in retrying
 execution strategy. See [transactions](../applications/transactions.md).
