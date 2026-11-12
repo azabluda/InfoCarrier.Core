@@ -22,6 +22,7 @@
 
 ## Repository instructions
 
+- Put temporary command logs under `artifacts/`, not the repository root.
 - Read `CLAUDE.md` fully at the start of each repository session.
 - Read `.claude/roslyn-codelens.md` fully at the same time.
 - Treat Claude tool names in those files as their Codex equivalents.

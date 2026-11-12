@@ -45,6 +45,8 @@ a separate decision; adoption alone does not remove unpublished-package notices.
 
 ## Commands
 
+Put temporary command logs under `artifacts/`, not the repository root.
+
 **Write all new and changed repository-owned engineering automation in C# file-based applications
 under `eng/`. Do not add Python or Bash orchestration.** Use PascalCase filenames, for example
 `eng/Measure.cs`, and top-level entry statements. Keep each script's testable implementation in
