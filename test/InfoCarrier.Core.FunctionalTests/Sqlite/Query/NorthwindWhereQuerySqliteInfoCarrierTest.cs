@@ -40,7 +40,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 70, 76,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 68, 74,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_constructed_equal(bool async)
@@ -48,7 +48,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 78, 84,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 76, 82,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_constructed_multi_value_equal(bool async)
@@ -56,7 +56,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 86, 92,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 84, 90,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_constructed_multi_value_not_equal(bool async)
@@ -64,7 +64,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 94, 100,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 92, 98,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_equal(bool async)
@@ -72,7 +72,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 102, 108,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 100, 106,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_multi_value_equal(bool async)
@@ -80,7 +80,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 118, 124,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 116, 122,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_equal(bool async)
@@ -88,7 +88,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 126, 132,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 124, 130,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_multi_value_equal(bool async)
@@ -96,7 +96,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 110, 116,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 108, 114,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_constructed_multi_value_not_equal(bool async)
@@ -104,7 +104,7 @@ public class NorthwindWhereQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierS
 
     [StoreIssue(
         IssueTracker.EfCore, 14672,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 134, 140,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindWhereQuerySqliteTest.cs", 132, 138,
         Justification = "Anonymous type to constant comparison. Issue #14672.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Where_compare_tuple_create_constructed_multi_value_not_equal(bool async)

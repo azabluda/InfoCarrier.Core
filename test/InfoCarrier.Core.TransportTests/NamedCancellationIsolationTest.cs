@@ -36,11 +36,11 @@ public class NamedCancellationIsolationTest
             await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
             {
                 Context seed = scope.ServiceProvider.GetRequiredKeyedService<Context>("first");
-                await seed.Database.EnsureCreatedAsync();
+                await seed.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
                 seed.Add(new Item { Id = 1, Name = "stored" });
-                await seed.SaveChangesAsync();
+                await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
-            await app.StartAsync();
+            await app.StartAsync(TestContext.Current.CancellationToken);
             using var meter = new RegistrationMetricsTest.Recording();
             await using Context firstClient = Remote("first");
             await using Context secondClient = Remote("second");
@@ -48,19 +48,19 @@ public class NamedCancellationIsolationTest
             first.Arm();
             second.Arm();
             Task<List<Item>> cancelled = firstClient.Items.ToListAsync(cancellation.Token);
-            Task<List<Item>> surviving = secondClient.Items.ToListAsync();
+            Task<List<Item>> surviving = secondClient.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
             try
             {
-                await Task.WhenAll(first.Entered.Task, second.Entered.Task).WaitAsync(deadline);
+                await Task.WhenAll(first.Entered.Task, second.Entered.Task).WaitAsync(deadline, TestContext.Current.CancellationToken);
                 await cancellation.CancelAsync();
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled.WaitAsync(deadline));
-                await first.Cancelled.Task.WaitAsync(deadline);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled.WaitAsync(deadline, TestContext.Current.CancellationToken));
+                await first.Cancelled.Task.WaitAsync(deadline, TestContext.Current.CancellationToken);
                 Assert.False(second.Cancelled.Task.IsCompleted);
                 Assert.False(surviving.IsCompleted);
                 second.Release();
-                Assert.Equal("stored", Assert.Single(await surviving.WaitAsync(deadline)).Name);
+                Assert.Equal("stored", Assert.Single(await surviving.WaitAsync(deadline, TestContext.Current.CancellationToken)).Name);
                 // A cancelled request must not poison the registration or its next operation.
-                Assert.Equal("stored", Assert.Single(await firstClient.Items.ToListAsync().WaitAsync(deadline)).Name);
+                Assert.Equal("stored", Assert.Single(await firstClient.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken).WaitAsync(deadline, TestContext.Current.CancellationToken)).Name);
                 await meter.WaitForPairs(3, 3);
                 meter.AssertPairs(3, 3);
                 foreach (string instrument in new[]
@@ -83,7 +83,7 @@ public class NamedCancellationIsolationTest
                 first.Release();
                 second.Release();
                 await cancellation.CancelAsync();
-                try { await Task.WhenAll(cancelled, surviving).WaitAsync(deadline); }
+                try { await Task.WhenAll(cancelled, surviving).WaitAsync(deadline, TestContext.Current.CancellationToken); }
                 catch (OperationCanceledException) { }
             }
         }

@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Operation.Union;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -48,7 +47,7 @@ public class SpatialiteServerTest
     ///     has a JSON form and the geometry mapper carries the value, which is why Tier A never
     ///     showed it. Found as EF's <c>SpatialQueryTestBase.SimpleSelect</c> on SpatiaLite.
     /// </remarks>
-    [ConditionalFact, SpatialiteRequired]
+    [SpatialiteRequired]
     public async Task A_geometry_read_from_a_spatial_store_crosses_the_wire()
     {
         await using SqliteInfoCarrierBackendTestStore store = await CreateSeededStoreAsync(registerAggregate: false);
@@ -63,7 +62,7 @@ public class SpatialiteServerTest
     ///     A geometry the client saves reaches SpatiaLite as the same geometry.
     /// </summary>
     /// <remarks>The write direction of the test above, through the same type mapping on the server.</remarks>
-    [ConditionalFact, SpatialiteRequired]
+    [SpatialiteRequired]
     public async Task A_geometry_saved_over_the_wire_reaches_a_spatial_store()
     {
         await using SqliteInfoCarrierBackendTestStore store = await CreateSeededStoreAsync(registerAggregate: false);
@@ -90,7 +89,7 @@ public class SpatialiteServerTest
     ///     <c>GUnion("Location")</c> with the <c>GROUP BY</c>. The configuration this suite tests,
     ///     as the owner asked on 2026-09-27; the next test pins the other one.
     /// </remarks>
-    [ConditionalFact, SpatialiteRequired]
+    [SpatialiteRequired]
     public async Task A_spatial_aggregate_registered_on_both_halves_runs_at_the_store()
     {
         (string overTheWire, string directly) = await AggregateStatementBothWaysAsync(registerAggregate: true);
@@ -109,7 +108,7 @@ public class SpatialiteServerTest
     ///     point instead of one union per group. Found as EF's four spatial <c>*_aggregate</c> tests
     ///     on SpatiaLite.
     /// </remarks>
-    [ConditionalFact, SpatialiteRequired]
+    [SpatialiteRequired]
     public async Task A_spatial_aggregate_not_registered_runs_on_the_client()
     {
         (string overTheWire, string directly) = await AggregateStatementBothWaysAsync(registerAggregate: false);

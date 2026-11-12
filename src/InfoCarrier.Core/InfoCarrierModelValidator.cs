@@ -1,7 +1,5 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -41,28 +39,22 @@ public class InfoCarrierModelValidator(ModelValidatorDependencies dependencies)
     : ModelValidator(dependencies)
 {
     /// <inheritdoc />
-    protected override void ValidateInheritanceMapping(
-        IModel model,
-        IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+    protected override void ValidateDiscriminatorValues(IEntityType rootEntityType)
     {
-        // `ModelExtensions.GetRootEntityTypes` is what the base walks, and it is internal for the
-        // one line it is. Spelled out here rather than reached for behind an EF1001 pragma.
-        foreach (IEntityType rootEntityType in model.GetEntityTypes().Where(e => e.BaseType is null))
+        // EF Core 11 validates each root through this method rather than ValidateInheritanceMapping.
+        if (rootEntityType.FindDiscriminatorProperty() is not null)
         {
-            if (rootEntityType.FindDiscriminatorProperty() is not null)
-            {
-                ValidateDiscriminatorValues(rootEntityType);
-                continue;
-            }
+            base.ValidateDiscriminatorValues(rootEntityType);
+            return;
+        }
 
-            // No discriminator: the server's provider owns the inheritance mapping. Nested complex
-            // types are still validated, exactly as the base does on the path it returns early on.
-            foreach (IEntityType derivedType in rootEntityType.GetDerivedTypesInclusive())
+        // No discriminator: the server's provider owns the inheritance mapping. Nested complex
+        // types are still validated, exactly as the base does on the path it returns early on.
+        foreach (IEntityType derivedType in rootEntityType.GetDerivedTypesInclusive())
+        {
+            foreach (IComplexProperty complexProperty in derivedType.GetDeclaredComplexProperties())
             {
-                foreach (IComplexProperty complexProperty in derivedType.GetDeclaredComplexProperties())
-                {
-                    ValidateDiscriminatorValues(complexProperty.ComplexType);
-                }
+                ValidateDiscriminatorValues(complexProperty.ComplexType);
             }
         }
     }

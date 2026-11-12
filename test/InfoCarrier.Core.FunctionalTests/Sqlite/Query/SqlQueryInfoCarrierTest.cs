@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Data.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -58,7 +58,7 @@ public class SqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<Noop
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite is dynamically typed, so there is no invalid cast to make.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 50, 52,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 48, 50,
         Justification = "Not supported on SQLite",
         Skip = true)]
     public override Task Bad_data_error_handling_invalid_cast_key(bool async)
@@ -67,7 +67,7 @@ public class SqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<Noop
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite is dynamically typed, so there is no invalid cast to make.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 54, 56,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 52, 54,
         Justification = "Not supported on SQLite",
         Skip = true)]
     public override Task Bad_data_error_handling_invalid_cast(bool async)
@@ -76,7 +76,7 @@ public class SqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<Noop
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite is dynamically typed, so there is no invalid cast to make.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 58, 60,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 56, 58,
         Justification = "Not supported on SQLite",
         Skip = true)]
     public override Task Bad_data_error_handling_invalid_cast_projection(bool async)
@@ -85,7 +85,7 @@ public class SqlQueryInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<Noop
     /// <inheritdoc />
     /// <remarks>EF's own: SQLite is dynamically typed, so there is no invalid cast to make.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 62, 64,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/SqlQuerySqliteTest.cs", 60, 62,
         Justification = "Not supported on SQLite",
         Skip = true)]
     public override Task Bad_data_error_handling_invalid_cast_no_tracking(bool async)

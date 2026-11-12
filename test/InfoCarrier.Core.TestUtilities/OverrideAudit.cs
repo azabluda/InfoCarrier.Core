@@ -204,6 +204,7 @@ public static class OverrideAudit
         => reason switch
         {
             StoreLimitAttribute => "LIMIT",
+            StoreSupportAttribute => "SUPPORT",
             StoreDefectAttribute d => $"DEFECT {d.Section}",
             StoreIssueAttribute i => $"ISSUE {i.Key}",
             InfoCarrierDefectAttribute d => $"INFOCARRIER DEFECT #{d.Issue}",
@@ -590,7 +591,9 @@ public static class OverrideAudit
             string headFile = Path.Combine(gitDirectory, "HEAD");
             if (!File.Exists(headFile))
             {
-                return null;
+                // An official source archive can be used without changing the read-only subrepos.
+                string revisionFile = Path.Combine(root, ".source-revision");
+                return File.Exists(revisionFile) ? File.ReadAllText(revisionFile).Trim() : null;
             }
 
             string head = File.ReadAllText(headFile).Trim();

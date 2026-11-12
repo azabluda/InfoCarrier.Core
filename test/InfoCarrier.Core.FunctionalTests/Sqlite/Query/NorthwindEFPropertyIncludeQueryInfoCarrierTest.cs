@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -24,7 +23,7 @@ public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCa
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 14, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 12, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_with_multiple_ordering(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Filtered_include_with_multiple_ordering(async));
@@ -32,7 +31,7 @@ public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCa
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 19, 23,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 17, 21,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_cross_apply_with_filter(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_cross_apply_with_filter(async));
@@ -40,7 +39,7 @@ public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCa
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 25, 29,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 23, 27,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter(async));
@@ -48,7 +47,7 @@ public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCa
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 31, 35,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 29, 33,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter_non_equality(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter_non_equality(async));
@@ -56,7 +55,7 @@ public class NorthwindEFPropertyIncludeQueryInfoCarrierTest(NorthwindQueryInfoCa
     /// <inheritdoc />
     /// <remarks>EF's own: a relational provider refuses <c>Last</c> without an ordering, where InMemory answers it.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 37, 40,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindEFPropertyIncludeQuerySqliteTest.cs", 35, 38,
         Justification = Upstream.GaveNoReason)]
     public override async Task Include_collection_with_last_no_orderby(bool async)
         => Assert.Equal(

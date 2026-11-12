@@ -30,7 +30,7 @@ public class EnvelopeFailureLoggingTest
         var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer,
             factory.CreateLogger<InfoCarrierEnvelopeServer>());
 
-        InfoCarrierEnvelope response = await dispatcher.DispatchAsync(Request);
+        InfoCarrierEnvelope response = await dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken);
         Assert.Equal(failure.Message, response.Fault!.Message);
         Assert.Equal(typeof(InvalidOperationException).FullName, response.Fault.TypeName);
         var entry = Assert.Single(logs.Entries);
@@ -53,10 +53,10 @@ public class EnvelopeFailureLoggingTest
         using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
         var server = new TestServer(faultPlaceholder ? new InvalidOperationException("secret-original") : null);
         var dispatcher = new InfoCarrierEnvelopeServer(server, new FailingSerializer(faultPlaceholder), factory.CreateLogger<InfoCarrierEnvelopeServer>());
-        if (faultPlaceholder) { await Assert.ThrowsAsync<FormatException>(() => dispatcher.DispatchAsync(Request)); }
+        if (faultPlaceholder) { await Assert.ThrowsAsync<FormatException>(() => dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken)); }
         else
         {
-            Assert.NotNull((await dispatcher.DispatchAsync(Request)).Fault);
+            Assert.NotNull((await dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken)).Fault);
             Assert.Equal(1, server.Completed);
         }
         var entry = Assert.Single(logs.Entries);
@@ -83,7 +83,7 @@ public class EnvelopeFailureLoggingTest
             },
         }, Serializer, factory.CreateLogger<InfoCarrierEnvelopeServer>());
         Task<InfoCarrierEnvelope>[] requests = Enumerable.Range(0, 20).Select(_ => dispatcher.DispatchAsync(Request)).ToArray();
-        try { await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)); }
+        try { await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken); }
         finally { release.TrySetResult(); }
         var responses = await Task.WhenAll(requests);
         Assert.All(responses, response => Assert.NotNull(response.Fault));
@@ -97,7 +97,7 @@ public class EnvelopeFailureLoggingTest
         using var factory = LoggerFactory.Create(b => b.AddProvider(new ThrowingLogs()));
         var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new InvalidOperationException("original")), Serializer,
             factory.CreateLogger<InfoCarrierEnvelopeServer>());
-        Assert.Equal("original", (await dispatcher.DispatchAsync(Request)).Fault!.Message);
+        Assert.Equal("original", (await dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken)).Fault!.Message);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class EnvelopeFailureLoggingTest
         using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
         var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(new DbUpdateConcurrencyException("secret")), Serializer,
             factory.CreateLogger<InfoCarrierEnvelopeServer>());
-        Assert.Equal("secret", (await dispatcher.DispatchAsync(Request)).Fault!.Message);
+        Assert.Equal("secret", (await dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken)).Fault!.Message);
         Assert.Equal(LogLevel.Information, Assert.Single(logs.Entries).Level);
     }
 
@@ -122,7 +122,7 @@ public class EnvelopeFailureLoggingTest
         {
             BeforeBegin = async () => Assert.NotNull((await inner.DispatchAsync(Request)).Fault),
         }, Serializer, logger);
-        Assert.NotNull((await outer.DispatchAsync(Request)).Fault);
+        Assert.NotNull((await outer.DispatchAsync(Request, TestContext.Current.CancellationToken)).Fault);
         Assert.Equal(2, logs.Entries.Count);
         Assert.All(logs.Entries, entry => Assert.DoesNotContain("secret", entry.Message));
     }
@@ -134,7 +134,7 @@ public class EnvelopeFailureLoggingTest
         using var factory = LoggerFactory.Create(b => b.AddProvider(logs));
         var failure = new OperationCanceledException("secret");
         var dispatcher = new InfoCarrierEnvelopeServer(new TestServer(failure), Serializer, factory.CreateLogger<InfoCarrierEnvelopeServer>());
-        Assert.Same(failure, await Assert.ThrowsAsync<OperationCanceledException>(() => dispatcher.DispatchAsync(Request)));
+        Assert.Same(failure, await Assert.ThrowsAsync<OperationCanceledException>(() => dispatcher.DispatchAsync(Request, TestContext.Current.CancellationToken)));
         Assert.Equal(LogLevel.Error, Assert.Single(logs.Entries).Level);
     }
 

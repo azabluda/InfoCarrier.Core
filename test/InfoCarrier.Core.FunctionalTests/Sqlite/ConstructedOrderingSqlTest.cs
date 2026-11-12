@@ -2,14 +2,13 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>Registered constructor ordering reaches the backend; implicit local ordering is refused.</summary>
 public class ConstructedOrderingSqlTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]
     [InlineData(false, true, true)]

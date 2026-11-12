@@ -13,6 +13,22 @@ namespace InfoCarrier.Core.TransportTests;
 public class WireContractGuardTest
 {
     [Fact]
+    public void Built_in_object_converter_changes_preserve_the_covered_contract()
+    {
+        var before = Describe(GuardJsonContext.Default.OriginalMessage);
+        var after = Describe(GuardJsonContext.Default.OriginalMessage);
+        before.Types["message"].Settings["converter"] =
+            "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]";
+        after.Types["message"].Settings["converter"] =
+            "System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[T]";
+
+        Assert.True(Compare(before, after).Passed);
+        after.Types["message"].Settings["caseInsensitive"] = "True";
+        Assert.Contains(Compare(before, after).Changes, change => change.Kind == ChangeKind.Unclassified);
+        Assert.False(Compare(before, after).Passed);
+    }
+
+    [Fact]
     public async Task Default_routes_have_nonempty_coverage_and_all_frame_kinds()
     {
         var frames = await FrameContracts.InspectAsync();

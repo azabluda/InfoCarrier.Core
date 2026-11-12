@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -35,12 +34,12 @@ public class TransactionOwnerTest
     {
         await using InProcessInfoCarrierServer server = CreateServer(identity: null);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         // No identity is registered, so nothing distinguishes callers and the token is the whole
         // credential. This is 10.1.0's behaviour and upgrading must not change it.
-        await server.SupportsSavepointsAsync(begun.TransactionId);
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -49,12 +48,11 @@ public class TransactionOwnerTest
         var caller = new MutableCaller("alice");
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
-        await server.SupportsSavepointsAsync(begun.TransactionId);
-        await server.SaveChangesAsync(
-            new SaveChangesRequest { Entries = [], TransactionId = begun.TransactionId });
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken);
+        await server.SaveChangesAsync(new SaveChangesRequest { Entries = [], TransactionId = begun.TransactionId }, TestContext.Current.CancellationToken);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -71,7 +69,7 @@ public class TransactionOwnerTest
         var caller = new MutableCaller("alice");
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         caller.Id = "bob";
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -98,15 +96,15 @@ public class TransactionOwnerTest
         var caller = new MutableCaller("alice");
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         caller.Id = "bob";
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.RollbackTransactionAsync(begun.TransactionId));
+            () => server.RollbackTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         // And the refusal left it open, so its owner can still finish it.
         caller.Id = "alice";
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -118,12 +116,12 @@ public class TransactionOwnerTest
         var caller = new MutableCaller("alice");
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
 
         // What `DisposeAsync` sends after a commit: a rollback for a token that is now gone.
-        await server.RollbackTransactionAsync(begun.TransactionId);
+        await server.RollbackTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -135,11 +133,11 @@ public class TransactionOwnerTest
         var caller = new MutableCaller("alice@example.com");
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         caller.Id = "bob";
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.SupportsSavepointsAsync(begun.TransactionId));
+            () => server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain("alice", thrown.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -158,14 +156,14 @@ public class TransactionOwnerTest
         var caller = new MutableCaller(null);
         await using InProcessInfoCarrierServer server = CreateServer(caller);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         caller.Id = "alice";
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.SupportsSavepointsAsync(begun.TransactionId));
+            () => server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         caller.Id = null;
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     private static Task Invoke(InProcessInfoCarrierServer server, string operation, string token)

@@ -3,14 +3,13 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>Registered JSON index helpers reach the backend; private helpers run after materialization.</summary>
 public class JsonIndexTranslationTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false, true, false)]
     [InlineData(true, false, true, false)]
     [InlineData(false, true, true, false)]
@@ -108,7 +107,7 @@ public class JsonIndexTranslationTest
         }
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_mapped_instance_function_can_supply_a_JSON_index(bool async)
@@ -144,7 +143,7 @@ public class JsonIndexTranslationTest
         store.AssertServerSql(direct);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void A_table_owned_occurrence_is_not_classified_by_another_occurrences_JSON_mapping()
     {
         using MixedContext context = new(new DbContextOptionsBuilder<MixedContext>()

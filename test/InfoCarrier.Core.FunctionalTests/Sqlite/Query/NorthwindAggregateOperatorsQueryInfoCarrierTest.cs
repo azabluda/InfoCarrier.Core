@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -52,7 +51,7 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
 {
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 114, 118,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 112, 116,
         Justification = Upstream.GaveNoReason)]
     public override async Task Multiple_collection_navigation_with_FirstOrDefault_chained(bool async)
         => Assert.Equal(
@@ -62,14 +61,14 @@ public class NorthwindAggregateOperatorsQueryInfoCarrierTest(NorthwindQueryInfoC
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 123, 124,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 121, 122,
         Justification = Upstream.GaveNoReason)]
     public override Task Contains_with_local_tuple_array_closure(bool async)
         => AssertTranslationFailed(() => base.Contains_with_local_tuple_array_closure(async));
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 120, 121,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindAggregateOperatorsQuerySqliteTest.cs", 118, 119,
         Justification = Upstream.GaveNoReason)]
     public override Task Contains_with_local_anonymous_type_array_closure(bool async)
         => AssertTranslationFailed(() => base.Contains_with_local_anonymous_type_array_closure(async));

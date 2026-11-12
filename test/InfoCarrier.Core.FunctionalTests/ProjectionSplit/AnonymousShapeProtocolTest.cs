@@ -3,7 +3,6 @@
 using System.Linq.Expressions;
 using System.Text.Json;
 using InfoCarrier.Core.Expressions;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 

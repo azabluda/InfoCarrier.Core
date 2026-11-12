@@ -26,10 +26,11 @@
     store-neutral, and SqliteInfoCarrierTier is the per-store answer beside them.
   -->
   <PropertyGroup>
-    <Description>Functional tests for InfoCarrier.Core against the ADR-009 backing stores: InMemory (Tier A), SQLite (Tier B) and Firebird (Tier C).</Description>
+    <Description>Functional tests for InfoCarrier.Core against InMemory (Tier A) and SQLite (Tier B). Tier C is suspended pending an EF Core 11 Firebird provider.</Description>
     <RootNamespace>InfoCarrier.Core.FunctionalTests</RootNamespace>
     <AssemblyName>InfoCarrier.Core.FunctionalTests</AssemblyName>
     <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
     <!--
       Not a documented API, but the doc file is generated anyway: IDE0005 (unnecessary using) does
       not run without one. The doc-comment warnings that come with it (1254 in this repository) are
@@ -47,6 +48,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Microsoft.EntityFrameworkCore.Query.Inheritance" />
+    <Using Include="Microsoft.EntityFrameworkCore.BulkUpdates.Inheritance" />
+    <!-- Keep Tier C source, but never restore an EF Core 10 provider into the EF Core 11 suite. -->
+    <Compile Remove="Firebird\**\*.cs;TestUtilities\Firebird*.cs" />
     <!--
       The compiled-model baselines are *expected output*, not source: the same
       `TestNamespace.DbContextModel` is generated once per test, so compiling them gives 125
@@ -73,15 +79,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <!-- ADR-009 Tier C. See Directory.Packages.props for why the engine arrives by package. -->
-    <PackageReference Include="FirebirdSql.EntityFrameworkCore.Firebird" />
-    <PackageReference Include="FirebirdDb.Embedded.NativeAssetManager" />
-    <PackageReference Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" />
-    <PackageReference Include="FirebirdDb.Embedded.V5.NativeAssets.Linux.X64" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.v3.mtp-off" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />

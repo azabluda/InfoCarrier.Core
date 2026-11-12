@@ -411,8 +411,14 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         // Everything but the selector — sources, key selectors — has to travel, or there is
         // nothing to hand the server.
-        for (int i = 0; i < call.Arguments.Count - 1; i++)
+        int selectorIndex = call.Arguments.ToList().FindIndex(argument => ReferenceEquals(StripQuotes(argument), selector));
+        for (int i = 0; i < call.Arguments.Count; i++)
         {
+            if (i == selectorIndex)
+            {
+                continue;
+            }
+
             Expression argument = call.Arguments[i];
             if (!analyzer.Analyze(argument).FactsFor(argument).ServerOk)
             {
@@ -443,14 +449,15 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         // A nested projection over a collection navigation is an Enumerable call whose lambdas
         // are plain Funcs, not quoted expression trees. Rebuilding it in the Queryable flavour
         // makes Expression.Call reject the argument.
-        bool quoted = call.Arguments[^1] is UnaryExpression { NodeType: ExpressionType.Quote };
+        bool quoted = call.Arguments[selectorIndex] is UnaryExpression { NodeType: ExpressionType.Quote };
         Expression Wrap(LambdaExpression lambda) => quoted ? Expression.Quote(lambda) : lambda;
 
         MethodCallExpression serverCall = Expression.Call(
             call.Method.GetGenericMethodDefinition().MakeGenericMethod(genericArguments),
             [
-                .. call.Arguments.Take(call.Arguments.Count - 1),
+                .. call.Arguments.Take(selectorIndex),
                 Wrap(Expression.Lambda(tuple, selector.Parameters)),
+                .. call.Arguments.Skip(selectorIndex + 1),
             ]);
 
         // Built with an explicit delegate type rather than inferred from the body, because the two
@@ -546,17 +553,22 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         ParameterExpression row = Expression.Parameter(tuple.Type, "row");
 
-        var slots = new Dictionary<Expression, Expression>(ReferenceEqualityComparer.Instance);
+        var slots = new Dictionary<Expression, Queue<Expression>>(ReferenceEqualityComparer.Instance);
         for (int i = 0; i < fragments.Count; i++)
         {
-            slots[fragments[i]] = Requeryable(
-                ReadBack(directScalar ? row : TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed);
+            if (!slots.TryGetValue(fragments[i], out Queue<Expression>? occurrences))
+            {
+                slots[fragments[i]] = occurrences = new Queue<Expression>();
+            }
+
+            occurrences.Enqueue(Requeryable(
+                ReadBack(directScalar ? row : TupleCarrier.Read(row, i), fragments[i]), fragments[i], consumed));
         }
 
         return (
             tuple,
             row,
-            new SlotSubstitutingVisitor(slots).Visit(body)!,
+            new OccurrenceSlotSubstitutingVisitor(slots).Visit(body)!,
             carriesACollection);
     }
 
@@ -1428,7 +1440,7 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
 
         Type resultType = call.Method.GetGenericArguments()[^1];
         if (ServerBoundaryAnalyzer.SequenceElementType(call.Method.ReturnType) != resultType
-            || StripQuotes(call.Arguments[^1]) is not LambdaExpression lambda
+            || call.Arguments.Select(StripQuotes).OfType<LambdaExpression>().LastOrDefault() is not { } lambda
             || lambda.ReturnType != resultType)
         {
             return false;
@@ -2135,6 +2147,15 @@ internal sealed class ProjectionRewriter(ServerBoundaryAnalyzer analyzer) : Expr
         }
 
         return node;
+    }
+
+    private sealed class OccurrenceSlotSubstitutingVisitor(IReadOnlyDictionary<Expression, Queue<Expression>> slots)
+        : ExpressionVisitor
+    {
+        public override Expression? Visit(Expression? node)
+            => node is not null && slots.TryGetValue(node, out Queue<Expression>? occurrences)
+                ? occurrences.Count > 1 ? occurrences.Dequeue() : occurrences.Peek()
+                : base.Visit(node);
     }
 
     private sealed class SlotSubstitutingVisitor(IReadOnlyDictionary<Expression, Expression> slots)

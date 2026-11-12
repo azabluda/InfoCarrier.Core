@@ -1,9 +1,8 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -122,7 +121,7 @@ public class SqliteSmokeTest
     // third-party provider has its own. The answer is not a list in this package -- it cannot
     // enumerate providers it does not reference -- but a registration the application makes, on
     // both sides, exactly as ADR-012 requires of a value mapper.
-    [ConditionalFact]
+    [Fact]
     public async Task A_provider_specific_EF_Functions_call_is_refused_when_nothing_is_registered()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -131,12 +130,12 @@ public class SqliteSmokeTest
         // EF's own `TranslationFailed`, raised by `QuerySplitter.RejectClientEvaluation`. The
         // closed default of ADR-008 constraint 2: a type the model does not imply is not named.
         InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*"), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("could not be translated", refused.Message, StringComparison.Ordinal);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_provider_specific_EF_Functions_call_crosses_once_both_sides_admit_its_host()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
@@ -148,11 +147,11 @@ public class SqliteSmokeTest
         // Two of the three titles do not start with "al"; the answer proves the server ran GLOB
         // rather than the client running something equivalent, because the client cannot run it
         // at all -- `SqliteDbFunctionsExtensions.Glob` throws when invoked.
-        Assert.Equal(1, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
-        Assert.Equal(2, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "*a*")));
+        Assert.Equal(1, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*"), cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(2, await client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "*a*"), cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Registering_the_host_on_the_client_alone_still_fails_on_the_server()
     {
         // ADR-012's rule restated for types, and the reason the server half is a separate call:
@@ -164,7 +163,7 @@ public class SqliteSmokeTest
             store, o => o.AddAllowedTypes(typeof(SqliteDbFunctionsExtensions)));
 
         InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*")));
+            () => client.Blogs.CountAsync(b => EF.Functions.Glob(b.Title!, "al*"), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("deserialization allowlist", refused.Message, StringComparison.Ordinal);
     }
@@ -180,7 +179,7 @@ public class SqliteSmokeTest
     // These four also REPLACE the tripwire `FromSqlAssertions` describes -- "if `FromSql` is ever
     // supported, every one of them fails". It is supported now, on an opt-in a server has to make,
     // and the refusal that class asserts is still the default and is still asserted, here.
-    [ConditionalFact]
+    [Fact]
     public async Task A_FromSql_query_is_refused_when_neither_side_grants_it()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -190,12 +189,12 @@ public class SqliteSmokeTest
         // inherited suites -- so this is the same refusal those tests assert, restated where the
         // gate lives. Default-deny, and the behaviour every caller had before the gate existed.
         InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("FromSqlQueryRootExpression", refused.Message, StringComparison.Ordinal);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_FromSql_query_crosses_once_both_sides_grant_it()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
@@ -207,19 +206,19 @@ public class SqliteSmokeTest
         // one came back as the whole table, because the wire's query-root node had no field for
         // the SQL and the subclass was shipped as its base. An answer of 2 here is that regression
         // returning, and it would otherwise look like an ordinary passing query.
-        Assert.Equal(1, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = 'alpha'").CountAsync());
-        Assert.Equal(2, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+        Assert.Equal(1, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = 'alpha'").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(2, await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         // And composed over, which is the shape EF wraps in a subquery.
         Blog[] composed = [.. await client.Blogs
             .FromSqlRaw(@"SELECT * FROM ""Blogs""")
             .Where(b => b.Title == "beta")
-            .ToArrayAsync()];
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken)];
 
         Assert.Equal("beta", Assert.Single(composed).Title);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Granting_it_on_the_client_alone_is_refused_by_the_server()
     {
         // The half that makes the two registrations something other than duplication, and the one
@@ -232,12 +231,12 @@ public class SqliteSmokeTest
         // an `InvalidOperationException` as itself -- so the exception TYPE says nothing about
         // which side refused, and the message is what does.
         InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync());
+            () => client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs""").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("does not permit a payload to carry SQL", refused.Message, StringComparison.Ordinal);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task FromSql_arguments_cross_as_values_and_are_bound_rather_than_interpolated()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync(
@@ -250,14 +249,14 @@ public class SqliteSmokeTest
         // own promise below: EF formats those literals, including their quote escaping.
         Assert.Equal(
             1,
-            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "alpha").CountAsync());
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "alpha").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(
             0,
-            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync());
+            await client.Blogs.FromSqlRaw(@"SELECT * FROM ""Blogs"" WHERE ""Title"" = {0}", "al'pha").CountAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     /// <summary>A compiled raw SQL query preserves its constant arguments as EF does.</summary>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, "alpha", 1, ParameterTranslationMode.MultipleParameters)]
     [InlineData(true, "alpha", 1, ParameterTranslationMode.MultipleParameters)]
     [InlineData(false, "al'pha", 0, ParameterTranslationMode.MultipleParameters)]
@@ -311,7 +310,7 @@ public class SqliteSmokeTest
     }
 
     /// <summary>An ordinary raw SQL query keeps the arguments EF extracted as parameters bound.</summary>
-    [ConditionalTheory]
+    [Theory]
     [InlineData("alpha", 1)]
     [InlineData("al'pha", 0)]
     public async Task An_ordinary_FromSqlRaw_argument_stays_bound(string title, int expected)
@@ -353,14 +352,14 @@ public class SqliteSmokeTest
     //
     // A context reaching the boundary any OTHER way is still refused, by
     // `ServerBoundaryAnalyzer.CarriesTheClientsContext`. Only a method the model maps is rewritten.
-    [ConditionalFact]
+    [Fact]
     public async Task A_predicate_calling_a_mapped_function_on_the_client_context_is_sent_to_the_server()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
         await using SqliteSmokeContext client = CreateClient(store);
 
         InfoCarrierServerException sent = await Assert.ThrowsAsync<InfoCarrierServerException>(
-            () => client.Blogs.CountAsync(b => client.TitleIsLong(b.Title)));
+            () => client.Blogs.CountAsync(b => client.TitleIsLong(b.Title), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains(nameof(SqliteSmokeContext.TitleIsLong), sent.Message, StringComparison.Ordinal);
     }
@@ -383,7 +382,7 @@ public class SqliteSmokeTest
     // Which is the third time in this session that "the allowlist admitted the type for an
     // unrelated reason" decided the behaviour -- R84, R89 and here. The type allowlist is load
     // bearing for far more than deserialization safety, and nothing says so where it is declared.
-    [ConditionalFact]
+    [Fact]
     public async Task A_DbFunction_declared_by_attribute_reaches_the_servers_model_and_not_the_clients()
     {
         await using SqliteInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -403,7 +402,7 @@ public class SqliteSmokeTest
         // what a server that maps it should produce. `TitleIsShort` throws when invoked, so this
         // could not be a client-side answer wearing a store-side message.
         InfoCarrierServerException reached = await Assert.ThrowsAsync<InfoCarrierServerException>(
-            () => client.Blogs.CountAsync(b => SqliteSmokeContext.TitleIsShort(b.Title)));
+            () => client.Blogs.CountAsync(b => SqliteSmokeContext.TitleIsShort(b.Title), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("no such function: TitleIsShort", reached.Message, StringComparison.Ordinal);
     }
@@ -435,7 +434,7 @@ public class SqliteSmokeTest
     //
     // `_TableSharingConcurrencyTokenConvention_` is a literal here on purpose: the constant is
     // private to EF, and this is a probe rather than a contract.
-    [ConditionalFact]
+    [Fact]
     public async Task A_table_split_pair_whose_server_model_has_a_synthesized_concurrency_token_round_trips()
     {
         await using var store = new SqliteInfoCarrierBackendTestStore(
@@ -477,24 +476,24 @@ public class SqliteSmokeTest
             Assert.NotNull(server.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
             Assert.Null(client.Model.FindEntityType(typeof(SharedDetail))!.FindProperty(synthesized));
 
-            SharedDetail detail = await client.Details.SingleAsync();
+            SharedDetail detail = await client.Details.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             detail.Note = "second";
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         await using (var client = new TableSplitSmokeContext(
             new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
         {
-            SharedRoot root = await client.Roots.SingleAsync();
+            SharedRoot root = await client.Roots.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             root.Name = "renamed";
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         await using (var client = new TableSplitSmokeContext(
             new DbContextOptionsBuilder<TableSplitSmokeContext>().UseInfoCarrier(store).Options))
         {
-            Assert.Equal("second", (await client.Details.SingleAsync()).Note);
-            Assert.Equal("renamed", (await client.Roots.SingleAsync()).Name);
+            Assert.Equal("second", (await client.Details.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Note);
+            Assert.Equal("renamed", (await client.Roots.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Name);
 
             // `Version` is deliberately not asserted. `ValueGeneratedOnAddOrUpdate` makes EF omit
             // the property from the INSERT and expect the store to supply it, and SQLite supplies
@@ -504,7 +503,7 @@ public class SqliteSmokeTest
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Client_query_round_trips_through_a_relational_server()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -520,12 +519,12 @@ public class SqliteSmokeTest
             });
 
         await using SqliteSmokeContext client = CreateClient(store);
-        List<Blog> blogs = await client.Blogs.OrderBy(b => b.Id).ToListAsync();
+        List<Blog> blogs = await client.Blogs.OrderBy(b => b.Id).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(["alpha", "beta"], blogs.Select(b => b.Title));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_is_split_and_answered_against_a_relational_server()
     {
         // The projection split's own claim, checked where it matters: the server translates a
@@ -546,13 +545,13 @@ public class SqliteSmokeTest
         var rows = await client.Blogs
             .Where(b => b.Id > 1)
             .Select(b => new { b.Title, Length = b.Title!.Length })
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("beta", Assert.Single(rows).Title);
         Assert.Equal(4, rows[0].Length);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task The_store_keeps_one_connection_open_for_its_lifetime()
     {
         // An in-memory SQLite database is destroyed when its last connection closes. If the
@@ -570,10 +569,10 @@ public class SqliteSmokeTest
 
         // A second, independent server context must still see the seeded row.
         using DbContext second = store.CreateDbContext();
-        Assert.Equal(1, await second.Set<Blog>().CountAsync());
+        Assert.Equal(1, await second.Set<Blog>().CountAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Insert_update_and_delete_round_trip_through_the_server()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -585,42 +584,42 @@ public class SqliteSmokeTest
         {
             var blog = new Blog { Title = "alpha" };
             client.Add(blog);
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
             Assert.NotEqual(0, blog.Id);
         }
 
         using (DbContext server = store.CreateDbContext())
         {
-            Assert.Equal("alpha", (await server.Set<Blog>().SingleAsync()).Title);
+            Assert.Equal("alpha", (await server.Set<Blog>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Title);
         }
 
         // Update.
         await using (SqliteSmokeContext client = CreateClient(store))
         {
-            Blog blog = await client.Blogs.SingleAsync();
+            Blog blog = await client.Blogs.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             blog.Title = "beta";
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using (DbContext server = store.CreateDbContext())
         {
-            Assert.Equal("beta", (await server.Set<Blog>().SingleAsync()).Title);
+            Assert.Equal("beta", (await server.Set<Blog>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Title);
         }
 
         // Delete.
         await using (SqliteSmokeContext client = CreateClient(store))
         {
-            client.Remove(await client.Blogs.SingleAsync());
-            Assert.Equal(1, await client.SaveChangesAsync());
+            client.Remove(await client.Blogs.SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using (DbContext server = store.CreateDbContext())
         {
-            Assert.Empty(await server.Set<Blog>().ToListAsync());
+            Assert.Empty(await server.Set<Blog>().ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_store_generated_key_comes_back_on_the_client_entity()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -631,7 +630,7 @@ public class SqliteSmokeTest
         var second = new Blog { Title = "beta" };
         client.AddRange(first, second);
 
-        Assert.Equal(2, await client.SaveChangesAsync());
+        Assert.Equal(2, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
 
         // Distinct, non-temporary, and matched to the right entity — the correlation id is what
         // keeps the second row's key off the first entity.
@@ -639,10 +638,10 @@ public class SqliteSmokeTest
         Assert.All([first.Id, second.Id], id => Assert.NotEqual(0, id));
         Assert.Equal(
             "alpha",
-            (await client.Blogs.SingleAsync(b => b.Id == first.Id)).Title);
+            (await client.Blogs.SingleAsync(b => b.Id == first.Id, cancellationToken: TestContext.Current.CancellationToken)).Title);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_foreign_key_set_from_a_principals_temporary_key_survives_the_round_trip()
     {
         // The dependent names its principal by *key* and not by navigation, which is the shape
@@ -678,17 +677,17 @@ public class SqliteSmokeTest
                     BlogId = client.Entry(alpha).Property(x => x.Id).CurrentValue,
                 });
 
-            Assert.Equal(2, await client.SaveChangesAsync());
+            Assert.Equal(2, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using DbContext server = store.CreateDbContext();
-        Blog blog = await server.Set<Blog>().Include(x => x.Posts).SingleAsync();
+        Blog blog = await server.Set<Blog>().Include(x => x.Posts).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotEqual(0, blog.Id);
         Assert.Equal(["to-alpha"], blog.Posts.Select(x => x.Heading));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_new_dependent_of_a_new_principal_gets_the_generated_foreign_key()
     {
         // The case the correlation id exists for. Blog.Id is store-generated, so on the client
@@ -705,18 +704,18 @@ public class SqliteSmokeTest
             blog.Posts.Add(new Post { Heading = "second" });
             client.Add(blog);
 
-            Assert.Equal(3, await client.SaveChangesAsync());
+            Assert.Equal(3, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
             Assert.NotEqual(0, blog.Id);
             Assert.All(blog.Posts, p => Assert.Equal(blog.Id, p.BlogId));
         }
 
         using DbContext server = store.CreateDbContext();
-        Blog saved = await server.Set<Blog>().Include(b => b.Posts).SingleAsync();
+        Blog saved = await server.Set<Blog>().Include(b => b.Posts).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(["first", "second"], saved.Posts.OrderBy(p => p.Heading).Select(p => p.Heading));
         Assert.All(saved.Posts, p => Assert.Equal(saved.Id, p.BlogId));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_dependent_of_an_existing_principal_travels_by_foreign_key()
     {
         // No link needed here: the blog already exists, so the foreign key is a real value and
@@ -729,21 +728,21 @@ public class SqliteSmokeTest
         {
             var blog = new Blog { Title = "alpha" };
             client.Add(blog);
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
             blogId = blog.Id;
         }
 
         await using (SqliteSmokeContext client = CreateClient(store))
         {
             client.Add(new Post { Heading = "later", BlogId = blogId });
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using DbContext server = store.CreateDbContext();
-        Assert.Equal(blogId, (await server.Set<Post>().SingleAsync()).BlogId);
+        Assert.Equal(blogId, (await server.Set<Post>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).BlogId);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_many_to_many_link_between_two_new_entities_is_persisted()
     {
         // The hardest SaveChanges shape, and the one ADR-004 calls v1's worst failure mode. The
@@ -760,15 +759,15 @@ public class SqliteSmokeTest
             post.Tags.Add(new Tag { Label = "linq" });
             client.Add(post);
 
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         using DbContext server = store.CreateDbContext();
-        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
+        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(["ef", "linq"], saved.Tags.OrderBy(t => t.Label).Select(t => t.Label));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_many_to_many_link_between_existing_entities_is_persisted()
     {
         // Here the join entity is the *only* changed entry: both principals already exist, so
@@ -780,22 +779,22 @@ public class SqliteSmokeTest
         {
             seed.Add(new Post { Heading = "first", Blog = new Blog { Title = "alpha" } });
             seed.Add(new Tag { Label = "ef" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         await using (SqliteSmokeContext client = CreateClient(store))
         {
-            Post post = await client.Posts.Include(p => p.Tags).SingleAsync();
-            post.Tags.Add(await client.Tags.SingleAsync());
-            Assert.Equal(1, await client.SaveChangesAsync());
+            Post post = await client.Posts.Include(p => p.Tags).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
+            post.Tags.Add(await client.Tags.SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using DbContext server = store.CreateDbContext();
-        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync();
+        Post saved = await server.Set<Post>().Include(p => p.Tags).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("ef", Assert.Single(saved.Tags).Label);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_deleted_row_releases_its_alternate_key_before_a_new_row_takes_it()
     {
         // The R44 originals audit's scenario pin: a `Deleted` and an `Added` row colliding on a
@@ -826,22 +825,22 @@ public class SqliteSmokeTest
 
         await using (SqliteSmokeContext client = CreateClient(store))
         {
-            Coded existing = await client.Coded.SingleAsync();
+            Coded existing = await client.Coded.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             client.Remove(existing);
 
             // Same `Code`, in the same call. Without the DELETE first the store answers
             // `SQLite Error 19: 'UNIQUE constraint failed: Coded.Code'`.
             client.Add(new Coded { Id = 2, Code = "X", Label = "after" });
 
-            Assert.Equal(2, await client.SaveChangesAsync());
+            Assert.Equal(2, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using DbContext server = store.CreateDbContext();
-        Coded saved = await server.Set<Coded>().SingleAsync();
+        Coded saved = await server.Set<Coded>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal((2, "X", "after"), (saved.Id, saved.Code, saved.Label));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_rolled_back_transaction_leaves_the_relational_store_untouched()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -849,21 +848,21 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext client = CreateClient(store);
 
-        await using (await client.Database.BeginTransactionAsync())
+        await using (await client.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             client.Blogs.Add(new Blog { Id = 1, Title = "provisional" });
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
             // Visible inside, because the query carries the same token and so runs on the
             // server context the transaction pinned.
-            Assert.Equal(1, await client.Blogs.CountAsync());
+            Assert.Equal(1, await client.Blogs.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
 
         await using SqliteSmokeContext after = CreateClient(store);
-        Assert.Equal(0, await after.Blogs.CountAsync());
+        Assert.Equal(0, await after.Blogs.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_committed_transaction_keeps_its_work()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -871,18 +870,18 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext client = CreateClient(store);
 
-        await using (var transaction = await client.Database.BeginTransactionAsync())
+        await using (var transaction = await client.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             client.Blogs.Add(new Blog { Id = 1, Title = "kept" });
-            await client.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await transaction.CommitAsync(TestContext.Current.CancellationToken);
         }
 
         await using SqliteSmokeContext after = CreateClient(store);
-        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
+        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_savepoint_rolls_back_part_of_a_transaction()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -890,45 +889,35 @@ public class SqliteSmokeTest
 
         await using SqliteSmokeContext client = CreateClient(store);
 
-        await using (var transaction = await client.Database.BeginTransactionAsync())
+        await using (var transaction = await client.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             // SQLite has savepoints, so this is the tier where the answer is not "no".
             Assert.True(transaction.SupportsSavepoints);
 
             client.Blogs.Add(new Blog { Id = 1, Title = "kept" });
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-            await transaction.CreateSavepointAsync("sp");
+            await transaction.CreateSavepointAsync("sp", TestContext.Current.CancellationToken);
 
             client.Blogs.Add(new Blog { Id = 2, Title = "undone" });
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-            await transaction.RollbackToSavepointAsync("sp");
-            await transaction.CommitAsync();
+            await transaction.RollbackToSavepointAsync("sp", TestContext.Current.CancellationToken);
+            await transaction.CommitAsync(TestContext.Current.CancellationToken);
         }
 
         await using SqliteSmokeContext after = CreateClient(store);
-        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync());
+        Assert.Equal(["kept"], await after.Blogs.Select(b => b.Title).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_left_join_keeps_an_owned_value_that_has_no_public_member(bool registered)
     {
-        // R64 originally tested a tuple carrier's automatic tracking downgrade. With
-        // matching declarations, the anonymous descriptor reaches EF as the original projection
-        // does: tracking an owned value without its owner is refused, and AsNoTracking is required.
-        // Without a client declaration, the released tuple reconstruction remains available.
-        //
-        // The quiet consequence is the worse one and this model does not reproduce it: with four
-        // owned types sharing one CLR type, as `OwnedQueryTestBase` has, the mapper falls back to
-        // the public CLR members and the value comes back with `City` set and `Line` -- which
-        // lives in a private field behind an indexer -- silently missing.
-        // `OwnedQueryRelationalTestBase.Left_join_on_entity_with_owned_navigations` is what covers
-        // that half, and this repository does not run it yet (R62).
-        //
-        // `Line` is asserted beside `City` because the defect took one and left the other.
+        // Both registered descriptors and tuple reconstruction must preserve the original
+        // query's tracking rules. AsNoTracking permits this owned-only projection in either
+        // route, and its private indexer-backed member must survive alongside public City.
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await store.InitializeAsync(
             store.ServiceProvider,
@@ -951,17 +940,9 @@ public class SqliteSmokeTest
 
         var query = client.Blogs
             .LeftJoin(client.Located, b => b.Id, l => l.Id, (b, l) => new { b.Title, Address = l!.Address });
-        if (registered)
-        {
-            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
-            Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
-        }
-        else
-        {
-            var tracked = Assert.Single(await query.ToListAsync());
-            Assert.Equal("Bahnhofstrasse 1", tracked.Address["Line"]);
-        }
-        var rows = await query.AsNoTracking().ToListAsync();
+        InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("owned entity without a corresponding owner", refusal.Message, StringComparison.Ordinal);
+        var rows = await query.AsNoTracking().ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         var row = Assert.Single(rows);
         LocatedAddress address = Assert.IsType<LocatedAddress>(row.Address);

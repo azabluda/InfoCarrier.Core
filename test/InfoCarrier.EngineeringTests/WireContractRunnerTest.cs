@@ -45,18 +45,18 @@ public sealed class WireContractRunnerTest : IDisposable
     [Fact]
     public async Task Local_default_uses_historical_head_even_if_main_advanced()
     {
-        Assert.Equal(Head, await Runner.SelectReference(null, "", new JsonObject(), Head));
+        Assert.Equal(Head, await Runner.SelectReference(null, "", new JsonObject(), Head, TestContext.Current.CancellationToken));
         Assert.Equal("HEAD^{commit}", Assert.Single(commands, c => c[1] == "rev-parse")[^1]);
     }
 
     [Fact]
     public async Task Merge_candidate_uses_target_instead_of_previous_feature_commit()
-        => Assert.Equal(Target, await Runner.SelectReference(null, "pull_request", PullRequest, Head));
+        => Assert.Equal(Target, await Runner.SelectReference(null, "pull_request", PullRequest, Head, TestContext.Current.CancellationToken));
 
     [Fact]
     public async Task Ci_cannot_substitute_a_local_baseline()
         => Assert.Contains("overrides", (await Assert.ThrowsAsync<ArgumentException>(() =>
-            Runner.SelectReference("HEAD", "pull_request", new JsonObject(), Head))).Message);
+            Runner.SelectReference("HEAD", "pull_request", new JsonObject(), Head, TestContext.Current.CancellationToken))).Message);
 
     [Theory]
     [InlineData("feature-parent")]
@@ -65,7 +65,7 @@ public sealed class WireContractRunnerTest : IDisposable
     {
         respond = args => args[1] == "show" ? new(0, parents) : Default(args);
         Assert.Contains("matching base and head", (await Assert.ThrowsAsync<ArgumentException>(() =>
-            Runner.SelectReference(null, "pull_request", PullRequest, Head))).Message);
+            Runner.SelectReference(null, "pull_request", PullRequest, Head, TestContext.Current.CancellationToken))).Message);
     }
 
     [Fact]
@@ -73,14 +73,14 @@ public sealed class WireContractRunnerTest : IDisposable
     {
         respond = _ => new(128, "missing ref");
         Assert.Contains("missing ref", (await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            Runner.SelectReference(null, "", new JsonObject(), Head))).Message);
+            Runner.SelectReference(null, "", new JsonObject(), Head, TestContext.Current.CancellationToken))).Message);
     }
 
     [Fact]
     public async Task Initial_reference_applies_only_before_policy_ancestry()
     {
         respond = args => args[1] == "merge-base" ? new(args[^1] == Target ? 1 : 0, "") : Default(args);
-        Assert.Equal(WireContractRunner.Initial, await Runner.SelectReference("target", "", new JsonObject(), Head));
+        Assert.Equal(WireContractRunner.Initial, await Runner.SelectReference("target", "", new JsonObject(), Head, TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -92,7 +92,7 @@ public sealed class WireContractRunnerTest : IDisposable
             && (missingPolicy ? args[^2] == WireContractRunner.Initial : args[^2] == Target)
             ? new(1, "") : Default(args);
         Assert.Contains(message, (await Assert.ThrowsAsync<ArgumentException>(() =>
-            Runner.SelectReference("target", "", new JsonObject(), Head))).Message);
+            Runner.SelectReference("target", "", new JsonObject(), Head, TestContext.Current.CancellationToken))).Message);
     }
 
     [Theory]
@@ -101,7 +101,7 @@ public sealed class WireContractRunnerTest : IDisposable
     [InlineData("")]
     public async Task Push_uses_previous_protected_state_or_main_for_new_branch(string before)
     {
-        Assert.Equal(Target, await Runner.SelectReference(null, "push", new JsonObject { ["before"] = before }, Head));
+        Assert.Equal(Target, await Runner.SelectReference(null, "push", new JsonObject { ["before"] = before }, Head, TestContext.Current.CancellationToken));
         Assert.Equal((before == "target" ? "target" : "origin/main") + "^{commit}", commands[0][^1]);
     }
 
@@ -110,7 +110,7 @@ public sealed class WireContractRunnerTest : IDisposable
     {
         respond = args => args[1] == "merge-base" ? new(1, "") : Default(args);
         Assert.Contains("rewrites", (await Assert.ThrowsAsync<ArgumentException>(() =>
-            Runner.SelectReference(null, "push", new JsonObject { ["before"] = "target" }, Head))).Message);
+            Runner.SelectReference(null, "push", new JsonObject { ["before"] = "target" }, Head, TestContext.Current.CancellationToken))).Message);
     }
 
     [Theory]
@@ -123,23 +123,23 @@ public sealed class WireContractRunnerTest : IDisposable
         var data = new JsonObject { ["merge_group"] = new JsonObject { ["base_sha"] = "target",
             ["head_sha"] = identityMatches ? Head : Feature } };
         if (success)
-            Assert.Equal(Target, await Runner.SelectReference(null, "merge_group", data, Head));
+            Assert.Equal(Target, await Runner.SelectReference(null, "merge_group", data, Head, TestContext.Current.CancellationToken));
         else
-            await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "merge_group", data, Head));
+            await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "merge_group", data, Head, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Ancestry_command_failure_is_not_false_ancestry()
     {
         respond = args => args[1] == "merge-base" ? new(128, "broken git") : Default(args);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.SelectReference(null, "", new JsonObject(), Head));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.SelectReference(null, "", new JsonObject(), Head, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Unsupported_event_and_missing_event_fields_fail_closed()
     {
-        await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "schedule", new JsonObject(), Head));
-        await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "merge_group", new JsonObject(), Head));
+        await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "schedule", new JsonObject(), Head, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => Runner.SelectReference(null, "merge_group", new JsonObject(), Head, TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -149,17 +149,17 @@ public sealed class WireContractRunnerTest : IDisposable
     public async Task Commit_requires_exact_lowercase_git_identity(string value)
     {
         respond = _ => new(0, value);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Commit("target"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Commit("target", TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Description_comes_from_protected_git_and_missing_description_has_no_fallback()
     {
-        var description = await Runner.ProtectedDescription("protected-reference");
+        var description = await Runner.ProtectedDescription("protected-reference", TestContext.Current.CancellationToken);
         Assert.True(JsonNode.DeepEquals(Schema(), description));
         Assert.Equal(new[] { "git", "show", "protected-reference:" + WireContractRunner.Description }, commands.Single());
         respond = _ => new(128, "missing description");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.ProtectedDescription(WireContractRunner.Initial));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.ProtectedDescription(WireContractRunner.Initial, TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -236,12 +236,12 @@ public sealed class WireContractRunnerTest : IDisposable
         };
         if (incompatibleMode is not null)
         {
-            await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Run(["--record", "--release-ref", "target"]));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Run(["--record", "--release-ref", "target"], token: TestContext.Current.CancellationToken));
             Assert.Equal(original, File.ReadAllBytes(descriptionPath));
         }
         else
         {
-            Assert.Equal(0, await Runner.Run(["--record", "--release-ref=target"]));
+            Assert.Equal(0, await Runner.Run(["--record", "--release-ref=target"], token: TestContext.Current.CancellationToken));
             WireContractRunner.VerifySaved(actual, WireContractRunner.ReadDescription(File.ReadAllText(descriptionPath)));
         }
         Assert.Equal(incompatibleMode == "compare" ? new[] { "compare" } : ["compare", "compare-compatible"], compared);
@@ -255,7 +255,7 @@ public sealed class WireContractRunnerTest : IDisposable
         var path = Path.Combine(root, "event.json");
         File.WriteAllText(path, "{}");
         Assert.Contains("cannot record", (await Assert.ThrowsAsync<ArgumentException>(() =>
-            Runner.Run(["--record"], "push", path))).Message);
+            Runner.Run(["--record"], "push", path, TestContext.Current.CancellationToken))).Message);
         Assert.Empty(commands);
     }
 
@@ -263,7 +263,7 @@ public sealed class WireContractRunnerTest : IDisposable
     public async Task Missing_event_file_fails_before_children()
     {
         Directory.CreateDirectory(root);
-        await Assert.ThrowsAsync<FileNotFoundException>(() => Runner.Run([], "push", Path.Combine(root, "missing.json")));
+        await Assert.ThrowsAsync<FileNotFoundException>(() => Runner.Run([], "push", Path.Combine(root, "missing.json"), TestContext.Current.CancellationToken));
         Assert.Empty(commands);
     }
 
@@ -275,16 +275,16 @@ public sealed class WireContractRunnerTest : IDisposable
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, "event.json");
         File.WriteAllText(path, value);
-        await Assert.ThrowsAsync<ArgumentException>(() => Runner.Run([], "push", path));
+        await Assert.ThrowsAsync<ArgumentException>(() => Runner.Run([], "push", path, TestContext.Current.CancellationToken));
         Assert.Empty(commands);
     }
 
     [Fact]
     public async Task Help_and_invalid_arguments_preserve_exit_codes()
     {
-        Assert.Equal(0, await Runner.Run(["--help"]));
-        Assert.Equal(2, await Runner.Run(["--base-ref"]));
-        Assert.Equal(2, await Runner.Run(["--unknown"]));
+        Assert.Equal(0, await Runner.Run(["--help"], token: TestContext.Current.CancellationToken));
+        Assert.Equal(2, await Runner.Run(["--base-ref"], token: TestContext.Current.CancellationToken));
+        Assert.Equal(2, await Runner.Run(["--unknown"], token: TestContext.Current.CancellationToken));
         Assert.Empty(commands);
     }
 
@@ -292,7 +292,7 @@ public sealed class WireContractRunnerTest : IDisposable
     public async Task Failed_build_cleans_temporary_files_without_recording()
     {
         respond = args => args[0] == "dotnet" ? new(args[1] == "build" ? 7 : 0, "failed build") : Default(args);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Run(["--record"]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Runner.Run(["--record"], token: TestContext.Current.CancellationToken));
         Assert.Empty(Directory.GetDirectories(Path.Combine(root, "artifacts")));
         Assert.False(File.Exists(Path.Combine(root, WireContractRunner.Description)));
     }
@@ -302,7 +302,7 @@ public sealed class WireContractRunnerTest : IDisposable
     {
         respond = args => args[1] == "build" ? throw new OperationCanceledException()
             : args[0] == "dotnet" ? new(0, "SDK") : Default(args);
-        await Assert.ThrowsAsync<OperationCanceledException>(() => Runner.Run(["--record"]));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Runner.Run(["--record"], token: TestContext.Current.CancellationToken));
         Assert.Empty(Directory.GetDirectories(Path.Combine(root, "artifacts")));
         Assert.False(File.Exists(Path.Combine(root, WireContractRunner.Description)));
     }
@@ -341,7 +341,7 @@ public sealed class WireContractRunnerTest : IDisposable
     {
         Directory.CreateDirectory(root);
         string[] args = [mode, "a b", "quote\"", "$(should-not-run); & | < >", "trailing\\"];
-        var result = await WireContractRunner.Execute(["dotnet", typeof(ChildProcess).Assembly.Location, .. args], root, true, default);
+        var result = await WireContractRunner.Execute(["dotnet", typeof(ChildProcess).Assembly.Location, .. args], root, true, TestContext.Current.CancellationToken);
         Assert.Equal(exit, result.ExitCode);
         Assert.Contains(JsonSerializer.Serialize(args), result.Output);
         Assert.Contains("é Ω 漢字 😀", result.Output);
@@ -360,7 +360,7 @@ public sealed class WireContractRunnerTest : IDisposable
         {
             while (!Directory.Exists(marker + ".ready"))
                 await Task.Delay(20, cancellation.Token);
-            pid = int.Parse(await File.ReadAllTextAsync(marker));
+            pid = int.Parse(await File.ReadAllTextAsync(marker, TestContext.Current.CancellationToken));
         }
         finally
         {

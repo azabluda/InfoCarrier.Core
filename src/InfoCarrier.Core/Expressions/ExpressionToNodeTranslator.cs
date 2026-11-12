@@ -437,6 +437,7 @@ public class ExpressionToNodeTranslator(
             && node.Operand is ConstantExpression
             && node.Operand.Type != node.Type
             && node.Type.IsClass
+            && !typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type)
             && TypeNodeMapper.Nameable(node.Operand.Type) == node.Type)
         {
             operand = new UnaryNode

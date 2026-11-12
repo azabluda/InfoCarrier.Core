@@ -11,7 +11,7 @@ Release notes describe changes at a particular release; their old examples retai
 Use [compatibility](../reference/compatibility.md) to plan separate client and server deployments.
 
 Version 11 is not yet a stable published package.
-See the [11.0 draft](../release-notes/11.0.md) for implemented changes and pending Entity Framework Core adoption.
+See the [11.0 draft](../release-notes/11.0.md) for the .NET 11 requirements and implemented changes.
 
 ## Feedback
 

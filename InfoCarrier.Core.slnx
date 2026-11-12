@@ -15,7 +15,7 @@
     <Project Path="test/InfoCarrier.Core.TestUtilities/InfoCarrier.Core.TestUtilities.csproj" />
     <Project Path="test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj" />
     <Project Path="test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj" />
-    <Project Path="test/InfoCarrier.Core.DocumentStoreTests/InfoCarrier.Core.DocumentStoreTests.csproj" />
+    <!-- Tier D is suspended until MongoDB ships an EF Core 11 provider. -->
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/InfoCarrier.CompatibilityProbe/InfoCarrier.CompatibilityProbe.csproj" />

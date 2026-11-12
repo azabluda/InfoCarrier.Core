@@ -97,8 +97,8 @@ public class RelationalInfoCarrierTestStore(InfoCarrierBackendTestStore backend)
                 InfoCarrierClient.Configure(_backend, InfoCarrierTestStore.ClientOptions(_backend)));
 
     /// <inheritdoc />
-    public override async Task CleanAsync(DbContext context)
-        => await _backend.CleanAsync(_backend.CreateDbContext()).ConfigureAwait(false);
+    public override async Task CleanAsync(DbContext context, bool createTables = true)
+        => await _backend.CleanAsync(_backend.CreateDbContext(), createTables).ConfigureAwait(false);
 
     /// <inheritdoc />
     /// <remarks>

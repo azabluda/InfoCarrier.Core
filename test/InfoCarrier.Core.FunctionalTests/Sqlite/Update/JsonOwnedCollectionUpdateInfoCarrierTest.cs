@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.JsonQuery;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 
@@ -45,7 +44,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
 {
     private InfoCarrierFixture Fixture { get; } = fixture;
 
-    [ConditionalFact]
+    [Fact]
     public Task An_element_added_to_an_owned_JSON_collection_reaches_the_store()
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
@@ -71,7 +70,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
                 Assert.Contains(reread.OwnedCollectionRoot, r => r.Name == "added" && r.Number == 99);
             });
 
-    [ConditionalFact]
+    [Fact]
     public Task An_element_edited_in_an_owned_JSON_collection_reaches_the_store()
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
@@ -94,7 +93,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
                 Assert.NotEqual("edited", onDisk.OwnedCollectionRoot[0].Name);
             });
 
-    [ConditionalFact]
+    [Fact]
     public Task An_element_removed_from_an_owned_JSON_collection_reaches_the_store()
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
@@ -116,7 +115,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
                 Assert.Single(onDisk.OwnedCollectionRoot);
             });
 
-    [ConditionalFact]
+    [Fact]
     public Task A_new_entity_carrying_an_owned_JSON_collection_reaches_the_store()
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,
@@ -153,7 +152,7 @@ public class JsonOwnedCollectionUpdateInfoCarrierTest(JsonOwnedCollectionUpdateI
     ///     that would have failed loudest — and it exercises the ordinal key while <em>writing</em>,
     ///     which is the half <c>JsonQueryTestBase</c> cannot reach.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task Two_owners_keep_their_own_elements_across_a_write()
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
             CreateContext,

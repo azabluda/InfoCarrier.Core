@@ -2,8 +2,10 @@
 
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Reflection;
 using InfoCarrier.Core.Query;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace InfoCarrier.Core.Expressions;
@@ -491,6 +493,15 @@ public class DynamicValueMapper(
 
         void AddMember(string name, Type memberType, object? memberValue)
         {
+            if (name == nameof(KeyValuePair<string, object>.Value)
+                && complexType is { IsPropertyBag: true }
+                && value is KeyValuePair<string, object> pair
+                && complexType.FindProperty(pair.Key) is { } bagProperty
+                && !IsPrimitive(memberValue))
+            {
+                memberType = bagProperty.ClrType;
+            }
+
             if (!seen.Add(name))
             {
                 return;
@@ -577,7 +588,7 @@ public class DynamicValueMapper(
     private object? ReadProperty(object value, IProperty property)
         => property.IsShadowProperty() && _readShadowValue is not null
             ? _readShadowValue(value, property)
-            : property.GetGetter().GetClrValue(value);
+            : property.GetGetter().GetClrValueUsingContainingEntity(value);
 
     /// <summary>
     ///     Maps an entity's mapped <em>values</em> — every scalar through its
@@ -613,9 +624,7 @@ public class DynamicValueMapper(
         // Mapped as an ordinary object, nesting and all, which is right because that is what a
         // complex value *is*: owned, with no identity, no navigations and no sharing. The
         // reflective object shape is therefore the whole of it, and the receiving side rehydrates
-        // it the same way. (The one thing it does not carry is a value converter or a shadow
-        // property declared *inside* a complex type — those need the accessor walk above, one
-        // level down.)
+        // it the same way. Shadow values need the separate entry-based walk below.
         foreach (IComplexProperty complexProperty in entityType.GetComplexProperties())
         {
             members.Add(new DynamicPropertyValue
@@ -623,6 +632,24 @@ public class DynamicValueMapper(
                 Name = complexProperty.Name,
                 Value = ToComplexValue(complexProperty.GetGetter().GetClrValue(value), complexProperty),
             });
+        }
+
+        if (_readShadowValue is not null)
+        {
+            foreach (IProperty property in entityType.GetFlattenedProperties())
+            {
+                if (property.DeclaringType is IComplexType && property.IsShadowProperty()
+                    && ChangeEntryMapper.PathFor(property) is { } path)
+                {
+                    object? scalar = PrimitiveCoercion.ToWireValue(property, ReadProperty(value, property));
+                    members.Add(new DynamicPropertyValue
+                    {
+                        Name = path,
+                        PrimitiveValue = IsPrimitive(scalar) ? scalar : null,
+                        Value = IsPrimitive(scalar) ? null : ToDynamicValue(scalar, PrimitiveCoercion.WireType(property)),
+                    });
+                }
+            }
         }
 
         return members;
@@ -643,7 +670,8 @@ public class DynamicValueMapper(
             // collection. Its join rows are a separate question, handled below — this used to
             // `continue` here and that is what made explicit skip-navigation loading return
             // nothing (plan A5/A6).
-            bool loaded = _isNavigationLoaded!(value, navigation);
+            bool loaded = _isNavigationLoaded!(value, navigation)
+                || (navigation.TargetEntityType.IsOwned() && navigation.TargetEntityType.IsMappedToJson());
 
             // A shadow navigation has no CLR member to read, and `GetGetter` on one does not
             // return null — it throws: "No backing field could be found for property
@@ -1061,19 +1089,39 @@ public class DynamicValueMapper(
     /// </remarks>
     private static object? ConstructCollection(Type type, Type elementType, IList items)
     {
+        if (type == typeof(FrozenSet<>).MakeGenericType(elementType))
+        {
+            return typeof(DynamicValueMapper)
+                .GetMethod(nameof(Freeze), BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(elementType)
+                .Invoke(null, [items]);
+        }
+
         if (!type.IsInterface && !type.IsAbstract)
         {
             foreach (ConstructorInfo ctor in type.GetConstructors())
             {
                 ParameterInfo[] parameters = ctor.GetParameters();
-                if (parameters.Length != 1 || !parameters[0].ParameterType.IsInstanceOfType(items))
+                if (parameters.Length != 1)
+                {
+                    continue;
+                }
+
+                object argument = items;
+                if (parameters[0].ParameterType == elementType.MakeArrayType())
+                {
+                    Array array = Array.CreateInstance(elementType, items.Count);
+                    items.CopyTo(array, 0);
+                    argument = array;
+                }
+                else if (!parameters[0].ParameterType.IsInstanceOfType(items))
                 {
                     continue;
                 }
 
                 try
                 {
-                    return ctor.Invoke([items]);
+                    return ctor.Invoke([argument]);
                 }
                 catch (TargetInvocationException)
                 {
@@ -1103,6 +1151,8 @@ public class DynamicValueMapper(
 
         return CreateRange(type, elementType, items) ?? AddToNew(type, elementType, items);
     }
+
+    private static FrozenSet<T> Freeze<T>(IEnumerable<T> items) => items.ToFrozenSet();
 
     /// <summary>
     ///     An <see cref="IOrderedEnumerable{TElement}" /> that enumerates <paramref name="items" /> in

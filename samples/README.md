@@ -1,7 +1,7 @@
 # Northwind samples
 
 The Northwind samples are a SQLite server with browser and console clients.
-This checkout uses version 11 development code and Entity Framework Core 10.
+This checkout uses version 11 development code and Entity Framework Core 11.
 For the published sample, use tag `v10.3.0` and its matching instructions.
 
 ## Run

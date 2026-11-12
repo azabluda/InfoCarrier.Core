@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -21,7 +20,7 @@ public class SqlitePrecisionTest
 
         if (async)
         {
-            await context.Database.OpenConnectionAsync();
+            await context.Database.OpenConnectionAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
         else
         {
@@ -30,7 +29,7 @@ public class SqlitePrecisionTest
 
         await using var command = context.Database.GetDbConnection().CreateCommand();
         command.CommandText = "SELECT CAST(1.0 / 3 AS TEXT)";
-        object? result = async ? await command.ExecuteScalarAsync() : command.ExecuteScalar();
+        object? result = async ? await command.ExecuteScalarAsync(TestContext.Current.CancellationToken) : command.ExecuteScalar();
 
         Assert.Equal("0.333333333333333", result);
     }
@@ -67,7 +66,7 @@ public class SqlitePrecisionTest
         {
             if (async)
             {
-                await connection.OpenAsync();
+                await connection.OpenAsync(TestContext.Current.CancellationToken);
             }
             else
             {
@@ -76,7 +75,7 @@ public class SqlitePrecisionTest
 
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT CAST(1.0 / 3 AS TEXT)";
-            object? result = async ? await command.ExecuteScalarAsync() : command.ExecuteScalar();
+            object? result = async ? await command.ExecuteScalarAsync(TestContext.Current.CancellationToken) : command.ExecuteScalar();
             Assert.Equal("0.333333333333333", result);
 
             if (async)

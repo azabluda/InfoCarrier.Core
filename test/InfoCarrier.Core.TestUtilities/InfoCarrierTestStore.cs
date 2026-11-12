@@ -127,9 +127,9 @@ public class InfoCarrierTestStore(InfoCarrierBackendTestStore backend)
         => builder.AllowArbitrarySqlExecution(true);
 
     /// <inheritdoc />
-    public override async Task CleanAsync(DbContext context)
+    public override async Task CleanAsync(DbContext context, bool createTables = true)
     {
-        await _backend.CleanAsync(_backend.CreateDbContext()).ConfigureAwait(false);
+        await _backend.CleanAsync(_backend.CreateDbContext(), createTables).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

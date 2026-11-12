@@ -2,7 +2,6 @@
 
 using System.Text.Json;
 using InfoCarrier.Core.Common;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Expressions;
 
@@ -81,7 +80,7 @@ public class PayloadLimitsTest
         var serializer = new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(1024));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await serializer.DeserializeAsync<InfoCarrierEnvelope>(Envelope(serializer, 8192)));
+            async () => await serializer.DeserializeAsync<InfoCarrierEnvelope>(Envelope(serializer, 8192), TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -135,12 +134,12 @@ public class PayloadLimitsTest
         using var source = new MemoryStream(Payload(size));
         if (size <= 64)
         {
-            Assert.Equal(new string('x', size - 2), await serializer.DeserializeAsync<string>(source));
+            Assert.Equal(new string('x', size - 2), await serializer.DeserializeAsync<string>(source, TestContext.Current.CancellationToken));
         }
         else
         {
             var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await serializer.DeserializeAsync<string>(source));
+                await serializer.DeserializeAsync<string>(source, TestContext.Current.CancellationToken));
             Assert.Contains(nameof(InfoCarrierPayloadLimits.MaxResponseBytes), failure.Message);
         }
         Assert.True(source.CanRead);
@@ -165,7 +164,7 @@ public class PayloadLimitsTest
     {
         var serializer = new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(maxResponseBytes: 64));
         await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            await serializer.DeserializeAsync<string>((Stream)null!));
+            await serializer.DeserializeAsync<string>((Stream)null!, TestContext.Current.CancellationToken));
     }
 
     /// <summary>

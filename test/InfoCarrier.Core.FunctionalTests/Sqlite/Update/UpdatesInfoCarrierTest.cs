@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.UpdatesModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Update;
 
@@ -46,7 +45,7 @@ public class UpdatesInfoCarrierTest(UpdatesInfoCarrierTest.UpdatesInfoCarrierFix
     ///     <c>UpdatesSqliteTest</c>'s: store-generated GUIDs are not supported on SQLite.
     /// </summary>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Update/UpdatesSqliteTest.cs", 13, 15,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Update/UpdatesSqliteTest.cs", 11, 13,
         Justification = "Store-generated guids are not supported",
         Skip = true)]
     public override Task Save_with_shared_foreign_key()

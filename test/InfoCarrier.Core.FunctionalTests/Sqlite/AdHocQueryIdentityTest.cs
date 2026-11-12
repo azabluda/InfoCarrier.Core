@@ -6,13 +6,12 @@ using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class AdHocQueryIdentityTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_constant_raw_query_preserves_its_identity_in_the_wire_node(bool mapped)
@@ -43,7 +42,7 @@ public class AdHocQueryIdentityTest
         if (!mapped) { Assert.True(marker.GetBoolean()); }
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, false, true)]

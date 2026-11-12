@@ -28,7 +28,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             .ConfigureServices(s => s.AddInfoCarrierServer<Northwind.Shared.NorthwindContext>()));
         using var context = NorthwindOverHttpTest.CreateClientContext(
             host, registerShape: true, out _);
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync());
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders.Select(o => new { o.Id, o.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("The anonymous shape is not registered in this server's trusted catalog.", failure.Message);
         Assert.False(failure.Data.Contains(typeof(AnonymousShapeCatalog)));
         FailureLogs.Entry entry = Assert.Single(logs.Entries);
@@ -58,7 +58,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             CorrelationId = "secret-client-correlation\n",
             Payload = serializer.Serialize<object?>(null),
         });
-        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(body));
+        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(body), TestContext.Current.CancellationToken);
         Assert.Equal(status, response.StatusCode);
         FailureLogs.Entry entry = Assert.Single(logs.Entries);
 
@@ -117,9 +117,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
                 IsAsync = true, ReturnsSingleResult = true,
             }),
         };
-        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope)));
+        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope)), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync())!.Fault);
+        Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken))!.Fault);
         var entry = Assert.Single(logs.Entries);
 
 
@@ -143,7 +143,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using HttpClient client = host.CreateClient();
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var server = host.Services.GetRequiredService<IInfoCarrierServer>();
-        string token = scenario == "caller" ? (await server.BeginTransactionAsync()).TransactionId
+        string token = scenario == "caller" ? (await server.BeginTransactionAsync(TestContext.Current.CancellationToken)).TransactionId
             : scenario == "instance" ? "secret-instance.secret-token" : "secret-missing-token";
         caller.CurrentCallerId = "secret-other-caller";
         try
@@ -154,9 +154,9 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
                 Operation = InfoCarrierOperation.CommitTransaction,
                 Payload = serializer.Serialize(token),
             };
-            using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope)));
+            using var response = await client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope)), TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync())!.Fault);
+            Assert.NotNull(serializer.Deserialize<InfoCarrierEnvelope>(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken))!.Fault);
             var entry = Assert.Single(logs.Entries);
 
             Assert.Equal(LogLevel.Error, entry.Level);
@@ -166,7 +166,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         finally
         {
             caller.CurrentCallerId = "secret-owner";
-            await server.RollbackTransactionAsync(token);
+            await server.RollbackTransactionAsync(token, TestContext.Current.CancellationToken);
         }
     }
 
@@ -179,7 +179,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             .ConfigureServices(s => s.AddSingleton<IInfoCarrierSerializer>(
                 new SystemTextJsonInfoCarrierSerializer(new InfoCarrierPayloadLimits(maxRequestBytes: 32)))));
         using var client = host.CreateClient();
-        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(new byte[33]));
+        using var response = await client.PostAsync("infocarrier", new ByteArrayContent(new byte[33]), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var entry = Assert.Single(logs.Entries);
 
@@ -202,12 +202,12 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var context = NorthwindOverHttpTest.CreateClientContext(host);
         if (databaseFailure)
         {
-            await Assert.ThrowsAsync<InfoCarrierServerException>(() => context.Customers.ToListAsync());
+            await Assert.ThrowsAsync<InfoCarrierServerException>(() => context.Customers.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
         else
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => context.Customers
-                .Where(c => c.Id.StartsWith("secret-expression", StringComparison.Ordinal)).ToListAsync());
+                .Where(c => c.Id.StartsWith("secret-expression", StringComparison.Ordinal)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
         var entry = Assert.Single(logs.Entries);
 
@@ -236,7 +236,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             Operation = InfoCarrierOperation.BeginTransaction,
             Payload = serializer.Serialize<object?>(null),
         };
-        await Assert.ThrowsAsync<FormatException>(() => client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope))));
+        await Assert.ThrowsAsync<FormatException>(() => client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(envelope)), TestContext.Current.CancellationToken));
         Assert.Equal(1, server.Completed);
         var entry = Assert.Single(logs.Entries);
 
@@ -257,7 +257,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         {
             Id = "secret-missing-customer", CompanyName = "secret-company", City = "secret-city", Country = "secret-country",
         });
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => context.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => context.SaveChangesAsync(TestContext.Current.CancellationToken));
         var entry = Assert.Single(logs.Entries);
 
 
@@ -274,7 +274,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
             .AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information).AddProvider(logs)));
         using var context = NorthwindOverHttpTest.CreateClientContext(host);
         logs.Entries.Clear();
-        await context.Customers.Where(c => c.Country == "Germany").ToListAsync();
+        await context.Customers.Where(c => c.Country == "Germany").ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Contains(logs.Entries, entry => entry.Category == "Microsoft.EntityFrameworkCore.Database.Command"
             && entry.Level == LogLevel.Information && entry.Message.Contains("SELECT", StringComparison.Ordinal));
     }
@@ -297,7 +297,7 @@ public class ServerFailureLoggingTest(NorthwindServerFactory factory) : IClassFi
         var serializer = new SystemTextJsonInfoCarrierSerializer();
         var request = new InfoCarrierEnvelope { ProtocolVersion = 999, Operation = InfoCarrierOperation.BeginTransaction, Payload = [] };
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(request))));
+            client.PostAsync("infocarrier", new ByteArrayContent(serializer.Serialize(request)), TestContext.Current.CancellationToken));
         Assert.Equal("secret-logger", failure.Message);
     }
 

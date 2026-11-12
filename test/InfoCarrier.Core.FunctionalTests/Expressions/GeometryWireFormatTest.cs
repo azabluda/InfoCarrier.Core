@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using InfoCarrier.Core.ValueMapping;
 using NetTopologySuite.Geometries;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Expressions;
 
@@ -20,7 +19,7 @@ public class GeometryWireFormatTest
 {
     private static readonly IInfoCarrierValueMapper Mapper = new InfoCarrierNetTopologySuiteValueMapper();
 
-    [ConditionalFact]
+    [Fact]
     public void A_point_survives_with_its_Z_and_M_ordinates()
     {
         GeometryFactory factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
@@ -35,7 +34,7 @@ public class GeometryWireFormatTest
         Assert.Equal(4326, read.SRID);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void A_plain_XY_geometry_round_trips_unchanged()
     {
         GeometryFactory factory = NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory(srid: 0);
@@ -47,7 +46,7 @@ public class GeometryWireFormatTest
         Assert.Equal(0, read.SRID);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void The_mapper_declines_everything_that_is_not_a_geometry()
     {
         Assert.False(Mapper.TryMapToWire("a string", typeof(string), out _));

@@ -31,7 +31,7 @@ public class NonSharedModelUpdatesInfoCarrierTest(NonSharedFixture fixture) : No
     private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -42,7 +42,7 @@ public class NonSharedModelUpdatesInfoCarrierTest(NonSharedFixture fixture) : No
         Func<DbContext, Task>? nestedTestOperation2 = null,
         Func<DbContext, Task>? nestedTestOperation3 = null)
         => TestHelpers.ExecuteWithStrategyInTransactionAsync(
-            contextFactory.CreateContext,
+            contextFactory.CreateDbContext,
             (facade, transaction) => facade.UseTestTransaction(transaction),
             testOperation,
             nestedTestOperation1,
@@ -58,13 +58,14 @@ public class NonSharedModelUpdatesInfoCarrierTest(NonSharedFixture fixture) : No
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

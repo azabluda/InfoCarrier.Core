@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using InfoCarrier.Core.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.TransportTests;
 

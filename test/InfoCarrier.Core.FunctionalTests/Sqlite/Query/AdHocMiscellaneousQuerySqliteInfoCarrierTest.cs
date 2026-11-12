@@ -57,11 +57,26 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocMiscellaneousQueryRelationalTestBase(fixture)
 {
+    protected override async Task Seed30915(Context30915 context)
+    {
+        context.Statuses.AddRange(
+            new Context30915.PickupStatus30915 { PickupStatusId = 1, Name = "Active" },
+            new Context30915.PickupStatus30915 { PickupStatusId = 2, Name = "NoRequests" },
+            new Context30915.PickupStatus30915 { PickupStatusId = 3, Name = "Busy" });
+
+        context.Requests.AddRange(
+            new Context30915.PickupRequest30915 { PickupStatusId = 1, Priority = 5 },
+            new Context30915.PickupRequest30915 { PickupStatusId = 1, Priority = null },
+            new Context30915.PickupRequest30915 { PickupStatusId = 3, Priority = 7 });
+
+        await context.SaveChangesAsync();
+    }
+
     private readonly NonSharedModelInfoCarrierHarness _harness = new(
         SqliteInfoCarrierTier.Instance, arbitrarySqlExecution: true);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -168,13 +183,14 @@ public class AdHocMiscellaneousQuerySqliteInfoCarrierTest(NonSharedFixture fixtu
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

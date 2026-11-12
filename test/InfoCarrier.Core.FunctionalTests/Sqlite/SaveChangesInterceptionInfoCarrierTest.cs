@@ -1,11 +1,10 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -132,8 +131,8 @@ public abstract class SaveChangesInterceptionInfoCarrierTestBase(
             Assert.Equal(35, Assert.IsType<Singularity>(Assert.Single(server.Entities)).Id);
 
             listener.AssertEventsInOrder(
-                CoreEventId.SaveChangesStarting.Name,
-                CoreEventId.SaveChangesCompleted.Name);
+                CoreEventId.SaveChangesStarting.Name!,
+                CoreEventId.SaveChangesCompleted.Name!);
         }
         finally
         {

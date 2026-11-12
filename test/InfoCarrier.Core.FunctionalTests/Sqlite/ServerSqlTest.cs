@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -39,7 +38,7 @@ public class ServerSqlTest
     #region Queries
 
     /// <summary>The filter is the server's work, and no row that fails it crosses the wire.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_filter_runs_on_the_server()
         => AssertServerRuns(
             client => client.Tickets.Where(t => t.Priority > 1).ToListAsync(),
@@ -50,7 +49,7 @@ WHERE "t"."Priority" > 1
 """);
 
     /// <summary>A projection asks the store for the columns it uses and no others.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_projection_asks_only_for_the_columns_it_uses()
         => AssertServerRuns(
             client => client.Tickets.Select(t => t.Subject).ToListAsync(),
@@ -86,7 +85,7 @@ FROM "Tickets" AS "t"
     ///         is the unnested shape.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_projected_collection_reading_no_column_projects_the_keys_alone()
     {
         bool flag = true;
@@ -113,7 +112,7 @@ ORDER BY "t"."Id"
     ///     query the server returned every matching row and the client kept one. The answer was
     ///     right and the whole table crossed the wire.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_First_over_a_client_projection_sends_its_row_limit_to_the_server()
         => AssertServerRuns(
             client => client.Tickets.Where(t => t.Priority > 0).Select(t => new { t.Id, t.Subject }).FirstAsync(),
@@ -128,7 +127,7 @@ LIMIT 1
     ///     <c>Single</c> sends a limit of two: one row cannot show that a second exists.
     /// </summary>
     /// <inheritdoc cref="A_First_over_a_client_projection_sends_its_row_limit_to_the_server" />
-    [ConditionalFact]
+    [Fact]
     public Task A_Single_over_a_client_projection_sends_a_limit_of_two_to_the_server()
         => AssertServerRuns(
             client => client.Tickets.Where(t => t.Id == 1).Select(t => new { t.Id, t.Subject }).SingleAsync(),
@@ -142,7 +141,7 @@ LIMIT 2
     /// <summary>
     ///     A root Single limits rows after the optional reference join, as EF Core does.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_root_Single_over_a_client_projection_limits_after_the_optional_reference_join()
         => AssertServerRuns(
             client => client.OptionalSeats
@@ -162,7 +161,7 @@ LIMIT 2
 """);
 
     /// <summary>A root Single keeps its ordinary empty and duplicate result exceptions.</summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_root_Single_over_a_client_projection_preserves_cardinality_errors()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -172,18 +171,18 @@ LIMIT 2
         InvalidOperationException empty = await Assert.ThrowsAsync<InvalidOperationException>(
             () => client.OptionalSeats
                 .Select(s => new { s.Id, Ticket = s.Ticket == null ? null : new { s.Ticket.Id } })
-                .SingleAsync(s => s.Id == 99));
+                .SingleAsync(s => s.Id == 99, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("Sequence contains no elements.", empty.Message);
 
         InvalidOperationException duplicate = await Assert.ThrowsAsync<InvalidOperationException>(
             () => client.OptionalSeats
                 .Select(s => new { s.Id, Ticket = s.Ticket == null ? null : new { s.Ticket.Id } })
-                .SingleAsync());
+                .SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("Sequence contains more than one element.", duplicate.Message);
     }
 
     /// <summary>A root SingleOrDefault limits rows after the optional reference join.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_root_SingleOrDefault_over_a_client_projection_limits_after_the_optional_reference_join()
         => AssertServerRuns(
             client => client.OptionalSeats
@@ -199,7 +198,7 @@ LIMIT 2
 """);
 
     /// <summary>A root SingleOrDefault returns null for no row and rejects duplicate rows.</summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_root_SingleOrDefault_over_a_client_projection_preserves_cardinality()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -209,24 +208,24 @@ LIMIT 2
         var empty = await client.OptionalSeats
             .Where(s => s.Id == 99)
             .Select(s => new { s.Id, Ticket = s.Ticket == null ? null : new { s.Ticket.Id } })
-            .SingleOrDefaultAsync();
+            .SingleOrDefaultAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Null(empty);
 
         var present = await client.OptionalSeats
             .Where(s => s.Id == 1)
             .Select(s => new { s.Id, LongSubject = NotTranslatable(s.Ticket!.Subject) })
-            .SingleOrDefaultAsync();
+            .SingleOrDefaultAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(present);
         Assert.Equal(1, present.Id);
         Assert.True(present.LongSubject);
 
         InvalidOperationException duplicate = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.OptionalSeats.Select(s => new { s.Id }).SingleOrDefaultAsync());
+            () => client.OptionalSeats.Select(s => new { s.Id }).SingleOrDefaultAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("Sequence contains more than one element.", duplicate.Message);
     }
 
     /// <summary>Paging is the store's work: the client never receives the pages it skipped.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task Paging_sends_the_limit_and_the_offset_to_the_server()
         => AssertServerRuns(
             client => client.Tickets.OrderBy(t => t.Id).Skip(1).Take(1).ToListAsync(),
@@ -238,7 +237,7 @@ LIMIT @Value0 OFFSET @Value
 """);
 
     /// <summary>An <c>Include</c> is one statement with a join, not one query per parent.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_Include_runs_as_one_statement_with_a_join()
         => AssertServerRuns(
             client => client.Tickets.Include(t => t.Seats).OrderBy(t => t.Id).ToListAsync(),
@@ -259,7 +258,7 @@ ORDER BY "t"."Id"
     ///     them. The answer was right and the wire carried everything.
     ///     <c>JoinKeyRewriter</c> gives the key a type the server has.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_join_on_a_composite_key_runs_one_statement_on_the_server()
         => AssertServerRuns(
             client => (from t in client.Tickets
@@ -274,7 +273,7 @@ INNER JOIN "Seats" AS "s" ON "t"."Id" = "s"."TicketId" AND ("t"."Subject" = "s".
     /// <summary>
     ///     A split query stays split: two statements cross the wire, not one join and not three.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_split_query_runs_as_two_statements()
         => AssertServerRuns(
             client => client.Tickets.Include(t => t.Seats).AsSplitQuery().OrderBy(t => t.Id).ToListAsync(),
@@ -291,7 +290,7 @@ ORDER BY "t"."Id"
 """);
 
     /// <summary>An aggregate is computed by the store, and no row crosses the wire for it.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_Count_is_computed_by_the_store()
         => AssertServerRuns(
             client => client.Tickets.Where(t => t.Priority > 0).CountAsync(),
@@ -302,7 +301,7 @@ WHERE "t"."Priority" > 0
 """);
 
     /// <summary>An existence check fetches no rows.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_Any_with_a_predicate_fetches_no_rows()
         => AssertServerRuns(
             client => client.Tickets.AnyAsync(t => t.Subject == "second"),
@@ -314,7 +313,7 @@ SELECT EXISTS (
 """);
 
     /// <summary>A grouping is aggregated by the store, not by the client over every row.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_GroupBy_is_aggregated_by_the_store()
         => AssertServerRuns(
             client => client.Tickets.GroupBy(t => t.Priority).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(),
@@ -332,7 +331,7 @@ GROUP BY "t"."Priority"
     ///     constant, so the store parsed a new statement for every pair of values, and the plan cache
     ///     filled with statements that could never be reused.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_collection_of_captured_values_reaches_the_store_as_parameters()
     {
         int first = 1;
@@ -359,7 +358,7 @@ WHERE "t"."Id" IN (@Value, @Value0)
     ///     writes the statement EF writes. An ORDINARY query is untouched, because EF folds such an
     ///     operator itself before this client ever sees the tree.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_compiled_query_keeps_its_collection_a_parameter()
     {
         Func<ServerSqlContext, int[], Task<int>> compiled = EF.CompileAsyncQuery(
@@ -393,7 +392,7 @@ WHERE "t"."Id" IN (
     ///     client, which answers correctly and costs the whole table. This asserts the refusal by
     ///     asserting that the store was never asked anything.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_query_the_server_cannot_run_is_refused_and_runs_no_statement()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -402,7 +401,7 @@ WHERE "t"."Id" IN (
         store.ServerSql.Clear();
 
         await Assert.ThrowsAnyAsync<InvalidOperationException>(
-            () => client.Tickets.Where(t => NotTranslatable(t.Subject)).ToListAsync());
+            () => client.Tickets.Where(t => NotTranslatable(t.Subject)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         store.AssertServerSql();
     }
@@ -412,7 +411,7 @@ WHERE "t"."Id" IN (
     #region Writes
 
     /// <summary>An update writes the property the client changed, and no other column.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_update_writes_only_the_property_the_client_changed()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 1),
@@ -435,7 +434,7 @@ RETURNING 1;
     ///     member another client had changed between this client's read and its write was silently
     ///     overwritten with the value this client had loaded.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_update_of_one_complex_member_writes_only_that_column()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 1),
@@ -454,7 +453,7 @@ RETURNING 1;
     ///     A complex collection in JSON that the client did not touch is not written.
     /// </summary>
     /// <inheritdoc cref="An_update_of_one_complex_member_writes_only_that_column" />
-    [ConditionalFact]
+    [Fact]
     public Task An_update_leaves_a_json_collection_alone_when_the_client_did_not_change_it()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 1),
@@ -470,7 +469,7 @@ RETURNING 1;
 """);
 
     /// <summary>A change to the JSON collection writes that column, and nothing else.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_update_of_the_json_collection_writes_only_that_column()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 1),
@@ -503,7 +502,7 @@ RETURNING 1;
     ///         reference, which does not.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_update_carries_every_concurrency_token_of_the_row()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 1),
@@ -519,7 +518,7 @@ RETURNING 1;
 """);
 
     /// <summary>An insert names the columns the client set, and the store generates nothing extra.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_insert_names_the_columns_of_the_new_row()
         => AssertServerRunsAfter(
             _ => Task.CompletedTask,
@@ -541,7 +540,7 @@ VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7);
 """);
 
     /// <summary>A delete names the key and the concurrency token, so a stale delete is refused.</summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_delete_names_the_key_and_the_concurrency_token()
         => AssertServerRunsAfter(
             client => client.Tickets.SingleAsync(t => t.Id == 2),
@@ -563,7 +562,7 @@ RETURNING 1;
     ///     A provider that fetched the matching rows to update them one by one would answer the same
     ///     and cost a table scan plus a round trip per row.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_ExecuteUpdate_runs_one_statement_and_reads_nothing()
         => AssertServerRuns(
             client => client.Tickets
@@ -577,7 +576,7 @@ WHERE "t"."Priority" > 1
 
     /// <summary>An <c>ExecuteDelete</c> runs one statement, and reads nothing first.</summary>
     /// <inheritdoc cref="An_ExecuteUpdate_runs_one_statement_and_reads_nothing" />
-    [ConditionalFact]
+    [Fact]
     public Task An_ExecuteDelete_runs_one_statement_and_reads_nothing()
         => AssertServerRuns(
             client => client.Seats.Where(s => s.Label == "A1").ExecuteDeleteAsync(),

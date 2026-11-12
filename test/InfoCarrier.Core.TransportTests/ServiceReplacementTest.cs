@@ -192,10 +192,10 @@ public partial class ServiceReplacementTest
         var inner = new PrefixSerializer(observations);
         var serializer = new InfoCarrierSerializerBoundary(inner, new InfoCarrierPayloadLimits(8, 8));
         Assert.Throws<InvalidOperationException>(() => serializer.Deserialize<QueryDataRequest>(new byte[9]));
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await serializer.DeserializeAsync<QueryDataResult>(new byte[9]));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await serializer.DeserializeAsync<QueryDataResult>(new byte[9], TestContext.Current.CancellationToken));
         Assert.Equal(0, inner.Reads);
         using var stream = new MemoryStream(new byte[9]);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await serializer.DeserializeAsync<QueryDataRequest>(stream));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await serializer.DeserializeAsync<QueryDataRequest>(stream, TestContext.Current.CancellationToken));
         Assert.True(stream.CanRead);
     }
 
@@ -207,7 +207,7 @@ public partial class ServiceReplacementTest
         {
             Context db = scope.ServiceProvider.GetRequiredService<Context>();
             db.Add(new Item { Id = 1, Name = new string('x', 2000) });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         var services = new ServiceCollection();
         services.AddSingleton<Observations>();
@@ -217,7 +217,7 @@ public partial class ServiceReplacementTest
         await using ServiceProvider provider = services.BuildServiceProvider();
         await using var context = new Context(new DbContextOptionsBuilder<Context>()
             .UseApplicationServiceProvider(provider).UseInfoCarrier("orders").Options);
-        InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Items.ToListAsync());
+        InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("MaxResponseBytes", failure.Message);
     }
 

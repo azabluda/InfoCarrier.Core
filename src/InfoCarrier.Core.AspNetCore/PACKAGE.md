@@ -23,7 +23,7 @@ app.MapInfoCarrier().RequireAuthorization("DataAccess");
 Configure the named authorization policy and the database provider in the application.
 The endpoint permits queries and writes; enforce access rules on the server.
 The shared model and imports are shown in the complete tutorial.
-This development build still uses Entity Framework Core 10.
+This development build uses Entity Framework Core 11.
 
 ## Getting started
 

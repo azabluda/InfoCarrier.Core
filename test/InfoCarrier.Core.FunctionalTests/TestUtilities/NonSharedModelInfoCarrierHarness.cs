@@ -49,12 +49,14 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     a shared fixture's, and threaded the same way.
 /// </param>
 /// <param name="allowedTypes">Types the fixture explicitly registers on both client and server.</param>
+/// <param name="anonymousShapes">Projection shapes the fixture registers on both client and server.</param>
 public sealed class NonSharedModelInfoCarrierHarness(
     InfoCarrierTier backend,
     bool relationalClientStore = false,
     bool arbitrarySqlExecution = false,
     bool serverLogForwarding = false,
-    Type[]? allowedTypes = null)
+    Type[]? allowedTypes = null,
+    object[]? anonymousShapes = null)
 {
     private SharedTestStoreProperties _pending;
     private ITestStoreFactory? _testStoreFactory;
@@ -95,6 +97,7 @@ public sealed class NonSharedModelInfoCarrierHarness(
             ArbitrarySqlExecution = arbitrarySqlExecution,
             ServerLogForwarding = serverLogForwarding,
             AllowedTypes = allowedTypes,
+            AnonymousShapes = anonymousShapes,
         };
 
     /// <summary>
@@ -160,6 +163,14 @@ public sealed class NonSharedModelInfoCarrierHarness(
             }
 
             onConfiguring?.Invoke(builder);
+            if (!DirectClient.IsEnabled
+                && builder.Options.FindExtension<CoreOptionsExtension>() is { } serverCore)
+            {
+                // LogTo belongs to the test's client; forwarding it doubles compilation events.
+                ((IDbContextOptionsBuilderInfrastructure)builder).AddOrUpdateExtension(
+                    serverCore.WithDbContextLogger(null));
+            }
+
             return builder;
         };
     }

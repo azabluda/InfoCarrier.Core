@@ -2,13 +2,12 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class DistinctClientProjectionTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -16,7 +15,7 @@ public class DistinctClientProjectionTest
     public async Task A_client_projection_after_distinct_matches_the_direct_statement(bool async, bool distinct)
         => await AssertProjection(async, distinct, ordered: false);
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_client_projection_after_ordered_distinct_matches_the_direct_statement(bool async)

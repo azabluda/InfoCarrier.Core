@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -44,7 +43,7 @@ public class TransactionTokenTest
     {
         await using InProcessInfoCarrierServer server = CreateServer();
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         string[] parts = begun.TransactionId.Split('.');
         Assert.Equal(2, parts.Length);
@@ -61,8 +60,8 @@ public class TransactionTokenTest
         await using InProcessInfoCarrierServer a = CreateServer();
         await using InProcessInfoCarrierServer b = CreateServer();
 
-        TransactionResult fromA = await a.BeginTransactionAsync();
-        TransactionResult fromB = await b.BeginTransactionAsync();
+        TransactionResult fromA = await a.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        TransactionResult fromB = await b.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         Assert.NotEqual(InstanceOf(fromA.TransactionId), InstanceOf(fromB.TransactionId));
     }
@@ -76,10 +75,10 @@ public class TransactionTokenTest
         await using InProcessInfoCarrierServer a = CreateServer();
         await using InProcessInfoCarrierServer b = CreateServer();
 
-        TransactionResult begun = await a.BeginTransactionAsync();
+        TransactionResult begun = await a.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => b.SupportsSavepointsAsync(begun.TransactionId));
+            () => b.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         // It names both instances, so a reader can tell the two apart in a log.
         Assert.Contains(InstanceOf(begun.TransactionId), thrown.Message, StringComparison.Ordinal);
@@ -96,10 +95,10 @@ public class TransactionTokenTest
         await using InProcessInfoCarrierServer a = CreateServer();
         await using InProcessInfoCarrierServer b = CreateServer();
 
-        TransactionResult begun = await a.BeginTransactionAsync();
+        TransactionResult begun = await a.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => b.CommitTransactionAsync(begun.TransactionId));
+            () => b.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         Assert.Contains("different server instance", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("session affinity", thrown.Message, StringComparison.Ordinal);
@@ -121,9 +120,9 @@ public class TransactionTokenTest
         await using InProcessInfoCarrierServer a = CreateServer();
         await using InProcessInfoCarrierServer b = CreateServer();
 
-        TransactionResult begun = await a.BeginTransactionAsync();
+        TransactionResult begun = await a.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
-        await b.RollbackTransactionAsync(begun.TransactionId);
+        await b.RollbackTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -138,11 +137,11 @@ public class TransactionTokenTest
     {
         await using InProcessInfoCarrierServer server = CreateServer();
 
-        TransactionResult begun = await server.BeginTransactionAsync();
-        await server.CommitTransactionAsync(begun.TransactionId);
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.SupportsSavepointsAsync(begun.TransactionId));
+            () => server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         Assert.Contains("committed", thrown.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("different server instance", thrown.Message, StringComparison.Ordinal);
@@ -157,7 +156,7 @@ public class TransactionTokenTest
         await using InProcessInfoCarrierServer server = CreateServer();
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.SupportsSavepointsAsync("not-a-token-this-server-ever-issued"));
+            () => server.SupportsSavepointsAsync("not-a-token-this-server-ever-issued", TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain("different server instance", thrown.Message, StringComparison.Ordinal);
     }

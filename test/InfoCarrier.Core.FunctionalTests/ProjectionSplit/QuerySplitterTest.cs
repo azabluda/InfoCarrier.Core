@@ -4,7 +4,6 @@ using System.Collections;
 using System.Linq.Expressions;
 using InfoCarrier.Core.Query;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 

@@ -1,12 +1,10 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestModels.TransportationModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -40,7 +38,7 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
         SqliteInfoCarrierTier.Instance, serverLogForwarding: true);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -49,7 +47,7 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
     ///     reason: the scenario is not valid for TPT. Adopted rather than invented.
     /// </remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/TPTTableSplittingSqliteTest.cs", 11, 13,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/TPTTableSplittingSqliteTest.cs", 9, 11,
         Justification = "This scenario is not valid for TPT",
         Skip = true)]
     public override Task Can_insert_dependent_with_just_one_parent()
@@ -102,13 +100,14 @@ public class TPTTableSplittingInfoCarrierTest(NonSharedFixture fixture, ITestOut
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

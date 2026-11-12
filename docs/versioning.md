@@ -22,8 +22,8 @@ kept in step.
 fix for version 10 starts there and can become version 10.3.1. Nothing is published merely because
 the branch exists.
 
-`main` is the version 11 development line. Its MinVer floor and assembly major are 11, although it
-can compile against EF Core 10 while public API cleanup continues. A stable version 11 package
+`main` is the version 11 development line. Its MinVer floor and assembly major are 11. It targets
+.NET 11 and EF Core 11 throughout the active solution. A stable version 11 package
 cannot ship before EF Core 11 adoption is complete.
 
 The rewritten site on `main` is development documentation. `website/mkdocs.yml` sets

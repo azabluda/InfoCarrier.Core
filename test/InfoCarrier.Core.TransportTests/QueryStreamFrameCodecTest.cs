@@ -21,8 +21,7 @@ public class QueryStreamFrameCodecTest
         Task writing = Write();
 
         await using IAsyncEnumerator<QueryStreamFrame> reader = QueryStreamFrameCodec
-            .ReadAsync(pipe.Reader.AsStream())
-            .GetAsyncEnumerator();
+            .ReadAsync(pipe.Reader.AsStream(), TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await reader.MoveNextAsync());
         Assert.IsType<QueryStartFrame>(reader.Current);
         Assert.True(await reader.MoveNextAsync());
@@ -61,13 +60,13 @@ public class QueryStreamFrameCodecTest
         };
         await using var stream = new MemoryStream();
 
-        await QueryStreamFrameCodec.WriteAsync(stream, Frames());
+        await QueryStreamFrameCodec.WriteAsync(stream, Frames(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
         string json = Encoding.UTF8.GetString(stream.ToArray());
         Assert.StartsWith($"[[0,{QueryStreamFrameCodec.Version},7,false,\"System.Int32\"],[2,", json, StringComparison.Ordinal);
         Assert.EndsWith("]]", json, StringComparison.Ordinal);
 
         stream.Position = 0;
-        List<QueryStreamFrame> frames = await QueryStreamFrameCodec.ReadAsync(stream).ToListAsync();
+        List<QueryStreamFrame> frames = await QueryStreamFrameCodec.ReadAsync(stream, TestContext.Current.CancellationToken).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Collection(
             frames,
             frame => Assert.IsType<QueryStartFrame>(frame),
@@ -94,7 +93,7 @@ public class QueryStreamFrameCodecTest
     {
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
         JsonException exception = await Assert.ThrowsAsync<JsonException>(
-            async () => await QueryStreamFrameCodec.ReadAsync(stream).ToListAsync());
+            async () => await QueryStreamFrameCodec.ReadAsync(stream, TestContext.Current.CancellationToken).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains(expected, exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 

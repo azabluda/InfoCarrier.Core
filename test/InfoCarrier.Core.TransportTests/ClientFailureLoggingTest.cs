@@ -49,7 +49,7 @@ public class ClientFailureLoggingTest
     {
         var logs = new Capture();
         var client = Create(new Transport("success", new Exception()), new SystemTextJsonInfoCarrierSerializer(), logs);
-        await client.CommitTransactionAsync("secret-token");
+        await client.CommitTransactionAsync("secret-token", TestContext.Current.CancellationToken);
         Assert.Empty(logs.Entries);
     }
 
@@ -58,7 +58,7 @@ public class ClientFailureLoggingTest
     {
         var failure = new InvalidOperationException("original");
         var client = Create(new Transport("transport exchange", failure), new SystemTextJsonInfoCarrierSerializer(), new Capture { Throw = true });
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => client.CommitTransactionAsync("t")));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => client.CommitTransactionAsync("t", TestContext.Current.CancellationToken)));
     }
 
     [Theory]
@@ -104,7 +104,7 @@ public class ClientFailureLoggingTest
         var logs = new Capture();
         var client = Create(new Transport("returned server fault", new DbUpdateConcurrencyException("secret")),
             new SystemTextJsonInfoCarrierSerializer(), logs);
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.CommitTransactionAsync("t"));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.CommitTransactionAsync("t", TestContext.Current.CancellationToken));
         Entry entry = Assert.Single(logs.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.Equal("ConcurrencyConflict", entry.State["Outcome"]);
@@ -118,7 +118,7 @@ public class ClientFailureLoggingTest
         var logs = new Capture { Enabled = false, ThrowOnEnable = broken };
         var failure = new TimeoutException("original");
         var client = Create(new Transport("transport exchange", failure), new SystemTextJsonInfoCarrierSerializer(), logs);
-        Assert.Same(failure, await Record.ExceptionAsync(() => client.CommitTransactionAsync("t")));
+        Assert.Same(failure, await Record.ExceptionAsync(() => client.CommitTransactionAsync("t", TestContext.Current.CancellationToken)));
         Assert.Empty(logs.Entries);
     }
 

@@ -3,14 +3,13 @@
 using System.Net;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>A constant's inaccessible runtime subtype must not change its SQL conversion.</summary>
 public class ConvertedConstantSqlTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, true)]
     [InlineData(true, true)]
     [InlineData(false, false)]

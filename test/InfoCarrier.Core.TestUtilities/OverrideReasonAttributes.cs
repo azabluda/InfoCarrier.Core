@@ -17,7 +17,7 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     <para>
 ///         <b>The label is the attribute type; the reference is its arguments.</b>
 ///         <see cref="StoreLimitAttribute" />, <see cref="StoreDefectAttribute" /> and
-///         <see cref="StoreIssueAttribute" /> describe the store.
+///         <see cref="StoreIssueAttribute" /> and <see cref="StoreSupportAttribute" /> describe the store.
 ///         <see cref="InfoCarrierDefectAttribute" /> describes this provider, and is the last
 ///         resort after a fix. <see cref="InfoCarrierDesignAttribute" /> describes this provider too,
 ///         where it differs on purpose.
@@ -67,7 +67,7 @@ public enum UpstreamRepository
     /// <summary>No upstream reference.</summary>
     None = 0,
 
-    /// <summary><c>dotnet/efcore</c> at <c>v10.0.1</c>, the version of the specification packages.</summary>
+    /// <summary><c>dotnet/efcore</c> at <c>v11.0.0</c>, the version of the specification packages.</summary>
     EfCore,
 
     /// <summary><c>mongodb/mongo-efcore-provider</c> at <c>v10.0.3</c>, the provider Tier D runs.</summary>
@@ -248,6 +248,10 @@ public sealed class StoreLimitAttribute : StoreBehaviourAttribute
     {
     }
 }
+
+/// <summary><c>SUPPORT</c>: the store correctly executes a query the common specification expects to refuse.</summary>
+public sealed class StoreSupportAttribute(UpstreamRepository repository, string path, int firstLine, int lastLine)
+    : StoreBehaviourAttribute(repository, path, firstLine, lastLine);
 
 /// <summary>
 ///     <c>DEFECT</c>: the store crashes, or answers wrongly. Never a limit, because a store that means
@@ -451,7 +455,7 @@ public static class Upstream
     public static string CommitOf(UpstreamRepository repository)
         => repository switch
         {
-            UpstreamRepository.EfCore => "a6217e3438ca1fb430079f2626056c1a11581927",
+            UpstreamRepository.EfCore => "9e685c7a52d1a344d133a3d370e458db97417b3f",
             UpstreamRepository.MongoEfCore => "de93261da6d989bd12db8815a3a672dcf28bafb1",
             _ => throw new ArgumentOutOfRangeException(nameof(repository), repository, null),
         };
@@ -466,13 +470,14 @@ public static class Upstream
         };
 
     /// <summary>
-    ///     Where a checkout of the repository sits in this repository, if one does. <c>subrepos/</c> is
-    ///     git-ignored, so a CI runner has none and the audit cannot check a reference's lines there.
+    ///     Where the pinned upstream source sits, if present. EF Core 11 uses an archive under
+    ///     <c>artifacts/</c>; preparation is documented in the adoption checklist. A runner without
+    ///     that source reports unchecked references.
     /// </summary>
     public static string? CheckoutOf(UpstreamRepository repository)
         => repository switch
         {
-            UpstreamRepository.EfCore => "subrepos/efcore",
+            UpstreamRepository.EfCore => "artifacts/efcore-v11",
             _ => null,
         };
 

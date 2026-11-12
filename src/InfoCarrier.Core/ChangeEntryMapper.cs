@@ -211,6 +211,26 @@ public static class ChangeEntryMapper
             }
         }
 
+        foreach (IProperty property in entityType.GetFlattenedProperties())
+        {
+            if (property.DeclaringType is not IComplexType || !property.IsShadowProperty()
+                || (entry.EntityState != EntityState.Added && !entry.IsModified(property)))
+            {
+                continue;
+            }
+
+            if (PathFor(property) is { } path)
+            {
+                properties.Add(new DynamicPropertyValue
+                {
+                    Name = path,
+                    Value = mapper.ToDynamicValue(
+                        Expressions.PrimitiveCoercion.ToWireValue(property, entry.GetCurrentValue(property)),
+                        Expressions.PrimitiveCoercion.WireType(property)),
+                });
+            }
+        }
+
         return new ChangeEntry
         {
             CorrelationId = correlationId,
@@ -272,6 +292,47 @@ public static class ChangeEntryMapper
     public static IReadOnlyList<DynamicPropertyValue> ReadValues(byte[] serialized)
         => JsonSerializer.Deserialize(serialized, ExpressionJsonContext.Default.DynamicValueNode)?.Properties
             ?? [];
+
+    // Collection elements have separate entries, so an owner-relative path cannot identify them.
+    internal static string? PathFor(IProperty property)
+    {
+        string path = property.Name;
+        ITypeBase declaring = property.DeclaringType;
+        while (declaring is IComplexType complex)
+        {
+            if (complex.ComplexProperty.IsCollection)
+            {
+                return null;
+            }
+
+            path = complex.ComplexProperty.Name + "." + path;
+            declaring = complex.ComplexProperty.DeclaringType;
+        }
+
+        return path;
+    }
+
+    internal static IProperty? FindProperty(IEntityType entityType, string path)
+    {
+        if (entityType.FindProperty(path) is { } property)
+        {
+            return property;
+        }
+
+        string[] segments = path.Split('.');
+        ITypeBase declaring = entityType;
+        foreach (string segment in segments[..^1])
+        {
+            if (declaring.FindComplexProperty(segment) is not { IsCollection: false } complex)
+            {
+                return null;
+            }
+
+            declaring = complex.ComplexType;
+        }
+
+        return declaring.FindProperty(segments[^1]);
+    }
 
     /// <summary>
     ///     Serializes store-generated values to return to the client.

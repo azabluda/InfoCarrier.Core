@@ -113,7 +113,7 @@ public class ServerCancellationPathTest(NorthwindServerFactory factory) : IClass
         // synchronous path. Only the query below is being measured.
         recorder.Reset();
 
-        List<Customer> customers = await context.Customers.Where(c => c.Country == "Germany").ToListAsync();
+        List<Customer> customers = await context.Customers.Where(c => c.Country == "Germany").ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(customers);
 
         // The server read the store, and it read it on the path that carries a token.

@@ -67,7 +67,7 @@ public class InMemoryInfoCarrierBackendTestStore(
     ///     that reseeds between tests, as the change-tracking bases do, appends to the previous
     ///     seed unless the store is actually emptied first.
     /// </remarks>
-    public override Task CleanAsync(DbContext context)
+    public override Task CleanAsync(DbContext context, bool createTables = true)
     {
         context.GetService<IInMemoryStoreProvider>().Store.Clear();
         return context.Database.EnsureCreatedAsync();

@@ -399,7 +399,9 @@ public class ClientResultMaterializer(
             // Left Detached, so it is invisible to ChangeTracker.Entries() until the residual
             // shows it actually reached the result — or, for a join row, until the result order
             // is known (`AttachJoinRows`).
-            entry = _stateManager.CreateEntry(values, entityType);
+            entry = _stateManager.CreateEntry(
+                values.ToDictionary(value => entityType.FindProperty(value.Key)!, value => value.Value),
+                entityType);
             instance = entry.Entity;
 
             if (deferredKey is not null)
@@ -438,6 +440,39 @@ public class ClientResultMaterializer(
                 entityType,
                 instance,
                 ((IRuntimeEntityType)entityType).ShadowValuesFactory(values));
+        }
+
+        // Complex shadow discriminators have no CLR member. Restore both snapshots so an
+        // unchanged nullable complex value is not cleared by a subsequent Update call.
+        foreach (DynamicPropertyValue member in row.Properties)
+        {
+            if (!member.IsLoadedNavigation
+                && ChangeEntryMapper.FindProperty(entityType, member.Name) is { DeclaringType: IComplexType } property
+                && property.IsShadowProperty())
+            {
+                object? value = PrimitiveCoercion.FromWireValue(property,
+                    member.Value is null ? member.PrimitiveValue : mapper.FromDynamicValue(member.Value));
+                entry.SetProperty(property, value, isMaterialization: true, setModified: false);
+                entry.SetOriginalValue(property, value);
+                if (value is null && property.DeclaringType is IComplexType complex
+                    && complex.FindDiscriminatorProperty() == property
+                    && complex.ComplexProperty.GetGetter().GetClrValueUsingContainingEntity(instance) is not null)
+                {
+                    // EF's query shaper can materialize a complex value without retaining its
+                    // discriminator in shadow state. Unknown values must not become UPDATE columns.
+                    entry.MarkUnknown(property);
+                }
+            }
+        }
+
+        foreach (IProperty property in entityType.GetFlattenedProperties())
+        {
+            if (property.DeclaringType is IComplexType && property.IsShadowProperty()
+                && ChangeEntryMapper.PathFor(property) is { } path
+                && !row.Properties.Any(member => member.Name == path))
+            {
+                entry.SetIsLoaded(property, false);
+            }
         }
 
         PopulateNavigations(row, instance, entityType, entry, mapper);
@@ -947,11 +982,11 @@ public class ClientResultMaterializer(
 
             // A collection is *filled*, never assigned — `MaterializeCollection` goes through the
             // model's own accessor and has already written whatever needed writing.
-            object? related = navigation.IsCollection
+            object? related = navigation.IsCollection && !member.Value.IsNull
                 ? MaterializeCollection(member.Value, navigation, instance, mapper)
                 : ResolveAgainstTracker(mapper.FromDynamicValue(member.Value), navigation, entry);
 
-            if (related is not null && !navigation.IsCollection)
+            if ((!navigation.IsCollection && related is not null) || member.Value.IsNull)
             {
                 // The backing field first, and the property only when there is no field. L6
                 // established this for *reads* — a property getter on a lazy-loading entity is

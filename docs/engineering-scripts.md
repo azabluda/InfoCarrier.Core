@@ -15,7 +15,7 @@ Run from the repository root unless noted otherwise. Put application arguments a
 | `eng/TrxFailures.cs` | `<results.trx> [more.trx ...]` | Stream XML, union failed names, and sort by Unicode code point. |
 | `eng/SpecParity.cs` | `<reasons.tsv ...> -- <results.trx ...>` | Write badge values to stdout and the parity table to stderr. |
 | `eng/SuiteSummary.cs` | `<results.trx> [more.trx ...]` | Write counters, failed names, parity, and the workflow summary beside the first TRX. |
-| `eng/Measure.cs` | `<label> [baseline-label]` | Run both specification projects and compare complete failure-name and reason snapshots. |
+| `eng/Measure.cs` | `<label> [baseline-label]` | Run the active specification project and compare complete failure-name and reason snapshots. |
 | `eng/TrimRatchet.cs` | `[baseline-file]` | Clean-publish the Blazor client and enforce the existing trim-warning limit. |
 | `eng/DocsServe.cs` | `[--build] [MkDocs serve arguments ...]` | Create the documentation environment and preview it, or build strictly. |
 | `eng/MakeIcons.cs` | `[--output-root directory]` | Generate the five PNGs and three-frame ICO from source artwork. |
@@ -40,8 +40,8 @@ Keep script-specific implementations in `eng/commands/`. Use `eng/shared/` only 
 multiple commands. `ScriptHost` owns safe argument passing, concurrent pipe draining, log streaming,
 and cancellation of child process trees. Commands retain their argument parsing, outputs, and error decisions.
 
-The entry files use `#:include` to compile those sources. `global.json` therefore requires SDK
-10.0.300 with `latestMinor` roll-forward. The engineering test project compiles the same source
+The entry files use `#:include` to compile those sources. `global.json` selects SDK
+11.0.100 with `latestMinor` roll-forward. The engineering test project compiles the same source
 files without the top-level entry statements. Keep comments on arguments, outputs, failures, and
 non-obvious safeguards current. Do not introduce new Python or Bash orchestration.
 
@@ -73,7 +73,7 @@ can differ because the PNG codec differs. Shipped artwork is unchanged; `--outpu
 
 Active contributor instructions, workflow invocations, and experiment skills use the new commands.
 The user-facing review includes README, package readmes, and website instructions. Source-build
-instructions name SDK 10.0.300; MkDocs comments name the new wrapper. Dated execution records retain
+instructions now name SDK 11.0.100; MkDocs comments name the new wrapper. Dated execution records retain
 commands that actually ran.
 
 ## External dependencies and remaining automation

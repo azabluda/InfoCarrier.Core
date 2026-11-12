@@ -37,9 +37,8 @@ public class NamedClientRegistrationTest
         {
             using IServiceScope scope = provider.CreateScope();
             await using Context context = method.Contains("factory", StringComparison.Ordinal)
-                ? await scope.ServiceProvider.GetRequiredService<IDbContextFactory<Context>>().CreateDbContextAsync()
-                : scope.ServiceProvider.GetRequiredService<Context>();
-            Assert.Empty(await context.Items.ToListAsync());
+                ? await scope.ServiceProvider.GetRequiredService<IDbContextFactory<Context>>().CreateDbContextAsync(TestContext.Current.CancellationToken) : scope.ServiceProvider.GetRequiredService<Context>();
+            Assert.Empty(await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
         Assert.Null(provider.GetService<IInfoCarrierClient>());
     }
@@ -134,7 +133,7 @@ public class NamedClientRegistrationTest
         IInfoCarrierClient named = Attached(options.UseInfoCarrier("orders"));
         Assert.NotSame(named, provider.GetRequiredService<IInfoCarrierClient>());
         await using var context = new Context(options.UseInfoCarrier().Options);
-        Assert.Empty(await context.Items.ToListAsync());
+        Assert.Empty(await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -190,7 +189,7 @@ public class NamedClientRegistrationTest
         }
         foreach (HttpClient http in wrappers.Values)
         {
-            await Assert.ThrowsAsync<ObjectDisposedException>(() => http.GetAsync("http://localhost"));
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => http.GetAsync("http://localhost", TestContext.Current.CancellationToken));
         }
     }
 

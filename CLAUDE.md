@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-EF Core 10 database provider that remotes LINQ queries and change-tracking over a wire
+EF Core 11 database provider that remotes LINQ queries and change-tracking over a wire
 protocol. Client `DbContext` has no database; the server executes against a real provider.
 
 **This file holds the rules; `docs/` holds the reasons.** A paragraph earns its place here by
@@ -59,37 +59,28 @@ dotnet run --file eng/Measure.cs -- <label> [baseline]                   # THE S
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
-dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C only
+# Tier C (Firebird) is suspended pending an EF Core 11 provider.
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in Measure.cs
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
-INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # the slow run of Tier C, seconds
+# Tier D (MongoDB) is suspended pending an EF Core 11 provider.
 ```
 
 ### Where the tests live
 
-**The spec suite is ONE project**, `test/InfoCarrier.Core.FunctionalTests`, and the ADR-009 tiers
-are namespaces inside it rather than projects: `InMemory/` is Tier A, `Sqlite/` is Tier B,
-`Firebird/` is Tier C. A run of one tier is a `--filter`, and the suite's number is one project's.
+**The active specification suite is one project**, `test/InfoCarrier.Core.FunctionalTests`:
+`InMemory/` is Tier A and `Sqlite/` is Tier B. `eng/Measure.cs` reports one combined result.
+All active projects target .NET 11 and use EF Core 11 without EF Core 10 overrides.
 
-**Tier D is a project of its own**, `test/InfoCarrier.Core.DocumentStoreTests`, an embedded
-MongoDB, because `MongoDB.EntityFrameworkCore` needs EF Core >= 10.0.11 while `src/` compiles
-against a 10.0.1 floor and one project has one package graph. That also makes it the one place the
-product runs on a NEWER EF Core than it was built with. It is 234 tests in two halves: the
-`OwnedNavigations` family over the wire, and the SAME bases with InfoCarrier REMOVED — the
-`Direct*` classes, plain EF Core on the same embedded store. **The control documents the store**:
-each of its overrides asserts exactly what MongoDB does, each wire override names the control test
-that shows it, and a control class that needs no override must stay green without one.
+**Tiers C and D are temporarily suspended.** Firebird sources remain excluded from compilation.
+The MongoDB project remains outside the solution and refuses direct builds. Restore either tier
+only when its provider supports EF Core 11; update dependencies, compliance exclusions, workflows,
+and measurements together. Do not introduce a mixed EF Core 10/11 graph to restore coverage.
 
-**`test/InfoCarrier.Core.TestUtilities` is the store-neutral half of the harness** — the client and
-server shells, the store factory, the fixture properties, the in-process transport, the geometry
-mapper, the server SQL log, the culture pin, `OverrideAudit`, and `CurrentTest` with the xUnit test
-framework that sets it for every test of the spec project (#167). It sits at the repository's 10.0.1
-floor and carries no `VersionOverride`, because .NET binds an assembly by name and a higher version
-satisfies a lower reference: compile-low/run-high works and the reverse does not. **Anything that
-names a store stays in `FunctionalTests/TestUtilities/`** — the tier classes, their backend stores,
-the Northwind contexts, the relational client shell — because moving one would put its provider
-package on every consumer's compile line.
+**`test/InfoCarrier.Core.TestUtilities` is the store-neutral harness**: client and server shells,
+fixtures, transport, geometry mapping, SQL capture, culture, and override auditing. Current-test
+identity comes from xUnit v3's `TestContext`. The custom executor handles only optional live
+comparison. Store-specific classes remain under `FunctionalTests/TestUtilities/`.
 
 ### Which tier a base belongs to, and it belongs to exactly one
 
@@ -231,9 +222,9 @@ claimed one. `Other` counts since the amendment of 2026-09-28.
 ### Running and reporting
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `dotnet run --file eng/Measure.cs --`, which runs
-every project in its own `projects` list and adds the figures. **That list holds TWO projects — the
-spec project and ADR-009 Tier D — so a project missing from it is missing from every measurement;
-add one there in the same commit that creates it.** `InfoCarrier.Core.TransportTests` is
+every project in its own `projects` list and adds the figures. **That list currently holds the active
+spec project. Tier D is suspended pending an EF Core 11 provider. Add a restored tier to the
+measurement list when its dependency graph is compatible.** `InfoCarrier.Core.TransportTests` is
 deliberately absent: it is this repository's own HTTP-transport suite, not a spec project, and the
 spec-suite badge counts spec tests. **So a `src/` change needs the transport line above as well as
 `Measure.cs`.**
@@ -424,8 +415,9 @@ owner had given, ten days earlier, for rejecting the same idea (ADR-014). Four r
 the tag matching the package Tier C runs), kept for source-level study. Each is checked out at the
 tag this repository references, and `firebird` loads in `roslyn-codelens` from
 `subrepos/firebird/src/NETProvider.slnx` with `rootProjects` naming its two EF Core projects.
-`efcore` is the authoritative EF Core 10 reference — read it to confirm API shapes rather than
-guessing. Edits there are invisible to git and will be lost.
+`efcore` retains the historical EF Core 10 reference. Current EF Core 11 adoption uses the pinned
+official archive under `artifacts/efcore-v11`; see the adoption checklist for preparation. Read
+the matching reference to confirm API shapes. Edits under `subrepos/` remain forbidden.
 
 **Never override a spec test without saying what the store does and where that is shown.** The
 inherited `EFCore.Specification.Tests` classes *are* the coverage goal (ADR-004), and silently
@@ -515,10 +507,11 @@ live on different carriers, check that one reader answers for both.**
 
 ### Packaging, the site, and the branch model
 
-**There are TWO shipped packages, and `release.yml` names them one by one**: `InfoCarrier.Core` and
-`InfoCarrier.Core.AspNetCore`. The push steps use exact filenames rather than a glob, so **a third
-package would ship nothing until that workflow named it**. Every packable project validates against
-the last published stable, which `PackageValidationBaselineVersion` names.
+**Version 11 has three packages, and `release.yml` names them one by one**:
+`InfoCarrier.Core.Abstractions`, `InfoCarrier.Core`, and `InfoCarrier.Core.AspNetCore`, in dependency
+order. The Abstractions package was restored for shared configuration during version 11 API work.
+The push steps use exact filenames. Package consistency validation stays enabled; restore the
+published-version baseline after 11.0.0 becomes available, as `docs/versioning.md` requires.
 
 **`InfoCarrier.Core.Relational` was a third package and is not one any more.** D3 is superseded
 (`architecture.md` §6a, 2026-09-03): the relational half lives at `src/InfoCarrier.Core/Relational/`,
@@ -642,15 +635,20 @@ crosses this wire. A non-relational backend tier is recorded as future scope wit
   client, for reads and for `ExecuteUpdate`/`ExecuteDelete` alike. The documented control is a
   server-side query interceptor. **Read `docs/plans/v10/cold-read-findings.md` §1 before touching the
   security or tenancy prose**, and never let a user-facing page claim the filter is the boundary.
-- **Reading an entity whose property-bag complex type holds a list fails, as it does in plain EF
-  Core** (`docs/upstream-defects.md` 1.1). **Inserting one works since 2026-09-29 (#52)**: the server
-  builds the entity with EF's empty materializer, which does EF's constructor binding and reaches no
-  defective branch, and restores the bag's member types the wire loses. This said the insert was
-  "an upstream defect on a path only this provider takes ... the route around it has to reproduce
-  constructor binding, so it is priced and not taken" until then; the empty materializer made the
-  price small, and plain EF turned out to reach the defect too, through any query of such an entity.
+- **EF Core 11 fixes ordinary property-bag complex reads** (`docs/upstream-defects.md` 1.1, rechecked
+  2026-11-12). The direct/wire test verifies list member types too. The server now uses its full
+  materializer for those values. **Property-bag complex collections still require the empty
+  materializer** when rebuilding a save from values. Keep that narrower workaround until upstream
+  fixes the remaining indexer branch. This paragraph described all such reads as failing on EF
+  Core 10; do not carry that limitation forward to the ordinary complex-value case.
 
 ### The test stores, and flakiness
+
+**Run only one functional-test process per working directory.** The startup sweep removes database
+files left by earlier runs. A second process can mistake the first process's temporarily closed
+databases for stale files and remove them. This was reproduced during EF Core 11 timing work on
+2026-11-12. Run timing probes and the slow suite sequentially; a concurrent run requires an isolated
+working directory. Transport and engineering projects use separate output directories.
 
 The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF Core's own
 `SqliteTestStore` is. **Do not move it back to `Mode=Memory;Cache=Shared`**: that makes the

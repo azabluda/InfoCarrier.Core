@@ -9,7 +9,7 @@ Run the commands below from the `ShopTutorial` directory.
 ## 1. Create the browser project
 
 ```powershell
-dotnet new blazorwasm -n Shop.Browser -f net10.0
+dotnet new blazorwasm -n Shop.Browser -f net11.0
 dotnet add Shop.Browser reference Shop.Shared
 dotnet add Shop.Browser package InfoCarrier.Core
 ```
@@ -166,7 +166,7 @@ A compiled model is a separate optimization; it is not required for a browser cl
 
 If you generate one, ensure it was generated for the client configuration rather than the server's
 database provider and proxy settings.
-Entity Framework Core 10's compiled-model initialization may use a thread unavailable in the browser.
+Entity Framework Core 11's compiled-model initialization may use a thread unavailable in the browser.
 Its inline-initialization switch is:
 
 ```csharp

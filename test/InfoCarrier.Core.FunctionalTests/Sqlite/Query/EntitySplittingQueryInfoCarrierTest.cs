@@ -18,10 +18,11 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 /// </remarks>
 public class EntitySplittingQueryInfoCarrierTest(NonSharedFixture fixture) : EntitySplittingQueryTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        SqliteInfoCarrierTier.Instance, relationalClientStore: true, arbitrarySqlExecution: true);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -33,13 +34,14 @@ public class EntitySplittingQueryInfoCarrierTest(NonSharedFixture fixture) : Ent
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

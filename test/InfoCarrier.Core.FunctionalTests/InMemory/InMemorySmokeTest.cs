@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -64,7 +63,7 @@ public class InMemorySmokeTest
             .Options;
 
         await using var context = new SmokeContext(clientOptions);
-        List<Blog> blogs = await context.Blogs.OrderBy(b => b.Id).ToListAsync();
+        List<Blog> blogs = await context.Blogs.OrderBy(b => b.Id).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, blogs.Count);
         Assert.Equal("alpha", blogs[0].Title);
@@ -72,7 +71,7 @@ public class InMemorySmokeTest
     }
 
 
-    [ConditionalFact]
+    [Fact]
     public async Task The_server_stops_a_query_when_the_caller_cancels()
     {
         // THE SERVER SIDE IS WHAT THIS ASSERTS, and no test EF ships can. EF's own
@@ -118,7 +117,7 @@ public class InMemorySmokeTest
 
         await using (var context = new SmokeContext(clientOptions))
         {
-            Assert.Equal(2, (await context.Blogs.ToListAsync()).Count);
+            Assert.Equal(2, (await context.Blogs.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Count);
         }
 
         QueryDataRequest request = serializer.Deserialize<QueryDataRequest>(capturedQuery!.Payload)!;
@@ -144,7 +143,7 @@ public class InMemorySmokeTest
     /// </summary>
     public sealed record TitleKey(string? Title);
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_the_server_cannot_run_is_logged_as_a_split()
     {
         // ESTABLISHES THAT THE EVENT FIRES, which is the only reason this test exists. A log
@@ -162,7 +161,7 @@ public class InMemorySmokeTest
             seed.Blogs.AddRange(
                 new Blog { Id = 1, Title = "alpha" },
                 new Blog { Id = 2, Title = "be" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var log = new List<string>();
@@ -176,7 +175,7 @@ public class InMemorySmokeTest
             var described = await context.Blogs
                 .Where(b => b.Id == 1)
                 .Select(b => new { b.Id, Label = ClientOnly.Describe(b.Title) })
-                .ToListAsync();
+                .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal("<alpha>", Assert.Single(described).Label);
         }
@@ -192,7 +191,7 @@ public class InMemorySmokeTest
         Assert.DoesNotContain(log, line => line.Contains("AllowTypes"));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_split_that_removes_rows_on_the_client_names_what_stayed_behind()
     {
         // THE SPLIT EVENT SAYS WHETHER THE SPLIT COST ANYTHING, not only that one happened.
@@ -215,7 +214,7 @@ public class InMemorySmokeTest
                 new Blog { Id = 1, Title = "alpha" },
                 new Blog { Id = 2, Title = "be" },
                 new Blog { Id = 3, Title = "gamma" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var log = new List<string>();
@@ -229,7 +228,7 @@ public class InMemorySmokeTest
             var second = await context.Blogs
                 .Select(b => new { b.Id, Label = ClientOnly.Describe(b.Title) })
                 .OrderBy(x => x.Id)
-                .ElementAtAsync(1);
+                .ElementAtAsync(1, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(2, second.Id);
         }
@@ -237,7 +236,7 @@ public class InMemorySmokeTest
         Assert.Contains(log, line => line.Contains("remove rows") && line.Contains("ElementAt"));
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task An_unregistered_group_key_is_refused_independently_of_store_rules(bool relationalRules)
@@ -252,7 +251,7 @@ public class InMemorySmokeTest
                 new Blog { Id = 1, Title = "alpha" },
                 new Blog { Id = 2, Title = "beta" },
                 new Blog { Id = 3, Title = "beta" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var log = new List<string>();
@@ -266,7 +265,7 @@ public class InMemorySmokeTest
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Blogs
                 .GroupBy(b => new TitleKey(b.Title))
                 .Select(g => g.Count())
-                .ToListAsync());
+                .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
             Assert.Contains("AddAllowedTypes", error.Message, StringComparison.Ordinal);
             Assert.Contains(nameof(TitleKey), error.Message, StringComparison.Ordinal);
@@ -275,7 +274,7 @@ public class InMemorySmokeTest
         Assert.Empty(log);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_query_the_server_runs_whole_logs_no_split()
     {
         // The other half, and the one that keeps the event honest: the common case must stay
@@ -286,7 +285,7 @@ public class InMemorySmokeTest
         await using (SmokeContext seed = CreateClient(store))
         {
             seed.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var log = new List<string>();
@@ -297,7 +296,7 @@ public class InMemorySmokeTest
                 .LogTo(log.Add, [InfoCarrierEventId.QuerySplit])
                 .Options))
         {
-            List<Blog> matched = await context.Blogs.Where(b => b.Title == "alpha").ToListAsync();
+            List<Blog> matched = await context.Blogs.Where(b => b.Title == "alpha").ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Single(matched);
         }
@@ -305,7 +304,7 @@ public class InMemorySmokeTest
         Assert.Empty(log);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_filter_the_server_cannot_run_throws_rather_than_fetching_everything()
     {
         // PINS `RejectClientEvaluation`, AND IT WAS WRITTEN AFTER GETTING THIS WRONG. Reading
@@ -325,18 +324,18 @@ public class InMemorySmokeTest
         await using (SmokeContext seed = CreateClient(store))
         {
             seed.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         await using SmokeContext context = CreateClient(store);
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => context.Blogs.Where(b => ClientOnly.TitleIsLong(b.Title)).ToListAsync());
+            () => context.Blogs.Where(b => ClientOnly.TitleIsLong(b.Title)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("could not be translated", thrown.Message);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_non_relational_server_is_served_end_to_end()
     {
         // PINS THAT THIS PROVIDER IS NOT RELATIONAL-ONLY, which is a claim the suite otherwise
@@ -361,24 +360,24 @@ public class InMemorySmokeTest
         context.Blogs.AddRange(
             new Blog { Id = 1, Title = "alpha" },
             new Blog { Id = 2, Title = "beta" });
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         List<Blog> matched = await context.Blogs
             .Where(b => b.Title!.StartsWith("a"))
             .OrderBy(b => b.Id)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("alpha", Assert.Single(matched).Title);
 
-        Blog toChange = await context.Blogs.SingleAsync(b => b.Id == 2);
+        Blog toChange = await context.Blogs.SingleAsync(b => b.Id == 2, cancellationToken: TestContext.Current.CancellationToken);
         toChange.Title = "changed";
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using SmokeContext reader = CreateClient(store);
-        Assert.Equal("changed", (await reader.Blogs.SingleAsync(b => b.Id == 2)).Title);
+        Assert.Equal("changed", (await reader.Blogs.SingleAsync(b => b.Id == 2, cancellationToken: TestContext.Current.CancellationToken)).Title);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Ordinary_use_never_builds_the_relational_model()
     {
         // THE OTHER HALF OF THE CLAIM ABOVE, and the one that would catch a regression. Since V5
@@ -393,8 +392,8 @@ public class InMemorySmokeTest
                 .Options);
 
         context.Blogs.Add(new Blog { Id = 1, Title = "alpha" });
-        await context.SaveChangesAsync();
-        Assert.Single(await context.Blogs.Where(b => b.Title == "alpha").ToListAsync());
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Single(await context.Blogs.Where(b => b.Title == "alpha").ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         // The factory is there, and its result is not.
         Assert.NotNull(context.Model.FindRuntimeAnnotation("Relational:RelationalModelFactory"));
@@ -420,7 +419,7 @@ public class InMemorySmokeTest
     private static SmokeContext CreateClient(InMemoryInfoCarrierBackendTestStore store)
         => new(new DbContextOptionsBuilder<SmokeContext>().UseInfoCarrier(store).Options);
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_foreign_key_placeholder_resolves_against_its_own_principal_type()
     {
         // C76, pinned on **Tier A** and not Tier B, which is the part worth knowing. A client
@@ -479,11 +478,11 @@ public class InMemorySmokeTest
                     BlogId = client.Entry(alpha).Property(x => x.Id).CurrentValue,
                 });
 
-            Assert.Equal(4, await client.SaveChangesAsync());
+            Assert.Equal(4, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
 
         using DbContext server = store.CreateDbContext();
-        List<Blog> blogs = await server.Set<Blog>().Include(x => x.Posts).ToListAsync();
+        List<Blog> blogs = await server.Set<Blog>().Include(x => x.Posts).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(["to-alpha"], blogs.Single(x => x.Title == "alpha").Posts.Select(p => p.Heading));
         Assert.Equal(["to-beta"], blogs.Single(x => x.Title == "beta").Posts.Select(p => p.Heading));
@@ -529,7 +528,7 @@ public class InMemorySmokeTest
     ///         <c>OfType</c> would pass this test.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_unshippable_type_argument_is_refused_rather_than_answered_by_Enumerable()
     {
         await using InMemoryInfoCarrierBackendTestStore store = CreateStore();

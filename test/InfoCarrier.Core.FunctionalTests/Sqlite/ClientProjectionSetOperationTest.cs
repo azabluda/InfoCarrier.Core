@@ -3,13 +3,12 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class ClientProjectionSetOperationTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
@@ -49,7 +48,7 @@ public class ClientProjectionSetOperationTest
             {
                 var localError = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 {
-                    if (async) { await query.FirstOrDefaultAsync(); }
+                    if (async) { await query.FirstOrDefaultAsync(cancellationToken: TestContext.Current.CancellationToken); }
                     else { query.FirstOrDefault(); }
                 });
                 Assert.Contains("implicit client execution of 'Union'", localError.Message, StringComparison.Ordinal);
@@ -59,7 +58,7 @@ public class ClientProjectionSetOperationTest
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             {
-                if (async) { await query.FirstOrDefaultAsync(); }
+                if (async) { await query.FirstOrDefaultAsync(cancellationToken: TestContext.Current.CancellationToken); }
                 else { query.FirstOrDefault(); }
             });
             Assert.Equal(RelationalStrings.SetOperationsNotAllowedAfterClientEvaluation, exception.Message);
@@ -76,7 +75,7 @@ public class ClientProjectionSetOperationTest
         }
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Union_of_constructed_scalar_projections_stays_on_the_server(bool async)
@@ -110,7 +109,7 @@ public class ClientProjectionSetOperationTest
         Assert.Contains("UNION", statement, StringComparison.Ordinal);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

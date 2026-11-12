@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Microsoft.Data.Sqlite;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 

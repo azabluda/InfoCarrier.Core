@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Scaffolding;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -138,10 +137,16 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     /// </remarks>
     protected override ICollection<Type> IgnoredTestBases { get; } =
     [
+        // Tier C is suspended: Firebird has no EF Core 11 provider. SQLite cannot host
+        // table-valued functions or APPLY. Restore this base with the Tier C project inputs.
+        typeof(UdfDbFunctionTestBase<>),
         // Migrations run DDL against a database. The client has none. The server is an ordinary
         // EF application, and EF already tests migrations for the provider it references.
         typeof(MigrationsInfrastructureTestBase<>),
         typeof(MigrationsTestBase<>),
+        // Runtime scaffolding and applying migrations requires client-side migration services
+        // and a database. InfoCarrier runs schema operations on the server only.
+        typeof(RuntimeMigrationTestBase<>),
 
         // Asserts the SQL an IMigrationsSqlGenerator emits, resolved from the context's services.
         typeof(MigrationsSqlGeneratorTestBase),

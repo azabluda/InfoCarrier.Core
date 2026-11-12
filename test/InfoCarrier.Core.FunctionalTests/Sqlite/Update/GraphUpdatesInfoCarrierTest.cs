@@ -5,9 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
-// A skipped override of an inherited `[ConditionalTheory]` supplies no data of its own, and the
+// A skipped override of an inherited `[Theory]` supplies no data of its own, and the
 // analyzer cannot see that the base still does. EF's own GraphUpdatesSqliteTestBase carries the same
 // six overrides and suppresses this in its project file.
 #pragma warning disable xUnit1003
@@ -77,55 +76,55 @@ public class GraphUpdatesInfoCarrierTest(GraphUpdatesInfoCarrierTest.InfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 27, 29,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 25, 27,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Delete_principal_with_CLR_key_owned_collection(bool async)
         => base.Delete_principal_with_CLR_key_owned_collection(async);
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 15, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 13, 15,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Delete_principal_with_shadow_key_owned_collection_throws(bool async)
         => base.Delete_principal_with_shadow_key_owned_collection_throws(async);
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 23, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 21, 23,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Update_principal_with_CLR_key_owned_collection(bool async)
         => base.Update_principal_with_CLR_key_owned_collection(async);
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 11, 13,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 9, 11,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Update_principal_with_shadow_key_owned_collection_throws(bool async)
         => base.Update_principal_with_shadow_key_owned_collection_throws(async);
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 31, 33,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 29, 31,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Clearing_CLR_key_owned_collection(bool async, bool useUpdate, bool addNew)
         => base.Clearing_CLR_key_owned_collection(async, useUpdate, addNew);
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 19, 21,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/GraphUpdates/GraphUpdatesSqliteTestBase.cs", 17, 19,
         Justification = "Default owned collection pattern does not work with SQLite due to composite key.",
         Skip = true)]
-    [ConditionalTheory(Skip = OwnedCollectionSkip)]
+    [Theory(Skip = OwnedCollectionSkip)]
     public override Task Clearing_shadow_key_owned_collection_throws(bool async, bool useUpdate, bool addNew)
         => base.Clearing_shadow_key_owned_collection_throws(async, useUpdate, addNew);
 

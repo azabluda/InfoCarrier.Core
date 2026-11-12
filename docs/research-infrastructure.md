@@ -3,6 +3,12 @@
 How the pre-implementation study environment is set up: reference clones (`subrepos/`) and
 the CodeGraph MCP used to query them. Decisions: [ADR-005](decisions.md), [ADR-007](decisions.md).
 
+**Current reference, November 12, 2026.** The setup below records the original study. EF Core 11
+work uses the official pinned source archive under `artifacts/efcore-v11`, without changing
+`subrepos/efcore`. See [source preparation](plans/v11/adoption-checklist.md#reproduce-the-upstream-source-audit).
+C# symbol navigation uses `.claude/roslyn-codelens.md`; the historical CodeGraph commands below
+do not override those repository instructions.
+
 ---
 
 ## 1. Reference subrepos (`subrepos/` — git-ignored, not submodules)

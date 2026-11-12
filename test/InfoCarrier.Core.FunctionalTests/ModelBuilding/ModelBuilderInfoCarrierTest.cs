@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ModelBuilding;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ModelBuilding;
 
@@ -25,7 +24,7 @@ namespace InfoCarrier.Core.FunctionalTests.ModelBuilding;
 ///         one concrete set built through `GenericTestModelBuilder`. EF's InMemory suite adds three
 ///         more concrete sets — non-generic, string-named and unqualified-string — which cover the
 ///         *builder API's* surface rather than the provider's, and are further coverage available
-///         later. The provider-specific `[ConditionalFact]`s EF adds to its own variants are
+///         later. The provider-specific `[Fact]`s EF adds to its own variants are
 ///         InMemory's tests, not spec base members, and are deliberately not carried.
 ///     </para>
 /// </remarks>

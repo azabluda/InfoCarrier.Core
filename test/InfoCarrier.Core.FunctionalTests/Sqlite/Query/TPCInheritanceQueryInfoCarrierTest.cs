@@ -2,10 +2,8 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 

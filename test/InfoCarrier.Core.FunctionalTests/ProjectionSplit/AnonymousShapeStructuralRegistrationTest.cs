@@ -4,7 +4,6 @@ using System.Runtime.Loader;
 using InfoCarrier.Core.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 
@@ -52,10 +51,10 @@ public class AnonymousShapeStructuralRegistrationTest
         var options = new DbContextOptionsBuilder<PrototypeContext>().UseInfoCarrier(client, o => o
             .AddAnonymousShapes(new { StructuralConfigured = 0 }, new { StructuralSecond = "" }, new { NotConfigured = 0 }));
         using var remote = new PrototypeContext(options.Options);
-        Assert.Equal(1, (await remote.Set<PrototypeRow>().Select(row => new { StructuralConfigured = row.Id }).SingleAsync()).StructuralConfigured);
-        Assert.Equal("1", (await remote.Set<PrototypeRow>().Select(row => new { StructuralSecond = row.Id.ToString() }).SingleAsync()).StructuralSecond);
+        Assert.Equal(1, (await remote.Set<PrototypeRow>().Select(row => new { StructuralConfigured = row.Id }).SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).StructuralConfigured);
+        Assert.Equal("1", (await remote.Set<PrototypeRow>().Select(row => new { StructuralSecond = row.Id.ToString() }).SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).StructuralSecond);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            remote.Set<PrototypeRow>().Select(row => new { NotConfigured = row.Id }).SingleAsync());
+            remote.Set<PrototypeRow>().Select(row => new { NotConfigured = row.Id }).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]

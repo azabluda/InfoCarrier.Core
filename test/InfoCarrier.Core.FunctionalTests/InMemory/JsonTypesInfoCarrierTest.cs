@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -46,7 +45,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 10, 12,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 8, 10,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point());
@@ -54,7 +53,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 14, 16,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 12, 14,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_M()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_M());
@@ -62,7 +61,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 18, 20,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 16, 18,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_Z()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_Z());
@@ -70,7 +69,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 22, 24,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 20, 22,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_point_with_Z_and_M()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_point_with_Z_and_M());
@@ -78,7 +77,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 26, 28,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 24, 26,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_line_string()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_line_string());
@@ -86,7 +85,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 30, 32,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 28, 30,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_multi_line_string()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_multi_line_string());
@@ -94,7 +93,7 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 34, 36,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 32, 34,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_polygon()
         => Assert.ThrowsAsync<NullReferenceException>(() => base.Can_read_write_polygon());
@@ -102,13 +101,13 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
     /// <inheritdoc />
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 38, 40,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/JsonTypesInMemoryTest.cs", 36, 38,
         Justification = "No built-in JSON support for spatial types in the in-memory provider")]
     public override Task Can_read_write_polygon_typed_as_geometry()
         => Assert.ThrowsAsync<NullReferenceException>(base.Can_read_write_polygon_typed_as_geometry);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -120,13 +119,14 @@ public class JsonTypesInfoCarrierTest(NonSharedFixture fixture) : JsonTypesTestB
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

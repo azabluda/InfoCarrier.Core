@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -60,7 +59,7 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
     /// <inheritdoc />
     /// <remarks>SQLite does not enforce a column length.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 155, 160,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 152, 158,
         Justification = "Sqlite does not support length")]
     public override Task MaxLengthAttribute_throws_while_inserting_value_longer_than_max_length()
     {
@@ -72,7 +71,7 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
     /// <inheritdoc />
     /// <remarks>SQLite does not enforce a column length.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 163, 168,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 160, 166,
         Justification = "Sqlite does not support length")]
     public override Task StringLengthAttribute_throws_while_inserting_value_longer_than_max_length()
     {
@@ -86,7 +85,7 @@ public class DataAnnotationInfoCarrierTest(DataAnnotationInfoCarrierTest.DataAnn
     ///     <c>OptimisticConcurrencyInfoCarrierTest</c> skips eleven tests for.</remarks>
     [StoreIssue(
         IssueTracker.EfCore, 2195,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 171, 176,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/DataAnnotationSqliteTest.cs", 168, 174,
         Justification = "Sqlite does not support rowversion. See issue #2195")]
     public override Task TimestampAttribute_throws_if_value_in_database_changed()
     {

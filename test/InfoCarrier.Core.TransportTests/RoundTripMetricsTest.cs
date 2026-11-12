@@ -84,7 +84,7 @@ public class RoundTripMetricsTest
             async client =>
             {
                 if (synchronous) { Assert.Throws<TimeoutException>(() => client.CommitTransaction("t1")); }
-                else { await Assert.ThrowsAsync<TimeoutException>(() => client.CommitTransactionAsync("t1")); }
+                else { await Assert.ThrowsAsync<TimeoutException>(() => client.CommitTransactionAsync("t1", TestContext.Current.CancellationToken)); }
             },
             _ => throw new TimeoutException("the server did not answer"));
 

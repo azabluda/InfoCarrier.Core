@@ -47,11 +47,11 @@ public class RegistrationMetricsTest
             await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
             {
                 Context seed = scope.ServiceProvider.GetRequiredService<Context>();
-                await seed.Database.EnsureCreatedAsync();
+                await seed.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
                 seed.Add(new Item { Id = 1, Name = "stored" });
-                await seed.SaveChangesAsync();
+                await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
-            await app.StartAsync();
+            await app.StartAsync(TestContext.Current.CancellationToken);
             using var meter = new Recording();
             await Task.WhenAll(Read(null), Read("default"), Read("orders"));
 
@@ -60,7 +60,7 @@ public class RegistrationMetricsTest
             await using (var context = new Context(new DbContextOptionsBuilder<Context>().UseInfoCarrier(
                 InfoCarrierClient.Create(http, o => o.WithEndpoint("http://localhost/earlier"))).Options))
             {
-                Assert.Equal("stored", (await context.Items.SingleAsync()).Name);
+                Assert.Equal("stored", (await context.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Name);
             }
             await meter.WaitForPairs(4, 4);
             var clientCounts = meter.For(InfoCarrierMetrics.RoundTripCountInstrumentName);
@@ -90,7 +90,7 @@ public class RegistrationMetricsTest
                 var stub = new Item { Id = 1, Name = "updated" };
                 saving.Attach(stub);
                 saving.Entry(stub).Property(value => value.Name).IsModified = true;
-                Assert.Equal(1, await saving.SaveChangesAsync());
+                Assert.Equal(1, await saving.SaveChangesAsync(TestContext.Current.CancellationToken));
             }
             await meter.WaitForPairs(1, 1);
             meter.AssertPairs(1, 1);
@@ -102,12 +102,12 @@ public class RegistrationMetricsTest
             await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
             {
                 Context stored = scope.ServiceProvider.GetRequiredService<Context>();
-                Assert.Equal("updated", (await stored.Items.SingleAsync()).Name);
+                Assert.Equal("updated", (await stored.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Name);
             }
 
             IInfoCarrierClient defaultClient = app.Services.GetRequiredService<IInfoCarrierClient>();
             meter.Clear();
-            Assert.NotNull(await Record.ExceptionAsync(() => defaultClient.CommitTransactionAsync("not-owned")));
+            Assert.NotNull(await Record.ExceptionAsync(() => defaultClient.CommitTransactionAsync("not-owned", TestContext.Current.CancellationToken)));
             await meter.WaitForPairs(1, 1);
             meter.AssertPairs(1, 1);
             Assert.All(meter.Values, reading =>
@@ -137,11 +137,11 @@ public class RegistrationMetricsTest
                             Payload = [],
                         }));
                 }
-                using HttpResponseMessage response = await http.SendAsync(request);
+                using HttpResponseMessage response = await http.SendAsync(request, TestContext.Current.CancellationToken);
                 if (mode == "stream")
                 {
-                    await using Stream content = await response.Content.ReadAsStreamAsync();
-                    Assert.Contains(await QueryStreamFrameCodec.ReadAsync(content).ToListAsync(), frame => frame is QueryFaultFrame);
+                    await using Stream content = await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
+                    Assert.Contains(await QueryStreamFrameCodec.ReadAsync(content, TestContext.Current.CancellationToken).ToListAsync(cancellationToken: TestContext.Current.CancellationToken), frame => frame is QueryFaultFrame);
                 }
                 await meter.WaitForPairs(0, 1);
                 meter.AssertPairs(0, 1);
@@ -255,8 +255,7 @@ public class RegistrationMetricsTest
         var client = new TransportInfoCarrierClient(transport, Serializer);
         using var context = new DbContext(new DbContextOptionsBuilder().Options);
         using var meter = new Recording();
-        await using (IAsyncEnumerator<QueryStreamFrame> frames = client.QueryDataStreamAsync(
-            Request(), context).GetAsyncEnumerator()) { }
+        await using (IAsyncEnumerator<QueryStreamFrame> frames = client.QueryDataStreamAsync(Request(), context, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken)) { }
         Assert.Empty(meter.Values);
         Assert.Equal(0, transport.Sends);
         Assert.Equal(0, transport.Disposals);

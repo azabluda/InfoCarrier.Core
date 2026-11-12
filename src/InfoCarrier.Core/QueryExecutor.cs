@@ -82,6 +82,20 @@ internal sealed class QueryExecutor<TElement>
             // Substitute compiled-query parameters as plain constants (research-findings §6).
             Expression substituted = new SubstituteParametersExpressionVisitor(queryContext).Visit(query);
 
+            _trackingBehavior = TrackingBehaviorFinder.Find(
+                query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
+            if (_trackingBehavior == QueryTrackingBehavior.TrackAll
+                && ProjectionShape.Of(substituted) is { } originalShape)
+            {
+                IEntityType[] projected = [.. originalShape.EntityTypes()];
+                if (Array.Exists(projected, entity => entity.IsOwned()
+                    && entity.FindOwnership()?.PrincipalEntityType is { } owner
+                    && !Array.Exists(projected, candidate => candidate == owner)))
+                {
+                    throw new InvalidOperationException(CoreStrings.OwnedEntitiesCannotBeTrackedWithoutTheirOwner);
+                }
+            }
+
             // Since 2026-10-07, anonymous join keys travel as bounded data descriptors. The former
             // Tuple rewrite lost member names and refused keys wider than seven members.
 
@@ -123,9 +137,6 @@ internal sealed class QueryExecutor<TElement>
             // Read AFTER the split, because the splitter records it while stripping. See
             // `QueryDataRequest.SplitQueryBehavior` for why the hint travels beside the tree.
             _splitQueryBehavior = splitter.SplitQueryBehavior;
-
-            _trackingBehavior = TrackingBehaviorFinder.Find(
-                query, queryContext.Context.ChangeTracker.QueryTrackingBehavior);
 
             // `EnableThreadSafetyChecks(false)` is answered here, not by the detector.
             // `QueryContext.ConcurrencyDetector` is never null in EF 10 and always throws when

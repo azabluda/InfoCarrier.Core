@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedTableSplitting;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
@@ -50,7 +49,9 @@ public class OwnedTableSplittingQueryInfoCarrierFixture : OwnedTableSplittingRel
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+            arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     /// <remarks>
@@ -102,7 +103,7 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
     /// <remarks>
     ///     So these two bodies come from <c>OwnedJsonProjectionSqliteTest</c>, character for
     ///     character, exactly as
-    ///     <see cref="OwnedNavigationsProjectionQueryInfoCarrierTest.Select_subquery_required_related_FirstOrDefault" />
+    ///     <see cref="OwnedNavigationsProjectionQueryInfoCarrierTest.Select_subquery_FirstOrDefault_complex_collection" />
     ///     does. <b>Two families now with the same upstream gap and the same substitute</b>, which
     ///     is worth stating once: #26708 costs EF two SQLite classes, and this provider runs both
     ///     of them with two tests red in each.
@@ -120,13 +121,27 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.BorrowedFromAnotherBase,
         DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
-    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+    public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
-                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+                () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
 
-    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    /// <summary>
+    ///     The whole of R27's red: SQLite has no <c>APPLY</c>, in both
+    ///     <c>QueryTrackingBehavior</c> arms. <b>EF ships no
+    ///     <c>OwnedTableSplittingProjectionSqliteTest</c> to take the override from</b> — that
+    ///     class is commented out upstream in full, for the same EF issue #26708 that disables
+    ///     <c>OwnedNavigationsProjectionSqliteTest</c>.
+    /// </summary>
+    /// <remarks>
+    ///     So these two bodies come from <c>OwnedJsonProjectionSqliteTest</c>, character for
+    ///     character, exactly as
+    ///     <see cref="OwnedNavigationsProjectionQueryInfoCarrierTest.Select_subquery_required_related_FirstOrDefault" />
+    ///     does. <b>Two families now with the same upstream gap and the same substitute</b>, which
+    ///     is worth stating once: #26708 costs EF two SQLite classes, and this provider runs both
+    ///     of them with two tests red in each.
+    /// </remarks>
     [StoreLimit(
         UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 31, 34,
         Case = nameof(QueryTrackingBehavior.TrackAll),
@@ -136,6 +151,26 @@ public class OwnedTableSplittingProjectionQueryInfoCarrierTest(
         DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
     [StoreLimit(
         UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 31, 34,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 36, 39,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = OwnedNavigationsProjectionQueryInfoCarrierTest.BorrowedFromOwnedJson)]
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedNavigationsProjectionQueryInfoCarrierTest.OwnedJsonProjectionSqlite, 36, 39,
         Case = nameof(QueryTrackingBehavior.NoTracking),
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.BorrowedFromAnotherBase,

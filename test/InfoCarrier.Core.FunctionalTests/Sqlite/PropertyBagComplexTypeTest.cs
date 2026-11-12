@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -48,7 +47,7 @@ public class PropertyBagComplexTypeTest
             },
         };
 
-    [ConditionalFact]
+    [Fact]
     public async Task An_entity_whose_complex_property_is_a_property_bag_holding_a_list_is_inserted()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -57,10 +56,10 @@ public class PropertyBagComplexTypeTest
         await using (PropertyBagContext client = CreateClient(store))
         {
             client.Crews.Add(NewCrew());
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        // Read back with SQL, because EF's own query of this entity fails: see the test below.
+        // Check the stored representation independently of both materializers.
         await using DbContext server = store.CreateDbContext();
         IEntityType crew = server.Model.FindEntityType(typeof(Crew))!;
         IComplexType team = crew.FindComplexProperty(nameof(Crew.Team))!.ComplexType;
@@ -77,20 +76,9 @@ public class PropertyBagComplexTypeTest
         return context.Database.SqlQueryRaw<string>(sql).SingleAsync();
     }
 
-    /// <summary>
-    ///     Reading such an entity fails where plain EF Core 10 fails, with EF's own exception.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>Plain EF cannot read it either, measured 2026-09-29.</b> EF's query shaper builds
-    ///         the entity through the same <c>StructuralTypeMaterializerSource</c> branch, so the
-    ///         server's own query of it fails before anything crosses the wire, and this client relays
-    ///         that failure. When EF fixes the branch this test goes red, and the read should then
-    ///         work through this client as well.
-    ///     </para>
-    /// </remarks>
-    [ConditionalFact]
-    public async Task Reading_such_an_entity_fails_where_EF_Core_10_fails()
+    /// <summary>Property-bag complex values can be read directly and through the wire.</summary>
+    [Fact]
+    public async Task Reading_a_property_bag_complex_value_matches_the_direct_query()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await store.InitializeAsync(
@@ -99,22 +87,18 @@ public class PropertyBagComplexTypeTest
             seed: async context =>
             {
                 context.Add(NewCrew());
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             });
 
-        ArgumentException directly;
-        await using (DbContext server = store.CreateDbContext())
-        {
-            directly = await Assert.ThrowsAsync<ArgumentException>(() => server.Set<Crew>().SingleAsync());
-        }
-
+        await using DbContext server = store.CreateDbContext();
+        Crew directly = await server.Set<Crew>().SingleAsync(TestContext.Current.CancellationToken);
         await using PropertyBagContext client = CreateClient(store);
-        ArgumentException overTheWire = await Assert.ThrowsAsync<ArgumentException>(() => client.Crews.SingleAsync());
+        Crew overTheWire = await client.Crews.SingleAsync(TestContext.Current.CancellationToken);
 
-        Assert.StartsWith(
-            "Incorrect number of arguments supplied for call to method 'System.Object get_Item(System.String)'",
-            directly.Message,
-            StringComparison.Ordinal);
-        Assert.Equal(directly.Message, overTheWire.Message);
+        Assert.Equal(directly.Name, overTheWire.Name);
+        Assert.Equal(directly.Team["Name"], overTheWire.Team["Name"]);
+        Assert.Equal(
+            Assert.IsType<List<string>>(directly.Team["Members"]),
+            Assert.IsType<List<string>>(overTheWire.Team["Members"]));
     }
 }

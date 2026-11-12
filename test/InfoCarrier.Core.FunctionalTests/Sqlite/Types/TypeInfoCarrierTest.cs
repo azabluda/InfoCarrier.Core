@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Types;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Types;
 
@@ -87,8 +86,8 @@ public abstract class TypeInfoCarrierFixture<T> : RelationalTypeFixtureBase<T>
         => facade.UseTestTransaction(transaction);
 }
 
-public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<bool, BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture>(fixture)
+public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<bool, BoolTypeInfoCarrierTest.BoolTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class BoolTypeInfoCarrierFixture : TypeInfoCarrierFixture<bool>
     {
@@ -98,8 +97,8 @@ public class BoolTypeInfoCarrierTest(BoolTypeInfoCarrierTest.BoolTypeInfoCarrier
     }
 }
 
-public class StringTypeInfoCarrierTest(StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<string, StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture>(fixture)
+public class StringTypeInfoCarrierTest(StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<string, StringTypeInfoCarrierTest.StringTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class StringTypeInfoCarrierFixture : TypeInfoCarrierFixture<string>
     {
@@ -109,8 +108,8 @@ public class StringTypeInfoCarrierTest(StringTypeInfoCarrierTest.StringTypeInfoC
     }
 }
 
-public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<Guid, GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture>(fixture)
+public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<Guid, GuidTypeInfoCarrierTest.GuidTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
@@ -118,13 +117,13 @@ public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrier
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 29, 34,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class GuidTypeInfoCarrierFixture : TypeInfoCarrierFixture<Guid>
     {
@@ -134,8 +133,8 @@ public class GuidTypeInfoCarrierTest(GuidTypeInfoCarrierTest.GuidTypeInfoCarrier
     }
 }
 
-public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<byte[], ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture>(fixture)
+public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<byte[], ByteArrayTypeInfoCarrierTest.ByteArrayTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
@@ -143,7 +142,7 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36749,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 46, 48,
         Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
@@ -154,13 +153,13 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 54, 59,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class ByteArrayTypeInfoCarrierFixture : TypeInfoCarrierFixture<byte[]>
     {
@@ -172,8 +171,8 @@ public class ByteArrayTypeInfoCarrierTest(ByteArrayTypeInfoCarrierTest.ByteArray
     }
 }
 
-public class ByteTypeInfoCarrierTest(ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<byte, ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture>(fixture)
+public class ByteTypeInfoCarrierTest(ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<byte, ByteTypeInfoCarrierTest.ByteTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class ByteTypeInfoCarrierFixture : TypeInfoCarrierFixture<byte>
     {
@@ -183,8 +182,8 @@ public class ByteTypeInfoCarrierTest(ByteTypeInfoCarrierTest.ByteTypeInfoCarrier
     }
 }
 
-public class ShortTypeInfoCarrierTest(ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<short, ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture>(fixture)
+public class ShortTypeInfoCarrierTest(ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<short, ShortTypeInfoCarrierTest.ShortTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class ShortTypeInfoCarrierFixture : TypeInfoCarrierFixture<short>
     {
@@ -194,8 +193,8 @@ public class ShortTypeInfoCarrierTest(ShortTypeInfoCarrierTest.ShortTypeInfoCarr
     }
 }
 
-public class IntTypeInfoCarrierTest(IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<int, IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture>(fixture)
+public class IntTypeInfoCarrierTest(IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<int, IntTypeInfoCarrierTest.IntTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class IntTypeInfoCarrierFixture : TypeInfoCarrierFixture<int>
     {
@@ -205,8 +204,8 @@ public class IntTypeInfoCarrierTest(IntTypeInfoCarrierTest.IntTypeInfoCarrierFix
     }
 }
 
-public class LongTypeInfoCarrierTest(LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<long, LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture>(fixture)
+public class LongTypeInfoCarrierTest(LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<long, LongTypeInfoCarrierTest.LongTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class LongTypeInfoCarrierFixture : TypeInfoCarrierFixture<long>
     {
@@ -216,8 +215,8 @@ public class LongTypeInfoCarrierTest(LongTypeInfoCarrierTest.LongTypeInfoCarrier
     }
 }
 
-public class DecimalTypeInfoCarrierTest(DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<decimal, DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture>(fixture)
+public class DecimalTypeInfoCarrierTest(DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<decimal, DecimalTypeInfoCarrierTest.DecimalTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class DecimalTypeInfoCarrierFixture : TypeInfoCarrierFixture<decimal>
     {
@@ -227,8 +226,8 @@ public class DecimalTypeInfoCarrierTest(DecimalTypeInfoCarrierTest.DecimalTypeIn
     }
 }
 
-public class DoubleTypeInfoCarrierTest(DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<double, DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture>(fixture)
+public class DoubleTypeInfoCarrierTest(DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<double, DoubleTypeInfoCarrierTest.DoubleTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class DoubleTypeInfoCarrierFixture : TypeInfoCarrierFixture<double>
     {
@@ -238,8 +237,8 @@ public class DoubleTypeInfoCarrierTest(DoubleTypeInfoCarrierTest.DoubleTypeInfoC
     }
 }
 
-public class FloatTypeInfoCarrierTest(FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<float, FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture>(fixture)
+public class FloatTypeInfoCarrierTest(FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<float, FloatTypeInfoCarrierTest.FloatTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     public class FloatTypeInfoCarrierFixture : TypeInfoCarrierFixture<float>
     {
@@ -249,8 +248,8 @@ public class FloatTypeInfoCarrierTest(FloatTypeInfoCarrierTest.FloatTypeInfoCarr
     }
 }
 
-public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<DateTime, DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture>(fixture)
+public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<DateTime, DateTimeTypeInfoCarrierTest.DateTimeTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
@@ -258,13 +257,13 @@ public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTyp
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 9, 14,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class DateTimeTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateTime>
     {
@@ -275,8 +274,9 @@ public class DateTimeTypeInfoCarrierTest(DateTimeTypeInfoCarrierTest.DateTimeTyp
 }
 
 public class DateTimeOffsetTypeInfoCarrierTest(
-    DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<DateTimeOffset, DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture>(fixture)
+    DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture fixture,
+    ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<DateTimeOffset, DateTimeOffsetTypeInfoCarrierTest.DateTimeOffsetTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
@@ -284,13 +284,13 @@ public class DateTimeOffsetTypeInfoCarrierTest(
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 28, 33,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class DateTimeOffsetTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateTimeOffset>
     {
@@ -300,8 +300,8 @@ public class DateTimeOffsetTypeInfoCarrierTest(
     }
 }
 
-public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<DateOnly, DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture>(fixture)
+public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<DateOnly, DateOnlyTypeInfoCarrierTest.DateOnlyTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
@@ -309,13 +309,13 @@ public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTyp
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 45, 50,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class DateOnlyTypeInfoCarrierFixture : TypeInfoCarrierFixture<DateOnly>
     {
@@ -325,16 +325,24 @@ public class DateOnlyTypeInfoCarrierTest(DateOnlyTypeInfoCarrierTest.DateOnlyTyp
     }
 }
 
-public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<TimeOnly, TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture>(fixture)
+public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<TimeOnly, TimeOnlyTypeInfoCarrierTest.TimeOnlyTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
+    /// <inheritdoc />
+    [StoreIssue(
+        IssueTracker.EfCore, 36749,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 66, 68,
+        Justification = "TODO: TimeOnly comparison within JSON primitive collections doesn't work on SQLite, see #36749.",
+        Skip = true)]
+    public override Task Primitive_collection_in_query() => Task.CompletedTask;
+
     /// <summary>
     ///     EF's own SQLite override: a string-representation discrepancy between EF's JSON and
     ///     <c>Microsoft.Data.Sqlite</c>'s (EF issue #36749).
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36749,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 53, 54,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 62, 64,
         Justification = "TODO: string representation discrepancy between our JSON and M.D.SQLite's string representation, see #36749.")]
     public override Task Query_property_within_json()
         => Assert.ThrowsAsync<InvalidOperationException>(base.Query_property_within_json);
@@ -345,13 +353,13 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 70, 75,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class TimeOnlyTypeInfoCarrierFixture : TypeInfoCarrierFixture<TimeOnly>
     {
@@ -361,8 +369,8 @@ public class TimeOnlyTypeInfoCarrierTest(TimeOnlyTypeInfoCarrierTest.TimeOnlyTyp
     }
 }
 
-public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture fixture)
-    : RelationalTypeTestBase<TimeSpan, TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture>(fixture)
+public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture fixture, ITestOutputHelper testOutputHelper)
+    : RelationalTypeTestBase<TimeSpan, TimeSpanTypeInfoCarrierTest.TimeSpanTypeInfoCarrierFixture>(fixture, testOutputHelper)
 {
     /// <summary>
     ///     EF's own SQLite override: <c>ExecuteUpdate</c> cannot set a JSON property from a
@@ -370,13 +378,13 @@ public class TimeSpanTypeInfoCarrierTest(TimeSpanTypeInfoCarrierTest.TimeSpanTyp
     /// </summary>
     [StoreIssue(
         IssueTracker.EfCore, 36688,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteMiscellaneousTypeTest.cs", 33, 38,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Types/SqliteTemporalTypeTest.cs", 87, 92,
         Justification = "See #36688 for supporting this for Sqlite types other than string/numeric/bool")]
     public override async Task ExecuteUpdate_within_json_to_nonjson_column()
         => Assert.Equal(
             RelationalStrings.ExecuteUpdateCannotSetJsonPropertyToNonJsonColumn,
             (await Assert.ThrowsAsync<InvalidOperationException>(
-                base.ExecuteUpdate_within_json_to_nonjson_column)).Message);
+                base.ExecuteUpdate_within_json_to_nonjson_column)).InnerException!.Message);
 
     public class TimeSpanTypeInfoCarrierFixture : TypeInfoCarrierFixture<TimeSpan>
     {

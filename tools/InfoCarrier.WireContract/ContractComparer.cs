@@ -74,11 +74,17 @@ internal static class ContractComparer
             }
             if (!Equal(before.Settings, after.Settings) || before.SkipUnknown != after.SkipUnknown)
             {
+                bool objectConverterOnly = before.Kind == "Object" && after.Kind == "Object"
+                    && before.SkipUnknown == after.SkipUnknown
+                    && EquivalentObjectConverterSettings(before.Settings, after.Settings);
                 Add(key + "/reader-writer-options", direction,
-                    before.SkipUnknown == after.SkipUnknown && KnownOptions(before.Settings, after.Settings)
+                    objectConverterOnly ? ChangeKind.Compatible
+                    : before.SkipUnknown == after.SkipUnknown && KnownOptions(before.Settings, after.Settings)
                         ? ChangeKind.Incompatible : ChangeKind.Unclassified,
                     new { before.Settings, before.SkipUnknown }, new { after.Settings, after.SkipUnknown },
-                    "Supported depth, null-omission, or named-number option changes conservatively require a fresh contract; other changes remain incomplete.");
+                    objectConverterOnly
+                        ? "Built-in object converter implementation changed; effective member and constructor requirements are compared separately."
+                        : "Supported depth, null-omission, or named-number option changes conservatively require a fresh contract; other changes remain incomplete.");
             }
             foreach (string mapping in before.Mappings.Keys.Union(after.Mappings.Keys).Order())
             {
@@ -205,6 +211,20 @@ internal static class ContractComparer
 
     private static bool Equal(Dictionary<string, string> left, Dictionary<string, string> right)
         => left.Count == right.Count && left.All(p => right.TryGetValue(p.Key, out string? value) && value == p.Value);
+
+    // .NET 11's generated metadata selects ObjectDefaultConverter for the parameterless
+    // QueryRequestIdentification record where .NET 10 selected the parameterized object converter.
+    // Both use the covered object properties. Do not extend this to custom/scalar converters.
+    private static bool EquivalentObjectConverterSettings(Dictionary<string, string> left, Dictionary<string, string> right)
+    {
+        static bool Covered(string? name) => name is
+            "System.Text.Json.Serialization.Converters.ObjectDefaultConverter`1[T]"
+            or "System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1[T]";
+        return left.Count == right.Count && Covered(left.GetValueOrDefault("converter"))
+            && Covered(right.GetValueOrDefault("converter"))
+            && left.Where(p => p.Key != "converter")
+                .All(p => right.TryGetValue(p.Key, out string? value) && value == p.Value);
+    }
 
     // These are covered settings, not arbitrary converter or callback changes. Classifying them
     // as incompatible preserves the unchanged-version gate and release compatibility checks.

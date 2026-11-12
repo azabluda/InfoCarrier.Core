@@ -1,8 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests;
 

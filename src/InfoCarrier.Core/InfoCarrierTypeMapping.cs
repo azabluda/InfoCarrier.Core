@@ -38,10 +38,6 @@ namespace InfoCarrier.Core;
 /// </remarks>
 public class InfoCarrierTypeMapping : RelationalTypeMapping
 {
-    // DECLARED FIRST BECAUSE `Default` BELOW IS BUILT FROM IT. Static field initializers
-    // run in textual order, and `Default` calls the constructor, which reads this table:
-    // declared after it, the table is still null when the type initializer runs and every
-    // client context in the process fails to build a model.
     private static readonly Dictionary<Type, RelationalTypeMapping> Neutral = new()
     {
         [typeof(bool)] = BoolTypeMapping.Default,
@@ -67,25 +63,14 @@ public class InfoCarrierTypeMapping : RelationalTypeMapping
         [typeof(ushort)] = UShortTypeMapping.Default,
     };
 
-    /// <summary>
-    ///     The instance a compiled model clones every other mapping from.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         Required by <c>CSharpRuntimeAnnotationCodeGenerator.CreateDefaultTypeMapping</c>,
-    ///         which emits <c>InfoCarrierTypeMapping.Default.Clone(…)</c> rather than a
-    ///         constructor call and refuses outright — <i>"the mapping type must have a
-    ///         'public static readonly …Default' property"</i> — when there is none. It is looked
-    ///         up by <c>GetProperty("Default")</c>, so a field will not do; EF's own
-    ///         <c>InMemoryTypeMapping</c> declares exactly this line.
-    ///     </para>
-    ///     <para>
-    ///         <c>typeof(object)</c> because it is never used as a mapping: it is the receiver of
-    ///         a <c>Clone</c> that replaces the CLR type, and the generator emits an explicit
-    ///         <c>clrType:</c> argument for every mapping whose type differs from this one's.
-    ///     </para>
-    /// </remarks>
-    public static InfoCarrierTypeMapping Default { get; } = new(typeof(object));
+    internal static InfoCarrierTypeMapping Create(
+        Type clrType,
+        Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer? comparer = null,
+        Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer? keyComparer = null,
+        Microsoft.EntityFrameworkCore.Storage.Json.JsonValueReaderWriter? jsonValueReaderWriter = null)
+        => (InfoCarrierTypeMapping)Activator.CreateInstance(
+            typeof(InfoCarrierTypeMapping<>).MakeGenericType(clrType),
+            comparer, keyComparer, jsonValueReaderWriter)!;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="InfoCarrierTypeMapping" /> class.

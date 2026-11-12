@@ -45,8 +45,8 @@ public class ClientProcessingLoggingTest
             if (save) { context.Items.Add(new Item { Name = "secret" }); }
             Assert.NotNull(await Record.ExceptionAsync(async () =>
             {
-                if (save) { await context.SaveChangesAsync(); }
-                else { await context.Items.Select(x => Fail(x.Name)).ToListAsync(); }
+                if (save) { await context.SaveChangesAsync(TestContext.Current.CancellationToken); }
+                else { await context.Items.Select(x => Fail(x.Name)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken); }
             }));
             Assert.DoesNotContain("secret", Assert.Single(simple));
             var payload = Assert.IsType<ClientFailureEventData>(Assert.Single(diagnostic));
@@ -115,7 +115,7 @@ public class ClientProcessingLoggingTest
 
         Exception? failure = await Record.ExceptionAsync(async () =>
         {
-            if (async) { await query.ToListAsync(); }
+            if (async) { await query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken); }
             else { query.ToList(); }
         });
 
@@ -150,13 +150,13 @@ public class ClientProcessingLoggingTest
         using (var seed = fixture.CreateClient())
         {
             seed.Items.Add(new Item { Id = 2, Name = "two" });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var context = fixture.CreateClient();
         var query = context.Items.OrderBy(x => x.Id).Select(x => x.Id == 1 ? x.Name : Fail(x.Name));
         if (async)
         {
-            await using var enumerator = query.AsAsyncEnumerable().GetAsyncEnumerator();
+            await using var enumerator = query.AsAsyncEnumerable().GetAsyncEnumerator(TestContext.Current.CancellationToken);
             Assert.True(await enumerator.MoveNextAsync());
             Assert.DoesNotContain(fixture.Log.Entries, e => e.Id == 35101);
             await Assert.ThrowsAsync<InvalidOperationException>(async () => await enumerator.MoveNextAsync());
@@ -181,7 +181,7 @@ public class ClientProcessingLoggingTest
         var query = context.Items.Select(x => Fail(x.Name));
         Assert.NotNull(await Record.ExceptionAsync(async () =>
         {
-            if (async) { await query.FirstAsync(); }
+            if (async) { await query.FirstAsync(cancellationToken: TestContext.Current.CancellationToken); }
             else { query.First(); }
         }));
         Logs.Entry entry = Assert.Single(fixture.Log.Entries, e => e.Id is 35100 or 35101 or 35102);
@@ -193,7 +193,7 @@ public class ClientProcessingLoggingTest
     {
         using var fixture = new Fixture();
         using var context = fixture.CreateClient();
-        Assert.Equal("ONE", Assert.Single(await context.Items.Select(x => Upper(x.Name)).ToListAsync()));
+        Assert.Equal("ONE", Assert.Single(await context.Items.Select(x => Upper(x.Name)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken)));
         Assert.Single(fixture.Log.Entries, e => e.Id == InfoCarrierEventId.QuerySplit.Id && e.Level == LogLevel.Information);
         Assert.DoesNotContain(fixture.Log.Entries, e => e.Id is 35100 or 35101 or 35102);
     }
@@ -210,7 +210,7 @@ public class ClientProcessingLoggingTest
         context.Items.Add(new Item { Name = "secret-name" });
         Exception? failure = await Record.ExceptionAsync(async () =>
         {
-            if (async) { await context.SaveChangesAsync(); }
+            if (async) { await context.SaveChangesAsync(TestContext.Current.CancellationToken); }
             else { context.SaveChanges(); }
         });
         Assert.IsType<InvalidOperationException>(failure);
@@ -266,7 +266,7 @@ public class ClientProcessingLoggingTest
         using var context = fixture.CreateClient();
         Assert.NotNull(await Record.ExceptionAsync(async () =>
         {
-            if (async) { await context.Items.ToListAsync(); }
+            if (async) { await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken); }
             else { context.Items.ToList(); }
         }));
         Logs.Entry entry = Assert.Single(fixture.Log.Entries, x => x.Id is 35100 or 35101 or 35102);
@@ -283,7 +283,7 @@ public class ClientProcessingLoggingTest
         using var context = fixture.CreateClient(configure: b => b.ReplaceService<IExpressionSerializer, FailingExpressionSerializer>());
         Exception? failure = await Record.ExceptionAsync(async () =>
         {
-            if (async) { await context.Items.ToListAsync(); }
+            if (async) { await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken); }
             else { context.Items.ToList(); }
         });
         Assert.IsType<InvalidOperationException>(failure);
@@ -326,8 +326,8 @@ public class ClientProcessingLoggingTest
         if (save) { context.Items.Add(new Item { Name = "saved" }); }
         Assert.NotNull(await Record.ExceptionAsync(async () =>
         {
-            if (save) { await context.SaveChangesAsync(); }
-            else { await context.Items.ToListAsync(); }
+            if (save) { await context.SaveChangesAsync(TestContext.Current.CancellationToken); }
+            else { await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken); }
         }));
         Logs.Entry entry = Assert.Single(fixture.Log.Entries, x => x.Id is 35100 or 35101 or 35102);
         Assert.Contains("server log replay", entry.Message);
@@ -350,14 +350,14 @@ public class ClientProcessingLoggingTest
         context.Items.Add(new Item { Name = "saved" });
         Assert.NotNull(await Record.ExceptionAsync(async () =>
         {
-            if (async) { await context.SaveChangesAsync(); }
+            if (async) { await context.SaveChangesAsync(TestContext.Current.CancellationToken); }
             else { context.SaveChanges(); }
         }));
         Logs.Entry entry = Assert.Single(fixture.Log.Entries, x => x.Id == 35102);
         Assert.Contains("generated value application", entry.Message);
         Assert.Null(entry.Exception);
         using var verification = fixture.CreateClient();
-        Assert.Equal(2, await verification.Items.CountAsync());
+        Assert.Equal(2, await verification.Items.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     internal sealed class Fixture : IDisposable
