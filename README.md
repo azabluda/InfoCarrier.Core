@@ -8,7 +8,9 @@
 
 [Published documentation](https://azabluda.github.io/InfoCarrier.Core/) ·
 [Getting started](website/docs/getting-started/installation.md) ·
-[Samples](samples/) · [Contributing](CONTRIBUTING.md)
+[Samples](samples/) ·
+[Try it in Codespaces](https://codespaces.new/azabluda/InfoCarrier.Core?quickstart=1) ·
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
