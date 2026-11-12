@@ -41,7 +41,7 @@ public class ProtocolCodecServicesTest(NorthwindServerFactory factory) : IClassF
             request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
             request.Headers.Add("InfoCarrier-Protocol-Version", "3");
         }
-        using HttpResponseMessage response = await http.SendAsync(request);
+        using HttpResponseMessage response = await http.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("3", Assert.Single(response.Headers.GetValues("InfoCarrier-Client-Protocol-Version")));
         Assert.Equal(0, ((ProtocolCompatibilityTest.CountingServer)server).Calls);
@@ -107,9 +107,9 @@ public class ProtocolCodecServicesTest(NorthwindServerFactory factory) : IClassF
         {
             ProtocolVersion = 3, Operation = Old.InfoCarrierOperation.Query, Payload = serializer.Serialize(invalid),
         });
-        using HttpResponseMessage buffered = await http.PostAsync("infocarrier", new ByteArrayContent(body));
+        using HttpResponseMessage buffered = await http.PostAsync("infocarrier", new ByteArrayContent(body), TestContext.Current.CancellationToken);
         buffered.EnsureSuccessStatusCode();
-        Old.InfoCarrierEnvelope response = serializer.Deserialize<Old.InfoCarrierEnvelope>(await buffered.Content.ReadAsByteArrayAsync())!;
+        Old.InfoCarrierEnvelope response = serializer.Deserialize<Old.InfoCarrierEnvelope>(await buffered.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken))!;
         Assert.Equal(3, response.ProtocolVersion);
         Assert.NotNull(response.Fault);
         Assert.True(calls.Has("envelope") && calls.Has("decode") && calls.Has("encode"));
@@ -125,10 +125,10 @@ public class ProtocolCodecServicesTest(NorthwindServerFactory factory) : IClassF
         using var request = new HttpRequestMessage(HttpMethod.Post, "infocarrier") { Content = new ByteArrayContent(serializer.Serialize(valid)) };
         request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
         request.Headers.Add("InfoCarrier-Protocol-Version", "3");
-        using HttpResponseMessage streamed = await http.SendAsync(request);
+        using HttpResponseMessage streamed = await http.SendAsync(request, TestContext.Current.CancellationToken);
         streamed.EnsureSuccessStatusCode();
-        await using Stream source = await streamed.Content.ReadAsStreamAsync();
-        List<Wire.V3.Query.QueryStreamFrame> frames = await Wire.V3.Query.QueryStreamFrameCodec.ReadAsync(source).ToListAsync();
+        await using Stream source = await streamed.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
+        List<Wire.V3.Query.QueryStreamFrame> frames = await Wire.V3.Query.QueryStreamFrameCodec.ReadAsync(source, TestContext.Current.CancellationToken).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(3, Assert.IsType<Wire.V3.Query.QueryStartFrame>(frames[0]).Version);
         Assert.True(calls.Has("query") && calls.Has("frames"));
 
@@ -137,7 +137,7 @@ public class ProtocolCodecServicesTest(NorthwindServerFactory factory) : IClassF
         InfoCarrierEnvelope adapted = await adapter.DispatchAsync(new InfoCarrierEnvelope
         {
             ProtocolVersion = 3, Operation = InfoCarrierOperation.Query, Payload = serializer.Serialize(invalid),
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.NotNull(adapted.Fault);
         Assert.Equal(before + 1, calls.Count("decode"));
     }

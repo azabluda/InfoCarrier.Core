@@ -2,13 +2,12 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class SharedOwnedRowUpdateTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false, false, false, false)]
     [InlineData(true, false, false, false)]
     [InlineData(false, true, false, false)]
@@ -68,7 +67,7 @@ public class SharedOwnedRowUpdateTest
         store.AssertServerSql(direct);
 
         using DbContext verify = store.CreateDbContext();
-        Owner[] saved = await verify.Set<Owner>().OrderBy(owner => owner.Id).ToArrayAsync();
+        Owner[] saved = await verify.Set<Owner>().OrderBy(owner => owner.Id).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, saved.Length);
         foreach (Owner owner in saved)
         {

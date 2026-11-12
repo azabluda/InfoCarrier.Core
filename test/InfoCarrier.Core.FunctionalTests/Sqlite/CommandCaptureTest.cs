@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -20,12 +19,12 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
     ///     A reader's count is EF's own <c>ReadCount</c>, which counts the last <c>Read()</c> as well,
     ///     the one that returns false.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_query_of_three_rows_is_one_reader_of_four_reads()
     {
         await using ServerSqlContext client = CreateClient();
 
-        _ = await client.Tickets.ToListAsync();
+        _ = await client.Tickets.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         CapturedCommand command = Assert.Single(CurrentTest.Value!.Commands);
         Assert.Equal(CapturedCommandKind.Reader, command.Kind);
@@ -43,15 +42,15 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
     ///     The plan expected one read (2026-09-26), and plain EF on the server's own context shows two.
     ///     A count is EF's, so the two sides count alike.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task First_reads_its_row_and_the_end_directly_and_through_the_wire()
     {
         await using ServerSqlContext client = CreateClient();
-        _ = await client.Tickets.OrderBy(t => t.Id).FirstAsync();
+        _ = await client.Tickets.OrderBy(t => t.Id).FirstAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await using (DbContext server = fixture.Store.CreateDbContext())
         {
-            _ = await server.Set<Ticket>().OrderBy(t => t.Id).FirstAsync();
+            _ = await server.Set<Ticket>().OrderBy(t => t.Id).FirstAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(
@@ -60,13 +59,13 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
     }
 
     /// <summary>A command that throws is recorded, and marked failed.</summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_SaveChanges_that_violates_a_key_is_a_failed_command()
     {
         await using ServerSqlContext client = CreateClient();
         client.Tickets.Add(new Ticket { Id = 1, Subject = "duplicate" });
 
-        _ = await Assert.ThrowsAnyAsync<DbUpdateException>(() => client.SaveChangesAsync());
+        _ = await Assert.ThrowsAnyAsync<DbUpdateException>(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
 
         CapturedCommand command = Assert.Single(CurrentTest.Value!.Commands);
         Assert.True(command.Failed);
@@ -77,21 +76,21 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
     ///     Once the test is closed, a statement is not the test's any more. <c>After</c> closes it,
     ///     which <see cref="CommandCaptureDisposeTest" /> shows end to end.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task After_Close_a_statement_is_not_recorded()
     {
         await using ServerSqlContext client = CreateClient();
         fixture.Store.ServerSql.Clear();
 
         CurrentTest.Value!.Close();
-        _ = await client.Tickets.ToListAsync();
+        _ = await client.Tickets.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(fixture.Store.ServerSql.Statements);
         Assert.Empty(CurrentTest.Value!.Commands);
     }
 
     /// <summary>The fixture seeded through the same interceptor, and none of it is this test's.</summary>
-    [ConditionalFact]
+    [Fact]
     public void No_command_is_recorded_while_the_class_fixture_seeds()
     {
         Assert.Null(fixture.CurrentTestWhileSeeding);
@@ -118,7 +117,7 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
 
         public int StatementsWhileSeeding { get; private set; }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             CurrentTestWhileSeeding = CurrentTest.Value;
             await Store.InitializeAsync(
@@ -135,7 +134,7 @@ public class CommandCaptureTest(CommandCaptureTest.Fixture fixture) : IClassFixt
             StatementsWhileSeeding = Store.ServerSql.Statements.Count;
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
             => await Store.DisposeAsync();
     }
 }
@@ -155,16 +154,16 @@ public class CommandCaptureDisposeTest(CommandCaptureTest.Fixture fixture)
 {
     private CurrentTest? _test;
 
-    [ConditionalFact]
+    [Fact]
     public void A_statement_in_the_test_class_DisposeAsync_is_filed_under_no_test()
         => _test = CurrentTest.Value;
 
     /// <inheritdoc />
-    public Task InitializeAsync()
-        => Task.CompletedTask;
+    public ValueTask InitializeAsync()
+        => ValueTask.CompletedTask;
 
     /// <inheritdoc />
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Assert.NotNull(_test);
         Assert.Same(_test, CurrentTest.Value);

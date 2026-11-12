@@ -12,971 +12,1406 @@ using Microsoft.EntityFrameworkCore.Update.Internal;
 #pragma warning disable 219, 612, 618
 #nullable disable
 
-namespace TestNamespace
+namespace TestNamespace;
+
+public partial class DbContextModel
 {
-    public partial class DbContextModel
+    private DbContextModel()
+        : base(skipDetectChanges: false, modelId: new Guid("00000000-0000-0000-0000-000000000000"), entityTypeCount: 2)
     {
-        private DbContextModel()
-            : base(skipDetectChanges: false, modelId: new Guid("00000000-0000-0000-0000-000000000000"), entityTypeCount: 2)
+    }
+
+    partial void Initialize()
+    {
+        var principalBase = PrincipalBaseEntityType.Create(this);
+        var principalDerived = PrincipalDerivedEntityType.Create(this, principalBase);
+
+        PrincipalBaseEntityType.CreateForeignKey1(principalBase, principalBase);
+
+        PrincipalBaseEntityType.CreateAnnotations(principalBase);
+        PrincipalDerivedEntityType.CreateAnnotations(principalDerived);
+
+        AddRuntimeAnnotation("Relational:RelationalModelFactory", () => CreateRelationalModel());
+    }
+
+    private IRelationalModel CreateRelationalModel()
+    {
+        var relationalModel = new RelationalModel(this);
+
+        var principalBase = FindEntityType("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase")!;
+
+        var defaultTableMappings = new List<TableMappingBase<ColumnMappingBase>>();
+        principalBase.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase = new TableBase("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase", null, relationalModel);
+        var dependent_IdColumnBase = new ColumnBase<ColumnMappingBase>("Dependent_Id", "tinyint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
         {
-        }
-
-        partial void Initialize()
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Dependent_Id", dependent_IdColumnBase);
+        var discriminatorColumnBase = new ColumnBase<ColumnMappingBase>("Discriminator", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Discriminator", discriminatorColumnBase);
+        var enum1ColumnBase = new ColumnBase<ColumnMappingBase>("Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Enum1", enum1ColumnBase);
+        var enum2ColumnBase = new ColumnBase<ColumnMappingBase>("Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
         {
-            var principalBase = PrincipalBaseEntityType.Create(this);
-            var principalDerived = PrincipalDerivedEntityType.Create(this, principalBase);
-
-            PrincipalBaseEntityType.CreateForeignKey1(principalBase, principalBase);
-
-            PrincipalBaseEntityType.CreateAnnotations(principalBase);
-            PrincipalDerivedEntityType.CreateAnnotations(principalDerived);
-
-            AddRuntimeAnnotation("Relational:RelationalModelFactory", () => CreateRelationalModel());
-        }
-
-        private IRelationalModel CreateRelationalModel()
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Enum2", enum2ColumnBase);
+        var flagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("FlagsEnum1", flagsEnum1ColumnBase);
+        var flagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("FlagsEnum2", flagsEnum2ColumnBase);
+        var idColumnBase = new ColumnBase<ColumnMappingBase>("Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Id", idColumnBase);
+        var manyOwned_DetailsColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Details", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
         {
-            var relationalModel = new RelationalModel(this);
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Details", manyOwned_DetailsColumnBase);
+        var manyOwned_NumberColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Number", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Number", manyOwned_NumberColumnBase);
+        var manyOwned_Principal_AlternateIdColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_AlternateId", "guid", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_AlternateId", manyOwned_Principal_AlternateIdColumnBase);
+        var manyOwned_Principal_Enum1ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Enum1", manyOwned_Principal_Enum1ColumnBase);
+        var manyOwned_Principal_Enum2ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Enum2", manyOwned_Principal_Enum2ColumnBase);
+        var manyOwned_Principal_FlagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_FlagsEnum1", manyOwned_Principal_FlagsEnum1ColumnBase);
+        var manyOwned_Principal_FlagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_FlagsEnum2", manyOwned_Principal_FlagsEnum2ColumnBase);
+        var manyOwned_Principal_IdColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Id", manyOwned_Principal_IdColumnBase);
+        var manyOwned_Principal_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeArray", manyOwned_Principal_RefTypeArrayColumnBase);
+        var manyOwned_Principal_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeEnumerable", manyOwned_Principal_RefTypeEnumerableColumnBase);
+        var manyOwned_Principal_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeIList", manyOwned_Principal_RefTypeIListColumnBase);
+        var manyOwned_Principal_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeList", manyOwned_Principal_RefTypeListColumnBase);
+        var manyOwned_Principal_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeArray", manyOwned_Principal_ValueTypeArrayColumnBase);
+        var manyOwned_Principal_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeEnumerable", manyOwned_Principal_ValueTypeEnumerableColumnBase);
+        var manyOwned_Principal_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeIList", manyOwned_Principal_ValueTypeIListColumnBase);
+        var manyOwned_Principal_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeList", manyOwned_Principal_ValueTypeListColumnBase);
+        var manyOwned_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeArray", manyOwned_RefTypeArrayColumnBase);
+        var manyOwned_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeEnumerable", manyOwned_RefTypeEnumerableColumnBase);
+        var manyOwned_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeIList", manyOwned_RefTypeIListColumnBase);
+        var manyOwned_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeList", manyOwned_RefTypeListColumnBase);
+        var manyOwned_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeArray", manyOwned_ValueTypeArrayColumnBase);
+        var manyOwned_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeEnumerable", manyOwned_ValueTypeEnumerableColumnBase);
+        var manyOwned_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeIList", manyOwned_ValueTypeIListColumnBase);
+        var manyOwned_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeList", manyOwned_ValueTypeListColumnBase);
+        var owned_DetailsColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Details", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Details", owned_DetailsColumnBase);
+        var owned_NumberColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Number", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Number", owned_NumberColumnBase);
+        var owned_Principal_AlternateIdColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_AlternateId", "guid", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_AlternateId", owned_Principal_AlternateIdColumnBase);
+        var owned_Principal_Enum1ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Enum1", owned_Principal_Enum1ColumnBase);
+        var owned_Principal_Enum2ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Enum2", owned_Principal_Enum2ColumnBase);
+        var owned_Principal_FlagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_FlagsEnum1", owned_Principal_FlagsEnum1ColumnBase);
+        var owned_Principal_FlagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_FlagsEnum2", owned_Principal_FlagsEnum2ColumnBase);
+        var owned_Principal_IdColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Id", owned_Principal_IdColumnBase);
+        var owned_Principal_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeArray", owned_Principal_RefTypeArrayColumnBase);
+        var owned_Principal_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeEnumerable", owned_Principal_RefTypeEnumerableColumnBase);
+        var owned_Principal_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeIList", owned_Principal_RefTypeIListColumnBase);
+        var owned_Principal_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeList", owned_Principal_RefTypeListColumnBase);
+        var owned_Principal_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeArray", owned_Principal_ValueTypeArrayColumnBase);
+        var owned_Principal_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeEnumerable", owned_Principal_ValueTypeEnumerableColumnBase);
+        var owned_Principal_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeIList", owned_Principal_ValueTypeIListColumnBase);
+        var owned_Principal_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeList", owned_Principal_ValueTypeListColumnBase);
+        var owned_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeArray", owned_RefTypeArrayColumnBase);
+        var owned_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeEnumerable", owned_RefTypeEnumerableColumnBase);
+        var owned_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeIList", owned_RefTypeIListColumnBase);
+        var owned_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeList", owned_RefTypeListColumnBase);
+        var owned_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeArray", owned_ValueTypeArrayColumnBase);
+        var owned_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeEnumerable", owned_ValueTypeEnumerableColumnBase);
+        var owned_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeIList", owned_ValueTypeIListColumnBase);
+        var owned_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeList", owned_ValueTypeListColumnBase);
+        var principalBaseIdColumnBase = new ColumnBase<ColumnMappingBase>("PrincipalBaseId", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("PrincipalBaseId", principalBaseIdColumnBase);
+        var refTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeArray", refTypeArrayColumnBase);
+        var refTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeEnumerable", refTypeEnumerableColumnBase);
+        var refTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeIList", refTypeIListColumnBase);
+        var refTypeListColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeList", refTypeListColumnBase);
+        var valueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeArray", valueTypeArrayColumnBase);
+        var valueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeEnumerable", valueTypeEnumerableColumnBase);
+        var valueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeIList", valueTypeIListColumnBase);
+        var valueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
+        {
+            IsNullable = true
+        };
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeList", valueTypeListColumnBase);
+        var arrayJsonArray = new RelationalJsonArray(manyOwned_Principal_RefTypeArrayColumnBase, true);
+        var scalarJsonScalar = new RelationalJsonScalar(arrayJsonArray, false);
+        arrayJsonArray.ElementType = scalarJsonScalar;
+        manyOwned_Principal_RefTypeArrayColumnBase.JsonElement = arrayJsonArray;
+        var arrayJsonArray0 = new RelationalJsonArray(manyOwned_Principal_RefTypeEnumerableColumnBase, true);
+        var scalarJsonScalar0 = new RelationalJsonScalar(arrayJsonArray0, false);
+        arrayJsonArray0.ElementType = scalarJsonScalar0;
+        manyOwned_Principal_RefTypeEnumerableColumnBase.JsonElement = arrayJsonArray0;
+        var arrayJsonArray1 = new RelationalJsonArray(manyOwned_Principal_RefTypeIListColumnBase, true);
+        var scalarJsonScalar1 = new RelationalJsonScalar(arrayJsonArray1, false);
+        arrayJsonArray1.ElementType = scalarJsonScalar1;
+        manyOwned_Principal_RefTypeIListColumnBase.JsonElement = arrayJsonArray1;
+        var arrayJsonArray2 = new RelationalJsonArray(manyOwned_Principal_RefTypeListColumnBase, true);
+        var scalarJsonScalar2 = new RelationalJsonScalar(arrayJsonArray2, false);
+        arrayJsonArray2.ElementType = scalarJsonScalar2;
+        manyOwned_Principal_RefTypeListColumnBase.JsonElement = arrayJsonArray2;
+        var arrayJsonArray3 = new RelationalJsonArray(manyOwned_Principal_ValueTypeArrayColumnBase, true);
+        var scalarJsonScalar3 = new RelationalJsonScalar(arrayJsonArray3, false);
+        arrayJsonArray3.ElementType = scalarJsonScalar3;
+        manyOwned_Principal_ValueTypeArrayColumnBase.JsonElement = arrayJsonArray3;
+        var arrayJsonArray4 = new RelationalJsonArray(manyOwned_Principal_ValueTypeEnumerableColumnBase, true);
+        var scalarJsonScalar4 = new RelationalJsonScalar(arrayJsonArray4, false);
+        arrayJsonArray4.ElementType = scalarJsonScalar4;
+        manyOwned_Principal_ValueTypeEnumerableColumnBase.JsonElement = arrayJsonArray4;
+        var arrayJsonArray5 = new RelationalJsonArray(manyOwned_Principal_ValueTypeIListColumnBase, true);
+        var scalarJsonScalar5 = new RelationalJsonScalar(arrayJsonArray5, false);
+        arrayJsonArray5.ElementType = scalarJsonScalar5;
+        manyOwned_Principal_ValueTypeIListColumnBase.JsonElement = arrayJsonArray5;
+        var arrayJsonArray6 = new RelationalJsonArray(manyOwned_Principal_ValueTypeListColumnBase, true);
+        var scalarJsonScalar6 = new RelationalJsonScalar(arrayJsonArray6, false);
+        arrayJsonArray6.ElementType = scalarJsonScalar6;
+        manyOwned_Principal_ValueTypeListColumnBase.JsonElement = arrayJsonArray6;
+        var arrayJsonArray7 = new RelationalJsonArray(manyOwned_RefTypeArrayColumnBase, true);
+        var scalarJsonScalar7 = new RelationalJsonScalar(arrayJsonArray7, false);
+        arrayJsonArray7.ElementType = scalarJsonScalar7;
+        manyOwned_RefTypeArrayColumnBase.JsonElement = arrayJsonArray7;
+        var arrayJsonArray8 = new RelationalJsonArray(manyOwned_RefTypeEnumerableColumnBase, true);
+        var scalarJsonScalar8 = new RelationalJsonScalar(arrayJsonArray8, false);
+        arrayJsonArray8.ElementType = scalarJsonScalar8;
+        manyOwned_RefTypeEnumerableColumnBase.JsonElement = arrayJsonArray8;
+        var arrayJsonArray9 = new RelationalJsonArray(manyOwned_RefTypeIListColumnBase, true);
+        var scalarJsonScalar9 = new RelationalJsonScalar(arrayJsonArray9, false);
+        arrayJsonArray9.ElementType = scalarJsonScalar9;
+        manyOwned_RefTypeIListColumnBase.JsonElement = arrayJsonArray9;
+        var arrayJsonArray10 = new RelationalJsonArray(manyOwned_RefTypeListColumnBase, true);
+        var scalarJsonScalar10 = new RelationalJsonScalar(arrayJsonArray10, false);
+        arrayJsonArray10.ElementType = scalarJsonScalar10;
+        manyOwned_RefTypeListColumnBase.JsonElement = arrayJsonArray10;
+        var arrayJsonArray11 = new RelationalJsonArray(manyOwned_ValueTypeArrayColumnBase, true);
+        var scalarJsonScalar11 = new RelationalJsonScalar(arrayJsonArray11, false);
+        arrayJsonArray11.ElementType = scalarJsonScalar11;
+        manyOwned_ValueTypeArrayColumnBase.JsonElement = arrayJsonArray11;
+        var arrayJsonArray12 = new RelationalJsonArray(manyOwned_ValueTypeEnumerableColumnBase, true);
+        var scalarJsonScalar12 = new RelationalJsonScalar(arrayJsonArray12, false);
+        arrayJsonArray12.ElementType = scalarJsonScalar12;
+        manyOwned_ValueTypeEnumerableColumnBase.JsonElement = arrayJsonArray12;
+        var arrayJsonArray13 = new RelationalJsonArray(manyOwned_ValueTypeIListColumnBase, true);
+        var scalarJsonScalar13 = new RelationalJsonScalar(arrayJsonArray13, false);
+        arrayJsonArray13.ElementType = scalarJsonScalar13;
+        manyOwned_ValueTypeIListColumnBase.JsonElement = arrayJsonArray13;
+        var arrayJsonArray14 = new RelationalJsonArray(manyOwned_ValueTypeListColumnBase, true);
+        var scalarJsonScalar14 = new RelationalJsonScalar(arrayJsonArray14, false);
+        arrayJsonArray14.ElementType = scalarJsonScalar14;
+        manyOwned_ValueTypeListColumnBase.JsonElement = arrayJsonArray14;
+        var arrayJsonArray15 = new RelationalJsonArray(owned_Principal_RefTypeArrayColumnBase, true);
+        var scalarJsonScalar15 = new RelationalJsonScalar(arrayJsonArray15, false);
+        arrayJsonArray15.ElementType = scalarJsonScalar15;
+        owned_Principal_RefTypeArrayColumnBase.JsonElement = arrayJsonArray15;
+        var arrayJsonArray16 = new RelationalJsonArray(owned_Principal_RefTypeEnumerableColumnBase, true);
+        var scalarJsonScalar16 = new RelationalJsonScalar(arrayJsonArray16, false);
+        arrayJsonArray16.ElementType = scalarJsonScalar16;
+        owned_Principal_RefTypeEnumerableColumnBase.JsonElement = arrayJsonArray16;
+        var arrayJsonArray17 = new RelationalJsonArray(owned_Principal_RefTypeIListColumnBase, true);
+        var scalarJsonScalar17 = new RelationalJsonScalar(arrayJsonArray17, false);
+        arrayJsonArray17.ElementType = scalarJsonScalar17;
+        owned_Principal_RefTypeIListColumnBase.JsonElement = arrayJsonArray17;
+        var arrayJsonArray18 = new RelationalJsonArray(owned_Principal_RefTypeListColumnBase, true);
+        var scalarJsonScalar18 = new RelationalJsonScalar(arrayJsonArray18, false);
+        arrayJsonArray18.ElementType = scalarJsonScalar18;
+        owned_Principal_RefTypeListColumnBase.JsonElement = arrayJsonArray18;
+        var arrayJsonArray19 = new RelationalJsonArray(owned_Principal_ValueTypeArrayColumnBase, true);
+        var scalarJsonScalar19 = new RelationalJsonScalar(arrayJsonArray19, false);
+        arrayJsonArray19.ElementType = scalarJsonScalar19;
+        owned_Principal_ValueTypeArrayColumnBase.JsonElement = arrayJsonArray19;
+        var arrayJsonArray20 = new RelationalJsonArray(owned_Principal_ValueTypeEnumerableColumnBase, true);
+        var scalarJsonScalar20 = new RelationalJsonScalar(arrayJsonArray20, false);
+        arrayJsonArray20.ElementType = scalarJsonScalar20;
+        owned_Principal_ValueTypeEnumerableColumnBase.JsonElement = arrayJsonArray20;
+        var arrayJsonArray21 = new RelationalJsonArray(owned_Principal_ValueTypeIListColumnBase, true);
+        var scalarJsonScalar21 = new RelationalJsonScalar(arrayJsonArray21, false);
+        arrayJsonArray21.ElementType = scalarJsonScalar21;
+        owned_Principal_ValueTypeIListColumnBase.JsonElement = arrayJsonArray21;
+        var arrayJsonArray22 = new RelationalJsonArray(owned_Principal_ValueTypeListColumnBase, true);
+        var scalarJsonScalar22 = new RelationalJsonScalar(arrayJsonArray22, false);
+        arrayJsonArray22.ElementType = scalarJsonScalar22;
+        owned_Principal_ValueTypeListColumnBase.JsonElement = arrayJsonArray22;
+        var arrayJsonArray23 = new RelationalJsonArray(owned_RefTypeArrayColumnBase, true);
+        var scalarJsonScalar23 = new RelationalJsonScalar(arrayJsonArray23, false);
+        arrayJsonArray23.ElementType = scalarJsonScalar23;
+        owned_RefTypeArrayColumnBase.JsonElement = arrayJsonArray23;
+        var arrayJsonArray24 = new RelationalJsonArray(owned_RefTypeEnumerableColumnBase, true);
+        var scalarJsonScalar24 = new RelationalJsonScalar(arrayJsonArray24, false);
+        arrayJsonArray24.ElementType = scalarJsonScalar24;
+        owned_RefTypeEnumerableColumnBase.JsonElement = arrayJsonArray24;
+        var arrayJsonArray25 = new RelationalJsonArray(owned_RefTypeIListColumnBase, true);
+        var scalarJsonScalar25 = new RelationalJsonScalar(arrayJsonArray25, false);
+        arrayJsonArray25.ElementType = scalarJsonScalar25;
+        owned_RefTypeIListColumnBase.JsonElement = arrayJsonArray25;
+        var arrayJsonArray26 = new RelationalJsonArray(owned_RefTypeListColumnBase, true);
+        var scalarJsonScalar26 = new RelationalJsonScalar(arrayJsonArray26, false);
+        arrayJsonArray26.ElementType = scalarJsonScalar26;
+        owned_RefTypeListColumnBase.JsonElement = arrayJsonArray26;
+        var arrayJsonArray27 = new RelationalJsonArray(owned_ValueTypeArrayColumnBase, true);
+        var scalarJsonScalar27 = new RelationalJsonScalar(arrayJsonArray27, false);
+        arrayJsonArray27.ElementType = scalarJsonScalar27;
+        owned_ValueTypeArrayColumnBase.JsonElement = arrayJsonArray27;
+        var arrayJsonArray28 = new RelationalJsonArray(owned_ValueTypeEnumerableColumnBase, true);
+        var scalarJsonScalar28 = new RelationalJsonScalar(arrayJsonArray28, false);
+        arrayJsonArray28.ElementType = scalarJsonScalar28;
+        owned_ValueTypeEnumerableColumnBase.JsonElement = arrayJsonArray28;
+        var arrayJsonArray29 = new RelationalJsonArray(owned_ValueTypeIListColumnBase, true);
+        var scalarJsonScalar29 = new RelationalJsonScalar(arrayJsonArray29, false);
+        arrayJsonArray29.ElementType = scalarJsonScalar29;
+        owned_ValueTypeIListColumnBase.JsonElement = arrayJsonArray29;
+        var arrayJsonArray30 = new RelationalJsonArray(owned_ValueTypeListColumnBase, true);
+        var scalarJsonScalar30 = new RelationalJsonScalar(arrayJsonArray30, false);
+        arrayJsonArray30.ElementType = scalarJsonScalar30;
+        owned_ValueTypeListColumnBase.JsonElement = arrayJsonArray30;
+        var arrayJsonArray31 = new RelationalJsonArray(refTypeArrayColumnBase, true);
+        var scalarJsonScalar31 = new RelationalJsonScalar(arrayJsonArray31, false);
+        arrayJsonArray31.ElementType = scalarJsonScalar31;
+        refTypeArrayColumnBase.JsonElement = arrayJsonArray31;
+        var arrayJsonArray32 = new RelationalJsonArray(refTypeEnumerableColumnBase, true);
+        var scalarJsonScalar32 = new RelationalJsonScalar(arrayJsonArray32, false);
+        arrayJsonArray32.ElementType = scalarJsonScalar32;
+        refTypeEnumerableColumnBase.JsonElement = arrayJsonArray32;
+        var arrayJsonArray33 = new RelationalJsonArray(refTypeIListColumnBase, true);
+        var scalarJsonScalar33 = new RelationalJsonScalar(arrayJsonArray33, false);
+        arrayJsonArray33.ElementType = scalarJsonScalar33;
+        refTypeIListColumnBase.JsonElement = arrayJsonArray33;
+        var arrayJsonArray34 = new RelationalJsonArray(refTypeListColumnBase, true);
+        var scalarJsonScalar34 = new RelationalJsonScalar(arrayJsonArray34, false);
+        arrayJsonArray34.ElementType = scalarJsonScalar34;
+        refTypeListColumnBase.JsonElement = arrayJsonArray34;
+        var arrayJsonArray35 = new RelationalJsonArray(valueTypeArrayColumnBase, true);
+        var scalarJsonScalar35 = new RelationalJsonScalar(arrayJsonArray35, false);
+        arrayJsonArray35.ElementType = scalarJsonScalar35;
+        valueTypeArrayColumnBase.JsonElement = arrayJsonArray35;
+        var arrayJsonArray36 = new RelationalJsonArray(valueTypeEnumerableColumnBase, true);
+        var scalarJsonScalar36 = new RelationalJsonScalar(arrayJsonArray36, false);
+        arrayJsonArray36.ElementType = scalarJsonScalar36;
+        valueTypeEnumerableColumnBase.JsonElement = arrayJsonArray36;
+        var arrayJsonArray37 = new RelationalJsonArray(valueTypeIListColumnBase, true);
+        var scalarJsonScalar37 = new RelationalJsonScalar(arrayJsonArray37, false);
+        arrayJsonArray37.ElementType = scalarJsonScalar37;
+        valueTypeIListColumnBase.JsonElement = arrayJsonArray37;
+        var arrayJsonArray38 = new RelationalJsonArray(valueTypeListColumnBase, true);
+        var scalarJsonScalar38 = new RelationalJsonScalar(arrayJsonArray38, false);
+        arrayJsonArray38.ElementType = scalarJsonScalar38;
+        valueTypeListColumnBase.JsonElement = arrayJsonArray38;
+        relationalModel.DefaultTables.Add("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase = new TableMappingBase<ColumnMappingBase>(principalBase, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, true);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase, false);
+        defaultTableMappings.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)idColumnBase, principalBase.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)discriminatorColumnBase, principalBase.FindProperty("Discriminator")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum1ColumnBase, principalBase.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum2ColumnBase, principalBase.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum1ColumnBase, principalBase.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum2ColumnBase, principalBase.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)principalBaseIdColumnBase, principalBase.FindProperty("PrincipalBaseId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeArrayColumnBase, principalBase.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeEnumerableColumnBase, principalBase.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeIListColumnBase, principalBase.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeListColumnBase, principalBase.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeArrayColumnBase, principalBase.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeEnumerableColumnBase, principalBase.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeIListColumnBase, principalBase.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeListColumnBase, principalBase.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeArray")!, arrayJsonArray31, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeEnumerable")!, arrayJsonArray32, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeIList")!, arrayJsonArray33, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeList")!, arrayJsonArray34, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeArray")!, arrayJsonArray35, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeEnumerable")!, arrayJsonArray36, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeIList")!, arrayJsonArray37, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeList")!, arrayJsonArray38, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
 
-            var principalBase = FindEntityType("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase")!;
+        var tableMappings = new List<TableMapping>();
+        principalBase.SetRuntimeAnnotation("Relational:TableMappings", tableMappings);
+        var principalBaseTable = new Table("PrincipalBase", null, relationalModel);
+        var idColumn = new Column("Id", "bigint", principalBaseTable);
+        principalBaseTable.Columns.Add("Id", idColumn);
+        idColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(idColumn);
+        var dependent_IdColumn = new Column("Dependent_Id", "tinyint", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Dependent_Id", dependent_IdColumn);
+        dependent_IdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<byte>(dependent_IdColumn);
+        var discriminatorColumn = new Column("Discriminator", "text", principalBaseTable);
+        principalBaseTable.Columns.Add("Discriminator", discriminatorColumn);
+        discriminatorColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(discriminatorColumn);
+        var enum1Column = new Column("Enum1", "int", principalBaseTable);
+        principalBaseTable.Columns.Add("Enum1", enum1Column);
+        enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(enum1Column);
+        var enum2Column = new Column("Enum2", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Enum2", enum2Column);
+        enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(enum2Column);
+        var flagsEnum1Column = new Column("FlagsEnum1", "int", principalBaseTable);
+        principalBaseTable.Columns.Add("FlagsEnum1", flagsEnum1Column);
+        flagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(flagsEnum1Column);
+        var flagsEnum2Column = new Column("FlagsEnum2", "int", principalBaseTable);
+        principalBaseTable.Columns.Add("FlagsEnum2", flagsEnum2Column);
+        flagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(flagsEnum2Column);
+        var manyOwned_DetailsColumn = new Column("ManyOwned_Details", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Details", manyOwned_DetailsColumn);
+        manyOwned_DetailsColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_DetailsColumn);
+        var manyOwned_NumberColumn = new Column("ManyOwned_Number", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Number", manyOwned_NumberColumn);
+        manyOwned_NumberColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<int>(manyOwned_NumberColumn);
+        var manyOwned_Principal_AlternateIdColumn = new Column("ManyOwned_Principal_AlternateId", "guid", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_AlternateId", manyOwned_Principal_AlternateIdColumn);
+        manyOwned_Principal_AlternateIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<Guid>(manyOwned_Principal_AlternateIdColumn);
+        var manyOwned_Principal_Enum1Column = new Column("ManyOwned_Principal_Enum1", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_Enum1", manyOwned_Principal_Enum1Column);
+        manyOwned_Principal_Enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(manyOwned_Principal_Enum1Column);
+        var manyOwned_Principal_Enum2Column = new Column("ManyOwned_Principal_Enum2", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_Enum2", manyOwned_Principal_Enum2Column);
+        manyOwned_Principal_Enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(manyOwned_Principal_Enum2Column);
+        var manyOwned_Principal_FlagsEnum1Column = new Column("ManyOwned_Principal_FlagsEnum1", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_FlagsEnum1", manyOwned_Principal_FlagsEnum1Column);
+        manyOwned_Principal_FlagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(manyOwned_Principal_FlagsEnum1Column);
+        var manyOwned_Principal_FlagsEnum2Column = new Column("ManyOwned_Principal_FlagsEnum2", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_FlagsEnum2", manyOwned_Principal_FlagsEnum2Column);
+        manyOwned_Principal_FlagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(manyOwned_Principal_FlagsEnum2Column);
+        var manyOwned_Principal_IdColumn = new Column("ManyOwned_Principal_Id", "bigint", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_Id", manyOwned_Principal_IdColumn);
+        manyOwned_Principal_IdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(manyOwned_Principal_IdColumn);
+        var manyOwned_Principal_RefTypeArrayColumn = new Column("ManyOwned_Principal_RefTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeArray", manyOwned_Principal_RefTypeArrayColumn);
+        manyOwned_Principal_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeArrayColumn);
+        var manyOwned_Principal_RefTypeEnumerableColumn = new Column("ManyOwned_Principal_RefTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeEnumerable", manyOwned_Principal_RefTypeEnumerableColumn);
+        manyOwned_Principal_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeEnumerableColumn);
+        var manyOwned_Principal_RefTypeIListColumn = new Column("ManyOwned_Principal_RefTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeIList", manyOwned_Principal_RefTypeIListColumn);
+        manyOwned_Principal_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeIListColumn);
+        var manyOwned_Principal_RefTypeListColumn = new Column("ManyOwned_Principal_RefTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeList", manyOwned_Principal_RefTypeListColumn);
+        manyOwned_Principal_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeListColumn);
+        var manyOwned_Principal_ValueTypeArrayColumn = new Column("ManyOwned_Principal_ValueTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeArray", manyOwned_Principal_ValueTypeArrayColumn);
+        manyOwned_Principal_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeArrayColumn);
+        var manyOwned_Principal_ValueTypeEnumerableColumn = new Column("ManyOwned_Principal_ValueTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeEnumerable", manyOwned_Principal_ValueTypeEnumerableColumn);
+        manyOwned_Principal_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeEnumerableColumn);
+        var manyOwned_Principal_ValueTypeIListColumn = new Column("ManyOwned_Principal_ValueTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeIList", manyOwned_Principal_ValueTypeIListColumn);
+        manyOwned_Principal_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeIListColumn);
+        var manyOwned_Principal_ValueTypeListColumn = new Column("ManyOwned_Principal_ValueTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeList", manyOwned_Principal_ValueTypeListColumn);
+        manyOwned_Principal_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeListColumn);
+        var manyOwned_RefTypeArrayColumn = new Column("ManyOwned_RefTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_RefTypeArray", manyOwned_RefTypeArrayColumn);
+        manyOwned_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeArrayColumn);
+        var manyOwned_RefTypeEnumerableColumn = new Column("ManyOwned_RefTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_RefTypeEnumerable", manyOwned_RefTypeEnumerableColumn);
+        manyOwned_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeEnumerableColumn);
+        var manyOwned_RefTypeIListColumn = new Column("ManyOwned_RefTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_RefTypeIList", manyOwned_RefTypeIListColumn);
+        manyOwned_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeIListColumn);
+        var manyOwned_RefTypeListColumn = new Column("ManyOwned_RefTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_RefTypeList", manyOwned_RefTypeListColumn);
+        manyOwned_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeListColumn);
+        var manyOwned_ValueTypeArrayColumn = new Column("ManyOwned_ValueTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_ValueTypeArray", manyOwned_ValueTypeArrayColumn);
+        manyOwned_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeArrayColumn);
+        var manyOwned_ValueTypeEnumerableColumn = new Column("ManyOwned_ValueTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_ValueTypeEnumerable", manyOwned_ValueTypeEnumerableColumn);
+        manyOwned_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeEnumerableColumn);
+        var manyOwned_ValueTypeIListColumn = new Column("ManyOwned_ValueTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_ValueTypeIList", manyOwned_ValueTypeIListColumn);
+        manyOwned_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeIListColumn);
+        var manyOwned_ValueTypeListColumn = new Column("ManyOwned_ValueTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ManyOwned_ValueTypeList", manyOwned_ValueTypeListColumn);
+        manyOwned_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeListColumn);
+        var owned_DetailsColumn = new Column("Owned_Details", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Details", owned_DetailsColumn);
+        owned_DetailsColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_DetailsColumn);
+        var owned_NumberColumn = new Column("Owned_Number", "int", principalBaseTable);
+        principalBaseTable.Columns.Add("Owned_Number", owned_NumberColumn);
+        owned_NumberColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<int>(owned_NumberColumn);
+        var owned_Principal_AlternateIdColumn = new Column("Owned_Principal_AlternateId", "guid", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_AlternateId", owned_Principal_AlternateIdColumn);
+        owned_Principal_AlternateIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<Guid>(owned_Principal_AlternateIdColumn);
+        var owned_Principal_Enum1Column = new Column("Owned_Principal_Enum1", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_Enum1", owned_Principal_Enum1Column);
+        owned_Principal_Enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(owned_Principal_Enum1Column);
+        var owned_Principal_Enum2Column = new Column("Owned_Principal_Enum2", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_Enum2", owned_Principal_Enum2Column);
+        owned_Principal_Enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(owned_Principal_Enum2Column);
+        var owned_Principal_FlagsEnum1Column = new Column("Owned_Principal_FlagsEnum1", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_FlagsEnum1", owned_Principal_FlagsEnum1Column);
+        owned_Principal_FlagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(owned_Principal_FlagsEnum1Column);
+        var owned_Principal_FlagsEnum2Column = new Column("Owned_Principal_FlagsEnum2", "int", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_FlagsEnum2", owned_Principal_FlagsEnum2Column);
+        owned_Principal_FlagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(owned_Principal_FlagsEnum2Column);
+        var owned_Principal_IdColumn = new Column("Owned_Principal_Id", "bigint", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_Id", owned_Principal_IdColumn);
+        owned_Principal_IdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(owned_Principal_IdColumn);
+        var owned_Principal_RefTypeArrayColumn = new Column("Owned_Principal_RefTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_RefTypeArray", owned_Principal_RefTypeArrayColumn);
+        owned_Principal_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeArrayColumn);
+        var owned_Principal_RefTypeEnumerableColumn = new Column("Owned_Principal_RefTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_RefTypeEnumerable", owned_Principal_RefTypeEnumerableColumn);
+        owned_Principal_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeEnumerableColumn);
+        var owned_Principal_RefTypeIListColumn = new Column("Owned_Principal_RefTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_RefTypeIList", owned_Principal_RefTypeIListColumn);
+        owned_Principal_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeIListColumn);
+        var owned_Principal_RefTypeListColumn = new Column("Owned_Principal_RefTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_RefTypeList", owned_Principal_RefTypeListColumn);
+        owned_Principal_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeListColumn);
+        var owned_Principal_ValueTypeArrayColumn = new Column("Owned_Principal_ValueTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_ValueTypeArray", owned_Principal_ValueTypeArrayColumn);
+        owned_Principal_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeArrayColumn);
+        var owned_Principal_ValueTypeEnumerableColumn = new Column("Owned_Principal_ValueTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_ValueTypeEnumerable", owned_Principal_ValueTypeEnumerableColumn);
+        owned_Principal_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeEnumerableColumn);
+        var owned_Principal_ValueTypeIListColumn = new Column("Owned_Principal_ValueTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_ValueTypeIList", owned_Principal_ValueTypeIListColumn);
+        owned_Principal_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeIListColumn);
+        var owned_Principal_ValueTypeListColumn = new Column("Owned_Principal_ValueTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_Principal_ValueTypeList", owned_Principal_ValueTypeListColumn);
+        owned_Principal_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeListColumn);
+        var owned_RefTypeArrayColumn = new Column("Owned_RefTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_RefTypeArray", owned_RefTypeArrayColumn);
+        owned_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeArrayColumn);
+        var owned_RefTypeEnumerableColumn = new Column("Owned_RefTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_RefTypeEnumerable", owned_RefTypeEnumerableColumn);
+        owned_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeEnumerableColumn);
+        var owned_RefTypeIListColumn = new Column("Owned_RefTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_RefTypeIList", owned_RefTypeIListColumn);
+        owned_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeIListColumn);
+        var owned_RefTypeListColumn = new Column("Owned_RefTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_RefTypeList", owned_RefTypeListColumn);
+        owned_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeListColumn);
+        var owned_ValueTypeArrayColumn = new Column("Owned_ValueTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_ValueTypeArray", owned_ValueTypeArrayColumn);
+        owned_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeArrayColumn);
+        var owned_ValueTypeEnumerableColumn = new Column("Owned_ValueTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_ValueTypeEnumerable", owned_ValueTypeEnumerableColumn);
+        owned_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeEnumerableColumn);
+        var owned_ValueTypeIListColumn = new Column("Owned_ValueTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_ValueTypeIList", owned_ValueTypeIListColumn);
+        owned_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeIListColumn);
+        var owned_ValueTypeListColumn = new Column("Owned_ValueTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("Owned_ValueTypeList", owned_ValueTypeListColumn);
+        owned_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeListColumn);
+        var principalBaseIdColumn = new Column("PrincipalBaseId", "bigint", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("PrincipalBaseId", principalBaseIdColumn);
+        principalBaseIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(principalBaseIdColumn);
+        var refTypeArrayColumn = new Column("RefTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("RefTypeArray", refTypeArrayColumn);
+        refTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeArrayColumn);
+        var refTypeEnumerableColumn = new Column("RefTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("RefTypeEnumerable", refTypeEnumerableColumn);
+        refTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeEnumerableColumn);
+        var refTypeIListColumn = new Column("RefTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("RefTypeIList", refTypeIListColumn);
+        refTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeIListColumn);
+        var refTypeListColumn = new Column("RefTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("RefTypeList", refTypeListColumn);
+        refTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeListColumn);
+        var valueTypeArrayColumn = new Column("ValueTypeArray", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ValueTypeArray", valueTypeArrayColumn);
+        valueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeArrayColumn);
+        var valueTypeEnumerableColumn = new Column("ValueTypeEnumerable", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ValueTypeEnumerable", valueTypeEnumerableColumn);
+        valueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeEnumerableColumn);
+        var valueTypeIListColumn = new Column("ValueTypeIList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ValueTypeIList", valueTypeIListColumn);
+        valueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeIListColumn);
+        var valueTypeListColumn = new Column("ValueTypeList", "text", principalBaseTable)
+        {
+            IsNullable = true
+        };
+        principalBaseTable.Columns.Add("ValueTypeList", valueTypeListColumn);
+        valueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeListColumn);
+        var arrayJsonArray39 = new RelationalJsonArray(manyOwned_Principal_RefTypeArrayColumn, true);
+        var scalarJsonScalar39 = new RelationalJsonScalar(arrayJsonArray39, false);
+        arrayJsonArray39.ElementType = scalarJsonScalar39;
+        manyOwned_Principal_RefTypeArrayColumn.JsonElement = arrayJsonArray39;
+        var arrayJsonArray40 = new RelationalJsonArray(manyOwned_Principal_RefTypeEnumerableColumn, true);
+        var scalarJsonScalar40 = new RelationalJsonScalar(arrayJsonArray40, false);
+        arrayJsonArray40.ElementType = scalarJsonScalar40;
+        manyOwned_Principal_RefTypeEnumerableColumn.JsonElement = arrayJsonArray40;
+        var arrayJsonArray41 = new RelationalJsonArray(manyOwned_Principal_RefTypeIListColumn, true);
+        var scalarJsonScalar41 = new RelationalJsonScalar(arrayJsonArray41, false);
+        arrayJsonArray41.ElementType = scalarJsonScalar41;
+        manyOwned_Principal_RefTypeIListColumn.JsonElement = arrayJsonArray41;
+        var arrayJsonArray42 = new RelationalJsonArray(manyOwned_Principal_RefTypeListColumn, true);
+        var scalarJsonScalar42 = new RelationalJsonScalar(arrayJsonArray42, false);
+        arrayJsonArray42.ElementType = scalarJsonScalar42;
+        manyOwned_Principal_RefTypeListColumn.JsonElement = arrayJsonArray42;
+        var arrayJsonArray43 = new RelationalJsonArray(manyOwned_Principal_ValueTypeArrayColumn, true);
+        var scalarJsonScalar43 = new RelationalJsonScalar(arrayJsonArray43, false);
+        arrayJsonArray43.ElementType = scalarJsonScalar43;
+        manyOwned_Principal_ValueTypeArrayColumn.JsonElement = arrayJsonArray43;
+        var arrayJsonArray44 = new RelationalJsonArray(manyOwned_Principal_ValueTypeEnumerableColumn, true);
+        var scalarJsonScalar44 = new RelationalJsonScalar(arrayJsonArray44, false);
+        arrayJsonArray44.ElementType = scalarJsonScalar44;
+        manyOwned_Principal_ValueTypeEnumerableColumn.JsonElement = arrayJsonArray44;
+        var arrayJsonArray45 = new RelationalJsonArray(manyOwned_Principal_ValueTypeIListColumn, true);
+        var scalarJsonScalar45 = new RelationalJsonScalar(arrayJsonArray45, false);
+        arrayJsonArray45.ElementType = scalarJsonScalar45;
+        manyOwned_Principal_ValueTypeIListColumn.JsonElement = arrayJsonArray45;
+        var arrayJsonArray46 = new RelationalJsonArray(manyOwned_Principal_ValueTypeListColumn, true);
+        var scalarJsonScalar46 = new RelationalJsonScalar(arrayJsonArray46, false);
+        arrayJsonArray46.ElementType = scalarJsonScalar46;
+        manyOwned_Principal_ValueTypeListColumn.JsonElement = arrayJsonArray46;
+        var arrayJsonArray47 = new RelationalJsonArray(manyOwned_RefTypeArrayColumn, true);
+        var scalarJsonScalar47 = new RelationalJsonScalar(arrayJsonArray47, false);
+        arrayJsonArray47.ElementType = scalarJsonScalar47;
+        manyOwned_RefTypeArrayColumn.JsonElement = arrayJsonArray47;
+        var arrayJsonArray48 = new RelationalJsonArray(manyOwned_RefTypeEnumerableColumn, true);
+        var scalarJsonScalar48 = new RelationalJsonScalar(arrayJsonArray48, false);
+        arrayJsonArray48.ElementType = scalarJsonScalar48;
+        manyOwned_RefTypeEnumerableColumn.JsonElement = arrayJsonArray48;
+        var arrayJsonArray49 = new RelationalJsonArray(manyOwned_RefTypeIListColumn, true);
+        var scalarJsonScalar49 = new RelationalJsonScalar(arrayJsonArray49, false);
+        arrayJsonArray49.ElementType = scalarJsonScalar49;
+        manyOwned_RefTypeIListColumn.JsonElement = arrayJsonArray49;
+        var arrayJsonArray50 = new RelationalJsonArray(manyOwned_RefTypeListColumn, true);
+        var scalarJsonScalar50 = new RelationalJsonScalar(arrayJsonArray50, false);
+        arrayJsonArray50.ElementType = scalarJsonScalar50;
+        manyOwned_RefTypeListColumn.JsonElement = arrayJsonArray50;
+        var arrayJsonArray51 = new RelationalJsonArray(manyOwned_ValueTypeArrayColumn, true);
+        var scalarJsonScalar51 = new RelationalJsonScalar(arrayJsonArray51, false);
+        arrayJsonArray51.ElementType = scalarJsonScalar51;
+        manyOwned_ValueTypeArrayColumn.JsonElement = arrayJsonArray51;
+        var arrayJsonArray52 = new RelationalJsonArray(manyOwned_ValueTypeEnumerableColumn, true);
+        var scalarJsonScalar52 = new RelationalJsonScalar(arrayJsonArray52, false);
+        arrayJsonArray52.ElementType = scalarJsonScalar52;
+        manyOwned_ValueTypeEnumerableColumn.JsonElement = arrayJsonArray52;
+        var arrayJsonArray53 = new RelationalJsonArray(manyOwned_ValueTypeIListColumn, true);
+        var scalarJsonScalar53 = new RelationalJsonScalar(arrayJsonArray53, false);
+        arrayJsonArray53.ElementType = scalarJsonScalar53;
+        manyOwned_ValueTypeIListColumn.JsonElement = arrayJsonArray53;
+        var arrayJsonArray54 = new RelationalJsonArray(manyOwned_ValueTypeListColumn, true);
+        var scalarJsonScalar54 = new RelationalJsonScalar(arrayJsonArray54, false);
+        arrayJsonArray54.ElementType = scalarJsonScalar54;
+        manyOwned_ValueTypeListColumn.JsonElement = arrayJsonArray54;
+        var arrayJsonArray55 = new RelationalJsonArray(owned_Principal_RefTypeArrayColumn, true);
+        var scalarJsonScalar55 = new RelationalJsonScalar(arrayJsonArray55, false);
+        arrayJsonArray55.ElementType = scalarJsonScalar55;
+        owned_Principal_RefTypeArrayColumn.JsonElement = arrayJsonArray55;
+        var arrayJsonArray56 = new RelationalJsonArray(owned_Principal_RefTypeEnumerableColumn, true);
+        var scalarJsonScalar56 = new RelationalJsonScalar(arrayJsonArray56, false);
+        arrayJsonArray56.ElementType = scalarJsonScalar56;
+        owned_Principal_RefTypeEnumerableColumn.JsonElement = arrayJsonArray56;
+        var arrayJsonArray57 = new RelationalJsonArray(owned_Principal_RefTypeIListColumn, true);
+        var scalarJsonScalar57 = new RelationalJsonScalar(arrayJsonArray57, false);
+        arrayJsonArray57.ElementType = scalarJsonScalar57;
+        owned_Principal_RefTypeIListColumn.JsonElement = arrayJsonArray57;
+        var arrayJsonArray58 = new RelationalJsonArray(owned_Principal_RefTypeListColumn, true);
+        var scalarJsonScalar58 = new RelationalJsonScalar(arrayJsonArray58, false);
+        arrayJsonArray58.ElementType = scalarJsonScalar58;
+        owned_Principal_RefTypeListColumn.JsonElement = arrayJsonArray58;
+        var arrayJsonArray59 = new RelationalJsonArray(owned_Principal_ValueTypeArrayColumn, true);
+        var scalarJsonScalar59 = new RelationalJsonScalar(arrayJsonArray59, false);
+        arrayJsonArray59.ElementType = scalarJsonScalar59;
+        owned_Principal_ValueTypeArrayColumn.JsonElement = arrayJsonArray59;
+        var arrayJsonArray60 = new RelationalJsonArray(owned_Principal_ValueTypeEnumerableColumn, true);
+        var scalarJsonScalar60 = new RelationalJsonScalar(arrayJsonArray60, false);
+        arrayJsonArray60.ElementType = scalarJsonScalar60;
+        owned_Principal_ValueTypeEnumerableColumn.JsonElement = arrayJsonArray60;
+        var arrayJsonArray61 = new RelationalJsonArray(owned_Principal_ValueTypeIListColumn, true);
+        var scalarJsonScalar61 = new RelationalJsonScalar(arrayJsonArray61, false);
+        arrayJsonArray61.ElementType = scalarJsonScalar61;
+        owned_Principal_ValueTypeIListColumn.JsonElement = arrayJsonArray61;
+        var arrayJsonArray62 = new RelationalJsonArray(owned_Principal_ValueTypeListColumn, true);
+        var scalarJsonScalar62 = new RelationalJsonScalar(arrayJsonArray62, false);
+        arrayJsonArray62.ElementType = scalarJsonScalar62;
+        owned_Principal_ValueTypeListColumn.JsonElement = arrayJsonArray62;
+        var arrayJsonArray63 = new RelationalJsonArray(owned_RefTypeArrayColumn, true);
+        var scalarJsonScalar63 = new RelationalJsonScalar(arrayJsonArray63, false);
+        arrayJsonArray63.ElementType = scalarJsonScalar63;
+        owned_RefTypeArrayColumn.JsonElement = arrayJsonArray63;
+        var arrayJsonArray64 = new RelationalJsonArray(owned_RefTypeEnumerableColumn, true);
+        var scalarJsonScalar64 = new RelationalJsonScalar(arrayJsonArray64, false);
+        arrayJsonArray64.ElementType = scalarJsonScalar64;
+        owned_RefTypeEnumerableColumn.JsonElement = arrayJsonArray64;
+        var arrayJsonArray65 = new RelationalJsonArray(owned_RefTypeIListColumn, true);
+        var scalarJsonScalar65 = new RelationalJsonScalar(arrayJsonArray65, false);
+        arrayJsonArray65.ElementType = scalarJsonScalar65;
+        owned_RefTypeIListColumn.JsonElement = arrayJsonArray65;
+        var arrayJsonArray66 = new RelationalJsonArray(owned_RefTypeListColumn, true);
+        var scalarJsonScalar66 = new RelationalJsonScalar(arrayJsonArray66, false);
+        arrayJsonArray66.ElementType = scalarJsonScalar66;
+        owned_RefTypeListColumn.JsonElement = arrayJsonArray66;
+        var arrayJsonArray67 = new RelationalJsonArray(owned_ValueTypeArrayColumn, true);
+        var scalarJsonScalar67 = new RelationalJsonScalar(arrayJsonArray67, false);
+        arrayJsonArray67.ElementType = scalarJsonScalar67;
+        owned_ValueTypeArrayColumn.JsonElement = arrayJsonArray67;
+        var arrayJsonArray68 = new RelationalJsonArray(owned_ValueTypeEnumerableColumn, true);
+        var scalarJsonScalar68 = new RelationalJsonScalar(arrayJsonArray68, false);
+        arrayJsonArray68.ElementType = scalarJsonScalar68;
+        owned_ValueTypeEnumerableColumn.JsonElement = arrayJsonArray68;
+        var arrayJsonArray69 = new RelationalJsonArray(owned_ValueTypeIListColumn, true);
+        var scalarJsonScalar69 = new RelationalJsonScalar(arrayJsonArray69, false);
+        arrayJsonArray69.ElementType = scalarJsonScalar69;
+        owned_ValueTypeIListColumn.JsonElement = arrayJsonArray69;
+        var arrayJsonArray70 = new RelationalJsonArray(owned_ValueTypeListColumn, true);
+        var scalarJsonScalar70 = new RelationalJsonScalar(arrayJsonArray70, false);
+        arrayJsonArray70.ElementType = scalarJsonScalar70;
+        owned_ValueTypeListColumn.JsonElement = arrayJsonArray70;
+        var arrayJsonArray71 = new RelationalJsonArray(refTypeArrayColumn, true);
+        var scalarJsonScalar71 = new RelationalJsonScalar(arrayJsonArray71, false);
+        arrayJsonArray71.ElementType = scalarJsonScalar71;
+        refTypeArrayColumn.JsonElement = arrayJsonArray71;
+        var arrayJsonArray72 = new RelationalJsonArray(refTypeEnumerableColumn, true);
+        var scalarJsonScalar72 = new RelationalJsonScalar(arrayJsonArray72, false);
+        arrayJsonArray72.ElementType = scalarJsonScalar72;
+        refTypeEnumerableColumn.JsonElement = arrayJsonArray72;
+        var arrayJsonArray73 = new RelationalJsonArray(refTypeIListColumn, true);
+        var scalarJsonScalar73 = new RelationalJsonScalar(arrayJsonArray73, false);
+        arrayJsonArray73.ElementType = scalarJsonScalar73;
+        refTypeIListColumn.JsonElement = arrayJsonArray73;
+        var arrayJsonArray74 = new RelationalJsonArray(refTypeListColumn, true);
+        var scalarJsonScalar74 = new RelationalJsonScalar(arrayJsonArray74, false);
+        arrayJsonArray74.ElementType = scalarJsonScalar74;
+        refTypeListColumn.JsonElement = arrayJsonArray74;
+        var arrayJsonArray75 = new RelationalJsonArray(valueTypeArrayColumn, true);
+        var scalarJsonScalar75 = new RelationalJsonScalar(arrayJsonArray75, false);
+        arrayJsonArray75.ElementType = scalarJsonScalar75;
+        valueTypeArrayColumn.JsonElement = arrayJsonArray75;
+        var arrayJsonArray76 = new RelationalJsonArray(valueTypeEnumerableColumn, true);
+        var scalarJsonScalar76 = new RelationalJsonScalar(arrayJsonArray76, false);
+        arrayJsonArray76.ElementType = scalarJsonScalar76;
+        valueTypeEnumerableColumn.JsonElement = arrayJsonArray76;
+        var arrayJsonArray77 = new RelationalJsonArray(valueTypeIListColumn, true);
+        var scalarJsonScalar77 = new RelationalJsonScalar(arrayJsonArray77, false);
+        arrayJsonArray77.ElementType = scalarJsonScalar77;
+        valueTypeIListColumn.JsonElement = arrayJsonArray77;
+        var arrayJsonArray78 = new RelationalJsonArray(valueTypeListColumn, true);
+        var scalarJsonScalar78 = new RelationalJsonScalar(arrayJsonArray78, false);
+        arrayJsonArray78.ElementType = scalarJsonScalar78;
+        valueTypeListColumn.JsonElement = arrayJsonArray78;
+        relationalModel.Tables.Add(("PrincipalBase", null), principalBaseTable);
+        var principalBaseTableMapping = new TableMapping(principalBase, principalBaseTable, true)
+        {
+            IsSharedTablePrincipal = true,
+        };
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping, false);
+        tableMappings.Add(principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(idColumn, principalBase.FindProperty("Id")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(discriminatorColumn, principalBase.FindProperty("Discriminator")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(enum1Column, principalBase.FindProperty("Enum1")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(enum2Column, principalBase.FindProperty("Enum2")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(flagsEnum1Column, principalBase.FindProperty("FlagsEnum1")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(flagsEnum2Column, principalBase.FindProperty("FlagsEnum2")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(principalBaseIdColumn, principalBase.FindProperty("PrincipalBaseId")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(refTypeArrayColumn, principalBase.FindProperty("RefTypeArray")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(refTypeEnumerableColumn, principalBase.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(refTypeIListColumn, principalBase.FindProperty("RefTypeIList")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(refTypeListColumn, principalBase.FindProperty("RefTypeList")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(valueTypeArrayColumn, principalBase.FindProperty("ValueTypeArray")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(valueTypeEnumerableColumn, principalBase.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(valueTypeIListColumn, principalBase.FindProperty("ValueTypeIList")!, principalBaseTableMapping);
+        RelationalModel.CreateColumnMapping(valueTypeListColumn, principalBase.FindProperty("ValueTypeList")!, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeArray")!, arrayJsonArray71, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeEnumerable")!, arrayJsonArray72, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeIList")!, arrayJsonArray73, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("RefTypeList")!, arrayJsonArray74, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeArray")!, arrayJsonArray75, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeEnumerable")!, arrayJsonArray76, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeIList")!, arrayJsonArray77, principalBaseTableMapping);
+        RelationalModel.CreateJsonElementMapping(principalBase.FindProperty("ValueTypeList")!, arrayJsonArray78, principalBaseTableMapping);
 
-            var defaultTableMappings = new List<TableMappingBase<ColumnMappingBase>>();
-            principalBase.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase = new TableBase("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase", null, relationalModel);
-            var discriminatorColumnBase = new ColumnBase<ColumnMappingBase>("Discriminator", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Discriminator", discriminatorColumnBase);
-            var enum1ColumnBase = new ColumnBase<ColumnMappingBase>("Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Enum1", enum1ColumnBase);
-            var enum2ColumnBase = new ColumnBase<ColumnMappingBase>("Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Enum2", enum2ColumnBase);
-            var flagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("FlagsEnum1", flagsEnum1ColumnBase);
-            var flagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("FlagsEnum2", flagsEnum2ColumnBase);
-            var idColumnBase = new ColumnBase<ColumnMappingBase>("Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Id", idColumnBase);
-            var manyOwned_DetailsColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Details", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Details", manyOwned_DetailsColumnBase);
-            var manyOwned_NumberColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Number", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Number", manyOwned_NumberColumnBase);
-            var manyOwned_Principal_AlternateIdColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_AlternateId", "guid", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_AlternateId", manyOwned_Principal_AlternateIdColumnBase);
-            var manyOwned_Principal_Enum1ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Enum1", manyOwned_Principal_Enum1ColumnBase);
-            var manyOwned_Principal_Enum2ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Enum2", manyOwned_Principal_Enum2ColumnBase);
-            var manyOwned_Principal_FlagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_FlagsEnum1", manyOwned_Principal_FlagsEnum1ColumnBase);
-            var manyOwned_Principal_FlagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_FlagsEnum2", manyOwned_Principal_FlagsEnum2ColumnBase);
-            var manyOwned_Principal_IdColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_Id", manyOwned_Principal_IdColumnBase);
-            var manyOwned_Principal_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeArray", manyOwned_Principal_RefTypeArrayColumnBase);
-            var manyOwned_Principal_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeEnumerable", manyOwned_Principal_RefTypeEnumerableColumnBase);
-            var manyOwned_Principal_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeIList", manyOwned_Principal_RefTypeIListColumnBase);
-            var manyOwned_Principal_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_RefTypeList", manyOwned_Principal_RefTypeListColumnBase);
-            var manyOwned_Principal_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeArray", manyOwned_Principal_ValueTypeArrayColumnBase);
-            var manyOwned_Principal_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeEnumerable", manyOwned_Principal_ValueTypeEnumerableColumnBase);
-            var manyOwned_Principal_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeIList", manyOwned_Principal_ValueTypeIListColumnBase);
-            var manyOwned_Principal_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_Principal_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_Principal_ValueTypeList", manyOwned_Principal_ValueTypeListColumnBase);
-            var manyOwned_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeArray", manyOwned_RefTypeArrayColumnBase);
-            var manyOwned_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeEnumerable", manyOwned_RefTypeEnumerableColumnBase);
-            var manyOwned_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeIList", manyOwned_RefTypeIListColumnBase);
-            var manyOwned_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_RefTypeList", manyOwned_RefTypeListColumnBase);
-            var manyOwned_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeArray", manyOwned_ValueTypeArrayColumnBase);
-            var manyOwned_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeEnumerable", manyOwned_ValueTypeEnumerableColumnBase);
-            var manyOwned_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeIList", manyOwned_ValueTypeIListColumnBase);
-            var manyOwned_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ManyOwned_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ManyOwned_ValueTypeList", manyOwned_ValueTypeListColumnBase);
-            var owned_DetailsColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Details", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Details", owned_DetailsColumnBase);
-            var owned_NumberColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Number", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Number", owned_NumberColumnBase);
-            var owned_Principal_AlternateIdColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_AlternateId", "guid", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_AlternateId", owned_Principal_AlternateIdColumnBase);
-            var owned_Principal_Enum1ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Enum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Enum1", owned_Principal_Enum1ColumnBase);
-            var owned_Principal_Enum2ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Enum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Enum2", owned_Principal_Enum2ColumnBase);
-            var owned_Principal_FlagsEnum1ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_FlagsEnum1", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_FlagsEnum1", owned_Principal_FlagsEnum1ColumnBase);
-            var owned_Principal_FlagsEnum2ColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_FlagsEnum2", "int", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_FlagsEnum2", owned_Principal_FlagsEnum2ColumnBase);
-            var owned_Principal_IdColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_Id", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_Id", owned_Principal_IdColumnBase);
-            var owned_Principal_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeArray", owned_Principal_RefTypeArrayColumnBase);
-            var owned_Principal_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeEnumerable", owned_Principal_RefTypeEnumerableColumnBase);
-            var owned_Principal_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeIList", owned_Principal_RefTypeIListColumnBase);
-            var owned_Principal_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_RefTypeList", owned_Principal_RefTypeListColumnBase);
-            var owned_Principal_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeArray", owned_Principal_ValueTypeArrayColumnBase);
-            var owned_Principal_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeEnumerable", owned_Principal_ValueTypeEnumerableColumnBase);
-            var owned_Principal_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeIList", owned_Principal_ValueTypeIListColumnBase);
-            var owned_Principal_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_Principal_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_Principal_ValueTypeList", owned_Principal_ValueTypeListColumnBase);
-            var owned_RefTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeArray", owned_RefTypeArrayColumnBase);
-            var owned_RefTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeEnumerable", owned_RefTypeEnumerableColumnBase);
-            var owned_RefTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeIList", owned_RefTypeIListColumnBase);
-            var owned_RefTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_RefTypeList", owned_RefTypeListColumnBase);
-            var owned_ValueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeArray", owned_ValueTypeArrayColumnBase);
-            var owned_ValueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeEnumerable", owned_ValueTypeEnumerableColumnBase);
-            var owned_ValueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeIList", owned_ValueTypeIListColumnBase);
-            var owned_ValueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("Owned_ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("Owned_ValueTypeList", owned_ValueTypeListColumnBase);
-            var principalBaseIdColumnBase = new ColumnBase<ColumnMappingBase>("PrincipalBaseId", "bigint", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("PrincipalBaseId", principalBaseIdColumnBase);
-            var refTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeArray", refTypeArrayColumnBase);
-            var refTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeEnumerable", refTypeEnumerableColumnBase);
-            var refTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeIList", refTypeIListColumnBase);
-            var refTypeListColumnBase = new ColumnBase<ColumnMappingBase>("RefTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("RefTypeList", refTypeListColumnBase);
-            var valueTypeArrayColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeArray", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeArray", valueTypeArrayColumnBase);
-            var valueTypeEnumerableColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeEnumerable", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeEnumerable", valueTypeEnumerableColumnBase);
-            var valueTypeIListColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeIList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeIList", valueTypeIListColumnBase);
-            var valueTypeListColumnBase = new ColumnBase<ColumnMappingBase>("ValueTypeList", "text", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase)
-            {
-                IsNullable = true
-            };
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.Columns.Add("ValueTypeList", valueTypeListColumnBase);
-            relationalModel.DefaultTables.Add("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase", microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase = new TableMappingBase<ColumnMappingBase>(principalBase, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, true);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase, false);
-            defaultTableMappings.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)idColumnBase, principalBase.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)discriminatorColumnBase, principalBase.FindProperty("Discriminator")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum1ColumnBase, principalBase.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum2ColumnBase, principalBase.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum1ColumnBase, principalBase.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum2ColumnBase, principalBase.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)principalBaseIdColumnBase, principalBase.FindProperty("PrincipalBaseId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeArrayColumnBase, principalBase.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeEnumerableColumnBase, principalBase.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeIListColumnBase, principalBase.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeListColumnBase, principalBase.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeArrayColumnBase, principalBase.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeEnumerableColumnBase, principalBase.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeIListColumnBase, principalBase.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeListColumnBase, principalBase.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase);
+        var ownedType = principalBase.FindComplexProperty("Owned")!.ComplexType;
 
-            var tableMappings = new List<TableMapping>();
-            principalBase.SetRuntimeAnnotation("Relational:TableMappings", tableMappings);
-            var principalBaseTable = new Table("PrincipalBase", null, relationalModel);
-            var idColumn = new Column("Id", "bigint", principalBaseTable);
-            principalBaseTable.Columns.Add("Id", idColumn);
-            idColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(idColumn);
-            var discriminatorColumn = new Column("Discriminator", "text", principalBaseTable);
-            principalBaseTable.Columns.Add("Discriminator", discriminatorColumn);
-            discriminatorColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(discriminatorColumn);
-            var enum1Column = new Column("Enum1", "int", principalBaseTable);
-            principalBaseTable.Columns.Add("Enum1", enum1Column);
-            enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(enum1Column);
-            var enum2Column = new Column("Enum2", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Enum2", enum2Column);
-            enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(enum2Column);
-            var flagsEnum1Column = new Column("FlagsEnum1", "int", principalBaseTable);
-            principalBaseTable.Columns.Add("FlagsEnum1", flagsEnum1Column);
-            flagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(flagsEnum1Column);
-            var flagsEnum2Column = new Column("FlagsEnum2", "int", principalBaseTable);
-            principalBaseTable.Columns.Add("FlagsEnum2", flagsEnum2Column);
-            flagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(flagsEnum2Column);
-            var manyOwned_DetailsColumn = new Column("ManyOwned_Details", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Details", manyOwned_DetailsColumn);
-            manyOwned_DetailsColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_DetailsColumn);
-            var manyOwned_NumberColumn = new Column("ManyOwned_Number", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Number", manyOwned_NumberColumn);
-            manyOwned_NumberColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<int>(manyOwned_NumberColumn);
-            var manyOwned_Principal_AlternateIdColumn = new Column("ManyOwned_Principal_AlternateId", "guid", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_AlternateId", manyOwned_Principal_AlternateIdColumn);
-            manyOwned_Principal_AlternateIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<Guid>(manyOwned_Principal_AlternateIdColumn);
-            var manyOwned_Principal_Enum1Column = new Column("ManyOwned_Principal_Enum1", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_Enum1", manyOwned_Principal_Enum1Column);
-            manyOwned_Principal_Enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(manyOwned_Principal_Enum1Column);
-            var manyOwned_Principal_Enum2Column = new Column("ManyOwned_Principal_Enum2", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_Enum2", manyOwned_Principal_Enum2Column);
-            manyOwned_Principal_Enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(manyOwned_Principal_Enum2Column);
-            var manyOwned_Principal_FlagsEnum1Column = new Column("ManyOwned_Principal_FlagsEnum1", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_FlagsEnum1", manyOwned_Principal_FlagsEnum1Column);
-            manyOwned_Principal_FlagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(manyOwned_Principal_FlagsEnum1Column);
-            var manyOwned_Principal_FlagsEnum2Column = new Column("ManyOwned_Principal_FlagsEnum2", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_FlagsEnum2", manyOwned_Principal_FlagsEnum2Column);
-            manyOwned_Principal_FlagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(manyOwned_Principal_FlagsEnum2Column);
-            var manyOwned_Principal_IdColumn = new Column("ManyOwned_Principal_Id", "bigint", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_Id", manyOwned_Principal_IdColumn);
-            manyOwned_Principal_IdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(manyOwned_Principal_IdColumn);
-            var manyOwned_Principal_RefTypeArrayColumn = new Column("ManyOwned_Principal_RefTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeArray", manyOwned_Principal_RefTypeArrayColumn);
-            manyOwned_Principal_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeArrayColumn);
-            var manyOwned_Principal_RefTypeEnumerableColumn = new Column("ManyOwned_Principal_RefTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeEnumerable", manyOwned_Principal_RefTypeEnumerableColumn);
-            manyOwned_Principal_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeEnumerableColumn);
-            var manyOwned_Principal_RefTypeIListColumn = new Column("ManyOwned_Principal_RefTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeIList", manyOwned_Principal_RefTypeIListColumn);
-            manyOwned_Principal_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeIListColumn);
-            var manyOwned_Principal_RefTypeListColumn = new Column("ManyOwned_Principal_RefTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_RefTypeList", manyOwned_Principal_RefTypeListColumn);
-            manyOwned_Principal_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_RefTypeListColumn);
-            var manyOwned_Principal_ValueTypeArrayColumn = new Column("ManyOwned_Principal_ValueTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeArray", manyOwned_Principal_ValueTypeArrayColumn);
-            manyOwned_Principal_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeArrayColumn);
-            var manyOwned_Principal_ValueTypeEnumerableColumn = new Column("ManyOwned_Principal_ValueTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeEnumerable", manyOwned_Principal_ValueTypeEnumerableColumn);
-            manyOwned_Principal_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeEnumerableColumn);
-            var manyOwned_Principal_ValueTypeIListColumn = new Column("ManyOwned_Principal_ValueTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeIList", manyOwned_Principal_ValueTypeIListColumn);
-            manyOwned_Principal_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeIListColumn);
-            var manyOwned_Principal_ValueTypeListColumn = new Column("ManyOwned_Principal_ValueTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_Principal_ValueTypeList", manyOwned_Principal_ValueTypeListColumn);
-            manyOwned_Principal_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_Principal_ValueTypeListColumn);
-            var manyOwned_RefTypeArrayColumn = new Column("ManyOwned_RefTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_RefTypeArray", manyOwned_RefTypeArrayColumn);
-            manyOwned_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeArrayColumn);
-            var manyOwned_RefTypeEnumerableColumn = new Column("ManyOwned_RefTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_RefTypeEnumerable", manyOwned_RefTypeEnumerableColumn);
-            manyOwned_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeEnumerableColumn);
-            var manyOwned_RefTypeIListColumn = new Column("ManyOwned_RefTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_RefTypeIList", manyOwned_RefTypeIListColumn);
-            manyOwned_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeIListColumn);
-            var manyOwned_RefTypeListColumn = new Column("ManyOwned_RefTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_RefTypeList", manyOwned_RefTypeListColumn);
-            manyOwned_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_RefTypeListColumn);
-            var manyOwned_ValueTypeArrayColumn = new Column("ManyOwned_ValueTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_ValueTypeArray", manyOwned_ValueTypeArrayColumn);
-            manyOwned_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeArrayColumn);
-            var manyOwned_ValueTypeEnumerableColumn = new Column("ManyOwned_ValueTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_ValueTypeEnumerable", manyOwned_ValueTypeEnumerableColumn);
-            manyOwned_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeEnumerableColumn);
-            var manyOwned_ValueTypeIListColumn = new Column("ManyOwned_ValueTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_ValueTypeIList", manyOwned_ValueTypeIListColumn);
-            manyOwned_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeIListColumn);
-            var manyOwned_ValueTypeListColumn = new Column("ManyOwned_ValueTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ManyOwned_ValueTypeList", manyOwned_ValueTypeListColumn);
-            manyOwned_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(manyOwned_ValueTypeListColumn);
-            var owned_DetailsColumn = new Column("Owned_Details", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Details", owned_DetailsColumn);
-            owned_DetailsColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_DetailsColumn);
-            var owned_NumberColumn = new Column("Owned_Number", "int", principalBaseTable);
-            principalBaseTable.Columns.Add("Owned_Number", owned_NumberColumn);
-            owned_NumberColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<int>(owned_NumberColumn);
-            var owned_Principal_AlternateIdColumn = new Column("Owned_Principal_AlternateId", "guid", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_AlternateId", owned_Principal_AlternateIdColumn);
-            owned_Principal_AlternateIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<Guid>(owned_Principal_AlternateIdColumn);
-            var owned_Principal_Enum1Column = new Column("Owned_Principal_Enum1", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_Enum1", owned_Principal_Enum1Column);
-            owned_Principal_Enum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(owned_Principal_Enum1Column);
-            var owned_Principal_Enum2Column = new Column("Owned_Principal_Enum2", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_Enum2", owned_Principal_Enum2Column);
-            owned_Principal_Enum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AnEnum>(owned_Principal_Enum2Column);
-            var owned_Principal_FlagsEnum1Column = new Column("Owned_Principal_FlagsEnum1", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_FlagsEnum1", owned_Principal_FlagsEnum1Column);
-            owned_Principal_FlagsEnum1Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(owned_Principal_FlagsEnum1Column);
-            var owned_Principal_FlagsEnum2Column = new Column("Owned_Principal_FlagsEnum2", "int", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_FlagsEnum2", owned_Principal_FlagsEnum2Column);
-            owned_Principal_FlagsEnum2Column.Accessors = ColumnAccessorsFactory.CreateGeneric<CompiledModelTestBase.AFlagsEnum>(owned_Principal_FlagsEnum2Column);
-            var owned_Principal_IdColumn = new Column("Owned_Principal_Id", "bigint", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_Id", owned_Principal_IdColumn);
-            owned_Principal_IdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(owned_Principal_IdColumn);
-            var owned_Principal_RefTypeArrayColumn = new Column("Owned_Principal_RefTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_RefTypeArray", owned_Principal_RefTypeArrayColumn);
-            owned_Principal_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeArrayColumn);
-            var owned_Principal_RefTypeEnumerableColumn = new Column("Owned_Principal_RefTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_RefTypeEnumerable", owned_Principal_RefTypeEnumerableColumn);
-            owned_Principal_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeEnumerableColumn);
-            var owned_Principal_RefTypeIListColumn = new Column("Owned_Principal_RefTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_RefTypeIList", owned_Principal_RefTypeIListColumn);
-            owned_Principal_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeIListColumn);
-            var owned_Principal_RefTypeListColumn = new Column("Owned_Principal_RefTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_RefTypeList", owned_Principal_RefTypeListColumn);
-            owned_Principal_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_RefTypeListColumn);
-            var owned_Principal_ValueTypeArrayColumn = new Column("Owned_Principal_ValueTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_ValueTypeArray", owned_Principal_ValueTypeArrayColumn);
-            owned_Principal_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeArrayColumn);
-            var owned_Principal_ValueTypeEnumerableColumn = new Column("Owned_Principal_ValueTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_ValueTypeEnumerable", owned_Principal_ValueTypeEnumerableColumn);
-            owned_Principal_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeEnumerableColumn);
-            var owned_Principal_ValueTypeIListColumn = new Column("Owned_Principal_ValueTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_ValueTypeIList", owned_Principal_ValueTypeIListColumn);
-            owned_Principal_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeIListColumn);
-            var owned_Principal_ValueTypeListColumn = new Column("Owned_Principal_ValueTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_Principal_ValueTypeList", owned_Principal_ValueTypeListColumn);
-            owned_Principal_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_Principal_ValueTypeListColumn);
-            var owned_RefTypeArrayColumn = new Column("Owned_RefTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_RefTypeArray", owned_RefTypeArrayColumn);
-            owned_RefTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeArrayColumn);
-            var owned_RefTypeEnumerableColumn = new Column("Owned_RefTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_RefTypeEnumerable", owned_RefTypeEnumerableColumn);
-            owned_RefTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeEnumerableColumn);
-            var owned_RefTypeIListColumn = new Column("Owned_RefTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_RefTypeIList", owned_RefTypeIListColumn);
-            owned_RefTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeIListColumn);
-            var owned_RefTypeListColumn = new Column("Owned_RefTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_RefTypeList", owned_RefTypeListColumn);
-            owned_RefTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_RefTypeListColumn);
-            var owned_ValueTypeArrayColumn = new Column("Owned_ValueTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_ValueTypeArray", owned_ValueTypeArrayColumn);
-            owned_ValueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeArrayColumn);
-            var owned_ValueTypeEnumerableColumn = new Column("Owned_ValueTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_ValueTypeEnumerable", owned_ValueTypeEnumerableColumn);
-            owned_ValueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeEnumerableColumn);
-            var owned_ValueTypeIListColumn = new Column("Owned_ValueTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_ValueTypeIList", owned_ValueTypeIListColumn);
-            owned_ValueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeIListColumn);
-            var owned_ValueTypeListColumn = new Column("Owned_ValueTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("Owned_ValueTypeList", owned_ValueTypeListColumn);
-            owned_ValueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(owned_ValueTypeListColumn);
-            var principalBaseIdColumn = new Column("PrincipalBaseId", "bigint", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("PrincipalBaseId", principalBaseIdColumn);
-            principalBaseIdColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<long>(principalBaseIdColumn);
-            var refTypeArrayColumn = new Column("RefTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("RefTypeArray", refTypeArrayColumn);
-            refTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeArrayColumn);
-            var refTypeEnumerableColumn = new Column("RefTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("RefTypeEnumerable", refTypeEnumerableColumn);
-            refTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeEnumerableColumn);
-            var refTypeIListColumn = new Column("RefTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("RefTypeIList", refTypeIListColumn);
-            refTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeIListColumn);
-            var refTypeListColumn = new Column("RefTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("RefTypeList", refTypeListColumn);
-            refTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(refTypeListColumn);
-            var valueTypeArrayColumn = new Column("ValueTypeArray", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ValueTypeArray", valueTypeArrayColumn);
-            valueTypeArrayColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeArrayColumn);
-            var valueTypeEnumerableColumn = new Column("ValueTypeEnumerable", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ValueTypeEnumerable", valueTypeEnumerableColumn);
-            valueTypeEnumerableColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeEnumerableColumn);
-            var valueTypeIListColumn = new Column("ValueTypeIList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ValueTypeIList", valueTypeIListColumn);
-            valueTypeIListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeIListColumn);
-            var valueTypeListColumn = new Column("ValueTypeList", "text", principalBaseTable)
-            {
-                IsNullable = true
-            };
-            principalBaseTable.Columns.Add("ValueTypeList", valueTypeListColumn);
-            valueTypeListColumn.Accessors = ColumnAccessorsFactory.CreateGeneric<string>(valueTypeListColumn);
-            relationalModel.Tables.Add(("PrincipalBase", null), principalBaseTable);
-            var principalBaseTableMapping = new TableMapping(principalBase, principalBaseTable, true)
-            {
-                IsSharedTablePrincipal = true,
-            };
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping, false);
-            tableMappings.Add(principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(idColumn, principalBase.FindProperty("Id")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(discriminatorColumn, principalBase.FindProperty("Discriminator")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(enum1Column, principalBase.FindProperty("Enum1")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(enum2Column, principalBase.FindProperty("Enum2")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(flagsEnum1Column, principalBase.FindProperty("FlagsEnum1")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(flagsEnum2Column, principalBase.FindProperty("FlagsEnum2")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(principalBaseIdColumn, principalBase.FindProperty("PrincipalBaseId")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(refTypeArrayColumn, principalBase.FindProperty("RefTypeArray")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(refTypeEnumerableColumn, principalBase.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(refTypeIListColumn, principalBase.FindProperty("RefTypeIList")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(refTypeListColumn, principalBase.FindProperty("RefTypeList")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(valueTypeArrayColumn, principalBase.FindProperty("ValueTypeArray")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(valueTypeEnumerableColumn, principalBase.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(valueTypeIListColumn, principalBase.FindProperty("ValueTypeIList")!, principalBaseTableMapping);
-            RelationalModel.CreateColumnMapping(valueTypeListColumn, principalBase.FindProperty("ValueTypeList")!, principalBaseTableMapping);
+        var defaultTableMappings0 = new List<TableMappingBase<ColumnMappingBase>>();
+        ownedType.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings0);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0 = new TableMappingBase<ColumnMappingBase>(ownedType, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0, false);
+        defaultTableMappings0.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_DetailsColumnBase, ownedType.FindProperty("Details")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_NumberColumnBase, ownedType.FindProperty("Number")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeArrayColumnBase, ownedType.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeEnumerableColumnBase, ownedType.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeIListColumnBase, ownedType.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeListColumnBase, ownedType.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeArrayColumnBase, ownedType.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeEnumerableColumnBase, ownedType.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeIListColumnBase, ownedType.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeListColumnBase, ownedType.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeArray")!, arrayJsonArray23, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeEnumerable")!, arrayJsonArray24, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeIList")!, arrayJsonArray25, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeList")!, arrayJsonArray26, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeArray")!, arrayJsonArray27, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeEnumerable")!, arrayJsonArray28, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeIList")!, arrayJsonArray29, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeList")!, arrayJsonArray30, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
 
-            var ownedType = principalBase.FindComplexProperty("Owned")!.ComplexType;
+        var tableMappings0 = new List<TableMapping>();
+        ownedType.SetRuntimeAnnotation("Relational:TableMappings", tableMappings0);
+        var principalBaseTableMapping0 = new TableMapping(ownedType, principalBaseTable, true);
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping0, false);
+        tableMappings0.Add(principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_DetailsColumn, ownedType.FindProperty("Details")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_NumberColumn, ownedType.FindProperty("Number")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_RefTypeArrayColumn, ownedType.FindProperty("RefTypeArray")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_RefTypeEnumerableColumn, ownedType.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_RefTypeIListColumn, ownedType.FindProperty("RefTypeIList")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_RefTypeListColumn, ownedType.FindProperty("RefTypeList")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_ValueTypeArrayColumn, ownedType.FindProperty("ValueTypeArray")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_ValueTypeEnumerableColumn, ownedType.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_ValueTypeIListColumn, ownedType.FindProperty("ValueTypeIList")!, principalBaseTableMapping0);
+        RelationalModel.CreateColumnMapping(owned_ValueTypeListColumn, ownedType.FindProperty("ValueTypeList")!, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeArray")!, arrayJsonArray63, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeEnumerable")!, arrayJsonArray64, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeIList")!, arrayJsonArray65, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("RefTypeList")!, arrayJsonArray66, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeArray")!, arrayJsonArray67, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeEnumerable")!, arrayJsonArray68, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeIList")!, arrayJsonArray69, principalBaseTableMapping0);
+        RelationalModel.CreateJsonElementMapping(ownedType.FindProperty("ValueTypeList")!, arrayJsonArray70, principalBaseTableMapping0);
 
-            var defaultTableMappings0 = new List<TableMappingBase<ColumnMappingBase>>();
-            ownedType.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings0);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0 = new TableMappingBase<ColumnMappingBase>(ownedType, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0, false);
-            defaultTableMappings0.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_DetailsColumnBase, ownedType.FindProperty("Details")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_NumberColumnBase, ownedType.FindProperty("Number")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeArrayColumnBase, ownedType.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeEnumerableColumnBase, ownedType.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeIListColumnBase, ownedType.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_RefTypeListColumnBase, ownedType.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeArrayColumnBase, ownedType.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeEnumerableColumnBase, ownedType.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeIListColumnBase, ownedType.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_ValueTypeListColumnBase, ownedType.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase0);
+        var principalBase0 = ownedType.FindComplexProperty("Principal")!.ComplexType;
 
-            var tableMappings0 = new List<TableMapping>();
-            ownedType.SetRuntimeAnnotation("Relational:TableMappings", tableMappings0);
-            var principalBaseTableMapping0 = new TableMapping(ownedType, principalBaseTable, true);
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping0, false);
-            tableMappings0.Add(principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_DetailsColumn, ownedType.FindProperty("Details")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_NumberColumn, ownedType.FindProperty("Number")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_RefTypeArrayColumn, ownedType.FindProperty("RefTypeArray")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_RefTypeEnumerableColumn, ownedType.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_RefTypeIListColumn, ownedType.FindProperty("RefTypeIList")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_RefTypeListColumn, ownedType.FindProperty("RefTypeList")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_ValueTypeArrayColumn, ownedType.FindProperty("ValueTypeArray")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_ValueTypeEnumerableColumn, ownedType.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_ValueTypeIListColumn, ownedType.FindProperty("ValueTypeIList")!, principalBaseTableMapping0);
-            RelationalModel.CreateColumnMapping(owned_ValueTypeListColumn, ownedType.FindProperty("ValueTypeList")!, principalBaseTableMapping0);
+        var defaultTableMappings1 = new List<TableMappingBase<ColumnMappingBase>>();
+        principalBase0.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings1);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1 = new TableMappingBase<ColumnMappingBase>(principalBase0, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1, false);
+        defaultTableMappings1.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_AlternateIdColumnBase, principalBase0.FindProperty("AlternateId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_Enum1ColumnBase, principalBase0.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_Enum2ColumnBase, principalBase0.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_FlagsEnum1ColumnBase, principalBase0.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_FlagsEnum2ColumnBase, principalBase0.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_IdColumnBase, principalBase0.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeArrayColumnBase, principalBase0.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeEnumerableColumnBase, principalBase0.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeIListColumnBase, principalBase0.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeListColumnBase, principalBase0.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeArrayColumnBase, principalBase0.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeEnumerableColumnBase, principalBase0.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeIListColumnBase, principalBase0.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeListColumnBase, principalBase0.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeArray")!, arrayJsonArray15, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeEnumerable")!, arrayJsonArray16, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeIList")!, arrayJsonArray17, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeList")!, arrayJsonArray18, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeArray")!, arrayJsonArray19, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeEnumerable")!, arrayJsonArray20, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeIList")!, arrayJsonArray21, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeList")!, arrayJsonArray22, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
 
-            var principalBase0 = ownedType.FindComplexProperty("Principal")!.ComplexType;
+        var tableMappings1 = new List<TableMapping>();
+        principalBase0.SetRuntimeAnnotation("Relational:TableMappings", tableMappings1);
+        var principalBaseTableMapping1 = new TableMapping(principalBase0, principalBaseTable, true);
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping1, true);
+        tableMappings1.Add(principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_AlternateIdColumn, principalBase0.FindProperty("AlternateId")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_Enum1Column, principalBase0.FindProperty("Enum1")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_Enum2Column, principalBase0.FindProperty("Enum2")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_FlagsEnum1Column, principalBase0.FindProperty("FlagsEnum1")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_FlagsEnum2Column, principalBase0.FindProperty("FlagsEnum2")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_IdColumn, principalBase0.FindProperty("Id")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_RefTypeArrayColumn, principalBase0.FindProperty("RefTypeArray")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_RefTypeEnumerableColumn, principalBase0.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_RefTypeIListColumn, principalBase0.FindProperty("RefTypeIList")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_RefTypeListColumn, principalBase0.FindProperty("RefTypeList")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeArrayColumn, principalBase0.FindProperty("ValueTypeArray")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeEnumerableColumn, principalBase0.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeIListColumn, principalBase0.FindProperty("ValueTypeIList")!, principalBaseTableMapping1);
+        RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeListColumn, principalBase0.FindProperty("ValueTypeList")!, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeArray")!, arrayJsonArray55, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeEnumerable")!, arrayJsonArray56, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeIList")!, arrayJsonArray57, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("RefTypeList")!, arrayJsonArray58, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeArray")!, arrayJsonArray59, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeEnumerable")!, arrayJsonArray60, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeIList")!, arrayJsonArray61, principalBaseTableMapping1);
+        RelationalModel.CreateJsonElementMapping(principalBase0.FindProperty("ValueTypeList")!, arrayJsonArray62, principalBaseTableMapping1);
 
-            var defaultTableMappings1 = new List<TableMappingBase<ColumnMappingBase>>();
-            principalBase0.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings1);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1 = new TableMappingBase<ColumnMappingBase>(principalBase0, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1, false);
-            defaultTableMappings1.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_AlternateIdColumnBase, principalBase0.FindProperty("AlternateId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_Enum1ColumnBase, principalBase0.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_Enum2ColumnBase, principalBase0.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_FlagsEnum1ColumnBase, principalBase0.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_FlagsEnum2ColumnBase, principalBase0.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_IdColumnBase, principalBase0.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeArrayColumnBase, principalBase0.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeEnumerableColumnBase, principalBase0.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeIListColumnBase, principalBase0.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_RefTypeListColumnBase, principalBase0.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeArrayColumnBase, principalBase0.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeEnumerableColumnBase, principalBase0.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeIListColumnBase, principalBase0.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)owned_Principal_ValueTypeListColumnBase, principalBase0.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase1);
+        var principalDerived = FindEntityType("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalDerived<Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+DependentBase<byte?>>")!;
 
-            var tableMappings1 = new List<TableMapping>();
-            principalBase0.SetRuntimeAnnotation("Relational:TableMappings", tableMappings1);
-            var principalBaseTableMapping1 = new TableMapping(principalBase0, principalBaseTable, true);
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping1, true);
-            tableMappings1.Add(principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_AlternateIdColumn, principalBase0.FindProperty("AlternateId")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_Enum1Column, principalBase0.FindProperty("Enum1")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_Enum2Column, principalBase0.FindProperty("Enum2")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_FlagsEnum1Column, principalBase0.FindProperty("FlagsEnum1")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_FlagsEnum2Column, principalBase0.FindProperty("FlagsEnum2")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_IdColumn, principalBase0.FindProperty("Id")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_RefTypeArrayColumn, principalBase0.FindProperty("RefTypeArray")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_RefTypeEnumerableColumn, principalBase0.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_RefTypeIListColumn, principalBase0.FindProperty("RefTypeIList")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_RefTypeListColumn, principalBase0.FindProperty("RefTypeList")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeArrayColumn, principalBase0.FindProperty("ValueTypeArray")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeEnumerableColumn, principalBase0.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeIListColumn, principalBase0.FindProperty("ValueTypeIList")!, principalBaseTableMapping1);
-            RelationalModel.CreateColumnMapping(owned_Principal_ValueTypeListColumn, principalBase0.FindProperty("ValueTypeList")!, principalBaseTableMapping1);
+        var defaultTableMappings2 = new List<TableMappingBase<ColumnMappingBase>>();
+        principalDerived.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings2);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2 = new TableMappingBase<ColumnMappingBase>(principalDerived, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2, false);
+        defaultTableMappings2.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)idColumnBase, principalDerived.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)discriminatorColumnBase, principalDerived.FindProperty("Discriminator")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum1ColumnBase, principalDerived.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum2ColumnBase, principalDerived.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum1ColumnBase, principalDerived.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum2ColumnBase, principalDerived.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)principalBaseIdColumnBase, principalDerived.FindProperty("PrincipalBaseId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeArrayColumnBase, principalDerived.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeEnumerableColumnBase, principalDerived.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeIListColumnBase, principalDerived.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeListColumnBase, principalDerived.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeArrayColumnBase, principalDerived.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeEnumerableColumnBase, principalDerived.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeIListColumnBase, principalDerived.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeListColumnBase, principalDerived.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
 
-            var principalDerived = FindEntityType("Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalDerived<Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+DependentBase<byte?>>")!;
+        var tableMappings2 = new List<TableMapping>();
+        principalDerived.SetRuntimeAnnotation("Relational:TableMappings", tableMappings2);
+        var principalBaseTableMapping2 = new TableMapping(principalDerived, principalBaseTable, null)
+        {
+            IsSharedTablePrincipal = false,
+        };
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping2, false);
+        tableMappings2.Add(principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(idColumn, principalDerived.FindProperty("Id")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(discriminatorColumn, principalDerived.FindProperty("Discriminator")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(enum1Column, principalDerived.FindProperty("Enum1")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(enum2Column, principalDerived.FindProperty("Enum2")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(flagsEnum1Column, principalDerived.FindProperty("FlagsEnum1")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(flagsEnum2Column, principalDerived.FindProperty("FlagsEnum2")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(principalBaseIdColumn, principalDerived.FindProperty("PrincipalBaseId")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(refTypeArrayColumn, principalDerived.FindProperty("RefTypeArray")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(refTypeEnumerableColumn, principalDerived.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(refTypeIListColumn, principalDerived.FindProperty("RefTypeIList")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(refTypeListColumn, principalDerived.FindProperty("RefTypeList")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(valueTypeArrayColumn, principalDerived.FindProperty("ValueTypeArray")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(valueTypeEnumerableColumn, principalDerived.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(valueTypeIListColumn, principalDerived.FindProperty("ValueTypeIList")!, principalBaseTableMapping2);
+        RelationalModel.CreateColumnMapping(valueTypeListColumn, principalDerived.FindProperty("ValueTypeList")!, principalBaseTableMapping2);
 
-            var defaultTableMappings2 = new List<TableMappingBase<ColumnMappingBase>>();
-            principalDerived.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings2);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2 = new TableMappingBase<ColumnMappingBase>(principalDerived, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2, false);
-            defaultTableMappings2.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)idColumnBase, principalDerived.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)discriminatorColumnBase, principalDerived.FindProperty("Discriminator")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum1ColumnBase, principalDerived.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)enum2ColumnBase, principalDerived.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum1ColumnBase, principalDerived.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)flagsEnum2ColumnBase, principalDerived.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)principalBaseIdColumnBase, principalDerived.FindProperty("PrincipalBaseId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeArrayColumnBase, principalDerived.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeEnumerableColumnBase, principalDerived.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeIListColumnBase, principalDerived.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)refTypeListColumnBase, principalDerived.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeArrayColumnBase, principalDerived.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeEnumerableColumnBase, principalDerived.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeIListColumnBase, principalDerived.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)valueTypeListColumnBase, principalDerived.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase2);
+        var dependentBasebyte = principalDerived.FindComplexProperty("Dependent")!.ComplexType;
 
-            var tableMappings2 = new List<TableMapping>();
-            principalDerived.SetRuntimeAnnotation("Relational:TableMappings", tableMappings2);
-            var principalBaseTableMapping2 = new TableMapping(principalDerived, principalBaseTable, null)
-            {
-                IsSharedTablePrincipal = false,
-            };
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping2, false);
-            tableMappings2.Add(principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(idColumn, principalDerived.FindProperty("Id")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(discriminatorColumn, principalDerived.FindProperty("Discriminator")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(enum1Column, principalDerived.FindProperty("Enum1")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(enum2Column, principalDerived.FindProperty("Enum2")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(flagsEnum1Column, principalDerived.FindProperty("FlagsEnum1")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(flagsEnum2Column, principalDerived.FindProperty("FlagsEnum2")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(principalBaseIdColumn, principalDerived.FindProperty("PrincipalBaseId")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(refTypeArrayColumn, principalDerived.FindProperty("RefTypeArray")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(refTypeEnumerableColumn, principalDerived.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(refTypeIListColumn, principalDerived.FindProperty("RefTypeIList")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(refTypeListColumn, principalDerived.FindProperty("RefTypeList")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(valueTypeArrayColumn, principalDerived.FindProperty("ValueTypeArray")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(valueTypeEnumerableColumn, principalDerived.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(valueTypeIListColumn, principalDerived.FindProperty("ValueTypeIList")!, principalBaseTableMapping2);
-            RelationalModel.CreateColumnMapping(valueTypeListColumn, principalDerived.FindProperty("ValueTypeList")!, principalBaseTableMapping2);
-            var pK_PrincipalBase = new UniqueConstraint("PK_PrincipalBase", principalBaseTable, new[] { idColumn });
-            principalBaseTable.PrimaryKey = pK_PrincipalBase;
-            pK_PrincipalBase.SetRowKeyValueFactory(new SimpleRowKeyValueFactory<long>(pK_PrincipalBase));
-            var pK_PrincipalBaseKey = RelationalModel.GetKey(this,
-                "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
-                new[] { "Id" });
-            pK_PrincipalBase.MappedKeys.Add(pK_PrincipalBaseKey);
-            RelationalModel.GetOrCreateUniqueConstraints(pK_PrincipalBaseKey).Add(pK_PrincipalBase);
-            principalBaseTable.UniqueConstraints.Add("PK_PrincipalBase", pK_PrincipalBase);
-            var iX_PrincipalBase_PrincipalBaseId = new TableIndex(
-            "IX_PrincipalBase_PrincipalBaseId", principalBaseTable, new[] { principalBaseIdColumn }, false);
-            iX_PrincipalBase_PrincipalBaseId.SetRowIndexValueFactory(new SimpleRowIndexValueFactory<long>(iX_PrincipalBase_PrincipalBaseId));
-            var iX_PrincipalBase_PrincipalBaseIdIx = RelationalModel.GetIndex(this,
-                "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
-                new[] { "PrincipalBaseId" });
-            iX_PrincipalBase_PrincipalBaseId.MappedIndexes.Add(iX_PrincipalBase_PrincipalBaseIdIx);
-            RelationalModel.GetOrCreateTableIndexes(iX_PrincipalBase_PrincipalBaseIdIx).Add(iX_PrincipalBase_PrincipalBaseId);
-            principalBaseTable.Indexes.Add("IX_PrincipalBase_PrincipalBaseId", iX_PrincipalBase_PrincipalBaseId);
+        var defaultTableMappings3 = new List<TableMappingBase<ColumnMappingBase>>();
+        dependentBasebyte.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings3);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3 = new TableMappingBase<ColumnMappingBase>(dependentBasebyte, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3, false);
+        defaultTableMappings3.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)dependent_IdColumnBase, dependentBasebyte.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
 
-            var ownedCollection = principalDerived.FindComplexProperty("ManyOwned")!.ComplexType;
+        var tableMappings3 = new List<TableMapping>();
+        dependentBasebyte.SetRuntimeAnnotation("Relational:TableMappings", tableMappings3);
+        var principalBaseTableMapping3 = new TableMapping(dependentBasebyte, principalBaseTable, true);
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping3, true);
+        tableMappings3.Add(principalBaseTableMapping3);
+        RelationalModel.CreateColumnMapping(dependent_IdColumn, dependentBasebyte.FindProperty("Id")!, principalBaseTableMapping3);
 
-            var defaultTableMappings3 = new List<TableMappingBase<ColumnMappingBase>>();
-            ownedCollection.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings3);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3 = new TableMappingBase<ColumnMappingBase>(ownedCollection, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3, false);
-            defaultTableMappings3.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_DetailsColumnBase, ownedCollection.FindProperty("Details")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_NumberColumnBase, ownedCollection.FindProperty("Number")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeArrayColumnBase, ownedCollection.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeEnumerableColumnBase, ownedCollection.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeIListColumnBase, ownedCollection.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeListColumnBase, ownedCollection.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeArrayColumnBase, ownedCollection.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeEnumerableColumnBase, ownedCollection.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeIListColumnBase, ownedCollection.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeListColumnBase, ownedCollection.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase3);
+        var ownedCollection = principalDerived.FindComplexProperty("ManyOwned")!.ComplexType;
 
-            var tableMappings3 = new List<TableMapping>();
-            ownedCollection.SetRuntimeAnnotation("Relational:TableMappings", tableMappings3);
-            var principalBaseTableMapping3 = new TableMapping(ownedCollection, principalBaseTable, true);
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping3, false);
-            tableMappings3.Add(principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_DetailsColumn, ownedCollection.FindProperty("Details")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_NumberColumn, ownedCollection.FindProperty("Number")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_RefTypeArrayColumn, ownedCollection.FindProperty("RefTypeArray")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_RefTypeEnumerableColumn, ownedCollection.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_RefTypeIListColumn, ownedCollection.FindProperty("RefTypeIList")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_RefTypeListColumn, ownedCollection.FindProperty("RefTypeList")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_ValueTypeArrayColumn, ownedCollection.FindProperty("ValueTypeArray")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_ValueTypeEnumerableColumn, ownedCollection.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_ValueTypeIListColumn, ownedCollection.FindProperty("ValueTypeIList")!, principalBaseTableMapping3);
-            RelationalModel.CreateColumnMapping(manyOwned_ValueTypeListColumn, ownedCollection.FindProperty("ValueTypeList")!, principalBaseTableMapping3);
+        var defaultTableMappings4 = new List<TableMappingBase<ColumnMappingBase>>();
+        ownedCollection.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings4);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4 = new TableMappingBase<ColumnMappingBase>(ownedCollection, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4, false);
+        defaultTableMappings4.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_DetailsColumnBase, ownedCollection.FindProperty("Details")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_NumberColumnBase, ownedCollection.FindProperty("Number")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeArrayColumnBase, ownedCollection.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeEnumerableColumnBase, ownedCollection.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeIListColumnBase, ownedCollection.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_RefTypeListColumnBase, ownedCollection.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeArrayColumnBase, ownedCollection.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeEnumerableColumnBase, ownedCollection.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeIListColumnBase, ownedCollection.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_ValueTypeListColumnBase, ownedCollection.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeArray")!, arrayJsonArray7, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeEnumerable")!, arrayJsonArray8, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeIList")!, arrayJsonArray9, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeList")!, arrayJsonArray10, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeArray")!, arrayJsonArray11, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeEnumerable")!, arrayJsonArray12, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeIList")!, arrayJsonArray13, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeList")!, arrayJsonArray14, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
 
-            var principalBase1 = ownedCollection.FindComplexProperty("Principal")!.ComplexType;
+        var tableMappings4 = new List<TableMapping>();
+        ownedCollection.SetRuntimeAnnotation("Relational:TableMappings", tableMappings4);
+        var principalBaseTableMapping4 = new TableMapping(ownedCollection, principalBaseTable, true);
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping4, false);
+        tableMappings4.Add(principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_DetailsColumn, ownedCollection.FindProperty("Details")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_NumberColumn, ownedCollection.FindProperty("Number")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_RefTypeArrayColumn, ownedCollection.FindProperty("RefTypeArray")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_RefTypeEnumerableColumn, ownedCollection.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_RefTypeIListColumn, ownedCollection.FindProperty("RefTypeIList")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_RefTypeListColumn, ownedCollection.FindProperty("RefTypeList")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_ValueTypeArrayColumn, ownedCollection.FindProperty("ValueTypeArray")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_ValueTypeEnumerableColumn, ownedCollection.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_ValueTypeIListColumn, ownedCollection.FindProperty("ValueTypeIList")!, principalBaseTableMapping4);
+        RelationalModel.CreateColumnMapping(manyOwned_ValueTypeListColumn, ownedCollection.FindProperty("ValueTypeList")!, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeArray")!, arrayJsonArray47, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeEnumerable")!, arrayJsonArray48, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeIList")!, arrayJsonArray49, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("RefTypeList")!, arrayJsonArray50, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeArray")!, arrayJsonArray51, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeEnumerable")!, arrayJsonArray52, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeIList")!, arrayJsonArray53, principalBaseTableMapping4);
+        RelationalModel.CreateJsonElementMapping(ownedCollection.FindProperty("ValueTypeList")!, arrayJsonArray54, principalBaseTableMapping4);
 
-            var defaultTableMappings4 = new List<TableMappingBase<ColumnMappingBase>>();
-            principalBase1.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings4);
-            var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4 = new TableMappingBase<ColumnMappingBase>(principalBase1, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
-            microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4, false);
-            defaultTableMappings4.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_AlternateIdColumnBase, principalBase1.FindProperty("AlternateId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_Enum1ColumnBase, principalBase1.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_Enum2ColumnBase, principalBase1.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_FlagsEnum1ColumnBase, principalBase1.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_FlagsEnum2ColumnBase, principalBase1.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_IdColumnBase, principalBase1.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeArrayColumnBase, principalBase1.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeEnumerableColumnBase, principalBase1.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeIListColumnBase, principalBase1.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeListColumnBase, principalBase1.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeArrayColumnBase, principalBase1.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeEnumerableColumnBase, principalBase1.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeIListColumnBase, principalBase1.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
-            RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeListColumnBase, principalBase1.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase4);
+        var principalBase1 = ownedCollection.FindComplexProperty("Principal")!.ComplexType;
 
-            var tableMappings4 = new List<TableMapping>();
-            principalBase1.SetRuntimeAnnotation("Relational:TableMappings", tableMappings4);
-            var principalBaseTableMapping4 = new TableMapping(principalBase1, principalBaseTable, true);
-            principalBaseTable.AddTypeMapping(principalBaseTableMapping4, true);
-            tableMappings4.Add(principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_AlternateIdColumn, principalBase1.FindProperty("AlternateId")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_Enum1Column, principalBase1.FindProperty("Enum1")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_Enum2Column, principalBase1.FindProperty("Enum2")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_FlagsEnum1Column, principalBase1.FindProperty("FlagsEnum1")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_FlagsEnum2Column, principalBase1.FindProperty("FlagsEnum2")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_IdColumn, principalBase1.FindProperty("Id")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeArrayColumn, principalBase1.FindProperty("RefTypeArray")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeEnumerableColumn, principalBase1.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeIListColumn, principalBase1.FindProperty("RefTypeIList")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeListColumn, principalBase1.FindProperty("RefTypeList")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeArrayColumn, principalBase1.FindProperty("ValueTypeArray")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeEnumerableColumn, principalBase1.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeIListColumn, principalBase1.FindProperty("ValueTypeIList")!, principalBaseTableMapping4);
-            RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeListColumn, principalBase1.FindProperty("ValueTypeList")!, principalBaseTableMapping4);
-            var fK_PrincipalBase_PrincipalBase_PrincipalBaseId = new ForeignKeyConstraint(
-                "FK_PrincipalBase_PrincipalBase_PrincipalBaseId", principalBaseTable, principalBaseTable,
-                new[] { principalBaseIdColumn },
-                principalBaseTable.FindUniqueConstraint("PK_PrincipalBase")!, ReferentialAction.NoAction);
-            fK_PrincipalBase_PrincipalBase_PrincipalBaseId.SetRowForeignKeyValueFactory(RowForeignKeyValueFactoryFactory.CreateSimpleNonNullableFactory<long, long>(fK_PrincipalBase_PrincipalBase_PrincipalBaseId));
-            var fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk = RelationalModel.GetForeignKey(this,
-                "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
-                new[] { "PrincipalBaseId" },
-                "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
-                new[] { "Id" });
-            fK_PrincipalBase_PrincipalBase_PrincipalBaseId.MappedForeignKeys.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk);
-            RelationalModel.GetOrCreateForeignKeyConstraints(fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk).Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
-            principalBaseTable.ForeignKeyConstraints.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
-            principalBaseTable.ReferencingForeignKeyConstraints.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
-            return relationalModel.MakeReadOnly();
-        }
+        var defaultTableMappings5 = new List<TableMappingBase<ColumnMappingBase>>();
+        principalBase1.SetRuntimeAnnotation("Relational:DefaultMappings", defaultTableMappings5);
+        var microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5 = new TableMappingBase<ColumnMappingBase>(principalBase1, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase, null);
+        microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseTableBase.AddTypeMapping(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5, false);
+        defaultTableMappings5.Add(microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_AlternateIdColumnBase, principalBase1.FindProperty("AlternateId")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_Enum1ColumnBase, principalBase1.FindProperty("Enum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_Enum2ColumnBase, principalBase1.FindProperty("Enum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_FlagsEnum1ColumnBase, principalBase1.FindProperty("FlagsEnum1")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_FlagsEnum2ColumnBase, principalBase1.FindProperty("FlagsEnum2")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_IdColumnBase, principalBase1.FindProperty("Id")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeArrayColumnBase, principalBase1.FindProperty("RefTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeEnumerableColumnBase, principalBase1.FindProperty("RefTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeIListColumnBase, principalBase1.FindProperty("RefTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_RefTypeListColumnBase, principalBase1.FindProperty("RefTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeArrayColumnBase, principalBase1.FindProperty("ValueTypeArray")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeEnumerableColumnBase, principalBase1.FindProperty("ValueTypeEnumerable")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeIListColumnBase, principalBase1.FindProperty("ValueTypeIList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateColumnMapping((ColumnBase<ColumnMappingBase>)manyOwned_Principal_ValueTypeListColumnBase, principalBase1.FindProperty("ValueTypeList")!, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeArray")!, arrayJsonArray, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeEnumerable")!, arrayJsonArray0, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeIList")!, arrayJsonArray1, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeList")!, arrayJsonArray2, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeArray")!, arrayJsonArray3, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeEnumerable")!, arrayJsonArray4, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeIList")!, arrayJsonArray5, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeList")!, arrayJsonArray6, microsoftEntityFrameworkCoreScaffoldingCompiledModelTestBasePrincipalBaseMappingBase5);
+
+        var tableMappings5 = new List<TableMapping>();
+        principalBase1.SetRuntimeAnnotation("Relational:TableMappings", tableMappings5);
+        var principalBaseTableMapping5 = new TableMapping(principalBase1, principalBaseTable, true);
+        principalBaseTable.AddTypeMapping(principalBaseTableMapping5, true);
+        tableMappings5.Add(principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_AlternateIdColumn, principalBase1.FindProperty("AlternateId")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_Enum1Column, principalBase1.FindProperty("Enum1")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_Enum2Column, principalBase1.FindProperty("Enum2")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_FlagsEnum1Column, principalBase1.FindProperty("FlagsEnum1")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_FlagsEnum2Column, principalBase1.FindProperty("FlagsEnum2")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_IdColumn, principalBase1.FindProperty("Id")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeArrayColumn, principalBase1.FindProperty("RefTypeArray")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeEnumerableColumn, principalBase1.FindProperty("RefTypeEnumerable")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeIListColumn, principalBase1.FindProperty("RefTypeIList")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_RefTypeListColumn, principalBase1.FindProperty("RefTypeList")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeArrayColumn, principalBase1.FindProperty("ValueTypeArray")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeEnumerableColumn, principalBase1.FindProperty("ValueTypeEnumerable")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeIListColumn, principalBase1.FindProperty("ValueTypeIList")!, principalBaseTableMapping5);
+        RelationalModel.CreateColumnMapping(manyOwned_Principal_ValueTypeListColumn, principalBase1.FindProperty("ValueTypeList")!, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeArray")!, arrayJsonArray39, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeEnumerable")!, arrayJsonArray40, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeIList")!, arrayJsonArray41, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("RefTypeList")!, arrayJsonArray42, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeArray")!, arrayJsonArray43, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeEnumerable")!, arrayJsonArray44, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeIList")!, arrayJsonArray45, principalBaseTableMapping5);
+        RelationalModel.CreateJsonElementMapping(principalBase1.FindProperty("ValueTypeList")!, arrayJsonArray46, principalBaseTableMapping5);
+        var pK_PrincipalBase = new UniqueConstraint("PK_PrincipalBase", principalBaseTable, new[] { idColumn });
+        principalBaseTable.PrimaryKey = pK_PrincipalBase;
+        pK_PrincipalBase.SetRowKeyValueFactory(new SimpleRowKeyValueFactory<long>(pK_PrincipalBase));
+        var pK_PrincipalBaseKey = RelationalModel.GetKey(this,
+            "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+            new[] { "Id" });
+        pK_PrincipalBase.MappedKeys.Add(pK_PrincipalBaseKey);
+        RelationalModel.GetOrCreateUniqueConstraints(pK_PrincipalBaseKey).Add(pK_PrincipalBase);
+        principalBaseTable.UniqueConstraints.Add("PK_PrincipalBase", pK_PrincipalBase);
+        var iX_PrincipalBase_Id_Owned_Number = new TableIndex(
+        "IX_PrincipalBase_Id_Owned_Number", principalBaseTable, new[] { idColumn, owned_NumberColumn }, false);
+        iX_PrincipalBase_Id_Owned_Number.SetRowIndexValueFactory(new CompositeRowIndexValueFactory(iX_PrincipalBase_Id_Owned_Number));
+        var iX_PrincipalBase_Id_Owned_NumberIx = RelationalModel.GetIndex(this,
+            "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+            "IX_PrincipalBase_Id_Owned_Number");
+        iX_PrincipalBase_Id_Owned_Number.MappedIndexes.Add(iX_PrincipalBase_Id_Owned_NumberIx);
+        RelationalModel.GetOrCreateTableIndexes(iX_PrincipalBase_Id_Owned_NumberIx).Add(iX_PrincipalBase_Id_Owned_Number);
+        principalBaseTable.Indexes.Add("IX_PrincipalBase_Id_Owned_Number", iX_PrincipalBase_Id_Owned_Number);
+        var iX_PrincipalBase_PrincipalBaseId = new TableIndex(
+        "IX_PrincipalBase_PrincipalBaseId", principalBaseTable, new[] { principalBaseIdColumn }, false);
+        iX_PrincipalBase_PrincipalBaseId.SetRowIndexValueFactory(new SimpleRowIndexValueFactory<long>(iX_PrincipalBase_PrincipalBaseId));
+        var iX_PrincipalBase_PrincipalBaseIdIx = RelationalModel.GetIndex(this,
+            "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+            new[] { "PrincipalBaseId" });
+        iX_PrincipalBase_PrincipalBaseId.MappedIndexes.Add(iX_PrincipalBase_PrincipalBaseIdIx);
+        RelationalModel.GetOrCreateTableIndexes(iX_PrincipalBase_PrincipalBaseIdIx).Add(iX_PrincipalBase_PrincipalBaseId);
+        principalBaseTable.Indexes.Add("IX_PrincipalBase_PrincipalBaseId", iX_PrincipalBase_PrincipalBaseId);
+        var fK_PrincipalBase_PrincipalBase_PrincipalBaseId = new ForeignKeyConstraint(
+            "FK_PrincipalBase_PrincipalBase_PrincipalBaseId", principalBaseTable, principalBaseTable,
+            new[] { principalBaseIdColumn },
+            principalBaseTable.FindUniqueConstraint("PK_PrincipalBase")!, ReferentialAction.NoAction);
+        fK_PrincipalBase_PrincipalBase_PrincipalBaseId.SetRowForeignKeyValueFactory(RowForeignKeyValueFactoryFactory.CreateSimpleNonNullableFactory<long, long>(fK_PrincipalBase_PrincipalBase_PrincipalBaseId));
+        var fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk = RelationalModel.GetForeignKey(this,
+            "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+            new[] { "PrincipalBaseId" },
+            "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+            new[] { "Id" });
+        fK_PrincipalBase_PrincipalBase_PrincipalBaseId.MappedForeignKeys.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk);
+        RelationalModel.GetOrCreateForeignKeyConstraints(fK_PrincipalBase_PrincipalBase_PrincipalBaseIdFk).Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
+        principalBaseTable.ForeignKeyConstraints.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
+        principalBaseTable.ReferencingForeignKeyConstraints.Add(fK_PrincipalBase_PrincipalBase_PrincipalBaseId);
+        return relationalModel.MakeReadOnly();
     }
 }

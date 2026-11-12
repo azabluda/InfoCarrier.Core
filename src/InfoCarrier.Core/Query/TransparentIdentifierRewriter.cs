@@ -403,7 +403,14 @@ internal static class TransparentIdentifierRewriter
                     or ExpressionType.TypeAs
                 && node.Type != node.Operand.Type)
             {
-                Disqualify(node.Operand.Type);
+                if (Nullable.GetUnderlyingType(node.Type) == node.Operand.Type)
+                {
+                    _referenceTyped.Add(node.Operand.Type);
+                }
+                else
+                {
+                    Disqualify(node.Operand.Type);
+                }
             }
 
             return base.VisitUnary(node);
@@ -445,6 +452,22 @@ internal static class TransparentIdentifierRewriter
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            if (node.Method.DeclaringType is { } joinOwner
+                && (joinOwner == typeof(Queryable) || joinOwner == typeof(Enumerable))
+                && node.Method.Name is nameof(Queryable.LeftJoin) or nameof(Queryable.RightJoin) or nameof(Queryable.FullJoin)
+                && node.Arguments.Count >= 2)
+            {
+                if (node.Method.Name != nameof(Queryable.LeftJoin))
+                {
+                    _referenceTyped.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[0].Type));
+                }
+
+                if (node.Method.Name != nameof(Queryable.RightJoin))
+                {
+                    _referenceTyped.Add(ServerBoundaryAnalyzer.SequenceElementType(node.Arguments[1].Type));
+                }
+            }
+
             // An operator whose whole job is to answer "there was no row" needs a carrier that
             // can say so. `FirstOrDefault` over a `ValueTuple<string, int>` yields `(null, 0)` —
             // a row that looks real — where the anonymous type it replaced yielded `null`.
@@ -725,6 +748,11 @@ internal static class TransparentIdentifierRewriter
 
         private Type Compute(Type type)
         {
+            if (Nullable.GetUnderlyingType(type) is { } underlying && carriers.ContainsKey(underlying))
+            {
+                return Map(underlying);
+            }
+
             if (carriers.TryGetValue(type, out MemberInfo[]? members))
             {
                 // A carrier compared to null -- or handed to a `where TEntity : class` method --
@@ -807,6 +835,14 @@ internal static class TransparentIdentifierRewriter
         /// </remarks>
         private Expression Rebuild(Expression tuple, Type carrier)
         {
+            if (Nullable.GetUnderlyingType(carrier) is { } underlying && carriers.ContainsKey(underlying))
+            {
+                return Expression.Condition(
+                    Expression.Equal(tuple, Expression.Constant(null, tuple.Type)),
+                    Expression.Default(carrier),
+                    Expression.Convert(Rebuild(tuple, underlying), carrier));
+            }
+
             MemberInfo[] members = carriers[carrier];
 
             var arguments = new Expression[members.Length];
@@ -831,7 +867,7 @@ internal static class TransparentIdentifierRewriter
                 ? rebuilt
                 : Expression.Condition(
                     Expression.Equal(tuple, Expression.Constant(null, tuple.Type)),
-                    Expression.Constant(null, carrier),
+                    Expression.Default(carrier),
                     rebuilt);
         }
 
@@ -851,6 +887,11 @@ internal static class TransparentIdentifierRewriter
         /// </remarks>
         private Expression RebuildEach(Expression slot, Type memberType)
         {
+            if (Nullable.GetUnderlyingType(memberType) is { } underlying && carriers.ContainsKey(underlying))
+            {
+                return Rebuild(slot, memberType);
+            }
+
             Type element = ServerBoundaryAnalyzer.SequenceElementType(memberType);
             if (element == memberType || !carriers.ContainsKey(element))
             {
@@ -898,9 +939,9 @@ internal static class TransparentIdentifierRewriter
         ///     because a <c>NewExpression.Members</c> is only ever populated for the former.
         /// </remarks>
         private static Expression Construct(Type carrier, MemberInfo[] members, Expression[] arguments)
-            => carrier.GetConstructor(Type.EmptyTypes) is { } parameterless
+            => carrier.GetConstructor(Type.EmptyTypes) is not null || (carrier.IsValueType && carrier.GetConstructors().Length == 0)
                 ? Expression.MemberInit(
-                    Expression.New(parameterless),
+                    Expression.New(carrier),
                     [.. members.Select((m, i) => (MemberBinding)Expression.Bind(m, arguments[i]))])
                 : Expression.New(carrier.GetConstructors()[0], arguments, members);
 
@@ -995,6 +1036,22 @@ internal static class TransparentIdentifierRewriter
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            if (node.Expression is { } nullable
+                && Nullable.GetUnderlyingType(nullable.Type) is { } underlying
+                && carriers.ContainsKey(underlying))
+            {
+                Expression mapped = Visit(nullable);
+                if (node.Member.Name == nameof(Nullable<int>.HasValue))
+                {
+                    return Expression.NotEqual(mapped, Expression.Constant(null, mapped.Type));
+                }
+
+                if (node.Member.Name == nameof(Nullable<int>.Value))
+                {
+                    return mapped;
+                }
+            }
+
             if (node.Expression is { } inner
                 && carriers.TryGetValue(inner.Type, out MemberInfo[]? members)
                 && Array.FindIndex(members, m => m.Name == node.Member.Name) is >= 0 and int index)
@@ -1067,6 +1124,18 @@ internal static class TransparentIdentifierRewriter
         {
             Expression operand = Visit(node.Operand);
             Type type = Map(node.Type);
+
+            if (Nullable.GetUnderlyingType(node.Type) == node.Operand.Type
+                && carriers.TryGetValue(node.Operand.Type, out MemberInfo[]? liftedMembers))
+            {
+                Expression[] defaults = [.. liftedMembers
+                    .Where(member => !IsEmptyCarrier(MemberType(member)))
+                    .Select(member => Expression.Default(Map(MemberType(member))))];
+                return Expression.Condition(
+                    Expression.Equal(operand, Expression.Constant(null, operand.Type)),
+                    TupleCarrier.New(defaults.Length == 0 ? [Expression.Constant(0)] : defaults, true),
+                    operand);
+            }
 
             if (ReferenceEquals(operand, node.Operand) && type == node.Type)
             {

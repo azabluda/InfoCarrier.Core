@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.Expressions;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 

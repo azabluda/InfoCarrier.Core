@@ -2,9 +2,9 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -46,9 +46,32 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class TPTManyToManyQueryInfoCarrierTest(TPTManyToManyQueryInfoCarrierFixture fixture)
     : TPTManyToManyQueryRelationalTestBase<TPTManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPTManyToManyQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => AssertApplyNotSupported(() => base
@@ -56,7 +79,7 @@ public class TPTManyToManyQueryInfoCarrierTest(TPTManyToManyQueryInfoCarrierFixt
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyQuerySqliteTest.cs", 19, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPTManyToManyQuerySqliteTest.cs", 17, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
@@ -73,9 +96,32 @@ public class TPTManyToManyQueryInfoCarrierTest(TPTManyToManyQueryInfoCarrierFixt
 public class TPTManyToManyNoTrackingQueryInfoCarrierTest(TPTManyToManyQueryInfoCarrierFixture fixture)
     : TPTManyToManyNoTrackingQueryRelationalTestBase<TPTManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyNoTrackingQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPTManyToManyNoTrackingQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -83,7 +129,7 @@ public class TPTManyToManyNoTrackingQueryInfoCarrierTest(TPTManyToManyQueryInfoC
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPTManyToManyNoTrackingQuerySqliteTest.cs", 19, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPTManyToManyNoTrackingQuerySqliteTest.cs", 17, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
@@ -95,9 +141,32 @@ public class TPTManyToManyNoTrackingQueryInfoCarrierTest(TPTManyToManyQueryInfoC
 public class TPCManyToManyQueryInfoCarrierTest(TPCManyToManyQueryInfoCarrierFixture fixture)
     : TPCManyToManyQueryRelationalTestBase<TPCManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPCManyToManyQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -105,7 +174,7 @@ public class TPCManyToManyQueryInfoCarrierTest(TPCManyToManyQueryInfoCarrierFixt
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyQuerySqliteTest.cs", 19, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPCManyToManyQuerySqliteTest.cs", 17, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
@@ -117,9 +186,32 @@ public class TPCManyToManyQueryInfoCarrierTest(TPCManyToManyQueryInfoCarrierFixt
 public class TPCManyToManyNoTrackingQueryInfoCarrierTest(TPCManyToManyQueryInfoCarrierFixture fixture)
     : TPCManyToManyNoTrackingQueryRelationalTestBase<TPCManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyNoTrackingQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPCManyToManyNoTrackingQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -127,7 +219,7 @@ public class TPCManyToManyNoTrackingQueryInfoCarrierTest(TPCManyToManyQueryInfoC
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/TPCManyToManyNoTrackingQuerySqliteTest.cs", 19, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Inheritance/TPCManyToManyNoTrackingQuerySqliteTest.cs", 17, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
@@ -148,9 +240,32 @@ public class TPCManyToManyNoTrackingQueryInfoCarrierTest(TPCManyToManyQueryInfoC
 public class ManyToManyQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fixture)
     : ManyToManyQueryRelationalTestBase<ManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -158,7 +273,7 @@ public class ManyToManyQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fi
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 19, 25,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyQuerySqliteTest.cs", 17, 23,
         Justification = Upstream.GaveNoReason)]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)
@@ -170,9 +285,32 @@ public class ManyToManyQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fi
 public class ManyToManyNoTrackingQueryInfoCarrierTest(ManyToManyQueryInfoCarrierFixture fixture)
     : ManyToManyNoTrackingQueryRelationalTestBase<ManyToManyQueryInfoCarrierFixture>(fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 15, 19,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 11, 17,
         Justification = "Sqlite does not support Apply operations")]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base
@@ -180,7 +318,7 @@ public class ManyToManyNoTrackingQueryInfoCarrierTest(ManyToManyQueryInfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 21, 27,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ManyToManyNoTrackingQuerySqliteTest.cs", 19, 25,
         Justification = "Sqlite does not support Apply operations")]
     public override Task Filtered_include_skip_navigation_order_by_skip_take_then_include_skip_navigation_where_EF_Property(
         bool async)

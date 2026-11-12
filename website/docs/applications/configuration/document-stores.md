@@ -34,13 +34,15 @@ Entity Framework Core's InMemory provider is not a document database merely beca
 
 ## Provider limits
 
-Owned-document behavior is tested against MongoDB alongside tests using that provider directly.
+Earlier releases tested owned-document behavior against MongoDB and that provider directly.
+The MongoDB comparison tier is temporarily disabled during the EF Core 11 migration.
+Use a document provider compatible with EF Core 11 and validate it against your application.
 A setting cannot add a query or transaction feature that the underlying provider lacks.
 Verify the provider version, model, and write behavior used by your application.
 
 Do not assume that several document writes are one atomic save on every provider.
 In particular, the [write-recovery procedure](../../operations/write-recovery.md) explains why its
-marker pattern cannot establish the outcome of a multi-document Cosmos DB save.
+marker pattern requires all changes to share one transaction, including with Cosmos DB batches.
 
 See [query rules](../querying.md#rules-that-come-from-the-servers-store) and
 [shared settings](shared.md).

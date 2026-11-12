@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query.Translations;
@@ -47,7 +47,7 @@ public class ByteArrayTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixt
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 16428,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 32, 33,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 31, 33,
         Justification = "Array access. Issue #16428.")]
     public override Task First()
         => AssertTranslationFailed(() => base.First());
@@ -55,7 +55,7 @@ public class ByteArrayTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixt
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 16428,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 28, 29,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/ByteArrayTranslationsSqliteTest.cs", 27, 29,
         Justification = "Array access. Issue #16428.")]
     public override Task Index()
         => AssertTranslationFailed(() => base.Index());
@@ -86,6 +86,18 @@ public class GuidTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
 public class MathTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : MathTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 430, 431,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Sign_int()
+        => AssertTranslationFailed(base.Sign_int);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MathTranslationsSqliteTest.cs", 427, 428,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Sign_decimal()
+        => AssertTranslationFailed(base.Sign_decimal);
+
     // --- SQLite cannot translate these, and EF's own MathTranslationsSqliteTest says so
     // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
     // actually failed rather than copied wholesale: EF overrides every test in this
@@ -140,6 +152,42 @@ public class MathTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture f
 public class MiscellaneousTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : MiscellaneousTranslationsRelationalTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 99, 104,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Byte_Parse()
+        => AssertTranslationFailed(base.Byte_Parse);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 112, 113,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Short_Parse()
+        => AssertTranslationFailed(base.Short_Parse);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 115, 116,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Int_Parse()
+        => AssertTranslationFailed(base.Int_Parse);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 118, 119,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Long_Parse()
+        => AssertTranslationFailed(base.Long_Parse);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 109, 110,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Double_Parse()
+        => AssertTranslationFailed(base.Double_Parse);
+
+    /// <inheritdoc />
+    [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 106, 107,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Decimal_Parse()
+        => AssertTranslationFailed(base.Decimal_Parse);
+
     // --- SQLite cannot translate these, and EF's own MiscellaneousTranslationsSqliteTest says so
     // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
     // actually failed rather than copied wholesale: EF overrides every test in this
@@ -147,7 +195,7 @@ public class MiscellaneousTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrier
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 75, 76,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/MiscellaneousTranslationsSqliteTest.cs", 71, 76,
         Justification = Upstream.GaveNoReason)]
     public override Task Convert_ToBoolean()
         => AssertTranslationFailed(() => base.Convert_ToBoolean());
@@ -221,7 +269,7 @@ public class StringTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/StringTranslationsSqliteTest.cs", 1411, 1412,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/StringTranslationsSqliteTest.cs", 1435, 1436,
         Justification = Upstream.GaveNoReason)]
     public override Task Join_non_aggregate()
         => AssertTranslationFailed(() => base.Join_non_aggregate());
@@ -242,14 +290,14 @@ public class BitwiseOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCarri
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 175, 176,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 173, 174,
         Justification = Upstream.GaveNoReason)]
     public override Task Left_shift()
         => AssertTranslationFailed(() => base.Left_shift());
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 178, 179,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 176, 177,
         Justification = Upstream.GaveNoReason)]
     public override Task Right_shift()
         => AssertTranslationFailed(() => base.Right_shift());
@@ -257,7 +305,7 @@ public class BitwiseOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCarri
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 16645,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 95, 97,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 95, 96,
         Justification = "Issue #16645 bitwise xor support",
         Deviation = DeviationKind.UpstreamAssertsNothing)]
     public override Task Xor()
@@ -266,7 +314,7 @@ public class BitwiseOperatorTranslationsInfoCarrierTest(BasicTypesQueryInfoCarri
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 16645,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 99, 101,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Operators/BitwiseOperatorTranslationsSqliteTest.cs", 98, 99,
         Justification = "Issue #16645 bitwise xor support",
         Deviation = DeviationKind.UpstreamAssertsNothing)]
     public override Task Xor_over_boolean()
@@ -356,6 +404,36 @@ public class DateTimeTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
 public class DateTimeOffsetTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixture fixture)
     : DateTimeOffsetTranslationsTestBase<BasicTypesQueryInfoCarrierFixture>(fixture)
 {
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 124, 129,
+        Justification = Upstream.GaveNoReason)]
+    public override Task UtcDateTime() => AssertTranslationFailed(() => base.UtcDateTime());
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 224, 225,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Ctor_DateTime() => AssertTranslationFailed(() => base.Ctor_DateTime());
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 227, 228,
+        Justification = Upstream.GaveNoReason)]
+    public override Task Ctor_DateTime_TimeSpan() => AssertTranslationFailed(() => base.Ctor_DateTime_TimeSpan());
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 131, 136,
+        Justification = Upstream.GaveNoReason)]
+    public override Task LocalDateTime() => AssertTranslationFailed(() => base.LocalDateTime());
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 117, 122,
+        Justification = Upstream.GaveNoReason)]
+    public override Task DateTime() => AssertTranslationFailed(() => base.DateTime());
+
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 221, 222,
+        Justification = Upstream.GaveNoReason)]
+    public override Task ToOffset() => AssertTranslationFailed(() => base.ToOffset());
+
     // --- SQLite cannot translate these, and EF's own DateTimeOffsetTranslationsSqliteTest says so
     // with the same `AssertTranslationFailed`. Adopted one by one from the tests that
     // actually failed rather than copied wholesale: EF overrides every test in this
@@ -451,14 +529,14 @@ public class DateTimeOffsetTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrie
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 194, 195,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 215, 216,
         Justification = Upstream.GaveNoReason)]
     public override Task ToUnixTimeMilliseconds()
         => AssertTranslationFailed(() => base.ToUnixTimeMilliseconds());
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 197, 198,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/DateTimeOffsetTranslationsSqliteTest.cs", 218, 219,
         Justification = Upstream.GaveNoReason)]
     public override Task ToUnixTimeSecond()
         => AssertTranslationFailed(() => base.ToUnixTimeSecond());
@@ -492,7 +570,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 63, 69,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 75, 81,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task AddHours()
@@ -501,7 +579,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 71, 77,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 83, 89,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task AddMinutes()
@@ -510,7 +588,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 79, 85,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 91, 97,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Add_TimeSpan()
@@ -519,7 +597,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 119, 125,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 131, 137,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_constant()
@@ -528,7 +606,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 111, 117,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 123, 129,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_parameter()
@@ -537,7 +615,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 103, 109,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 115, 121,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromDateTime_compared_to_property()
@@ -546,7 +624,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 135, 141,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 147, 153,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromTimeSpan_compared_to_parameter()
@@ -555,25 +633,17 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 127, 133,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 139, 145,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task FromTimeSpan_compared_to_property()
         => AssertTranslationFailed(() => base.FromTimeSpan_compared_to_property());
 
-    /// <inheritdoc />
-    [StoreIssue(
-        IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 15, 21,
-        Justification = "TimeSpan. Issue #18844.",
-        Deviation = DeviationKind.SqlNotAsserted)]
-    public override Task Hour()
-        => AssertTranslationFailed(() => base.Hour());
 
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 87, 93,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 99, 105,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task IsBetween()
@@ -582,7 +652,7 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 47, 53,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 59, 65,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Microsecond()
@@ -591,25 +661,17 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 39, 45,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 51, 57,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Millisecond()
         => AssertTranslationFailed(() => base.Millisecond());
 
-    /// <inheritdoc />
-    [StoreIssue(
-        IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 23, 29,
-        Justification = "TimeSpan. Issue #18844.",
-        Deviation = DeviationKind.SqlNotAsserted)]
-    public override Task Minute()
-        => AssertTranslationFailed(() => base.Minute());
 
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 55, 61,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 67, 73,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Nanosecond()
@@ -618,25 +680,17 @@ public class TimeOnlyTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 25103,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 143, 149,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 155, 161,
         Justification = "TimeOnly/DateOnly is not supported. Issue #25103.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Order_by_FromTimeSpan()
         => AssertTranslationFailed(() => base.Order_by_FromTimeSpan());
 
-    /// <inheritdoc />
-    [StoreIssue(
-        IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 31, 37,
-        Justification = "TimeSpan. Issue #18844.",
-        Deviation = DeviationKind.SqlNotAsserted)]
-    public override Task Second()
-        => AssertTranslationFailed(() => base.Second());
 
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 95, 101,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeOnlyTranslationsSqliteTest.cs", 107, 113,
         Justification = "TimeSpan. Issue #18844.",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Subtract()
@@ -655,7 +709,7 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 16, 21,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 15, 21,
         Justification = "Translate TimeSpan members, #18844",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Hours()
@@ -664,7 +718,7 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 47, 52,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 46, 52,
         Justification = "Translate TimeSpan members, #18844",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Microseconds()
@@ -673,7 +727,7 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 39, 44,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 38, 44,
         Justification = "Translate TimeSpan members, #18844",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Milliseconds()
@@ -682,7 +736,7 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 24, 29,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 23, 29,
         Justification = "Translate TimeSpan members, #18844",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Minutes()
@@ -691,7 +745,7 @@ public class TimeSpanTranslationsInfoCarrierTest(BasicTypesQueryInfoCarrierFixtu
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 18844,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 55, 60,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Translations/Temporal/TimeSpanTranslationsSqliteTest.cs", 54, 60,
         Justification = "Translate TimeSpan members, #18844",
         Deviation = DeviationKind.SqlNotAsserted)]
     public override Task Nanoseconds()

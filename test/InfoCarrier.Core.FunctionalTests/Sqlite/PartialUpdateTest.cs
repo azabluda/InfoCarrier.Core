@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -54,52 +53,52 @@ public class PartialUpdateTest
     private static PartialUpdateContext CreateClient(SqliteInfoCarrierBackendTestStore store)
         => new(new DbContextOptionsBuilder<PartialUpdateContext>().UseInfoCarrier(store).Options);
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_complex_value_in_columns_that_the_client_did_not_change_is_not_written()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await SeedAsync(store);
 
         await using PartialUpdateContext client = CreateClient(store);
-        Shipment shipment = await client.Shipments.SingleAsync();
+        Shipment shipment = await client.Shipments.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await using (DbContext other = store.CreateDbContext())
         {
-            Shipment theirs = await other.Set<Shipment>().SingleAsync();
+            Shipment theirs = await other.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             theirs.Destination.City = "Trondheim";
-            await other.SaveChangesAsync();
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         shipment.Name = "mine";
-        await client.SaveChangesAsync();
+        await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using DbContext server = store.CreateDbContext();
-        Shipment stored = await server.Set<Shipment>().SingleAsync();
+        Shipment stored = await server.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("mine", stored.Name);
         Assert.Equal("Trondheim", stored.Destination.City);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_complex_collection_in_json_that_the_client_did_not_change_is_not_written()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await SeedAsync(store);
 
         await using PartialUpdateContext client = CreateClient(store);
-        Shipment shipment = await client.Shipments.SingleAsync();
+        Shipment shipment = await client.Shipments.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await using (DbContext other = store.CreateDbContext())
         {
-            Shipment theirs = await other.Set<Shipment>().SingleAsync();
+            Shipment theirs = await other.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             theirs.Stops.Add(new Stop { Place = "Stavanger" });
-            await other.SaveChangesAsync();
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         shipment.Name = "mine";
-        await client.SaveChangesAsync();
+        await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using DbContext server = store.CreateDbContext();
-        Shipment stored = await server.Set<Shipment>().SingleAsync();
+        Shipment stored = await server.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("mine", stored.Name);
         Assert.Equal(["Bergen", "Stavanger"], stored.Stops.Select(s => s.Place));
     }
@@ -113,7 +112,7 @@ public class PartialUpdateTest
     ///     the entity. Six <c>ComplexCollectionJsonUpdate</c> tests wrote nothing while the first
     ///     version of the fix got that wrong.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_complex_collection_the_client_changed_alone_is_written()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -121,18 +120,18 @@ public class PartialUpdateTest
 
         await using (PartialUpdateContext client = CreateClient(store))
         {
-            Shipment shipment = await client.Shipments.SingleAsync();
+            Shipment shipment = await client.Shipments.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             shipment.Stops.Add(new Stop { Place = "Tromso" });
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         await using DbContext server = store.CreateDbContext();
-        Shipment stored = await server.Set<Shipment>().SingleAsync();
+        Shipment stored = await server.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("original", stored.Name);
         Assert.Equal(["Bergen", "Tromso"], stored.Stops.Select(s => s.Place));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_complex_value_the_client_did_change_is_written()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -140,14 +139,14 @@ public class PartialUpdateTest
 
         await using (PartialUpdateContext client = CreateClient(store))
         {
-            Shipment shipment = await client.Shipments.SingleAsync();
+            Shipment shipment = await client.Shipments.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             shipment.Destination.Street = "Harbour";
             shipment.Stops.Add(new Stop { Place = "Tromso" });
-            await client.SaveChangesAsync();
+            await client.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         await using DbContext server = store.CreateDbContext();
-        Shipment stored = await server.Set<Shipment>().SingleAsync();
+        Shipment stored = await server.Set<Shipment>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Oslo", stored.Destination.City);
         Assert.Equal("Harbour", stored.Destination.Street);
         Assert.Equal(["Bergen", "Tromso"], stored.Stops.Select(s => s.Place));

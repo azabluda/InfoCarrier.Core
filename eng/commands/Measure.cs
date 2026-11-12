@@ -9,7 +9,8 @@ using System.Text.RegularExpressions;
 internal static class Measure
 {
     private static string Root() => ScriptHost.Root;
-    private static readonly string[] Projects = ["InfoCarrier.Core.FunctionalTests", "InfoCarrier.Core.DocumentStoreTests"];
+    // Tiers C and D are suspended until their providers support EF Core 11.
+    private static readonly string[] Projects = ["InfoCarrier.Core.FunctionalTests"];
 
     // Stream to disk, not memory: a specification run can write many megabytes. Cancel the tree,
     // await both output pumps, and retain the partial log for diagnosis.

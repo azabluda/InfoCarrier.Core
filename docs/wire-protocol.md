@@ -68,6 +68,25 @@ Acceptance of the selected development client does not create a published prerel
 
 ### Contract evolution
 
+**EF Core 11 adoption review, November 12, 2026.** The framework upgrade retains wire contract 4.
+The metadata check reports no structural break. .NET 11 changes the built-in object converter
+implementation used for `QueryRequestIdentification`; the guard accepts that exact implementation
+substitution only when the effective object settings and independently checked member contracts
+remain equal. Historical protocol 3 clients and a preserved protocol 4 client execute buffered and
+streamed queries, writes, generated keys, rollback, and deletion against the EF Core 11 server.
+The expanded protocol 3 probe also checks tracking, savepoints, failed-save atomicity, cancellation,
+early stream disposal, and independently observed database values.
+
+EF Core 11's complex shadow discriminators use additional named values in existing
+`DynamicPropertyValue` collections. Names for entity properties and whole complex values keep
+their meaning. Dotted names identify shadow members within single complex values; omitted members
+retain their previous behavior. This adds data for newly supported model metadata, rather than
+reinterpreting a previously supported value. Older models do not contain those members. Nullable
+complex read/update/null transitions are checked by the inherited EF Core 11 tests. No discriminator
+number, frame shape, operation, encoding, or existing default changes. A future incompatible
+interpretation still requires a new integer under the procedure below; the structural check alone
+does not establish this semantic conclusion.
+
 Preserve existing field names, types, and meanings. Add fields with defaults that preserve older
 behavior, and give new expression node kinds new discriminator numbers. A field or interpretation
 that carries a new promise requires a contract version change, even if the schema is unchanged.

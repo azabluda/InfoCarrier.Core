@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -9,8 +9,6 @@ using Microsoft.EntityFrameworkCore.TestModels.Northwind;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
-using Xunit.Abstractions;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -70,7 +68,15 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
             configureConventions: ConfigureConventions,
             relationalClientStore: true,
             arbitrarySqlExecution: true,
-            allowedTypes: [typeof(TestExtensions)]);
+            allowedTypes: [typeof(TestExtensions)],
+            anonymousShapes:
+            [
+                new
+                {
+                    e = default(Microsoft.EntityFrameworkCore.TestModels.Northwind.Order),
+                    Customer = default(Microsoft.EntityFrameworkCore.TestModels.Northwind.Customer),
+                },
+            ]);
 
     /// <inheritdoc />
     /// <remarks>
@@ -79,52 +85,6 @@ public class NorthwindBulkUpdatesInfoCarrierFixture<TModelCustomizer>
     /// </remarks>
     public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
         => facade.UseTestTransaction(transaction);
-}
-
-/// <summary>
-///     The inheritance fixture for the two inheritance bulk-update classes, TPH — the default
-///     strategy, and the one EF's own <c>TPHInheritanceBulkUpdatesSqliteFixture</c> uses.
-/// </summary>
-public class InheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesFixtureBase, ITestSqlLoggerFactory
-{
-    /// <summary>
-    ///     The compliance gate's second assertion (R54). The property is real —
-    ///     <c>InfoCarrierTestStoreFactory.CreateListLoggerFactory</c> returns a
-    ///     <c>TestSqlLoggerFactory</c> — but what it observes is the <em>client's</em> log, and
-    ///     this client has no database and emits no SQL. The server's statements are read
-    ///     by <c>ServerSqlRecorder</c>, and compared with plain EF's by the slow run of #167.
-    /// </summary>
-    public TestSqlLoggerFactory TestSqlLoggerFactory
-        => (TestSqlLoggerFactory)ListLoggerFactory;
-
-    private ITestStoreFactory? _testStoreFactory;
-
-    /// <inheritdoc />
-    protected override string StoreName
-        => "InheritanceBulkUpdatesInfoCarrierTest";
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _testStoreFactory ??= InfoCarrierTestStoreFactory.Create(
-            SqliteInfoCarrierTier.Instance,
-            ContextType,
-            (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-            configureConventions: ConfigureConventions);
-
-    /// <inheritdoc cref="NorthwindBulkUpdatesInfoCarrierFixture{TModelCustomizer}.UseTransaction" />
-    public override void UseTransaction(DatabaseFacade facade, IDbContextTransaction transaction)
-        => facade.UseTestTransaction(transaction);
-}
-
-public class FiltersInheritanceBulkUpdatesInfoCarrierFixture : InheritanceBulkUpdatesInfoCarrierFixture
-{
-    /// <inheritdoc />
-    public override bool EnableFilters
-        => true;
-
-    /// <inheritdoc />
-    protected override string StoreName
-        => "FiltersInheritanceBulkUpdatesInfoCarrierTest";
 }
 
 /// <summary>
@@ -160,7 +120,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 601, 604,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 579, 582,
         Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_cross_apply(bool async)
         => Assert.Equal(
@@ -169,7 +129,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 606, 609,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 584, 587,
         Justification = Upstream.GaveNoReason)]
     public override async Task Delete_with_outer_apply(bool async)
         => Assert.Equal(
@@ -178,7 +138,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1397, 1400,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1407, 1410,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_apply_set_constant(bool async)
         => Assert.Equal(
@@ -188,7 +148,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1402, 1405,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1412, 1415,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_outer_apply_set_constant(bool async)
         => Assert.Equal(
@@ -198,7 +158,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1430, 1434,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1440, 1444,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_cross_apply_set_constant(bool async)
         => Assert.Equal(
@@ -208,7 +168,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1436, 1440,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1446, 1450,
         Justification = Upstream.GaveNoReason)]
     public override async Task Update_with_cross_join_outer_apply_set_constant(bool async)
         => Assert.Equal(
@@ -217,7 +177,7 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
                 () => base.Update_with_cross_join_outer_apply_set_constant(async))).Message);
 
     // --- EF's own open bug, adopted verbatim (C94). `NorthwindBulkUpdatesSqliteTest` carries
-    // `[ConditionalTheory(Skip = "Issue#28886")]` on exactly these two, and the SQL it records
+    // `[Theory(Skip = "Issue#28886")]` on exactly these two, and the SQL it records
     // under the skip is the truncated `UPDATE` this provider produces character for character —
     // `no such column: c.CustomerID` / `o.OrderID`. **Issue #28886 is SQLite's**: it appears
     // nowhere in EF's SQL Server suite, and these classes are Tier B, so adopting the attribute
@@ -231,31 +191,15 @@ public class NorthwindBulkUpdatesInfoCarrierTest(
     /// <inheritdoc />
     [StoreIssue(
         IssueTracker.EfCore, 28886,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1407, 1428,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1417, 1438,
         Justification = "Issue#28886",
         Skip = true,
         Deviation = DeviationKind.SqlNotAsserted)]
-    [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
+    [Theory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
     public override Task Update_with_cross_join_left_join_set_constant(bool async)
         => base.Update_with_cross_join_left_join_set_constant(async);
 
-    /// <inheritdoc />
-    [StoreIssue(
-        IssueTracker.EfCore, 28886,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/BulkUpdates/NorthwindBulkUpdatesSqliteTest.cs", 1522, 1531,
-        Justification = "Issue#28886",
-        Skip = true,
-        Deviation = DeviationKind.SqlNotAsserted)]
-    [ConditionalTheory(Skip = "Issue#28886"), MemberData(nameof(IsAsyncData))]
-    public override Task Update_with_two_inner_joins(bool async)
-        => base.Update_with_two_inner_joins(async);
 }
-
-public class InheritanceBulkUpdatesInfoCarrierTest(InheritanceBulkUpdatesInfoCarrierFixture fixture)
-    : InheritanceBulkUpdatesTestBase<InheritanceBulkUpdatesInfoCarrierFixture>(fixture);
-
-public class FiltersInheritanceBulkUpdatesInfoCarrierTest(FiltersInheritanceBulkUpdatesInfoCarrierFixture fixture)
-    : FiltersInheritanceBulkUpdatesTestBase<FiltersInheritanceBulkUpdatesInfoCarrierFixture>(fixture);
 
 /// <summary>
 ///     The non-shared-model variant, through the same harness
@@ -274,7 +218,7 @@ public class NonSharedModelBulkUpdatesInfoCarrierTest(NonSharedFixture fixture)
     private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc cref="NorthwindBulkUpdatesInfoCarrierFixture{TModelCustomizer}.UseTransaction" />
@@ -290,13 +234,14 @@ public class NonSharedModelBulkUpdatesInfoCarrierTest(NonSharedFixture fixture)
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

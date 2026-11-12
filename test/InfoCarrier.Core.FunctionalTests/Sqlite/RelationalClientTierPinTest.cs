@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -38,7 +37,7 @@ public class RelationalClientTierPinTest
     ///     Tier B's client resolves EF's relational facade dependencies, which is what
     ///     <c>Database.SqlQuery&lt;T&gt;</c> tests for before it builds anything.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public void Tier_B_registers_the_relational_facade_dependencies()
     {
         IServiceCollection services = ProviderServicesFor(SqliteInfoCarrierTier.Instance);
@@ -54,7 +53,7 @@ public class RelationalClientTierPinTest
     ///     registration answers nothing and costs nothing. What it removes is the half-configured
     ///     state: there is no way to ask for InfoCarrier and get only part of it.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public void Tier_A_registers_them_as_well()
     {
         IServiceCollection services = ProviderServicesFor(InMemoryInfoCarrierTier.Instance);
@@ -78,7 +77,7 @@ public class RelationalClientTierPinTest
     ///         that stopped replacing would leave both present and the last one would silently win.
     ///     </para>
     /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void One_convention_set_builder_and_it_is_the_relational_one(bool relationalTier)

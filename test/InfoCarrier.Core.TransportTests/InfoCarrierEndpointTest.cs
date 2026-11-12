@@ -14,13 +14,12 @@ public class InfoCarrierEndpointTest(NorthwindServerFactory factory) : IClassFix
     {
         var transport = new HttpInfoCarrierTransport(factory.CreateClient(), Serializer);
 
-        InfoCarrierEnvelope response = await transport.SendAsync(
-            new InfoCarrierEnvelope
+        InfoCarrierEnvelope response = await transport.SendAsync(new InfoCarrierEnvelope
             {
                 ProtocolVersion = InfoCarrierEnvelope.CurrentProtocolVersion,
                 Operation = InfoCarrierOperation.BeginTransaction,
                 Payload = Serializer.Serialize<object?>(null),
-            });
+            }, TestContext.Current.CancellationToken);
 
         Assert.Null(response.Fault);
 
@@ -34,13 +33,12 @@ public class InfoCarrierEndpointTest(NorthwindServerFactory factory) : IClassFix
         var transport = new HttpInfoCarrierTransport(factory.CreateClient(), Serializer);
 
         InfoCarrierProtocolException exception = await Assert.ThrowsAsync<InfoCarrierProtocolException>(
-            () => transport.SendAsync(
-                new InfoCarrierEnvelope
+            () => transport.SendAsync(new InfoCarrierEnvelope
                 {
                     ProtocolVersion = 999,
                     Operation = InfoCarrierOperation.BeginTransaction,
                     Payload = Serializer.Serialize<object?>(null),
-                }));
+                }, TestContext.Current.CancellationToken));
 
         Assert.Contains("999", exception.Message);
     }

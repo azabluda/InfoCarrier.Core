@@ -35,7 +35,7 @@ public class NorthwindKeylessEntitiesQueryInfoCarrierTest(NorthwindQueryInfoCarr
     /// </remarks>
     [StoreIssue(
         IssueTracker.EfCore, 21627,
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindKeylessEntitiesQuerySqliteTest.cs", 22, 24,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindKeylessEntitiesQuerySqliteTest.cs", 20, 22,
         Justification = "FromSql mapping. Issue #21627.",
         Deviation = DeviationKind.StoreExceptionAsData)]
     public override Task KeylessEntity_with_nav_defining_query(bool async)

@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -47,10 +46,10 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         context.Blogs.Add(new Blog { Title = "t" });
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("server-token-1", Assert.Single(client.SaveTokens));
     }
@@ -62,7 +61,7 @@ public class TransactionRemotingTest
         await using var context = new SmokeContext(Options(client));
 
         context.Blogs.Add(new Blog { Title = "t" });
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(Assert.Single(client.SaveTokens));
     }
@@ -73,8 +72,8 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
-        await transaction.CommitAsync();
+        IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await transaction.CommitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(["commit:server-token-1"], client.Ends);
         Assert.Null(context.Database.CurrentTransaction);
@@ -86,7 +85,7 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        await using (await context.Database.BeginTransactionAsync())
+        await using (await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
         }
 
@@ -101,9 +100,9 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        await using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync())
+        await using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(["commit:server-token-1"], client.Ends);
@@ -115,10 +114,10 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => context.Database.BeginTransactionAsync());
+            () => context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains("already open", exception.Message);
     }
@@ -155,12 +154,12 @@ public class TransactionRemotingTest
         var client = new RecordingClient();
         await using var context = new SmokeContext(Options(client));
 
-        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         Assert.True(transaction.SupportsSavepoints);
-        await transaction.CreateSavepointAsync("sp1");
-        await transaction.RollbackToSavepointAsync("sp1");
-        await transaction.ReleaseSavepointAsync("sp1");
+        await transaction.CreateSavepointAsync("sp1", TestContext.Current.CancellationToken);
+        await transaction.RollbackToSavepointAsync("sp1", TestContext.Current.CancellationToken);
+        await transaction.ReleaseSavepointAsync("sp1", TestContext.Current.CancellationToken);
 
         // A savepoint is not a scope of its own, so it carries no token of its own: the
         // transaction's token plus a name is the whole address.

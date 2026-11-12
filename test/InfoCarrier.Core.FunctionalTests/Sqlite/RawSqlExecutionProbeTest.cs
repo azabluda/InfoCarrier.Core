@@ -2,7 +2,6 @@
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -51,7 +50,7 @@ public class RawSqlExecutionProbeTest
     //
     // Both execution paths are measured, because they are not the same code in the driver and only
     // the second is the one EF takes for a query.
-    [ConditionalFact]
+    [Fact]
     public void A_single_CommandText_executes_every_statement_it_contains()
     {
         using SqliteConnection connection = OpenProbeDatabase();
@@ -83,12 +82,12 @@ public class RawSqlExecutionProbeTest
     }
 
     // QUESTION 2a. ANSWER: unwrapped. The caller's string IS the command, character for character.
-    [ConditionalFact]
+    [Fact]
     public async Task An_uncomposed_FromSqlRaw_reaches_the_store_unwrapped()
     {
         using SqliteConnection connection = OpenProbeDatabase();
         await using ProbeContext context = CreateContext(connection);
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
         const string Sql = @"SELECT ""Id"", ""Title"" FROM ""Rows"" WHERE ""Id"" = 1";
 
@@ -99,18 +98,18 @@ public class RawSqlExecutionProbeTest
 
         // ToQueryString reports what EF *would* send, so the query is run as well and the
         // assertion does not rest on a code path the execution does not take.
-        Assert.Empty(await context.Rows.FromSqlRaw(Sql).ToListAsync());
+        Assert.Empty(await context.Rows.FromSqlRaw(Sql).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     // QUESTION 2b, the contrast that makes 2a mean something: the wrapping does exist, it is just
     // not a property of `FromSqlRaw`. It appears when - and only when - something is composed on
     // top and EF has to build a SELECT around the caller's text.
-    [ConditionalFact]
+    [Fact]
     public async Task A_composed_FromSqlRaw_is_wrapped_in_a_subquery()
     {
         using SqliteConnection connection = OpenProbeDatabase();
         await using ProbeContext context = CreateContext(connection);
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
         const string Sql = @"SELECT ""Id"", ""Title"" FROM ""Rows""";
 

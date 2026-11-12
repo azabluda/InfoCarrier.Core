@@ -210,8 +210,8 @@ The provider must allow:
 
 ## 5. Target Platform
 
-- **.NET 10**, **EF Core 10**
-- Provider library: `net10.0`
+- **.NET 11**, **EF Core 11**
+- Provider library: `net11.0`
 - Server backends: SQL Server, PostgreSQL, InMemory (minimum)
 - Transport: transport-agnostic (HTTP, gRPC, in-process)
 

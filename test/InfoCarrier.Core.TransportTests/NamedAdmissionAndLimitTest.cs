@@ -22,20 +22,20 @@ public class NamedAdmissionAndLimitTest
         var probe = new CleanupProbe();
         var host = await Host.Start(false, probe);
         using HttpClient http = host.App.GetTestClient();
-        using HttpResponseMessage response = await http.GetAsync("/cleanup-probe", HttpCompletionOption.ResponseHeadersRead);
-        await probe.Entered.Task.WaitAsync(deadline);
+        using HttpResponseMessage response = await http.GetAsync("/cleanup-probe", HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
+        await probe.Entered.Task.WaitAsync(deadline, TestContext.Current.CancellationToken);
         response.Dispose();
         Task disposing = host.DisposeAsync().AsTask();
         try
         {
-            await host.DrainStarted.Task.WaitAsync(deadline);
+            await host.DrainStarted.Task.WaitAsync(deadline, TestContext.Current.CancellationToken);
             Assert.False(disposing.IsCompleted, "Host disposal ended while a request still owned an open database connection.");
         }
         finally
         {
             probe.Release.TrySetResult();
-            await probe.Finished.Task.WaitAsync(deadline);
-            try { await disposing.WaitAsync(deadline); }
+            await probe.Finished.Task.WaitAsync(deadline, TestContext.Current.CancellationToken);
+            try { await disposing.WaitAsync(deadline, TestContext.Current.CancellationToken); }
             finally
             {
                 // Also remove the file during a failed regression check, after the probe released it.
@@ -87,12 +87,12 @@ public class NamedAdmissionAndLimitTest
         string predicate = new('z', 8 * 1024);
         await using (Context limited = Direct(http, "limited"))
         {
-            Exception? failure = await Record.ExceptionAsync(() => limited.Items.Where(item => item.Name == predicate).ToListAsync());
+            Exception? failure = await Record.ExceptionAsync(() => limited.Items.Where(item => item.Name == predicate).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.NotNull(failure);
             Assert.Contains("MaxRequestBytes", failure.ToString());
         }
         await using Context allowed = Direct(http, "allowed");
-        Assert.Empty(await allowed.Items.Where(item => item.Name == predicate).ToListAsync());
+        Assert.Empty(await allowed.Items.Where(item => item.Name == predicate).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -102,10 +102,10 @@ public class NamedAdmissionAndLimitTest
         using HttpClient http = host.App.GetTestClient();
         await using Context allowed = Direct(http, "allowed");
         await using Context denied = Direct(http, "denied");
-        var rows = await allowed.Items.Select(item => new { item.Id, item.Name }).ToListAsync();
+        var rows = await allowed.Items.Select(item => new { item.Id, item.Name }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(8192, Assert.Single(rows).Name.Length);
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            denied.Items.Select(item => new { item.Id, item.Name }).ToListAsync());
+            denied.Items.Select(item => new { item.Id, item.Name }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("anonymous shape is not registered", failure.Message);
     }
 
@@ -117,9 +117,9 @@ public class NamedAdmissionAndLimitTest
         await using Context allowed = Direct(http, "allowed");
         await using Context denied = Direct(http, "denied");
         Assert.Equal("checked:" + new string('x', 8192),
-            await allowed.Items.Select(item => SharedHelper.Decorate(item.Name)).SingleAsync());
+            await allowed.Items.Select(item => SharedHelper.Decorate(item.Name)).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         Exception? failure = await Record.ExceptionAsync(() =>
-            denied.Items.Select(item => SharedHelper.Decorate(item.Name)).SingleAsync());
+            denied.Items.Select(item => SharedHelper.Decorate(item.Name)).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.NotNull(failure);
         Assert.Contains(nameof(SharedHelper), failure.ToString());
     }

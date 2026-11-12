@@ -44,7 +44,7 @@ public class ServerCancellationOverSocketTest
 
         // A real query succeeds first. Host startup and database seeding must not arm the probe.
         List<Customer> customers = await context.Customers.Where(c => c.Country == "Germany")
-            .ToListAsync().WaitAsync(Deadline);
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken).WaitAsync(Deadline, TestContext.Current.CancellationToken);
         Assert.NotEmpty(customers);
 
         using var cancellation = new CancellationTokenSource();
@@ -62,7 +62,7 @@ public class ServerCancellationOverSocketTest
 
             // The client stopping is not enough: the command must observe its server-side token,
             // and the actual request pipeline must unwind before any cleanup releases the probe.
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query.WaitAsync(Deadline));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query.WaitAsync(Deadline, TestContext.Current.CancellationToken));
             await WaitForAsync(probe.CancellationObserved.Task, "server-side command cancellation");
             await WaitForAsync(probe.RequestFinished.Task, "the server request to finish");
         }
@@ -74,7 +74,7 @@ public class ServerCancellationOverSocketTest
             await cancellation.CancelAsync();
             try
             {
-                await query.WaitAsync(Deadline);
+                await query.WaitAsync(Deadline, TestContext.Current.CancellationToken);
             }
             catch (OperationCanceledException)
             {

@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.Common;
 using System.Text.Json;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Expressions;
 
@@ -42,8 +41,7 @@ public class EnvelopeProtocolTest
     public async Task An_unsupported_protocol_version_is_refused_by_number(int version)
     {
         InfoCarrierProtocolException ex = await Assert.ThrowsAsync<InfoCarrierProtocolException>(
-            () => Server(new ThrowingServer()).DispatchAsync(
-                Envelope(InfoCarrierOperation.BeginTransaction, version: version)));
+            () => Server(new ThrowingServer()).DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction, version: version), TestContext.Current.CancellationToken));
 
         // Both numbers: a client one release ahead has to learn which version it is talking to.
         Assert.Contains(version.ToString(), ex.Message);
@@ -60,8 +58,7 @@ public class EnvelopeProtocolTest
         var server = new RecordingServer();
 
         await Assert.ThrowsAsync<InfoCarrierProtocolException>(
-            () => Server(server).DispatchAsync(
-                Envelope(InfoCarrierOperation.BeginTransaction, version: 7)));
+            () => Server(server).DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction, version: 7), TestContext.Current.CancellationToken));
 
         Assert.Empty(server.Calls);
     }
@@ -75,8 +72,7 @@ public class EnvelopeProtocolTest
     [Fact]
     public async Task An_unknown_operation_is_refused_by_name_as_a_fault()
     {
-        InfoCarrierEnvelope response = await Server(new ThrowingServer()).DispatchAsync(
-            Envelope((InfoCarrierOperation)99));
+        InfoCarrierEnvelope response = await Server(new ThrowingServer()).DispatchAsync(Envelope((InfoCarrierOperation)99), TestContext.Current.CancellationToken);
 
         Assert.NotNull(response.Fault);
         Assert.Equal(typeof(NotSupportedException).FullName, response.Fault!.TypeName);
@@ -94,8 +90,7 @@ public class EnvelopeProtocolTest
     [Fact]
     public async Task A_version_mismatch_escapes_rather_than_becoming_a_fault()
         => await Assert.ThrowsAsync<InfoCarrierProtocolException>(
-            () => Server(new ThrowingServer()).DispatchAsync(
-                Envelope(InfoCarrierOperation.BeginTransaction, version: InfoCarrierEnvelope.CurrentProtocolVersion + 1)));
+            () => Server(new ThrowingServer()).DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction, version: InfoCarrierEnvelope.CurrentProtocolVersion + 1), TestContext.Current.CancellationToken));
 
     /// <summary>
     ///     A server-side failure comes back with its type, message and inner chain intact — which
@@ -106,7 +101,7 @@ public class EnvelopeProtocolTest
     {
         InfoCarrierEnvelope response = await Server(
                 new FailingServer(new InvalidOperationException("outer", new FormatException("inner"))))
-            .DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction));
+            .DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction), TestContext.Current.CancellationToken);
 
         Assert.NotNull(response.Fault);
 
@@ -305,19 +300,19 @@ public class EnvelopeProtocolTest
                 TrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.TrackAll,
                 IsAsync = false,
                 ReturnsSingleResult = false,
-            }));
+            }), TestContext.Current.CancellationToken);
         await envelopeServer.DispatchAsync(Envelope(
-            InfoCarrierOperation.SaveChanges, new SaveChangesRequest { Entries = [] }));
-        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction));
-        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.CommitTransaction, "t1"));
-        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.RollbackTransaction, "t2"));
+            InfoCarrierOperation.SaveChanges, new SaveChangesRequest { Entries = [] }), TestContext.Current.CancellationToken);
+        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction), TestContext.Current.CancellationToken);
+        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.CommitTransaction, "t1"), TestContext.Current.CancellationToken);
+        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.RollbackTransaction, "t2"), TestContext.Current.CancellationToken);
         await envelopeServer.DispatchAsync(Envelope(
-            InfoCarrierOperation.CreateSavepoint, new SavepointRequest { TransactionId = "t3", Name = "s1" }));
+            InfoCarrierOperation.CreateSavepoint, new SavepointRequest { TransactionId = "t3", Name = "s1" }), TestContext.Current.CancellationToken);
         await envelopeServer.DispatchAsync(Envelope(
-            InfoCarrierOperation.RollbackToSavepoint, new SavepointRequest { TransactionId = "t4", Name = "s2" }));
+            InfoCarrierOperation.RollbackToSavepoint, new SavepointRequest { TransactionId = "t4", Name = "s2" }), TestContext.Current.CancellationToken);
         await envelopeServer.DispatchAsync(Envelope(
-            InfoCarrierOperation.ReleaseSavepoint, new SavepointRequest { TransactionId = "t5", Name = "s3" }));
-        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.SupportsSavepoints, "t6"));
+            InfoCarrierOperation.ReleaseSavepoint, new SavepointRequest { TransactionId = "t5", Name = "s3" }), TestContext.Current.CancellationToken);
+        await envelopeServer.DispatchAsync(Envelope(InfoCarrierOperation.SupportsSavepoints, "t6"), TestContext.Current.CancellationToken);
 
         Assert.Equal(
             [
@@ -345,7 +340,7 @@ public class EnvelopeProtocolTest
             CorrelationId = "abc",
         };
 
-        InfoCarrierEnvelope response = await Server(new RecordingServer()).DispatchAsync(request);
+        InfoCarrierEnvelope response = await Server(new RecordingServer()).DispatchAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(request.ProtocolVersion, response.ProtocolVersion);
         Assert.Equal(request.Operation, response.Operation);
@@ -360,8 +355,7 @@ public class EnvelopeProtocolTest
     [Fact]
     public async Task A_void_operation_still_returns_a_readable_payload()
     {
-        InfoCarrierEnvelope response = await Server(new RecordingServer()).DispatchAsync(
-            Envelope(InfoCarrierOperation.CommitTransaction, "t"));
+        InfoCarrierEnvelope response = await Server(new RecordingServer()).DispatchAsync(Envelope(InfoCarrierOperation.CommitTransaction, "t"), TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(response.Payload);
         Assert.Null(Serializer.Deserialize<object>(response.Payload));

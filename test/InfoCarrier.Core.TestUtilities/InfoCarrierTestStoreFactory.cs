@@ -127,6 +127,16 @@ public class InfoCarrierTestStoreFactory : ITestStoreFactory
             .AddEntityFrameworkInfoCarrier()
             .AddSingleton<InfoCarrier.Core.ValueMapping.IInfoCarrierValueMapper, InfoCarrierNetTopologySuiteValueMapper>();
 
+        if (_relationalClientStore)
+        {
+            // EF's provider service dependencies are intentionally used by this test harness.
+#pragma warning disable EF1001
+            serviceCollection.AddSingleton<Microsoft.EntityFrameworkCore.Storage.ISqlGenerationHelper>(
+                new Microsoft.EntityFrameworkCore.Storage.RelationalSqlGenerationHelper(
+                    new Microsoft.EntityFrameworkCore.Storage.RelationalSqlGenerationHelperDependencies()));
+#pragma warning restore EF1001
+        }
+
         // THERE IS NO PER-TIER CLIENT SEAM, and there has not been one worth keeping since R135.
         // `InfoCarrierTier.AddClientServices` used to sit here so the relational tier could call
         // `AddInfoCarrierRelationalClient()`. That call is gone, `AddEntityFrameworkInfoCarrier()`

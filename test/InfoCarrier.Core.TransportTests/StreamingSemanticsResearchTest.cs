@@ -26,7 +26,7 @@ public class StreamingSemanticsResearchTest(NorthwindServerFactory factory)
             .OrderBy(row => row.Detail.ProductId)
             .AsAsyncEnumerable();
 
-        await using var rows = query.GetAsyncEnumerator();
+        await using var rows = query.GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await rows.MoveNextAsync());
         dynamic first = rows.Current;

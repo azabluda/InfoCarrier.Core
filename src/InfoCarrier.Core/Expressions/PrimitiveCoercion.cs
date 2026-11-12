@@ -155,7 +155,7 @@ internal static class PrimitiveCoercion
     private static Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter? EffectiveConverter(
         Microsoft.EntityFrameworkCore.Metadata.IProperty property)
         => property.GetValueConverter()
-            ?? (property.GetProviderClrType() is null && JsonForm(property) is null
+            ?? (property.GetProviderClrType() is null && property.GetElementType() is null && JsonForm(property) is null
                 ? (property.FindTypeMapping() as InfoCarrierTypeMapping)?.Converter
                 : null);
 

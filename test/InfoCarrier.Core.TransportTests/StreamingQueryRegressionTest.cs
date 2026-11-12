@@ -69,14 +69,14 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
         await using IAsyncEnumerator<Customer> rows = context.Customers
             .OrderBy(customer => customer.Id)
             .AsAsyncEnumerable()
-            .GetAsyncEnumerator();
+            .GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Task<bool> firstMove = rows.MoveNextAsync().AsTask();
-        await gate.BufferedCallStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.BufferedCallStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(firstMove.IsCompleted);
 
         gate.Release.TrySetResult();
-        Assert.True(await firstMove.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await firstMove.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal("ALFKI", rows.Current.Id);
     }
 

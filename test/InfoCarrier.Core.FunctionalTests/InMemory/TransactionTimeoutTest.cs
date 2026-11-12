@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -51,7 +50,7 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         // Idle past the timeout. `Advance` runs the sweep the periodic timer drives, on this
         // thread, so there is nothing to wait for and nothing to race.
@@ -63,7 +62,7 @@ public class TransactionTimeoutTest
         // commit is not punished for following the ordinary `using` pattern. Every operation that
         // does real work goes through `Open`, and that is what a returning client meets.
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.SupportsSavepointsAsync(begun.TransactionId));
+            () => server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         Assert.Contains("is not open on this server", thrown.Message);
     }
@@ -78,15 +77,15 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         // Real work inside the transaction, which also refreshes liveness.
-        await server.SupportsSavepointsAsync(begun.TransactionId);
+        await server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken);
 
         clock.Advance(Timeout + TimeSpan.FromMinutes(1));
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.CommitTransactionAsync(begun.TransactionId));
+            () => server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken));
 
         Assert.Contains("cannot be", thrown.Message);
         Assert.Contains("discarded", thrown.Message);
@@ -101,11 +100,11 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         clock.Advance(Timeout + TimeSpan.FromMinutes(1));
 
-        await server.RollbackTransactionAsync(begun.TransactionId);
+        await server.RollbackTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -114,16 +113,16 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         // Three quarters of the timeout, one request, then three quarters again. The total elapsed
         // time is past the timeout, so without the refresh this transaction would be gone.
         clock.Advance(Timeout * 0.75);
-        await server.SupportsSavepointsAsync(begun.TransactionId);
+        await server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken);
         clock.Advance(Timeout * 0.75);
 
         // Still open, so committing succeeds rather than throwing.
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -135,11 +134,11 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, idleTimeout: null);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         clock.Advance(TimeSpan.FromDays(7));
 
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -148,7 +147,7 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        await server.BeginTransactionAsync();
+        await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         await server.DisposeAsync();
         await server.DisposeAsync();
@@ -212,7 +211,7 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         clock.Advance(Timeout + TimeSpan.FromMinutes(1));
 
         if (expectThrow)
@@ -247,10 +246,10 @@ public class TransactionTimeoutTest
         string token = await LoseTokenAsync(server, clock, cause);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => server.CommitTransactionAsync(token));
+            () => server.CommitTransactionAsync(token, TestContext.Current.CancellationToken));
 
         // And the same token, rolled back, says nothing.
-        await server.RollbackTransactionAsync(token);
+        await server.RollbackTransactionAsync(token, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -268,13 +267,12 @@ public class TransactionTimeoutTest
         var clock = new FakeTimeProvider();
         await using InProcessInfoCarrierServer server = CreateServer(clock, Timeout);
 
-        TransactionResult begun = await server.BeginTransactionAsync();
+        TransactionResult begun = await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
-        await server.SupportsSavepointsAsync(begun.TransactionId);
-        await server.SaveChangesAsync(
-            new SaveChangesRequest { Entries = [], TransactionId = begun.TransactionId });
+        await server.SupportsSavepointsAsync(begun.TransactionId, TestContext.Current.CancellationToken);
+        await server.SaveChangesAsync(new SaveChangesRequest { Entries = [], TransactionId = begun.TransactionId }, TestContext.Current.CancellationToken);
 
-        await server.CommitTransactionAsync(begun.TransactionId);
+        await server.CommitTransactionAsync(begun.TransactionId, TestContext.Current.CancellationToken);
     }
 
     private static async Task<string> LoseTokenAsync(

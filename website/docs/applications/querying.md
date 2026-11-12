@@ -61,6 +61,43 @@ var summary = await context.Orders
 The server performs the relationship lookup. The result contains the selected values.
 Use [related-data loading](related-data.md) when you need editable entity graphs.
 
+## Join both sets, including unmatched rows
+
+With .NET 11 and Entity Framework Core 11, use `FullJoin` when either set can contain unmatched rows:
+
+```csharp
+var matches = await context.Customers
+    .FullJoin(
+        context.Orders,
+        customer => customer.Id,
+        order => order.CustomerId,
+        (customer, order) => new
+        {
+            Company = customer == null ? null : customer.Company,
+            OrderId = order == null ? (int?)null : order.Id
+        })
+    .ToListAsync();
+```
+
+A missing customer produces a null company. A customer without orders produces a null order identifier.
+The server provider must support this join. The SQLite suite checks matched and unmatched rows.
+
+## Filter with a frozen set
+
+A `FrozenSet<T>` is an immutable set optimized for repeated lookups. It can supply values for a filter:
+
+```csharp
+using System.Collections.Frozen;
+
+FrozenSet<string> customerIds = new[] { "ALFKI", "ANATR" }.ToFrozenSet();
+List<Customer> selected = await context.Customers
+    .Where(customer => customerIds.Contains(customer.Id))
+    .ToListAsync();
+```
+
+The values cross the connection and the server applies its provider's collection translation.
+They do not cause the client to download and filter every customer.
+
 ## Tracking and saving
 
 Ordinary entity queries track the returned entities. Change a property and call

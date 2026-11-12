@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -67,8 +67,8 @@
       unique, ordered, and exactly what an internal CI feed wants.
 
       `MinVerMinimumMajorMinor` is 11.0 because main is now the version 11 development line. The
-      version 10 maintenance boundary is `release/10.3` at commit 663170d5. Main can compile
-      against EF Core 10 during cleanup, but no stable version 11 package can ship before the
+      version 10 maintenance boundary is `release/10.3` at commit 663170d5. Main targets
+      .NET 11 and EF Core 11, but no stable version 11 package can ship before the
       EF Core 11 adoption is complete. This property is a FLOOR, so later version 11 tags pass it
       unchanged.
 

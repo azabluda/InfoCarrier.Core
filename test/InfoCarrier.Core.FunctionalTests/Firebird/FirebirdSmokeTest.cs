@@ -2,7 +2,6 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Firebird;
 
@@ -107,7 +106,7 @@ public class FirebirdSmokeTest
     /// <summary>
     ///     The round trip. A tier that cannot answer this proves nothing else.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_query_crosses_the_wire_and_the_Firebird_server_answers_it()
     {
         await using FirebirdInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -128,7 +127,7 @@ public class FirebirdSmokeTest
     ///     The method throws when invoked, so a client that evaluated it instead of sending it
     ///     would fail by name rather than return a plausible number.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_scalar_store_function_is_translated_and_run_on_the_server()
     {
         await using FirebirdInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -177,7 +176,7 @@ public class FirebirdSmokeTest
     ///         inside a query.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_table_valued_function_as_the_only_query_root_is_answered_by_the_server()
     {
         await using FirebirdInfoCarrierBackendTestStore store = await SeededStoreAsync();
@@ -208,7 +207,7 @@ public class FirebirdSmokeTest
     ///         SQLite has no <c>APPLY</c> and refuses the query one step earlier.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_correlated_table_valued_function_is_answered_through_APPLY()
     {
         await using FirebirdInfoCarrierBackendTestStore store = await SeededStoreAsync();

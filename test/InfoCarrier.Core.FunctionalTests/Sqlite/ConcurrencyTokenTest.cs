@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -55,49 +54,49 @@ public class ConcurrencyTokenTest
                 await context.SaveChangesAsync();
             });
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_client_that_bumps_the_concurrency_token_is_not_a_conflict()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await SeedAsync(store);
 
         await using ConcurrencyContext client = CreateClient(store);
-        Widget widget = await client.Widgets.SingleAsync();
+        Widget widget = await client.Widgets.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // The application-managed pattern: change the row and bump its token in one go. The
         // original token is still 1, which is what the store holds, so nothing conflicts.
         widget.Name = "updated";
         widget.Version = 2;
 
-        await client.SaveChangesAsync();
+        await client.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using DbContext server = store.CreateDbContext();
-        Widget stored = await server.Set<Widget>().SingleAsync();
+        Widget stored = await server.Set<Widget>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("updated", stored.Name);
         Assert.Equal(2, stored.Version);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task A_stale_write_is_refused()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
         await SeedAsync(store);
 
         await using ConcurrencyContext client = CreateClient(store);
-        Widget widget = await client.Widgets.SingleAsync();
+        Widget widget = await client.Widgets.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Someone else commits first, straight against the store.
         await using (DbContext other = store.CreateDbContext())
         {
-            Widget theirs = await other.Set<Widget>().SingleAsync();
+            Widget theirs = await other.Set<Widget>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             theirs.Name = "theirs";
             theirs.Version = 99;
-            await other.SaveChangesAsync();
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         widget.Name = "mine";
 
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -109,7 +108,7 @@ public class ConcurrencyTokenTest
     ///     the server's <c>UPDATE</c> for that test checked only the scalar tokens: comparing its SQL
     ///     with EF's, 2026-09-15. A write that ignores a changed token overwrites someone else's row.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_stale_write_is_refused_when_the_token_is_in_a_complex_property()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -123,18 +122,18 @@ public class ConcurrencyTokenTest
             });
 
         await using ConcurrencyContext client = CreateClient(store);
-        Crate crate = await client.Crates.SingleAsync();
+        Crate crate = await client.Crates.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await using (DbContext other = store.CreateDbContext())
         {
-            Crate theirs = await other.Set<Crate>().SingleAsync();
+            Crate theirs = await other.Set<Crate>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             theirs.Place.Latitude = 99;
-            await other.SaveChangesAsync();
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         crate.Name = "mine";
 
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -146,7 +145,7 @@ public class ConcurrencyTokenTest
     ///     complex property, and the one whose tokens were missing from the server's <c>UPDATE</c>.
     ///     EF checks an unchanged owned entry's tokens when the row it shares is written.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_stale_write_is_refused_when_the_token_is_in_an_owned_reference()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();
@@ -160,18 +159,18 @@ public class ConcurrencyTokenTest
             });
 
         await using ConcurrencyContext client = CreateClient(store);
-        Parcel parcel = await client.Parcels.SingleAsync();
+        Parcel parcel = await client.Parcels.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await using (DbContext other = store.CreateDbContext())
         {
-            Parcel theirs = await other.Set<Parcel>().SingleAsync();
+            Parcel theirs = await other.Set<Parcel>().SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
             theirs.Spot.Latitude = 99;
-            await other.SaveChangesAsync();
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         parcel.Name = "mine";
 
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -183,7 +182,7 @@ public class ConcurrencyTokenTest
     ///     (2026-09-27). Plain EF Core on the same store, measured on 2026-09-27: <c>SaveChanges</c>
     ///     returns 2, the insert is written, and the stale update is not.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_suppression_configured_on_the_server_writes_the_rest_of_the_save()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore(b => b.AddInterceptors(new ConflictSuppressor()));
@@ -214,7 +213,7 @@ public class ConcurrencyTokenTest
     ///         suppression, would each change this test.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_suppression_misconfigured_on_the_client_writes_nothing()
     {
         await using SqliteInfoCarrierBackendTestStore store = CreateStore();

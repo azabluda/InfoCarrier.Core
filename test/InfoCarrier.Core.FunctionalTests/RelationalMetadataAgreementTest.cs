@@ -4,7 +4,6 @@ using InfoCarrier.Core.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Reflection;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -72,7 +71,7 @@ public class RelationalMetadataAgreementTest
     // reflection, so a rename would not even fail to compile -- it would answer "this model maps no
     // functions", which puts every mapped function back to being refused at the client boundary and
     // client-evaluated into its own `throw`. That is 81 tests, silently.
-    [ConditionalFact]
+    [Fact]
     public void The_db_function_methods_agree_with_EFs_own_GetDbFunctions()
     {
         using var context = new DbFunctionPinContext();
@@ -104,7 +103,7 @@ public class RelationalMetadataAgreementTest
     // whose FIRST parameter is a `DbSet<>`, because that is the parameter core EF's rewriter fills
     // with an `IQueryable`. A new overload group EF adds would fail this test rather than fail a
     // caller's model build with `ArgumentException`.
-    [ConditionalFact]
+    [Fact]
     public void Every_DbSet_taking_method_EF_declares_there_is_one_the_convention_leaves_alone()
     {
         string[] takingADbSet = typeof(RelationalQueryableExtensions)
@@ -124,7 +123,7 @@ public class RelationalMetadataAgreementTest
             takingADbSet);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void The_walk_agrees_with_EF_for_every_type_including_nested_ones()
     {
         using var context = new PinContext();

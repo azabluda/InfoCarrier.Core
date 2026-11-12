@@ -1,10 +1,10 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -41,6 +41,29 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
     : ComplexTypeQueryRelationalTestBase<ComplexTypeQuerySqliteInfoCarrierTest.ComplexTypeQuerySqliteInfoCarrierFixture>(
         fixture)
 {
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
     // R32 deleted six overrides here -- the two `Subquery_over_*` and the four
     // `Concat_`/`Union_two_different_*`. Every one was `ComplexTypeQueryRelationalTestBase`'s,
     // copied in by hand because that base was believed to assert SQL, and the re-parent now
@@ -52,7 +75,7 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
     ///     <c>APPLY</c>, which it does not have.
     /// </summary>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1014, 1018,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1012, 1016,
         Justification = Upstream.GaveNoReason)]
     public override async Task Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(
@@ -63,7 +86,7 @@ public class ComplexTypeQuerySqliteInfoCarrierTest(
 
     /// <inheritdoc cref="Same_entity_with_complex_type_projected_twice_with_pushdown_as_part_of_another_projection" />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1020, 1024,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/ComplexTypeQuerySqliteTest.cs", 1018, 1022,
         Justification = Upstream.GaveNoReason)]
     public override async Task Same_complex_type_projected_twice_with_pushdown_as_part_of_another_projection(bool async)
         => Assert.Equal(

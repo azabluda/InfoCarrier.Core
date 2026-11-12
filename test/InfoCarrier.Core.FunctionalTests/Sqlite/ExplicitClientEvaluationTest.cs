@@ -4,13 +4,12 @@ using System.Text.Json;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class ExplicitClientEvaluationTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData("filter")]
     [InlineData("order")]
     [InlineData("reverse")]
@@ -47,11 +46,11 @@ public class ExplicitClientEvaluationTest
         Assert.Single(store.ServerSql.Statements);
 
         store.ServerSql.Clear();
-        Assert.Equal(new Key("one"), Assert.Single(await rows.Select(row => new Key(row.Name)).ToArrayAsync()));
+        Assert.Equal(new Key("one"), Assert.Single(await rows.Select(row => new Key(row.Name)).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken)));
         Assert.DoesNotContain("Unused", Assert.Single(store.ServerSql.Statements), StringComparison.Ordinal);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Null_component_group_join_uses_backend_semantics_or_explicit_local_execution(bool async)
@@ -108,8 +107,7 @@ public class ExplicitClientEvaluationTest
 
         // Explicit local execution retains .NET key equality, including its null match.
         store.ServerSql.Clear();
-        Row[] rows = async ? await unregistered.Set<Row>().OrderBy(row => row.Id).ToArrayAsync()
-            : unregistered.Set<Row>().OrderBy(row => row.Id).ToArray();
+        Row[] rows = async ? await unregistered.Set<Row>().OrderBy(row => row.Id).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken) : unregistered.Set<Row>().OrderBy(row => row.Id).ToArray();
         int[] local = [.. rows.AsEnumerable().GroupJoin(rows,
             outer => new Key(outer.Name), inner => new Key(inner.Name), (_, matches) => matches.Count())];
         Assert.Equal(new[] { 1, 1 }, local);

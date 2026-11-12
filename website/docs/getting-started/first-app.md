@@ -9,7 +9,7 @@ The example runs locally. Follow the [security guide](../operations/security.md)
 
 ## Before you start
 
-Install the .NET 10 SDK. Start in any directory where you create application projects.
+Install the .NET 11 SDK. Start in any directory where you create application projects.
 The commands below use PowerShell.
 
 | Project | Job |
@@ -26,20 +26,20 @@ Create your own application and install its NuGet dependencies:
 New-Item -ItemType Directory -Name ShopTutorial
 Set-Location ShopTutorial
 
-dotnet new classlib -n Shop.Shared -f net10.0
-dotnet new web -n Shop.Server -f net10.0
-dotnet new console -n Shop.Client -f net10.0
+dotnet new classlib -n Shop.Shared -f net11.0
+dotnet new web -n Shop.Server -f net11.0
+dotnet new console -n Shop.Client -f net11.0
 
 dotnet add Shop.Server reference Shop.Shared
 dotnet add Shop.Client reference Shop.Shared
 
-dotnet add Shop.Shared package Microsoft.EntityFrameworkCore --version 10.*
+dotnet add Shop.Shared package Microsoft.EntityFrameworkCore --version 11.*
 dotnet add Shop.Client package InfoCarrier.Core
 dotnet add Shop.Server package InfoCarrier.Core.AspNetCore
-dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 10.*
+dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 11.*
 ```
 
-The Entity Framework Core commands select the latest version 10 packages, matching the current draft.
+The Entity Framework Core commands select the latest version 11 packages, matching the current draft.
 Keep InfoCarrier package versions matched on both sides.
 Delete `Shop.Shared/Class1.cs`. Keep this terminal in `ShopTutorial`.
 

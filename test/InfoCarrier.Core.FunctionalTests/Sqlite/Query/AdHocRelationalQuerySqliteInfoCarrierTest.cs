@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -15,62 +14,14 @@ using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
-/// <summary>
-///     <c>AdHocManyToManyQueryRelationalTestBase</c> on ADR-009 <b>Tier B</b>.
-/// </summary>
-/// <remarks>
-///     <para>
-///         The <c>AdHoc*</c> bases are EF's regression corpus: each test is a model built for one
-///         reported bug, built <em>per test</em> rather than shared, which is why they need
-///         <see cref="NonSharedModelInfoCarrierHarness" /> (A49). The two overrides below are the
-///         whole of the wiring, and are the same in every class of this kind.
-///     </para>
-///     <para>
-///         <b>Moved here from Tier A by R46, not added alongside it</b> — a base belongs to
-///         exactly one tier. The relational base adds no tests of its own: its whole contribution
-///         is a <c>TestSqlLoggerFactory</c>, a <c>ClearLog</c> and an <c>AssertSql</c>, which is
-///         why the move is a re-parent and nothing more. EF's own
-///         <c>AdHocManyToManyQuerySqliteTest</c> is twelve lines with no overrides, so the store
-///         asks for nothing either.
-///     </para>
-/// </remarks>
-public class AdHocManyToManyQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
-    : AdHocManyToManyQueryRelationalTestBase(fixture)
-{
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
-
-    /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
-        => _harness.TestStoreFactory;
-
-    /// <inheritdoc />
-    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
-        Action<ModelBuilder>? onModelCreating = null,
-        Action<DbContextOptionsBuilder>? onConfiguring = null,
-        Func<IServiceCollection, IServiceCollection>? addServices = null,
-        Action<ModelConfigurationBuilder>? configureConventions = null,
-        Func<string, bool>? shouldLogCategory = null,
-        Func<TestStore>? createTestStore = null,
-        bool usePooling = true,
-        bool useServiceProvider = true)
-    {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
-
-        return base.CreateContextFactory<TContext>(
-            onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
-    }
-}
-
-/// <inheritdoc cref="AdHocManyToManyQuerySqliteInfoCarrierTest" />
+/// <summary>Query-filter regression tests against SQLite through InfoCarrier.</summary>
 public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocQueryFiltersQueryRelationalTestBase(fixture)
 {
     private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -82,14 +33,15 @@ public class AdHocQueryFiltersQuerySqliteInfoCarrierTest(NonSharedFixture fixtur
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }
 
@@ -132,7 +84,7 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
         allowedTypes: [typeof(Context18087.IDummyEntity)]);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -147,9 +99,9 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
         DeviationNote = "The base asserts the exact message in its third block; only the diagnostic parameter name differs.")]
     public override async Task Casts_are_removed_from_expression_tree_when_redundant()
     {
-        var contextFactory = await InitializeAsync<Context18087>(seed: c => c.SeedAsync());
+        var contextFactory = await InitializeNonSharedTest<Context18087>(seed: c => c.SeedAsync());
 
-        using (var context = contextFactory.CreateContext())
+        using (var context = contextFactory.CreateDbContext())
         {
             var queryBase = (IQueryable)context.MockEntities;
             var id = 1;
@@ -158,7 +110,7 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
             Assert.Equal(1, query!.Id);
         }
 
-        using (var context = contextFactory.CreateContext())
+        using (var context = contextFactory.CreateDbContext())
         {
             var queryBase = (IQueryable)context.MockEntities;
             var query = queryBase.Cast<object>().Count();
@@ -166,7 +118,7 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
             Assert.Equal(3, query);
         }
 
-        using (var context = contextFactory.CreateContext())
+        using (var context = contextFactory.CreateDbContext())
         {
             var queryBase = (IQueryable)context.MockEntities;
             var id = 1;
@@ -191,14 +143,15 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }
 
@@ -235,10 +188,17 @@ public class AdHocAdvancedMappingsQuerySqliteInfoCarrierTest(NonSharedFixture fi
 public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture)
     : AdHocNavigationsQueryRelationalTestBase(fixture)
 {
-    private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
+    private readonly NonSharedModelInfoCarrierHarness _harness = new(
+        SqliteInfoCarrierTier.Instance,
+        anonymousShapes:
+        [
+            new { Id = 0L, Job = new { Id = 0L, Address = new { Id = 0L, Street = "" } } },
+            new { Id = 0L, Job = new { Id = 0L } },
+            new { Id = 0L, Job = new { Id = 0L, AddressId = 0L } },
+        ]);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -250,14 +210,15 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 
     // --- SQLite has no APPLY. All three overrides are EF's own AdHocNavigationsQuerySqliteTest,
@@ -266,7 +227,7 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 15, 23,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 13, 21,
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task Projection_with_multiple_includes_and_subquery_with_set_operation()
@@ -277,7 +238,7 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 25, 32,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 23, 30,
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task Let_multiple_references_with_reference_to_outer()
@@ -288,7 +249,7 @@ public class AdHocNavigationsQuerySqliteInfoCarrierTest(NonSharedFixture fixture
 
     /// <inheritdoc />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 34, 42,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/AdHocNavigationsQuerySqliteTest.cs", 32, 40,
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.SqlNotAsserted)]
     public override async Task SelectMany_and_collection_in_projection_in_FirstOrDefault()

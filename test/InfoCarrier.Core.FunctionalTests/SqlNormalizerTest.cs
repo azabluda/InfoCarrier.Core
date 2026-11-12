@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -11,7 +10,7 @@ namespace InfoCarrier.Core.FunctionalTests;
 /// </summary>
 public class SqlNormalizerTest
 {
-    [ConditionalFact]
+    [Fact]
     public void A_parameter_is_numbered_by_first_appearance_whatever_its_name()
     {
         Assert.Equal("WHERE \"x\" = @p0", SqlNormalizer.Normalize("WHERE \"x\" = @city"));
@@ -21,7 +20,7 @@ public class SqlNormalizerTest
             SqlNormalizer.Normalize("WHERE \"x\" = @b OR \"y\" = @a OR \"z\" = @b"));
     }
 
-    [ConditionalFact]
+    [Fact]
     public void A_table_alias_is_numbered_as_alias_and_as_qualifier()
         => Assert.Equal(
             """
@@ -32,7 +31,7 @@ public class SqlNormalizerTest
                 FROM "Customers" AS "c" WHERE "c"."City" = @city
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_table_alias_is_numbered_where_it_first_appears_even_before_its_FROM()
         => Assert.Equal(
             """
@@ -48,7 +47,7 @@ public class SqlNormalizerTest
                 """));
 
     /// <summary>EF writes no <c>AS</c> where the alias equals the column's own name.</summary>
-    [ConditionalFact]
+    [Fact]
     public void A_column_alias_goes()
         => Assert.Equal(
             SqlNormalizer.Normalize(
@@ -62,7 +61,7 @@ public class SqlNormalizerTest
                 FROM "Customers" AS "c"
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_column_of_a_derived_table_is_numbered_within_its_alias()
     {
         string titled = SqlNormalizer.Normalize(
@@ -94,7 +93,7 @@ public class SqlNormalizerTest
             titled);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void A_column_of_a_function_is_numbered_within_its_alias()
         => Assert.Equal(
             """
@@ -111,25 +110,25 @@ public class SqlNormalizerTest
                 ORDER BY "m"."key", "m"."value"
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_column_of_a_base_table_keeps_its_name()
         => Assert.NotEqual(
             SqlNormalizer.Normalize("""SELECT "c"."City" FROM "Customers" AS "c" """),
             SqlNormalizer.Normalize("""SELECT "c"."Region" FROM "Customers" AS "c" """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_literal_and_a_parameter_still_differ()
         => Assert.NotEqual(
             SqlNormalizer.Normalize("""WHERE "c"."City" = 'London'"""),
             SqlNormalizer.Normalize("""WHERE "c"."City" = @city"""));
 
-    [ConditionalFact]
+    [Fact]
     public void A_string_literal_is_kept_whole()
         => Assert.Equal(
             """SELECT 'a "x" AS "y" @z', 'it''s' FROM "T" AS "t0" """.TrimEnd(),
             SqlNormalizer.Normalize("""SELECT 'a "x" AS "y" @z', 'it''s' FROM "T" AS "t" """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_line_comment_is_kept_whole()
         => Assert.Equal(
             """
@@ -144,7 +143,7 @@ public class SqlNormalizerTest
                 FROM "T" AS "c"
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_scalar_subquery_in_a_select_list_loses_its_column_alias_and_keeps_its_table_alias()
         => Assert.Equal(
             """
@@ -157,13 +156,13 @@ public class SqlNormalizerTest
                 FROM "Customers" AS "c"
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void CAST_keeps_its_AS()
         => Assert.Equal(
             """SELECT CAST("x"."X" AS TEXT)""",
             SqlNormalizer.Normalize("""SELECT CAST("x"."X" AS TEXT)"""));
 
-    [ConditionalFact]
+    [Fact]
     public void UPDATE_names_a_table_alias()
         => Assert.Equal(
             """
@@ -178,7 +177,7 @@ public class SqlNormalizerTest
                 WHERE "c"."Id" = @id
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_lateral_join_names_a_derived_table()
         => Assert.Equal(
             """
@@ -199,7 +198,7 @@ public class SqlNormalizerTest
                 ) AS "s" ON TRUE
                 """));
 
-    [ConditionalFact]
+    [Fact]
     public void A_batch_numbers_its_parameters_across_the_whole_command()
         => Assert.Equal(
             """
@@ -219,7 +218,7 @@ public class SqlNormalizerTest
                 """));
 
     /// <summary>A slow run's red message ends at the console's empty line, so a statement never holds one.</summary>
-    [ConditionalFact]
+    [Fact]
     public void Line_ends_are_LF_with_no_trailing_space_and_no_empty_line()
         => Assert.Equal(
             "SELECT 1\n  FROM \"T\" AS \"t0\"",
@@ -230,7 +229,7 @@ public class SqlNormalizerTest
     ///     the order they are first read, so these two normalize equal though the first filters on
     ///     <c>A</c> and the second on <c>B</c>. See the remarks of <see cref="SqlNormalizer" />.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public void Known_limit_two_derived_columns_that_change_places_in_two_places_normalize_equal()
         => Assert.Equal(
             SqlNormalizer.Normalize(

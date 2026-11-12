@@ -30,12 +30,12 @@ public class NamedServerRegistrationTest
 
         await using (var context = ContextFor(admin))
         {
-            Assert.Equal(1, await context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync());
+            Assert.Equal(1, await context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
         await using (var context = ContextFor(publicClient))
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync());
+                context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
         Assert.All(host.Contexts, context => Assert.Equal(1, context.Disposals));
     }
@@ -47,15 +47,15 @@ public class NamedServerRegistrationTest
         using HttpClient http = host.App.GetTestClient();
         IInfoCarrierClient admin = Client(http, "admin");
         IInfoCarrierClient publicClient = Client(http, "public");
-        string token = (await admin.BeginTransactionAsync()).TransactionId!;
+        string token = (await admin.BeginTransactionAsync(TestContext.Current.CancellationToken)).TransactionId!;
         try
         {
-            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => publicClient.CommitTransactionAsync(token));
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => publicClient.CommitTransactionAsync(token, TestContext.Current.CancellationToken));
             Assert.Contains("different server", failure.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
-            await admin.RollbackTransactionAsync(token);
+            await admin.RollbackTransactionAsync(token, TestContext.Current.CancellationToken);
         }
         Assert.All(host.Contexts, context => Assert.Equal(1, context.Disposals));
     }
@@ -72,14 +72,14 @@ public class NamedServerRegistrationTest
             Operation = InfoCarrierOperation.BeginTransaction,
             Payload = new byte[32 * 1024],
         });
-        using HttpResponseMessage rejected = await http.PostAsync("/public", new ByteArrayContent(body));
+        using HttpResponseMessage rejected = await http.PostAsync("/public", new ByteArrayContent(body), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
-        using HttpResponseMessage accepted = await http.PostAsync("/admin", new ByteArrayContent(body));
+        using HttpResponseMessage accepted = await http.PostAsync("/admin", new ByteArrayContent(body), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
-        InfoCarrierEnvelope envelope = serializer.Deserialize<InfoCarrierEnvelope>(await accepted.Content.ReadAsByteArrayAsync())!;
+        InfoCarrierEnvelope envelope = serializer.Deserialize<InfoCarrierEnvelope>(await accepted.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken))!;
         Assert.Null(envelope.Fault);
         string token = serializer.Deserialize<TransactionResult>(envelope.Payload)!.TransactionId;
-        await Client(http, "admin").RollbackTransactionAsync(token);
+        await Client(http, "admin").RollbackTransactionAsync(token, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -87,8 +87,8 @@ public class NamedServerRegistrationTest
     {
         var host = await Host.Start(false);
         using HttpClient http = host.App.GetTestClient();
-        await Client(http, "admin").BeginTransactionAsync();
-        await Client(http, "public").BeginTransactionAsync();
+        await Client(http, "admin").BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await Client(http, "public").BeginTransactionAsync(TestContext.Current.CancellationToken);
         Assert.Equal(2, host.Contexts.Count(context => context.Disposals == 0));
         await host.DisposeAsync();
         Assert.All(host.Contexts, context => Assert.Equal(1, context.Disposals));

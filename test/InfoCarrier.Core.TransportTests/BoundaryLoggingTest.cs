@@ -35,7 +35,7 @@ public class BoundaryLoggingTest
         }
         else
         {
-            Assert.Equal(failure.Message, (await dispatcher.DispatchAsync(request)).Fault!.Message);
+            Assert.Equal(failure.Message, (await dispatcher.DispatchAsync(request, TestContext.Current.CancellationToken)).Fault!.Message);
         }
         var entry = Assert.Single(logs.Entries);
         Assert.Equal(typeof(InfoCarrierEnvelopeServer).FullName, entry.Category);

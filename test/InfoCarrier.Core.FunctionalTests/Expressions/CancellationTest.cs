@@ -4,7 +4,6 @@ using InfoCarrier.Core.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Expressions;
 
@@ -125,7 +124,7 @@ public class CancellationTest
         var server = new InfoCarrierEnvelopeServer(
             new ThrowingServer(new InvalidOperationException("not a cancellation")), Serializer);
 
-        InfoCarrierEnvelope response = await server.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction));
+        InfoCarrierEnvelope response = await server.DispatchAsync(Envelope(InfoCarrierOperation.BeginTransaction), TestContext.Current.CancellationToken);
 
         Assert.NotNull(response.Fault);
         Assert.Equal(typeof(InvalidOperationException).FullName, response.Fault!.TypeName);

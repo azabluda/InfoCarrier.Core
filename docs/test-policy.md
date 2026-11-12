@@ -76,6 +76,7 @@ class and one more arm of that switch.
 | Write this | What it says the store does | What the audit prints |
 |---|---|---|
 | `[StoreLimit]` | refuses by design | `LIMIT` |
+| `[StoreSupport]` | correctly executes a query the common specification expects to refuse | `SUPPORT` |
 | `[StoreDefect("1.6")]` | crashes, or answers wrongly; the argument is the section of `docs/upstream-defects.md` that records it | `DEFECT 1.6` |
 | `[StoreIssue(IssueTracker.EfCore, 36400)]` | behaves in a way a tracker entry already covers | `ISSUE dotnet/efcore#36400` |
 | `[InfoCarrierDesign(10)]` | nothing: this provider differs on purpose, by a recorded decision | `DESIGN ADR-010` |
@@ -84,6 +85,12 @@ class and one more arm of that switch.
 **A crash or a wrong answer is never `[StoreLimit]`.** A store that means "no" says so. A
 `NullReferenceException` is a `[StoreDefect]` even when the store would refuse the same query on a
 better day, because the attribute records what happened and not what was intended.
+
+**EF Core 11 adoption, November 12, 2026:** `StoreSupport` records a positive provider capability
+without misclassifying it as a limitation or inventing an issue. It requires the same pinned
+upstream evidence and justification as other store reasons. The first case is SQLite's successful
+byte-array join cache test, where the common specification expects translation failure. The
+override copies SQLite's answer assertions; live comparison still checks the statements and outcomes.
 
 **`[StoreIssue]` names any tracker, not only the store's.** `IssueTracker` chooses it and the
 attribute computes the key, so EF Core's own issues qualify: two Tier D tests fail because the store

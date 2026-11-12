@@ -3,7 +3,6 @@
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Xunit;
 using Row = InfoCarrier.Core.FunctionalTests.Sqlite.ExplicitClientEvaluationTest.Row;
 using RowContext = InfoCarrier.Core.FunctionalTests.Sqlite.ExplicitClientEvaluationTest.RowContext;
 
@@ -11,7 +10,7 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 public class ResidualReachabilityTest
 {
-    [ConditionalFact]
+    [Fact]
     public async Task A_client_helper_in_an_instance_receiver_keeps_its_translation_diagnostic()
     {
         await using SqliteInfoCarrierBackendTestStore store = await CreateStore();
@@ -26,7 +25,7 @@ public class ResidualReachabilityTest
         Assert.Empty(store.ServerSql.Statements);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Overlapping_concat_sources_reuse_deferred_entities_before_tracking(bool async)
@@ -40,7 +39,7 @@ public class ResidualReachabilityTest
         var query = rows.Where(row => row.Id <= 2).Select(row => LocalRow(row))
             .Concat(rows.Where(row => row.Id > 0).Select(row => LocalRow(row)));
         store.ServerSql.Clear();
-        Row[] results = async ? await query.ToArrayAsync() : query.ToArray();
+        Row[] results = async ? await query.ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken) : query.ToArray();
 
         Assert.Equal(new[] { 1, 2, 1, 2, 3 }, results.Select(row => row.Id));
         Assert.Same(results[0], results[2]);
@@ -49,12 +48,12 @@ public class ResidualReachabilityTest
         Assert.Equal(2, store.ServerSql.Statements.Count);
 
         store.ServerSql.Clear();
-        Row first = async ? await query.FirstAsync() : query.First();
+        Row first = async ? await query.FirstAsync(cancellationToken: TestContext.Current.CancellationToken) : query.First();
         Assert.Same(results[0], first);
         Assert.Equal(2, store.ServerSql.Statements.Count);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Paging_between_a_client_projection_and_First_keeps_offset_and_limit_on_the_server(bool async)
@@ -65,7 +64,7 @@ public class ResidualReachabilityTest
             .Select(row => BuildLastRow(row.Id, row.Name)).Skip(1).Take(1);
         store.ServerSql.Clear();
 
-        LastRow result = async ? await query.FirstAsync() : query.First();
+        LastRow result = async ? await query.FirstAsync(cancellationToken: TestContext.Current.CancellationToken) : query.First();
 
         Assert.Equal(new LastRow(2, "same"), result);
         string statement = Assert.Single(store.ServerSql.Statements);
@@ -74,7 +73,7 @@ public class ResidualReachabilityTest
         Assert.DoesNotContain("Unused", statement, StringComparison.Ordinal);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Last_over_a_client_projection_reverses_descending_keys_and_limits_the_server(bool async)

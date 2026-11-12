@@ -16,7 +16,7 @@ InfoCarrier.Core is an Entity Framework Core provider for client applications th
 through an application server. Write LINQ and save tracked changes through one generic server endpoint, without a controller
 for every entity. The database driver and connection string stay on the server.
 
-This README previews unreleased version 11 APIs, currently targeting .NET 10 and Entity Framework Core 10.
+This README previews unreleased version 11 APIs, targeting .NET 11 and Entity Framework Core 11.
 For available 10.3 packages, use the [published documentation](https://azabluda.github.io/InfoCarrier.Core/).
 The [installation guide](website/docs/getting-started/installation.md) describes package-based setup for version 11.
 

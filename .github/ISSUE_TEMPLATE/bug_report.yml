@@ -16,14 +16,14 @@ body:
     id: version
     attributes:
       label: Version
-      placeholder: "10.0.0"
+      placeholder: "11.0.0"
     validations:
       required: true
   - type: input
     id: provider
     attributes:
       label: The server's EF Core provider
-      placeholder: "Npgsql 10.0.0, SQL Server, SQLite, InMemory"
+      placeholder: "SQLite 11.0.0, SQL Server, InMemory"
     validations:
       required: true
   - type: textarea

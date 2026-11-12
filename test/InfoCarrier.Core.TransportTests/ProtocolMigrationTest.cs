@@ -8,7 +8,6 @@ using InfoCarrier.Core.Wire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Xunit.Abstractions;
 using InfoCarrier.WireContract;
 using Old = InfoCarrier.Core.Wire.V3.Common;
 using OldNodes = InfoCarrier.Core.Wire.V3.Expressions;
@@ -111,7 +110,7 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
         InfoCarrierEnvelope response = await dispatcher.DispatchAsync(new InfoCarrierEnvelope
         {
             ProtocolVersion = 3, Operation = InfoCarrierOperation.Query, Payload = serializer.Serialize(request),
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.Equal(3, response.ProtocolVersion);
         Assert.NotNull(response.Fault);
         Assert.Equal(0, ((ProtocolCompatibilityTest.CountingServer)server).Calls);
@@ -146,7 +145,7 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
         {
             ProtocolVersion = 3, Operation = InfoCarrierOperation.Query, Payload = serializer.Serialize(old),
             CorrelationId = "invalid-historical-meaning",
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.Equal(3, response.ProtocolVersion);
         Assert.Equal("invalid-historical-meaning", response.CorrelationId);
         Assert.NotNull(response.Fault);
@@ -175,10 +174,10 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
     {
         using var destination = new MemoryStream();
         var codec = new Protocol3WireProtocolCodec();
-        await codec.WriteFramesAsync(destination, Frames(), default);
+        await codec.WriteFramesAsync(destination, Frames(), TestContext.Current.CancellationToken);
         destination.Position = 0;
         var frames = new List<Wire.V3.Query.QueryStreamFrame>();
-        await foreach (Wire.V3.Query.QueryStreamFrame frame in Wire.V3.Query.QueryStreamFrameCodec.ReadAsync(destination))
+        await foreach (Wire.V3.Query.QueryStreamFrame frame in Wire.V3.Query.QueryStreamFrameCodec.ReadAsync(destination, TestContext.Current.CancellationToken))
         {
             frames.Add(frame);
         }
@@ -216,8 +215,8 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
             ProtocolVersion = 3, Operation = (Old.InfoCarrierOperation)999, Payload = [], CorrelationId = "unknown-old",
         });
         using var source = new MemoryStream(bytes);
-        InfoCarrierEnvelope request = (await Protocol.ReadEnvelopeAsync(serializer, source, default))!;
-        InfoCarrierEnvelope response = await Dispatcher(server, serializer).DispatchAsync(request);
+        InfoCarrierEnvelope request = (await Protocol.ReadEnvelopeAsync(serializer, source, TestContext.Current.CancellationToken))!;
+        InfoCarrierEnvelope response = await Dispatcher(server, serializer).DispatchAsync(request, TestContext.Current.CancellationToken);
         Old.InfoCarrierEnvelope encoded = serializer.Deserialize<Old.InfoCarrierEnvelope>(
             Protocol.Serialize(serializer, response, 3))!;
         Assert.Equal(3, encoded.ProtocolVersion);
@@ -254,7 +253,7 @@ public class ProtocolMigrationTest(ITestOutputHelper output) : IDisposable
         });
         using var source = new MemoryStream(body);
         InfoCarrierProtocolException failure = await Assert.ThrowsAsync<InfoCarrierProtocolException>(async () =>
-            await Protocol.ReadQueryAsync(serializer, source, 3, default));
+            await Protocol.ReadQueryAsync(serializer, source, 3, TestContext.Current.CancellationToken));
         Assert.Equal(0, failure.ClientVersion);
     }
 

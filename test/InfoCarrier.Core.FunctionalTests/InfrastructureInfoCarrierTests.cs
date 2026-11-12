@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests;
 
@@ -76,7 +75,7 @@ public class InfoCarrierServiceCollectionExtensionsTest()
         6,
         Justification = "InfoCarrier captures the expression at IDatabase. The later EF Core query translation "
             + "pipeline is therefore inapplicable.")]
-    [ConditionalFact]
+    [Fact]
     public override void Required_services_are_registered_with_expected_lifetimes()
     {
         Dictionary<Type, string> inapplicableServices = new()
@@ -139,13 +138,13 @@ public class InfoCarrierServiceCollectionExtensionsTest()
         Assert.Equal(expected, Assert.Throws<InvalidOperationException>(() => context.Database.CanConnect()).Message);
         Assert.Equal(
             expected,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureCreatedAsync())).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken))).Message);
         Assert.Equal(
             expected,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureDeletedAsync())).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken))).Message);
         Assert.Equal(
             expected,
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.CanConnectAsync())).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => context.Database.CanConnectAsync(TestContext.Current.CancellationToken))).Message);
     }
 
     [Fact]

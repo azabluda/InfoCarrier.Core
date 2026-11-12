@@ -9,6 +9,13 @@ internal static class ChildProcess
 {
     public static async Task<int> Main(string[] args)
     {
+        // xUnit v3's VSTest adapter starts this executable with its discovery/execution request.
+        // Keep the existing child-process modes for ScriptHost's process tests.
+        if (args.Length == 0 || args[0] == "@@")
+        {
+            return await Xunit.Runner.InProc.SystemConsole.ConsoleRunner.Run(args);
+        }
+
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         if (args[0] == "wait")
         {

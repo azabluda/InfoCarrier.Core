@@ -64,9 +64,13 @@ Delete old markers according to your application's retention policy.
 The marker and business changes must commit or roll back together.
 This applies to a transactional relational save. Check the document provider's transaction behavior;
 do not infer it from this library's request boundary.
-The MongoDB save path is covered by the existing atomic-save guidance.
-Entity Framework Core 10 Cosmos DB writes separate documents separately, so one marker cannot prove
-which other documents were saved.
+The MongoDB comparison tier is temporarily disabled during the EF Core 11 migration.
+Its earlier results do not establish transaction behavior for an EF Core 11 provider.
+
+EF Core 11's Cosmos DB provider groups writes into transactional batches by container and partition.
+The default can use several batches, so a marker in one batch does not prove another batch committed.
+Use the marker pattern only when the marker and all business changes are guaranteed to share one transaction.
+See Microsoft's [Cosmos DB transaction guidance](https://learn.microsoft.com/en-us/ef/core/what-is-new/ef-core-11.0/whatsnew#transactional-batches).
 
 Generated values in a lost response never reached the client.
 Prefer application-generated identifiers where appropriate, or reload using a durable business key.

@@ -46,7 +46,7 @@ public class HttpInfoCarrierTransportTest
         var transport = new HttpInfoCarrierTransport(
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
-        await transport.SendAsync(AnEnvelope());
+        await transport.SendAsync(AnEnvelope(), TestContext.Current.CancellationToken);
 
         Assert.Equal("https://example.test/infocarrier", seen?.ToString());
     }
@@ -60,7 +60,7 @@ public class HttpInfoCarrierTransportTest
         var transport = new HttpInfoCarrierTransport(
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
-        InfoCarrierEnvelope actual = await transport.SendAsync(AnEnvelope());
+        InfoCarrierEnvelope actual = await transport.SendAsync(AnEnvelope(), TestContext.Current.CancellationToken);
 
         Assert.Equal("abc-123", actual.CorrelationId);
         Assert.Equal(InfoCarrierOperation.BeginTransaction, actual.Operation);
@@ -78,7 +78,7 @@ public class HttpInfoCarrierTransportTest
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
         InfoCarrierTransportException exception =
-            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transport.SendAsync(AnEnvelope()));
+            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transport.SendAsync(AnEnvelope(), TestContext.Current.CancellationToken));
 
         Assert.Contains("502", exception.Message);
         Assert.Contains("upstream is down", exception.Message);
@@ -96,7 +96,7 @@ public class HttpInfoCarrierTransportTest
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
         InfoCarrierTransportException exception =
-            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transport.SendAsync(AnEnvelope()));
+            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transport.SendAsync(AnEnvelope(), TestContext.Current.CancellationToken));
 
         Assert.NotNull(exception.InnerException);
     }
@@ -122,10 +122,8 @@ public class HttpInfoCarrierTransportTest
         var transport = (IInfoCarrierStreamTransport)new HttpInfoCarrierTransport(
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
-        await using IInfoCarrierResponse response = await transport.SendAsync(
-            InfoCarrierOperation.Query,
-            async (destination, cancellationToken) =>
-                await destination.WriteAsync(expected, cancellationToken));
+        await using IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query, async (destination, cancellationToken) =>
+                await destination.WriteAsync(expected, cancellationToken), TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, requestBody);
         Assert.True(streamingEnabled);
@@ -141,8 +139,7 @@ public class HttpInfoCarrierTransportTest
         var transport = (IInfoCarrierStreamTransport)new HttpInfoCarrierTransport(
             new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") }, Serializer);
 
-        IInfoCarrierResponse response = await transport.SendAsync(
-            InfoCarrierOperation.Query, (_, _) => ValueTask.CompletedTask);
+        IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query, (_, _) => ValueTask.CompletedTask, TestContext.Current.CancellationToken);
         await response.DisposeAsync();
 
         Assert.True(content.Disposed);

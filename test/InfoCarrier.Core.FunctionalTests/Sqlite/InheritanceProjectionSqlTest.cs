@@ -2,14 +2,13 @@
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
 /// <summary>Final scalar projections do not wrap an inheritance union in a subquery.</summary>
 public class InheritanceProjectionSqlTest
 {
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_one_column_projection_over_a_derived_hierarchy_keeps_EFs_union(bool async)
@@ -53,7 +52,7 @@ public class InheritanceProjectionSqlTest
         store.AssertServerSql(direct);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task A_two_column_shadow_projection_keeps_EFs_union(bool async)

@@ -47,12 +47,12 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         _ = host.CreateClient();
         InProcessInfoCarrierServer server = host.Services.GetRequiredKeyedService<InProcessInfoCarrierServer>(
             host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.Identity);
-        await server.BeginTransactionAsync();
-        await server.BeginTransactionAsync();
+        await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         if (idle)
         {
             clock.Advance(TimeSpan.FromMinutes(11));
-            await completed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
         else { await server.DisposeAsync(); }
         Assert.Equal(2, interceptor.Rollbacks);
@@ -86,7 +86,7 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         using var client = host.CreateClient();
         InProcessInfoCarrierServer server = host.Services.GetRequiredKeyedService<InProcessInfoCarrierServer>(
             host.Services.GetRequiredService<InfoCarrierServerRegistrationStore>().Default.Identity);
-        string token = (await server.BeginTransactionAsync()).TransactionId;
+        string token = (await server.BeginTransactionAsync(TestContext.Current.CancellationToken)).TransactionId;
         clock.Advance(TimeSpan.FromMinutes(11));
         await server.DisposeAsync();
         var eviction = Assert.Single(logs.Entries);
@@ -113,13 +113,13 @@ public class ServerCleanupLoggingTest(NorthwindServerFactory factory) : IClassFi
         services.AddSingleton(_ => new AdvanceOnDispose(clock));
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var server = provider.GetRequiredService<IInfoCarrierServer>();
-        await server.BeginTransactionAsync();
+        await server.BeginTransactionAsync(TestContext.Current.CancellationToken);
         _ = provider.GetRequiredService<AdvanceOnDispose>();
         Task shutdown = provider.DisposeAsync().AsTask();
         Assert.Equal(1, interceptor.Rollbacks);
         try { Assert.False(shutdown.IsCompleted); }
         finally { release.TrySetResult(); }
-        await shutdown.WaitAsync(TimeSpan.FromSeconds(10));
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Single(logs.Entries, e => e.Id.Id == 35021);
         Assert.Single(logs.Entries, e => e.Id.Id == 35022);
     }

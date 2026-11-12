@@ -40,7 +40,7 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
 
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -52,9 +52,10 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
+        NonSharedFixture = null;
 
         // `Test` builds the context factory TWICE, and the second call is where every model in
         // this class would otherwise be lost. The first carries the test's model customization;
@@ -72,11 +73,11 @@ public class CompiledModelInfoCarrierTest(NonSharedFixture fixture) : CompiledMo
         // would replace the model the server is meant to build for itself with the client's.
         _harness.Prepare(
             typeof(TContext), _lastOnModelCreating, addServices, onConfiguring: null, configureConventions,
-            AddOptions);
+            AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 
     /// <summary>

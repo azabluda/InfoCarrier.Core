@@ -95,13 +95,13 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         if (clientShape && !serverShape)
         {
-            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(beforeQuery, counter.ReaderExecutions);
         }
         else
         {
-            var rows = await query.ToListAsync();
+            var rows = await query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(NorthwindSeed.OrderCount, rows.Sum(row => row.Count));
             Assert.All(rows, row => Assert.Equal(prototype.GetType(), row.GetType()));
             Assert.True(counter.ReaderExecutions > beforeQuery);
@@ -127,9 +127,9 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         shapes[0] = new { Other = 0 };
 
         InvalidOperationException first = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
-            .Select(order => new { order.Id, order.CustomerId }).ToListAsync());
+            .Select(order => new { order.Id, order.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         InvalidOperationException second = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
-            .Select(order => new { Code = order.CustomerId }).ToListAsync());
+            .Select(order => new { Code = order.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("catalog", first.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("catalog", second.Message, StringComparison.OrdinalIgnoreCase);
@@ -137,7 +137,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         Assert.Equal(beforeQuery, counter.ReaderExecutions);
 
         using NorthwindContext undeclared = CreateClientContext(unconfigured, registerShape: false, out RecordingHandler other);
-        var rows = await undeclared.Orders.Select(order => new { Code = order.CustomerId }).ToListAsync();
+        var rows = await undeclared.Orders.Select(order => new { Code = order.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal(1, other.RequestCount);
     }
@@ -169,13 +169,13 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
 
         if (clientShape && !serverShape)
         {
-            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync());
+            InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(beforeQuery, counter.ReaderExecutions);
         }
         else
         {
-            var rows = await query.ToListAsync();
+            var rows = await query.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(NorthwindSeed.OrderCount, rows.Sum(row => row.Count));
             Assert.All(rows, row => Assert.Equal(prototype.GetType(), row.GetType()));
             Assert.True(counter.ReaderExecutions > beforeQuery);
@@ -192,7 +192,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         using NorthwindContext context = CreateClientContext(unconfigured, registerShape: false, out RecordingHandler recorder);
 
         var rows = await context.Orders.OrderBy(o => o.Id)
-            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
@@ -213,7 +213,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         using NorthwindContext context = CreateClientContext(unconfigured, registerShape: true, out RecordingHandler recorder);
 
         InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
-            .Select(o => new { o.Id, o.CustomerId }).ToListAsync());
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("catalog", refusal.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, recorder.RequestCount);
@@ -226,7 +226,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         using NorthwindContext context = CreateClientContext(factory, registerShape: false, out RecordingHandler recorder);
 
         var rows = await context.Orders.OrderBy(o => o.Id)
-            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
@@ -240,7 +240,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         using NorthwindContext context = CreateClientContext(factory, registerShape: true, out RecordingHandler recorder);
 
         var rows = await context.Orders.OrderBy(o => o.Id)
-            .Select(o => new { o.Id, o.CustomerId }).ToListAsync();
+            .Select(o => new { o.Id, o.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal(prototype.GetType(), rows[0].GetType());
@@ -265,7 +265,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         {
             order.Id,
             Customer = new { order.CustomerId },
-        }).ToListAsync();
+        }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal(prototype.GetType(), rows[0].GetType());
@@ -286,7 +286,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             configured, registerShape: true, out RecordingHandler recorder);
 
         InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
-            .OrderBy(order => new { order.Id, order.CustomerId }).ToListAsync());
+            .OrderBy(order => new { order.Id, order.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("translated", refusal.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, recorder.RequestCount);
@@ -300,7 +300,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             factory, registerShape: false, out RecordingHandler recorder, allowRecord: false);
 
         List<OrderCard> rows = await context.Orders.OrderBy(order => order.Id)
-            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync();
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
@@ -319,7 +319,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             unconfigured, registerShape: false, out RecordingHandler recorder, allowRecord: true);
 
         InvalidOperationException refusal = await Assert.ThrowsAsync<InvalidOperationException>(() => context.Orders
-            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync());
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("allowed", refusal.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, recorder.RequestCount);
@@ -343,7 +343,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
             configured, registerShape: false, out RecordingHandler recorder, allowRecord: true);
 
         List<OrderCard> rows = await context.Orders.OrderBy(order => order.Id)
-            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync();
+            .Select(order => new OrderCard(order.Id, order.CustomerId)).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
@@ -359,7 +359,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         List<Customer> customers = await context.Customers
             .Where(c => c.Country == "Germany")
             .OrderBy(c => c.Id)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Every German customer the seed defines, in id order. An exact set rather than a count:
         // a Where that silently matched everything would still produce a plausible number.
@@ -376,7 +376,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         var rows = await context.Orders
             .OrderBy(o => o.Id)
             .Select(o => new { o.Id, o.CustomerId })
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
         Assert.Equal("ALFKI", rows[0].CustomerId);
@@ -427,7 +427,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
     {
         using NorthwindContext context = CreateClientContext(factory, out RecordingHandler recorder);
 
-        int count = await context.OrderDetails.CountAsync(d => d.Quantity >= 10);
+        int count = await context.OrderDetails.CountAsync(d => d.Quantity >= 10, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(330, count);
 
@@ -456,7 +456,7 @@ public class NorthwindOverHttpTest(NorthwindServerFactory factory) : IClassFixtu
         using var httpClient = new HttpClient(recorder) { BaseAddress = endpoint.BaseAddress };
         using NorthwindContext context = CreateClientContext(httpClient);
 
-        Order order = await context.Orders.SingleAsync(o => o.Id == 1);
+        Order order = await context.Orders.SingleAsync(o => o.Id == 1, cancellationToken: TestContext.Current.CancellationToken);
 
         // The initial query asked for orders and nothing else. A defect that eagerly over-fetched
         // Customer and OrderDetails during this call would make every assertion below pass while

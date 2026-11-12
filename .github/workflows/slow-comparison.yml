@@ -8,9 +8,9 @@ on:
       suite:
         description: Store comparisons to run
         required: true
-        default: both
+        default: sqlite
         type: choice
-        options: [both, sqlite, firebird]
+        options: [sqlite]
       ref:
         description: Optional commit or branch to test instead of the selected branch
         required: false
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  DOTNET_VERSION: '10.0.x'
+  DOTNET_VERSION: '11.0.x'
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
   CI: true
 
@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        store: ${{ fromJSON(inputs.suite == 'both' && '["Sqlite","Firebird"]' || inputs.suite == 'sqlite' && '["Sqlite"]' || '["Firebird"]') }}
+        store: [Sqlite]
     env:
       STORE: ${{ matrix.store }}
       REQUESTED_REF: ${{ inputs.ref || github.ref }}

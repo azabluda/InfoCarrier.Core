@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -49,7 +48,7 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
                 () => base.Intercept_query_materialization_with_owned_types_projecting_collection(async, usePooling))).Message);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -61,9 +60,10 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
+        NonSharedFixture = null;
 
         // The model goes to the server; the interceptors do not (C71). `AddProviderOptions`
         // forwards the test's `onConfiguring` and `addServices` so the two models match (A49) —
@@ -79,11 +79,11 @@ public class MaterializationInterceptionInfoCarrierTest(NonSharedFixture fixture
         // two. Scoped to this class because only here is the forwarded payload *only* interceptors
         // — `PropertyValuesFixtureBase` registers one server-side on purpose and keeps it.
         _harness.Prepare(
-            typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions, AddOptions);
+            typeof(TContext), onModelCreating, addServices: null, onConfiguring: null, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 
     /// <summary>

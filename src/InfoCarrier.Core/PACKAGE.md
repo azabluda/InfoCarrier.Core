@@ -19,7 +19,7 @@ builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 
 The server uses its own database provider and the `InfoCarrier.Core.AspNetCore` HTTP endpoint.
 Both sides need matching model definitions and compatible InfoCarrier versions.
-This development build still uses Entity Framework Core 10.
+This development build uses Entity Framework Core 11.
 
 ## Getting started
 

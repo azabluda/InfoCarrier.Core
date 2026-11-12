@@ -5,7 +5,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 

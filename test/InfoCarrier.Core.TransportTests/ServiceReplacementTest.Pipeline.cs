@@ -43,13 +43,13 @@ public partial class ServiceReplacementTest
             configure: options => options.MaxRequestBytes = null);
         IInfoCarrierServer limitedServer = limited.App.Services.GetInfoCarrierServerEndpoint("orders").Server;
         IInfoCarrierServer unlimitedServer = unlimited.App.Services.GetInfoCarrierServerEndpoint("orders").Server;
-        InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(() => limitedServer.QueryDataAsync(request));
+        InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(() => limitedServer.QueryDataAsync(request, TestContext.Current.CancellationToken));
         Assert.Contains("MaxRequestBytes", failure.Message);
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await foreach (QueryStreamFrame _ in ((IInfoCarrierStreamServer)limitedServer).QueryFramesAsync(request)) { }
+            await foreach (QueryStreamFrame _ in ((IInfoCarrierStreamServer)limitedServer).QueryFramesAsync(request, TestContext.Current.CancellationToken)) { }
         });
-        QueryDataResult result = await unlimitedServer.QueryDataAsync(request);
+        QueryDataResult result = await unlimitedServer.QueryDataAsync(request, TestContext.Current.CancellationToken);
         DynamicValueNode row = Assert.Single(BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults));
         Assert.Equal("0", row.PrimitiveValue?.ToString());
     }
@@ -78,12 +78,12 @@ public partial class ServiceReplacementTest
             IsAsync = false, ReturnsSingleResult = false,
         };
         if (mode == "sync") { Assert.Throws<InvalidOperationException>(() => server.QueryData(request)); }
-        else if (mode == "async") { await Assert.ThrowsAsync<InvalidOperationException>(() => server.QueryDataAsync(request)); }
+        else if (mode == "async") { await Assert.ThrowsAsync<InvalidOperationException>(() => server.QueryDataAsync(request, TestContext.Current.CancellationToken)); }
         else
         {
             await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             {
-                await foreach (QueryStreamFrame _ in ((IInfoCarrierStreamServer)server).QueryFramesAsync(request)) { }
+                await foreach (QueryStreamFrame _ in ((IInfoCarrierStreamServer)server).QueryFramesAsync(request, TestContext.Current.CancellationToken)) { }
             });
         }
         Assert.Equal(1, disposed);
@@ -115,7 +115,7 @@ public partial class ServiceReplacementTest
         {
             Context context = scope.ServiceProvider.GetRequiredService<Context>();
             context.Add(new Item { Id = 1, Name = "streamed" });
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             ExpressionNode node = ExpressionSerializer.CreateForModel(context.Model).ToNode(
                 ((IQueryable<Item>)context.Items).Expression);
             request = new QueryDataRequest
@@ -160,11 +160,11 @@ public partial class ServiceReplacementTest
             IsAsync = false, ReturnsSingleResult = false,
         };
         Assert.ThrowsAny<Exception>(() => server.QueryData(request));
-        await Assert.ThrowsAnyAsync<Exception>(() => server.QueryDataAsync(request));
+        await Assert.ThrowsAnyAsync<Exception>(() => server.QueryDataAsync(request, TestContext.Current.CancellationToken));
         await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
             await foreach (QueryStreamFrame _ in Assert.IsAssignableFrom<IInfoCarrierStreamServer>(server)
-                .QueryFramesAsync(request)) { }
+                .QueryFramesAsync(request, TestContext.Current.CancellationToken)) { }
         });
         Assert.Equal(3, calls.Pipelines);
         Assert.Equal(3, calls.PipelineDisposals);
@@ -232,17 +232,17 @@ public partial class ServiceReplacementTest
                     .ReplaceService<IDynamicValueMapper, RecordingValueMapper>().Options;
                 await using (var db = new Context(options))
                 {
-                    await using var transaction = await db.Database.BeginTransactionAsync();
+                    await using var transaction = await db.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
                     db.Add(new Item { Id = 1, Name = "inserted" });
-                    Assert.Equal(1, await db.SaveChangesAsync());
+                    Assert.Equal(1, await db.SaveChangesAsync(TestContext.Current.CancellationToken));
                     db.ChangeTracker.Clear();
-                    Item item = await db.Items.SingleAsync();
+                    Item item = await db.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
                     Assert.Equal("inserted", item.Name);
                     Assert.Equal(EntityState.Unchanged, db.Entry(item).State);
-                    Assert.Same(item, await db.Items.SingleAsync());
+                    Assert.Same(item, await db.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
                     item.Name = "committed";
-                    Assert.Equal(1, await db.SaveChangesAsync());
-                    await transaction.CommitAsync();
+                    Assert.Equal(1, await db.SaveChangesAsync(TestContext.Current.CancellationToken));
+                    await transaction.CommitAsync(TestContext.Current.CancellationToken);
                     Assert.True(Assert.IsType<RecordingValueMapper>(db.GetService<IDynamicValueMapper>()).Calls > 0);
                 }
                 // All server pipelines above received the same actual transaction context.

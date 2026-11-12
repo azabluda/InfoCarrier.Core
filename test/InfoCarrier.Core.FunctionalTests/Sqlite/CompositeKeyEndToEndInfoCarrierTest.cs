@@ -28,7 +28,7 @@ public class CompositeKeyEndToEndInfoCarrierTest(CompositeKeyEndToEndInfoCarrier
     /// <inheritdoc />
     /// <remarks>EF's own SQLite class skips it: SQLite generates no value for a key of more than one column.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CompositeKeyEndToEndSqliteTest.cs", 12, 14,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CompositeKeyEndToEndSqliteTest.cs", 10, 12,
         Justification = "Not supported on Sqlite",
         Skip = true)]
     public override Task Can_use_generated_values_in_composite_key_end_to_end()

@@ -64,7 +64,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         List<OrderDetail> lines = await context.OrderDetails
             .Where(d => d.OrderId == 4)
             .OrderBy(d => d.ProductId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, lines.Count);
 
@@ -78,7 +78,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         // the preceding query above also costs a request.
         int requestCountBeforeSave = recorder.RequestCount;
 
-        int written = await context.SaveChangesAsync();
+        int written = await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, recorder.RequestCount - requestCountBeforeSave);
         Assert.Equal(2, written);
@@ -88,7 +88,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
             .Where(d => d.OrderId == 4)
             .OrderBy(d => d.ProductId)
             .Select(d => d.Quantity)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal([8, 12], quantities);
     }
@@ -108,7 +108,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
 
         int requestCountBeforeSave = recorder.RequestCount;
 
-        DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(1, recorder.RequestCount - requestCountBeforeSave);
 
@@ -116,7 +116,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         Assert.Equal("ALFKI", ((Customer)entry.Entity).Id);
 
         using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
-        Assert.False(await verify.Customers.AnyAsync(c => c.Id == "ZZZ01" || c.Id == "ZZZ03"));
+        Assert.False(await verify.Customers.AnyAsync(c => c.Id == "ZZZ01" || c.Id == "ZZZ03", cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         var category = new Category { Name = "Seafood" };
         context.Categories.Add(category);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // The client held a temporary placeholder before the save; the store's own key comes
         // back by correlation id (research-findings 9).
@@ -141,7 +141,7 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
         // would either fetch nothing (SingleOrDefaultAsync returns null) or fetch a different row
         // whose Name is not "Seafood".
         using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
-        Category? roundTripped = await verify.Categories.SingleOrDefaultAsync(c => c.Id == category.Id);
+        Category? roundTripped = await verify.Categories.SingleOrDefaultAsync(c => c.Id == category.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(roundTripped);
         Assert.Equal("Seafood", roundTripped.Name);
@@ -152,14 +152,14 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
     {
         using NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(factory);
 
-        int before = await context.Products.CountAsync();
+        int before = await context.Products.CountAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync())
+        using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             context.Products.Add(
                 new Product { Name = "Rolled back", UnitPrice = 1.0m, UnitsInStock = 1, CategoryId = 1 });
 
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
             // Nothing so far proves the insert ever reached the store -- a SaveChangesAsync that
             // was a complete no-op inside an open transaction would leave the final count equal
@@ -167,13 +167,13 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
             // undoes a real write. Querying on the same context, inside the still-open
             // transaction, is what tells "rolled back a real write" apart from "never wrote
             // anything".
-            Assert.Equal(before + 1, await context.Products.CountAsync());
+            Assert.Equal(before + 1, await context.Products.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
 
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync(TestContext.Current.CancellationToken);
         }
 
         using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
-        Assert.Equal(before, await verify.Products.CountAsync());
+        Assert.Equal(before, await verify.Products.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -181,17 +181,17 @@ public class NorthwindWritesOverHttpTest(NorthwindServerFactory factory) : IClas
     {
         using NorthwindContext context = NorthwindOverHttpTest.CreateClientContext(factory);
 
-        using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync())
+        using (IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             context.Products.Add(
                 new Product { Name = "Committed", UnitPrice = 2.0m, UnitsInStock = 4, CategoryId = 1 });
 
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(TestContext.Current.CancellationToken);
         }
 
         using NorthwindContext verify = NorthwindOverHttpTest.CreateClientContext(factory);
-        Assert.True(await verify.Products.AnyAsync(p => p.Name == "Committed"));
+        Assert.True(await verify.Products.AnyAsync(p => p.Name == "Committed", cancellationToken: TestContext.Current.CancellationToken));
     }
 }

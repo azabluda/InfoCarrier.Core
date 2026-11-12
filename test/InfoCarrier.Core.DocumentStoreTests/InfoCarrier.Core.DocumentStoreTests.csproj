@@ -1,94 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <!--
-    ADR-009 TIER D: the spec suite's fourth backing store, and the only one that is not a database
-    of tables. It exists to prove a NEGATIVE, that this provider is not relational-only, which the
-    other three tiers can only assert by implication.
-
-    A PROJECT OF ITS OWN, AND THE REASON IS NOT THE ONE THAT SPLIT THE SUITE BEFORE. R136 merged
-    the spec projects back together because the split existed to keep a package off Tier A's
-    compile line and that package was gone. This split has a live reason instead:
-    `MongoDB.EntityFrameworkCore` requires Entity Framework Core >= 10.0.11, and `src/` compiles
-    against a 10.0.1 floor on purpose. Putting them in one project makes central package management
-    refuse the graph (NU1109), and forcing it would drag the whole 29,000-test suite onto a
-    different EF Core patch than the product is built against.
-
-    Keeping it apart also means the EF version the tier runs on is a property of this file rather
-    than of the whole repository, which is exactly what a tier pinning a non-relational store wants.
-
-    NO SPECIFICATION BASES LIVE HERE, so none of EF's spec-test packages are referenced. That is
-    the design and not an omission: Tiers B and C adopt bases to GAIN coverage, and this one owns a
-    small, deliberate set of tests whose green means something no relational store can mean. If a
-    compliance test ever appears here demanding every base be adopted against a document store, it
-    has misread the tier.
-  -->
+  <!-- Tier D is suspended until MongoDB.EntityFrameworkCore supports EF Core 11.
+       Keep its source for restoration. No EF Core 10 package graph is retained. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <IsPackable>false</IsPackable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
-
-  <ItemGroup>
-    <!--
-      ABOVE THE FLOOR `src/` COMPILES AGAINST, DELIBERATELY. The Mongo provider requires >= 10.0.11
-      and this repository ships against >= 10.0.1, so this project runs the product on a NEWER EF
-      Core than it was built with. That is the configuration a consumer is really in, and the one
-      that would have caught the defect 10.1.1 fixed.
-    -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" VersionOverride="10.0.11" />
-
-    <!--
-      THE EF BUMP CASCADES, and this is the whole cost of running one project above the repository
-      floor. EF Core 10.0.11 reaches Microsoft.Extensions.Logging 10.0.11, which floors
-      Microsoft.Extensions.DependencyInjection at 10.0.11, above the 10.0.9 pinned centrally. The
-      override is local to this project, so `src/` and the main suite keep the versions they ship
-      against.
-    -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.11" />
-
-    <!--
-      THE HARNESS BRINGS THIS, AND THE OVERRIDE KEEPS IT ON THE SAME EF CORE AS EVERYTHING ELSE
-      HERE. InfoCarrier.Core.TestUtilities references the spec-test package at the repository floor,
-      so without this line the transitive pin would put 10.0.1 in this tier's output beside EF Core
-      10.0.11. That resolves — the 10.0.1 package asks only for EF >= 10.0.1 — but it would make
-      this the one project running two EF Core patches at once for no reason. The package publishes
-      the whole 10.0.x band, so the tier can name its own.
-    -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Specification.Tests" VersionOverride="10.0.11" />
-
-    <!--
-      AND THE SPEC-TEST PACKAGE CASCADES IN TURN. It reaches Microsoft.EntityFrameworkCore.Proxies
-      directly and Microsoft.EntityFrameworkCore.Relational through EF's design package, both at
-      10.0.11, and central transitive pinning would hold them at 10.0.1 — which NuGet reports as a
-      downgrade (NU1109) rather than resolving quietly. Naming them here is the whole cost of this
-      tier running above the repository floor, and the errors say exactly which packages to name,
-      so this list does not have to be guessed.
-    -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" VersionOverride="10.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" VersionOverride="10.0.11" />
-
-    <PackageReference Include="Mongo2Go" />
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" VersionOverride="10.0.11" />
-    <PackageReference Include="MongoDB.EntityFrameworkCore" />
-
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="coverlet.collector" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\InfoCarrier.Core.Abstractions\InfoCarrier.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\InfoCarrier.Core\InfoCarrier.Core.csproj" />
-    <ProjectReference Include="..\..\src\InfoCarrier.Core.AspNetCore\InfoCarrier.Core.AspNetCore.csproj" />
-    <!--
-      THE SECOND CONSUMER OF THE SHARED HARNESS, AND THE REASON IT IS A PROJECT AGAIN. It is built
-      at the repository's 10.0.1 floor and runs here on 10.0.11, which is the same compile-low /
-      run-high arrangement this tier already has with `src/InfoCarrier.Core` itself.
-    -->
-    <ProjectReference Include="..\InfoCarrier.Core.TestUtilities\InfoCarrier.Core.TestUtilities.csproj" />
-  </ItemGroup>
-
+  <Target Name="TierDSuspended" BeforeTargets="Build;VSTest">
+    <Error Text="Tier D is suspended pending a MongoDB provider for EF Core 11. See docs/plans/v11/adoption-checklist.md." />
+  </Target>
 </Project>

@@ -17,6 +17,14 @@ twice.
 
 ### 1.1 The property-bag materializer skips a guard the same method applies eight lines later
 
+**EF Core 11 recheck, November 12, 2026.** Ordinary property-bag complex values now materialize
+successfully. `PropertyBagComplexTypeTest.Reading_a_property_bag_complex_value_matches_the_direct_query`
+checks direct SQLite and wire reads, including the concrete `List<string>` member type. The server
+therefore uses the full materializer for these values. The inherited
+`Can_track_entity_with_complex_property_bag_collections` still reaches the indexer exception while
+constructing a complex collection from a value buffer. The empty-materializer workaround remains
+only for property-bag complex collections. The EF Core 10 diagnosis below is historical.
+
 **Site.** `StructuralTypeMaterializerSource.AddInitializeExpression`, its local function
 `CreateMemberAssignment`, in the branch taken when `IsPrimitiveCollection` is true and the CLR type
 is not an array. That branch calls `MakeMemberAccess(parameter, property.GetMemberInfo(…))`, and
@@ -371,6 +379,10 @@ record of its InMemory provider.
 
 ### 1.12 EF's relational pipeline leaves a primitive-collection parameter without a type mapping
 
+**EF Core 11 recheck, November 12, 2026.** All three refusal overrides remain in the relational
+specification base at `v11.0.0`. The uncorrelated-list fix in section 2 does not remove these
+expectations. The inherited tests pass without a local override.
+
 **Recorded 2026-09-15, first diagnosed in R31.** EF's `PrimitiveCollectionsQueryRelationalTestBase`
 overrides three core tests to assert that the query is refused. **This provider answered all three
 until 2026-09-15, two until 2026-09-20, one until 2026-09-22, and none now**: all three inherit EF's
@@ -430,6 +442,34 @@ used to group the rows itself. That is EF's behaviour, which the owner prefers t
 answer. `ServerParameterizationTest.A_final_GroupBy_on_an_anonymous_key_groups_at_the_store` leaves
 `Id` out of its key for this reason.
 
+### 1.14 Bulk updates between nested navigation-mapped associates fail in expression construction
+
+Rechecked against EF Core 11.0.0, November 12, 2026. The upstream SQLite test
+`NavigationsBulkUpdateSqliteTest.Update_nested_associate_to_another_nested_associate`
+expects `InvalidOperationException`. The same failure occurs through InfoCarrier. Its inner
+`ArgumentException` says that a transparent identifier's `Inner` field does not belong to the
+identifier type being constructed. This is an expression construction failure, rather than a
+deliberate translation refusal. It blocks this bulk update. The test retains upstream's
+assertion and records a defect category. No external report has been filed.
+
+### 1.15 A bulk update of a projected associate with ordering and pagination returns the wrong count
+
+Rechecked against EF Core 11.0.0, November 12, 2026. The upstream SQLite test
+`NavigationsBulkUpdateSqliteTest.Update_property_on_projected_associate_with_OrderBy_Skip`
+expects xUnit's `EqualException`. InfoCarrier reaches the same assertion failure. This records
+a wrong result, not a translation limit. The adopted test retains upstream's assertion.
+No external report has been filed.
+
+### 1.16 SQLite loses subsecond precision in the AddTicks translation
+
+Rechecked against EF Core 11.0.0, November 12, 2026. Running the inherited
+`NorthwindMiscellaneousQueryTestBase.Select_expression_datetime_add_ticks` produces
+`1996-07-04T00:00:00.0000000` where its expected value is
+`1996-07-04T00:00:00.0010000`. The upstream SQLite override changes the scenario to whole
+seconds and documents inaccurate subsecond results. The adopted override retains that scenario,
+but its category is a defect because the original query returns an incorrect value rather than
+refusing translation. No external report has been filed.
+
 ## 2. Already reported
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
@@ -441,6 +481,6 @@ reader meeting one of these numbers in a comment can see what it covers.
 | [dotnet/efcore#36401](https://github.com/dotnet/efcore/issues/36401) | An owned JSON entity compared to a **parameterized** null translates to `WHERE 0 = 1` instead of `IS NULL`, so the rows are wrong | `Associate_with_parameter_null`. This provider answered it correctly until V8, by the accident of sending the parameter inline; it now reproduces EF's answer, and the `limitations.md` entry claiming otherwise is removed |
 | [dotnet/efcore#33522](https://github.com/dotnet/efcore/issues/33522) | A `byte[]` inside a JSON document is not comparable by value | `Json_predicate_on_byte_array`. EF's own SQLite override adopted in C85 |
 | [dotnet/efcore#30730](https://github.com/dotnet/efcore/issues/30730) | `Array_of_TimeOnly` round-trips wrong on SQLite | Reclassified from "ours" to SQLite's in one run, by reading the row the store actually holds |
-| [dotnet/efcore#37370](https://github.com/dotnet/efcore/issues/37370) | A compiled query over a list parameter that nothing compares with a column throws `UnreachableException`, because EF has no element type mapping to give the list. Fixed by dotnet/efcore#37372 for EF Core 11 only; `release/10.0` still has the old code (read 2026-09-21) | `ServerParameterizationTest.A_compiled_query_consuming_a_list_fails_where_EF_Core_10_fails`, which asserts the same failure over the wire in `Constant` and `MultipleParameters` mode. **Parked until EF 11 by the owner (2026-09-22)**: this provider behaves as plain EF Core does, and that test turns red when the server runs EF 11. **Listed since a comment first cited it**; before that the owner kept it out, because §2 lists only numbers this repository cites |
+| [dotnet/efcore#37370](https://github.com/dotnet/efcore/issues/37370) | A compiled query over an uncorrelated list could throw `UnreachableException`. Fixed by [dotnet/efcore#37372](https://github.com/dotnet/efcore/pull/37372), shipped in EF Core 11.0.0; rechecked November 12, 2026. | `ServerParameterizationTest.A_compiled_query_consuming_a_list_matches_the_direct_query` now checks all three collection modes. The obsolete failure-only test was removed. |
 | [dotnet/efcore#31751](https://github.com/dotnet/efcore/issues/31751) | Lazy-loading proxies need threads, which WebAssembly has none of | Automatic lazy loading in Blazor WebAssembly. Not a defect this repository found; listed because two documents cite it |
 | [FirebirdSQL/NETProvider#1277](https://github.com/FirebirdSQL/NETProvider/issues/1277) | `FbQuerySqlGenerator` wraps a plain table after `LATERAL` and never added the branch for a function, which is the whole of that provider's fourteen "Not supported on Firebird" skips | Tier C. **Reported by this repository on 2026-09-04**, with the repro and the suggested branch. `FirebirdLateralQuerySqlGenerator` in the test harness is the correction, and is deleted when the fix lands. **Still open at `EFCore-13.0.0.0`, read in `subrepos/firebird` on 2026-09-20**: `VisitCrossApply` and `VisitOuterApply` wrap a `TableExpression` and pass everything else to `Visit`, and `VisitTableValuedFunction` writes the bare function |

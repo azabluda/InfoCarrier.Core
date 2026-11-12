@@ -76,7 +76,7 @@ public class ChainedClientLoggingTest
     {
         using var chain = new Chain(middleGrant, downstreamGrant, sensitive);
         using var context = chain.CreateClient();
-        Assert.Equal("one", Assert.Single(await context.Items.ToListAsync()).Name);
+        Assert.Equal("one", Assert.Single(await context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Name);
         bool downstreamCommand = chain.DownstreamResult?.ServerLog?.Any(e => e.Category == "Microsoft.EntityFrameworkCore.Database.Command") == true;
         bool upstreamCommand = chain.UpstreamResult?.ServerLog?.Any(e => e.Category == "Microsoft.EntityFrameworkCore.Database.Command") == true;
         Assert.Equal(downstreamGrant && !sensitive, downstreamCommand);
@@ -136,7 +136,7 @@ public class ChainedClientLoggingTest
         {
             chain.Downstream.Transform = r => r;
             using var verification = chain.Downstream.CreateClient();
-            Assert.Equal(2, await verification.Items.CountAsync());
+            Assert.Equal(2, await verification.Items.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.DoesNotContain("rolled back", middle.Message);
         }
     }
@@ -152,7 +152,7 @@ public class ChainedClientLoggingTest
             using var clientScope = chain.ClientFactory.CreateLogger("host").BeginScope(scopeName);
             using var middleScope = chain.MiddleFactory.CreateLogger("host").BeginScope(scopeName);
             using var context = chain.CreateClient();
-            Assert.NotNull(await Record.ExceptionAsync(() => context.Items.ToListAsync()));
+            Assert.NotNull(await Record.ExceptionAsync(() => context.Items.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)));
         })));
         for (int i = 0; i < 6; i++)
         {

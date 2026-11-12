@@ -1,14 +1,12 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -68,19 +66,19 @@ public partial class ServerParameterizationTest
 {
     private readonly List<string> _sink = [];
 
-    [ConditionalFact]
+    [Fact]
     public Task A_scalar_string_parameter_stays_a_parameter()
         => AssertSameStatement(
             "beta",
             static (blogs, title) => blogs.Where(b => b.Title == title));
 
-    [ConditionalFact]
+    [Fact]
     public Task A_scalar_int_parameter_stays_a_parameter()
         => AssertSameStatement(
             2,
             static (blogs, minId) => blogs.Where(b => b.Id >= minId));
 
-    [ConditionalFact]
+    [Fact]
     public Task A_collection_parameter_stays_an_IN_list()
         => AssertSameStatement(
             new List<string> { "alpha", "gamma" },
@@ -107,7 +105,7 @@ public partial class ServerParameterizationTest
     ///         passed before the fix, which makes it the control.
     ///     </para>
     /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(ParameterTranslationMode.Constant)]
     [InlineData(ParameterTranslationMode.Parameter)]
     [InlineData(ParameterTranslationMode.MultipleParameters)]
@@ -136,7 +134,7 @@ public partial class ServerParameterizationTest
     ///         <c>MultipleParameters</c> passed before the change and is the control.
     ///     </para>
     /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(ParameterTranslationMode.Constant)]
     [InlineData(ParameterTranslationMode.Parameter)]
     [InlineData(ParameterTranslationMode.MultipleParameters)]
@@ -152,59 +150,16 @@ public partial class ServerParameterizationTest
     }
 
     /// <summary>
-    ///     A compiled query that consumes its list runs plain EF Core's statement.
+    ///     A compiled query that consumes its list runs plain EF Core's statement in every collection mode.
     /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>The client did not mark a list that an operator consumes, until 2026-09-22.</b> The
-    ///         server evaluated <c>ids.Count()</c> and ran <c>WHERE "b"."Id" &lt; @p</c>, where plain
-    ///         EF Core runs <c>WHERE "b"."Id" &lt; json_array_length(@p)</c>. Neither has a literal or
-    ///         changes with the list; the owner chose EF's statement over a difference to explain.
-    ///     </para>
-    ///     <para>
-    ///         Only <c>Parameter</c> mode is here, because it is the only mode in which EF Core 10
-    ///         answers; the other two are the next test.
-    ///     </para>
-    /// </remarks>
-    [ConditionalFact]
-    public Task A_compiled_query_consuming_a_list_matches_the_direct_query()
-        => AssertSameStatementFor(
-            context => CountBelowTheListSize()(context, [1, 2, 3]),
-            ParameterTranslationMode.Parameter);
-
-    /// <summary>
-    ///     A compiled query that consumes its list fails where plain EF Core 10 fails, and runs no
-    ///     statement.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <b>This is EF's defect, dotnet/efcore#37370, and it is parked until EF Core 11</b> (the
-    ///         owner, 2026-09-22). EF has no element type mapping for a list that nothing compares with
-    ///         a column, and in these two modes it throws <c>UnreachableException</c>. dotnet/efcore#37372
-    ///         fixed it for EF Core 11 only.
-    ///     </para>
-    ///     <para>
-    ///         <b>Until 2026-09-22 this client answered here</b>, because it did not mark the list and
-    ///         the server evaluated <c>ids.Count()</c>. A list it did mark, <c>ids.Skip(1).Count()</c>,
-    ///         already failed the same way. The owner chose EF's behaviour for both.
-    ///     </para>
-    ///     <para>
-    ///         <b>This turns red when the server runs EF Core 11</b>, because the direct query answers
-    ///         then. The modes belong in the test above at that point; <c>docs/plans/v11/</c> records it.
-    ///     </para>
-    /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(ParameterTranslationMode.Constant)]
+    [InlineData(ParameterTranslationMode.Parameter)]
     [InlineData(ParameterTranslationMode.MultipleParameters)]
-    public async Task A_compiled_query_consuming_a_list_fails_where_EF_Core_10_fails(ParameterTranslationMode mode)
-    {
-        (Exception overTheWire, string[] wireStatements, Exception directly) =
-            await RunFailingBothWays(context => CountBelowTheListSize()(context, [1, 2, 3]), mode);
+    public Task A_compiled_query_consuming_a_list_matches_the_direct_query(ParameterTranslationMode mode)
+        => AssertSameStatementFor(
+            context => CountBelowTheListSize()(context, [1, 2, 3]), mode);
 
-        Assert.IsType<UnreachableException>(directly);
-        Assert.IsType<UnreachableException>(overTheWire);
-        Assert.Empty(wireStatements);
-    }
 
     // One compiled query per context: EF binds a compiled query to the first model it runs on, and
     // the client's model is not the server's.
@@ -223,7 +178,7 @@ public partial class ServerParameterizationTest
     ///     marks the list with <c>EF.Parameter</c> here and not with the mode-named mark, because a
     ///     server in <c>Constant</c> mode then inlined the list as <c>'[1,2,3]' -&gt;&gt; 1</c>.
     /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(ParameterTranslationMode.Constant, false)]
     [InlineData(ParameterTranslationMode.Parameter, false)]
     [InlineData(ParameterTranslationMode.MultipleParameters, false)]
@@ -252,7 +207,7 @@ public partial class ServerParameterizationTest
     ///     are told apart by what they wrap: the client marks a <c>ParameterBox</c>, and a marker the
     ///     caller wrote reaches the server over a plain constant.
     /// </remarks>
-    [ConditionalTheory]
+    [Theory]
     [InlineData(ParameterTranslationMode.Constant)]
     [InlineData(ParameterTranslationMode.Parameter)]
     public Task A_list_the_caller_marks_keeps_the_callers_mode(ParameterTranslationMode mode)
@@ -261,7 +216,7 @@ public partial class ServerParameterizationTest
             static (blogs, ids) => blogs.Where(b => EF.MultipleParameters(ids).Contains(b.Id)),
             mode);
 
-    [ConditionalFact]
+    [Fact]
     public Task A_limit_and_offset_stay_parameters()
         => AssertSameStatement(
             2,
@@ -278,7 +233,7 @@ public partial class ServerParameterizationTest
     ///     non-numeric key lookup with it — 3,927 of them in the SQLite tier alone, each reaching
     ///     the store as a literal. `Find` is not an edge case.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_Guid_key_lookup_stays_a_parameter()
     {
         Guid id = new("11111111-1111-1111-1111-111111111111");
@@ -298,14 +253,14 @@ public partial class ServerParameterizationTest
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
         {
-            Assert.NotNull(await client.GuidKeyed.FindAsync(id));
+            Assert.NotNull(await client.GuidKeyed.FindAsync(new object?[] { id }, TestContext.Current.CancellationToken));
         }
 
         string overTheWire = SingleStatement(Drain());
 
         using (DbContext server = store.CreateDbContext())
         {
-            Assert.NotNull(await server.Set<GuidKeyed>().FindAsync(id));
+            Assert.NotNull(await server.Set<GuidKeyed>().FindAsync(new object?[] { id }, TestContext.Current.CancellationToken));
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
@@ -331,28 +286,28 @@ public partial class ServerParameterizationTest
     ///         one place a parameter appears outside a predicate.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_null_string_parameter_matches_the_direct_query()
         => AssertSameStatement<string?, Blog>(
             null,
             static (blogs, title) => blogs.Where(b => b.Title == title));
 
     /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_StartsWith_parameter_matches_the_direct_query()
         => AssertSameStatement<string, Blog>(
             "al",
             static (blogs, prefix) => blogs.Where(b => b.Title!.StartsWith(prefix)));
 
     /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task An_empty_collection_parameter_matches_the_direct_query()
         => AssertSameStatement<List<string>, Blog>(
             [],
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <inheritdoc cref="A_null_string_parameter_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_parameter_in_the_projection_matches_the_direct_query()
         => AssertSameStatement<string, string>(
             "!",
@@ -368,28 +323,28 @@ public partial class ServerParameterizationTest
     ///     null rule is about. Each is a place where a middleman that mishandled the parameter
     ///     would show up as a different statement rather than a different literal.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_parameter_under_Include_matches_the_direct_query()
         => AssertSameStatement<string, Blog>(
             "beta",
             static (blogs, title) => blogs.Include(b => b.Posts).Where(b => b.Title == title));
 
     /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_parameter_under_GroupBy_matches_the_direct_query()
         => AssertSameStatement<int, string?>(
             2,
             static (blogs, minId) => blogs.Where(b => b.Id >= minId).GroupBy(b => b.Title).Select(g => g.Key));
 
     /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_parameter_inside_Any_matches_the_direct_query()
         => AssertSameStatement<string, Blog>(
             "first",
             static (blogs, heading) => blogs.Where(b => b.Posts.Any(p => p.Heading == heading)));
 
     /// <inheritdoc cref="A_parameter_under_Include_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_nullable_value_type_parameter_matches_the_direct_query()
         => AssertSameStatement<int?, Blog>(
             2,
@@ -414,7 +369,7 @@ public partial class ServerParameterizationTest
     ///         twice per case.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task ToQueryString_runs_no_statement()
     {
         string title = "beta";
@@ -452,7 +407,7 @@ public partial class ServerParameterizationTest
     ///         why none of its promises saw it.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_captured_variable_read_twice_is_one_parameter()
     {
         string title = "beta";
@@ -483,7 +438,7 @@ public partial class ServerParameterizationTest
     ///         (831 rows read where plain EF reads one).
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_filter_over_a_client_type_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -500,7 +455,7 @@ public partial class ServerParameterizationTest
     ///     the store, with the terminal operator's row limit.
     /// </summary>
     /// <inheritdoc cref="A_filter_over_a_client_type_runs_at_the_store" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_terminal_predicate_over_a_client_type_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -523,7 +478,7 @@ public partial class ServerParameterizationTest
     ///     six <c>GroupJoin_in_subquery_with_client_projection</c> methods, the last of which read
     ///     every row of two tables for a count compared in a filter.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_count_over_a_client_computed_projection_counts_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -542,7 +497,7 @@ public partial class ServerParameterizationTest
     ///     below it as above it, and EF applies them in SQL. Found by #167's slow run, as EF's own
     ///     six <c>Client_method_*_loads_owned_navigations</c> methods.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task Paging_over_a_client_computed_projection_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -575,7 +530,7 @@ public partial class ServerParameterizationTest
     ///         two were parked on 2026-09-26 for the slow run to show them.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_nested_FirstOrDefault_over_a_client_type_reads_one_row_per_owner()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -602,7 +557,7 @@ public partial class ServerParameterizationTest
     ///     <c>Select_subquery_projecting_single_constant_of_non_mapped_type</c> and its <c>null</c>
     ///     variant, in the TPC and TPT Gears of War classes.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_nested_FirstOrDefault_reading_no_column_reads_one_row_per_owner()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -631,7 +586,7 @@ public partial class ServerParameterizationTest
     ///         was parked on 2026-09-26 for the slow run to show it.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_subquery_reading_nothing_of_the_row_runs_in_the_same_statement()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -666,7 +621,7 @@ public partial class ServerParameterizationTest
     ///         and <c>Correlated_subquery_with_owned_navigation_being_compared_to_null_works</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_value_under_a_null_check_is_read_as_the_column()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -700,7 +655,7 @@ public partial class ServerParameterizationTest
     ///         <c>Select_null_parameter</c> among others.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_constant_in_a_translatable_projection_is_projected_by_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -715,7 +670,7 @@ public partial class ServerParameterizationTest
     ///     A projection of a constant alone projects the constant, not a stand-in.
     /// </summary>
     /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_of_a_constant_alone_projects_the_constant()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -730,7 +685,7 @@ public partial class ServerParameterizationTest
     ///     A captured value in a projection that translates whole is a parameter of the statement.
     /// </summary>
     /// <inheritdoc cref="A_constant_in_a_translatable_projection_is_projected_by_the_store" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_captured_value_in_a_translatable_projection_is_projected_by_the_store()
     {
         int? answer = 42;
@@ -746,7 +701,7 @@ public partial class ServerParameterizationTest
     ///     The control: a projection with client code in it keeps its constants on the client, as
     ///     plain EF Core keeps them.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_constant_beside_client_code_stays_on_the_client()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -773,7 +728,7 @@ public partial class ServerParameterizationTest
     ///         in the TPC and TPT Gears of War classes.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_member_of_a_construction_in_a_filter_is_read_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -794,7 +749,7 @@ public partial class ServerParameterizationTest
     ///     #167's slow run, as EF's own
     ///     <c>Filter_on_nested_DTO_with_interface_gets_simplified_correctly</c>.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_member_through_a_null_checked_construction_in_a_filter_is_read_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -826,7 +781,7 @@ public partial class ServerParameterizationTest
     ///         <c>Group_by_multiple_aggregate_joining_different_tables</c> methods.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_group_by_an_empty_key_aggregates_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -842,7 +797,7 @@ public partial class ServerParameterizationTest
     ///     A <c>GroupBy</c> on an empty key whose key is projected aggregates at the store too.
     /// </summary>
     /// <inheritdoc cref="A_group_by_an_empty_key_aggregates_at_the_store" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_group_by_an_empty_key_projecting_the_key_aggregates_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -870,7 +825,7 @@ public partial class ServerParameterizationTest
     ///         <c>Return_type_of_singular_operator_is_preserved</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_Last_over_a_client_type_reads_one_row_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -899,7 +854,7 @@ public partial class ServerParameterizationTest
     ///         Found by #167's slow run, as EF's own <c>SelectMany_with_client_eval_with_constructor</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_filter_inside_a_nested_SelectMany_over_a_client_type_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -939,7 +894,7 @@ public partial class ServerParameterizationTest
     ///         included. The wire now meets the same exception there, where the client used to group.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_final_GroupBy_on_an_anonymous_key_groups_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -960,7 +915,7 @@ public partial class ServerParameterizationTest
     ///     on the client with the <c>GroupBy</c>, so every column of every customer travelled, where
     ///     plain EF reads three.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_final_GroupBy_building_its_elements_reads_only_their_columns()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -979,7 +934,7 @@ public partial class ServerParameterizationTest
     ///     Found by #167's slow run, as EF's own <c>Final_GroupBy_property_anonymous_type</c> and the
     ///     three <c>Final_GroupBy_property_entity_projecting_collection</c> methods.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_final_GroupBy_over_a_client_type_groups_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -1006,7 +961,7 @@ public partial class ServerParameterizationTest
     ///         and <c>OwnsMany_correlated_projection</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projected_collection_reading_no_column_projects_none_for_it()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -1034,7 +989,7 @@ public partial class ServerParameterizationTest
     ///         <c>Whats_new_2021_sample_2</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_First_over_a_grouped_anonymous_type_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -1065,7 +1020,7 @@ public partial class ServerParameterizationTest
     ///         <c>Whats_new_2021_sample_10</c>, which also joins and orders the groups.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_grouping_projected_as_a_collection_of_a_client_type_groups_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -1088,7 +1043,7 @@ public partial class ServerParameterizationTest
     ///     the cross join; this client read all 75531 and ordered, paged and checked them on the
     ///     client.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_ordering_over_a_client_type_runs_at_the_store()
     {
         (string overTheWire, string directly) = await PositionalStatementBothWays(
@@ -1120,21 +1075,21 @@ public partial class ServerParameterizationTest
     ///         <c>Contains_with_local_ordered_enumerable_*</c> tests, until 2026-09-24.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_HashSet_parameter_matches_the_direct_query()
         => AssertSameStatement(
             new HashSet<string> { "alpha", "gamma" },
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <inheritdoc cref="A_HashSet_parameter_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task An_ImmutableArray_parameter_matches_the_direct_query()
         => AssertSameStatement(
             ImmutableArray.Create("alpha", "gamma"),
             static (blogs, titles) => blogs.Where(b => titles.Contains(b.Title!)));
 
     /// <inheritdoc cref="A_HashSet_parameter_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_ReadOnlyCollection_parameter_matches_the_direct_query()
         => AssertSameStatement(
             new ReadOnlyCollection<string>(["alpha", "gamma"]),
@@ -1157,7 +1112,7 @@ public partial class ServerParameterizationTest
     ///         method's reads with the reads through the wire.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_ordered_enumerable_parameter_matches_the_direct_query()
         => AssertSameStatement(
             new[] { "alpha", "gamma" }.Order(),
@@ -1167,7 +1122,7 @@ public partial class ServerParameterizationTest
     ///     The same sequence written out of literals, which EF evaluates on the client into a
     ///     constant of LINQ's own internal iterator type rather than into a parameter.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public Task An_ordered_collection_of_literals_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs
@@ -1184,7 +1139,7 @@ public partial class ServerParameterizationTest
     ///     replaced by its literal values is a defect, whatever it buys; <c>Substitute</c> records
     ///     what it bought.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_inline_collection_of_parameters_matches_the_direct_query()
         => AssertSameStatement(
             (First: 1, Second: 3),
@@ -1199,7 +1154,7 @@ public partial class ServerParameterizationTest
     ///     <c>NorthwindMiscellaneousQueryTestBase.Contains_over_concatenated_parameter_and_constant</c>,
     ///     and EF's SQLite suite asserts no SQL for that test, so this is where it is compared.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_predicate_of_captured_values_matches_the_direct_query()
         => AssertSameStatement(
             "alpha",
@@ -1218,7 +1173,7 @@ public partial class ServerParameterizationTest
     ///     here as it does on EF's own client, or as a literal: <c>Substitute</c> excludes an
     ///     entity-typed parameter from boxing on the grounds that EF expands it itself.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task An_entity_constant_matches_the_direct_query()
         => AssertSameStatement(
             new Blog { Id = 2, Title = "beta" },
@@ -1235,7 +1190,7 @@ public partial class ServerParameterizationTest
     ///     "Object must implement IConvertible"; the open question is whether the value can cross
     ///     in its <em>converted</em> form instead.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_converted_struct_key_lookup_matches_the_direct_query()
     {
         IntStructKey id = new(7);
@@ -1255,14 +1210,14 @@ public partial class ServerParameterizationTest
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
         {
-            Assert.NotNull(await client.StructKeyed.FindAsync(id));
+            Assert.NotNull(await client.StructKeyed.FindAsync(new object?[] { id }, TestContext.Current.CancellationToken));
         }
 
         string overTheWire = SingleStatement(Drain());
 
         using (DbContext server = store.CreateDbContext())
         {
-            Assert.NotNull(await server.Set<StructKeyed>().FindAsync(id));
+            Assert.NotNull(await server.Set<StructKeyed>().FindAsync(new object?[] { id }, TestContext.Current.CancellationToken));
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
@@ -1275,7 +1230,7 @@ public partial class ServerParameterizationTest
     ///     EF splits a complex value into one parameter per property. The question is whether this
     ///     side sends one constant instead, which would reach the store as literals.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_complex_type_value_matches_the_direct_query()
     {
         Address address = new() { City = "Oslo", Postcode = "0150" };
@@ -1295,14 +1250,14 @@ public partial class ServerParameterizationTest
         await using (SqliteSmokeContext client = new(
             new DbContextOptionsBuilder<SqliteSmokeContext>().UseInfoCarrier(store).Options))
         {
-            _ = await client.Addressed.Where(e => e.Address == address).ToListAsync();
+            _ = await client.Addressed.Where(e => e.Address == address).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
         string overTheWire = SingleStatement(Drain());
 
         using (DbContext server = store.CreateDbContext())
         {
-            _ = await server.Set<Addressed>().Where(e => e.Address == address).ToListAsync();
+            _ = await server.Set<Addressed>().Where(e => e.Address == address).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(SingleStatement(Drain()), overTheWire);
@@ -1370,13 +1325,13 @@ public partial class ServerParameterizationTest
     ///         keeps the operator on the server, and a <c>Take</c> the caller wrote ships as it is.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_First_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.Where(b => b.Id > 0).Select(b => new { b.Id, b.Title }).FirstAsync());
 
     /// <inheritdoc cref="A_First_over_a_client_projection_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_FirstOrDefault_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.Where(b => b.Id > 99).Select(b => new { b.Id, b.Title }).FirstOrDefaultAsync());
@@ -1386,7 +1341,7 @@ public partial class ServerParameterizationTest
     ///     is what raises EF's "more than one element".
     /// </summary>
     /// <inheritdoc cref="A_First_over_a_client_projection_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_Single_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.Where(b => b.Id == 2).Select(b => new { b.Id, b.Title }).SingleAsync());
@@ -1407,13 +1362,13 @@ public partial class ServerParameterizationTest
     ///         method's reads with the reads through the wire.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_Skip_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).ToListAsync());
 
     /// <inheritdoc cref="A_Skip_over_a_client_projection_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_Take_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Take(2).ToListAsync());
@@ -1427,7 +1382,7 @@ public partial class ServerParameterizationTest
     ///     <c>First</c>'s row limit with the shipped query, so neither the offset nor the limit
     ///     reached the server.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_First_after_Skip_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).FirstAsync());
@@ -1436,7 +1391,7 @@ public partial class ServerParameterizationTest
     ///     Both paging operators between the terminal operator and the projection move, in the
     ///     order they were written.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_First_after_Skip_and_Take_over_a_client_projection_matches_the_direct_query()
         => AssertSameStatementFor(
             static async blogs => _ = await blogs.OrderBy(b => b.Id).Select(b => new { b.Id, b.Title }).Skip(1).Take(2).FirstAsync());
@@ -1458,7 +1413,7 @@ public partial class ServerParameterizationTest
     ///         three unbounded statements to one bounded one.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_split_First_over_a_client_projection_matches_the_direct_query()
     {
         Run run = await RunBothWays(
@@ -1471,7 +1426,7 @@ public partial class ServerParameterizationTest
     }
 
     /// <inheritdoc cref="A_split_First_over_a_client_projection_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_split_First_after_Skip_over_a_client_projection_matches_the_direct_query()
     {
         Run run = await RunBothWays(
@@ -1494,7 +1449,7 @@ public partial class ServerParameterizationTest
     ///     the plain cut sent every column the entity has. Both answers are right, which is why no
     ///     test in the suite could see it.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_projection_reading_no_column_matches_the_direct_query()
     {
         bool flag = true;
@@ -1532,7 +1487,7 @@ public partial class ServerParameterizationTest
     ///         says so.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_hoisted_projection_reading_no_column_fails_where_EF_fails()
     {
         bool flag = true;
@@ -1573,7 +1528,7 @@ public partial class ServerParameterizationTest
     ///         happily as with it there. A probe that cannot fail measures nothing.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_predicate_naming_a_Type_matches_the_direct_query()
     {
         await AssertOneMatchingStatement(
@@ -1601,7 +1556,7 @@ public partial class ServerParameterizationTest
     ///         and TPC narrows to the one concrete table with no union.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_OfType_filter_matches_the_direct_query_under_every_mapping()
     {
         await AssertOneMatchingStatement(async c => _ = await c.Set<Creature>().OfType<Sparrow>().ToListAsync());
@@ -1649,7 +1604,7 @@ public partial class ServerParameterizationTest
     ///         <c>@p.F</c>.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_ordering_by_a_captured_value_fails_where_EF_fails()
     {
         bool flag = false;
@@ -1683,7 +1638,7 @@ public partial class ServerParameterizationTest
     ///         client removed the duplicates.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_Distinct_over_a_projected_collection_without_its_key_fails_where_EF_fails()
     {
         Run run = await RunBothWays(
@@ -1722,7 +1677,7 @@ public partial class ServerParameterizationTest
     ///         answered.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projected_collection_reading_the_enclosing_row_fails_where_EF_fails()
     {
         Run run = await RunBothWays(
@@ -1757,7 +1712,7 @@ public partial class ServerParameterizationTest
     ///         has <c>Title</c> of the anonymous type. A column alias does not change the plan.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_over_a_client_typed_projection_matches_the_direct_query()
     {
         Run run = await RunBothWays(
@@ -1804,19 +1759,19 @@ public partial class ServerParameterizationTest
     ///         and four siblings.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public Task A_Distinct_over_a_constructed_type_matches_the_direct_query()
         => AssertSameStatementFor(
             async blogs => _ = await blogs.Select(b => new TitleCard(b.Title)).Distinct().ToListAsync());
 
     /// <inheritdoc cref="A_Distinct_over_a_constructed_type_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_Distinct_over_a_constructed_and_initialized_type_matches_the_direct_query()
         => AssertSameStatementFor(
             async blogs => _ = await blogs.Select(b => new TitleCard(b.Title) { Id = b.Id }).Distinct().ToListAsync());
 
     /// <inheritdoc cref="A_Distinct_over_a_constructed_type_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public Task A_Distinct_over_a_type_nested_in_an_anonymous_type_matches_the_direct_query()
         => AssertSameStatementFor(
             async blogs => _ = await blogs
@@ -1828,7 +1783,7 @@ public partial class ServerParameterizationTest
     ///     A <c>Distinct</c> over a constructed type that reads no column runs plain EF Core's
     ///     <c>SELECT DISTINCT 1</c>.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public Task A_Distinct_over_a_constructed_type_reading_no_column_matches_the_direct_query()
         => AssertSameStatementFor(
             async blogs => _ = await blogs.Select(b => new TitleCard()).Distinct().ToListAsync());
@@ -1850,7 +1805,7 @@ public partial class ServerParameterizationTest
     ///         <see cref="A_projection_over_a_client_typed_projection_matches_the_direct_query" />.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projected_collection_over_a_Distinct_of_a_constructed_type_matches_the_direct_query()
     {
         Run run = await RunBothWays(
@@ -1906,7 +1861,7 @@ public partial class ServerParameterizationTest
     ///         <c>FileInfo</c> nameable by a payload (<c>security-review.md</c> §2b).
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_over_a_converted_list_of_a_registered_type_fails_where_EF_fails()
     {
         Run registered = await RunBothWays([typeof(Tile)], ProjectTiles);
@@ -1926,7 +1881,7 @@ public partial class ServerParameterizationTest
     ///     <see cref="A_projection_over_a_converted_list_of_a_registered_type_fails_where_EF_fails" />
     ///     is the other half.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_over_a_converted_list_of_an_unregistered_type_reads_the_whole_column()
     {
         Run unregistered = await RunBothWays(allowedTypes: null, ProjectTiles);
@@ -1969,7 +1924,7 @@ public partial class ServerParameterizationTest
     ///     is what the boundary analyzer cannot ship, so without it the cut lands below the
     ///     <c>GroupBy</c> and the grouping runs here. With it, the statement is EF's own.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_group_key_matches_the_direct_query()
     {
         Run wire = await RunBothWays(
@@ -2001,7 +1956,7 @@ public partial class ServerParameterizationTest
     ///         registered falls here.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_unregistered_group_key_is_refused_before_reading_the_table()
     {
         Run wire = await RunBothWays(
@@ -2025,7 +1980,7 @@ public partial class ServerParameterizationTest
     ///     declared cannot be rewritten that way, because a class with its own <c>Equals</c> is not
     ///     data. Registering it is what closes this one.
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task An_unregistered_join_key_is_refused_before_reading_either_table()
     {
         Run wire = await RunBothWays(allowedTypes: null, JoinOnTitle);
@@ -2037,7 +1992,7 @@ public partial class ServerParameterizationTest
     }
 
     /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_join_key_matches_the_direct_query()
     {
         Run wire = await RunBothWays([typeof(TitleKey)], JoinOnTitle);
@@ -2047,7 +2002,7 @@ public partial class ServerParameterizationTest
     }
 
     /// <inheritdoc cref="An_unregistered_join_key_is_refused_before_reading_either_table" />
-    [ConditionalFact]
+    [Fact]
     public async Task An_unregistered_group_join_key_is_refused_before_reading_either_table()
     {
         Run wire = await RunBothWays(allowedTypes: null, GroupJoinOnTitle);
@@ -2059,7 +2014,7 @@ public partial class ServerParameterizationTest
     }
 
     /// <inheritdoc cref="A_registered_group_key_matches_the_direct_query" />
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_group_join_key_matches_the_direct_query()
     {
         Run wire = await RunBothWays([typeof(TitleKey)], GroupJoinOnTitle);
@@ -2081,7 +2036,7 @@ public partial class ServerParameterizationTest
     ///         Registration permits transport, not translation, and refusal triggers no local retry.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_key_makes_this_client_refuse_what_EF_refuses()
     {
         Run unregistered = await RunBothWays(allowedTypes: null, DistinctByTitle);
@@ -2114,7 +2069,7 @@ public partial class ServerParameterizationTest
     ///         10.2.0 on 2026-09-28.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_filter_on_a_local_list_of_anonymous_objects_is_refused_as_EF_refuses_it()
     {
         var keys = new[] { new { Id = 1, Title = (string?)"alpha" }, new { Id = 3, Title = (string?)"beta" } };
@@ -2143,7 +2098,7 @@ public partial class ServerParameterizationTest
     ///         EF's cache kept every disposed context that had run such a query.
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_calling_a_method_of_a_captured_instance_is_refused_as_EF_refuses_it()
     {
         Run run = await RunBothWays(
@@ -2157,7 +2112,7 @@ public partial class ServerParameterizationTest
     ///     A projection that passes an instance the query holds as a constant to a method is refused,
     ///     as EF refuses it, and the store is asked nothing.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_passing_a_captured_instance_to_a_method_is_refused_as_EF_refuses_it()
     {
         Run run = await RunBothWays(
@@ -2171,7 +2126,7 @@ public partial class ServerParameterizationTest
     ///     A projection that holds an instance the query captured as a constant is refused, as EF
     ///     refuses it, and the store is asked nothing.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_holding_a_captured_instance_is_refused_as_EF_refuses_it()
     {
         Run run = await RunBothWays(
@@ -2194,7 +2149,7 @@ public partial class ServerParameterizationTest
     ///         exactly this rewrite: "consider assigning this constant to a local variable".
     ///     </para>
     /// </remarks>
-    [ConditionalFact]
+    [Fact]
     public async Task A_projection_calling_a_method_of_a_local_variable_is_answered_as_EF_answers_it()
     {
         var labeler = new BlogLabeler();
@@ -2334,7 +2289,7 @@ public partial class ServerParameterizationTest
     private Task AssertSameStatementFor(Func<IQueryable<Blog>, Task> run, params object[] anonymousShapes)
         => AssertSameStatementFor(context => run(context.Set<Blog>()), collectionMode: null, anonymousShapes);
 
-    [ConditionalFact]
+    [Fact]
     public Task A_nine_member_anonymous_join_key_runs_as_one_database_join()
         => AssertSameStatementFor(async blogs =>
         {
@@ -2345,7 +2300,7 @@ public partial class ServerParameterizationTest
             Assert.Equal([1, 2, 3], rows);
         }, new { A = 0, B = 0, C = 0, D = 0, E = 0, F = 0, G = 0, H = 0, I = 0 });
 
-    [ConditionalFact]
+    [Fact]
     public Task Anonymous_shapes_restore_nested_lists_and_empty_objects()
         => AssertSameStatementFor(async blogs =>
         {
@@ -2362,7 +2317,7 @@ public partial class ServerParameterizationTest
             Assert.Equal("{ }", row.Empty.ToString());
         });
 
-    [ConditionalTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public Task Missing_anonymous_terminal_rows_remain_null(bool async)

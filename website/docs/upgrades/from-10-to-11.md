@@ -1,6 +1,6 @@
 # Upgrade from 10.3 to 11
 
-This draft describes upgrading an application to version 11. It currently uses Entity Framework Core 10.
+This draft describes upgrading an application to version 11. It requires .NET 11 and Entity Framework Core 11.
 See [package availability](../getting-started/installation.md); stable 10.3 packages
 do not contain these setup methods.
 

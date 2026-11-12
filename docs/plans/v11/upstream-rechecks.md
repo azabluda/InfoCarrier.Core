@@ -5,6 +5,29 @@ re-read, and what the answer changes here. **A fixed upstream defect is invisibl
 `OverrideAudit` checks that a `[StoreDefect]` names a section that exists, not that the defect still
 does.
 
+## Recheck results, November 12, 2026
+
+The pinned source is EF Core `v11.0.0`, commit
+[`9e685c7a52d1a344d133a3d370e458db97417b3f`](https://github.com/dotnet/efcore/tree/9e685c7a52d1a344d133a3d370e458db97417b3f).
+The original instructions below remain as the dated investigation brief.
+
+- The uncorrelated compiled-list fix shipped. The successful direct/wire statement test now runs
+  all three collection modes; the obsolete EF Core 10 failure-only test is removed.
+- The three section 1.12 refusal overrides remain in
+  `PrimitiveCollectionsQueryRelationalTestBase` at this tag, including the original inference
+  comment. The complete functional suite passes their inherited expectations.
+- [dotnet/efcore#19749](https://github.com/dotnet/efcore/issues/19749) remains open. The compiled
+  collection marking still has a purpose; it is not removed as an assumed upstream fix.
+- `StringTranslationsSqliteTest.IsNullOrEmpty` still calls `base.IsNullOrWhiteSpace` at this tag.
+  No external defect report was filed.
+- The Firebird correction is retained in suspended source. It is excluded from the active build;
+  recheck it when restoring the tier with an EF Core 11 provider.
+- Plain complex property-bag reads now pass. The full value-buffer materializer still fails for
+  complex property-bag collections, so only that narrower workaround remains. The inherited
+  tracking tests and the direct/wire property-bag test pass.
+- Existing attributed overrides were probed without their bodies and checked against direct-store
+  behavior before removal or recategorization. See the [adoption evidence](adoption-checklist.md#adoption-investigation-november-12-2026).
+
 ## dotnet/efcore#37370: a compiled query over an uncorrelated list
 
 **Written 2026-09-21.** In EF Core 10, a compiled query over a list parameter that nothing compares

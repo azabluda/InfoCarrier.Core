@@ -15,7 +15,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Northwind.Shared;
 using Northwind.Shared.Model;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.TransportTests;
 
@@ -27,18 +26,18 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
     public async Task Tracked_many_to_many_frames_preserve_loaded_collections_and_cross_frame_references()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
         var options = new DbContextOptionsBuilder<StreamingGraphContext>()
             .UseSqlite(connection)
             .Options;
         await using var context = new StreamingGraphContext(options);
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
         var shared = new StreamingTag { Name = "shared" };
         context.AddRange(
             new StreamingPost { Title = "first", Tags = [shared, new StreamingTag { Name = "first-only" }] },
             new StreamingPost { Title = "second", Tags = [shared] });
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         context.ChangeTracker.Clear();
 
         var mapper = new DynamicValueMapper(
@@ -125,11 +124,9 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new NodeFramedHandler(ProviderNodes, release);
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        using HttpResponseMessage response = await client.SendAsync(
-            new HttpRequestMessage(HttpMethod.Post, "query"),
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "query"), HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using IAsyncEnumerator<NodeFrame> frames = ReadNodeFrames(response).GetAsyncEnumerator();
+        await using IAsyncEnumerator<NodeFrame> frames = ReadNodeFrames(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await frames.MoveNextAsync());
         Assert.Equal(FrameKind.Start, frames.Current.Kind);
         Assert.True(await frames.MoveNextAsync());
@@ -147,7 +144,7 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         Assert.True(await frames.MoveNextAsync());
         Assert.Equal(FrameKind.Complete, frames.Current.Kind);
         Assert.False(await frames.MoveNextAsync());
-        await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         async IAsyncEnumerable<DynamicValueNode> ProviderNodes(
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -191,17 +188,15 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         using (IServiceScope scope = factory.Services.CreateScope())
         {
             await using NorthwindContext context = scope.ServiceProvider.GetRequiredService<NorthwindContext>();
-            expectedCount = await context.OrderDetails.CountAsync();
+            expectedCount = await context.OrderDetails.CountAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
         var providerDisposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new FramedHandler(rows: ProviderRows);
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        using HttpResponseMessage response = await client.SendAsync(
-            new HttpRequestMessage(HttpMethod.Post, "query"),
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "query"), HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using IAsyncEnumerator<int> rows = ReadRows(response).GetAsyncEnumerator();
+        await using IAsyncEnumerator<int> rows = ReadRows(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await rows.MoveNextAsync());
         Assert.Equal(1, rows.Current);
         Assert.False(providerDisposed.Task.IsCompleted);
@@ -215,7 +210,7 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         }
 
         Assert.Equal(expectedCount, count);
-        await providerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await providerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         async IAsyncEnumerable<int> ProviderRows(
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -260,7 +255,7 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
                 detail.Quantity,
             })
             .Take(1_000)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         var mapper = new DynamicValueMapper(null, new TypeNodeMapper(), new TypeNodeResolver());
         DynamicValueNode[] nodes = projections
             .Select(projection => mapper.ToDynamicValue(projection, typeof(object[])))
@@ -291,20 +286,18 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         var connectionClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new FramedHandler(rows: ProviderRows);
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        using HttpResponseMessage response = await client.SendAsync(
-            new HttpRequestMessage(HttpMethod.Post, "query"),
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "query"), HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using (IAsyncEnumerator<int> rows = ReadRows(response).GetAsyncEnumerator())
+        await using (IAsyncEnumerator<int> rows = ReadRows(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
             Assert.True(await rows.MoveNextAsync());
         }
 
         response.Dispose();
-        await handler.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await providerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await connectionOpened.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await connectionClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await handler.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await providerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await connectionOpened.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await connectionClosed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(handler.Completed.Task.IsCompleted);
 
         async IAsyncEnumerable<int> ProviderRows(
@@ -380,11 +373,9 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         var handler = new FramedHandler();
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
         using var request = new HttpRequestMessage(HttpMethod.Post, "query");
-        using HttpResponseMessage response = await client.SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using IAsyncEnumerator<Frame> frames = ReadFrames(response).GetAsyncEnumerator();
+        await using IAsyncEnumerator<Frame> frames = ReadFrames(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await frames.MoveNextAsync());
         Assert.Equal(FrameKind.Start, frames.Current.Kind);
@@ -401,7 +392,7 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
         Assert.True(await frames.MoveNextAsync());
         Assert.Equal(FrameKind.Complete, frames.Current.Kind);
         Assert.False(await frames.MoveNextAsync());
-        await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -409,11 +400,9 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
     {
         var handler = new FramedHandler(fail: true);
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        using HttpResponseMessage response = await client.SendAsync(
-            new HttpRequestMessage(HttpMethod.Post, "query"),
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "query"), HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using IAsyncEnumerator<int> rows = ReadRows(response).GetAsyncEnumerator();
+        await using IAsyncEnumerator<int> rows = ReadRows(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await rows.MoveNextAsync());
         Assert.Equal(1, rows.Current);
 
@@ -429,17 +418,15 @@ public class FramedStreamingResearchTest(ITestOutputHelper output, NorthwindServ
     {
         var handler = new FramedHandler();
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        using HttpResponseMessage response = await client.SendAsync(
-            new HttpRequestMessage(HttpMethod.Post, "query"),
-            HttpCompletionOption.ResponseHeadersRead);
+        using HttpResponseMessage response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "query"), HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
 
-        await using (IAsyncEnumerator<int> rows = ReadRows(response).GetAsyncEnumerator())
+        await using (IAsyncEnumerator<int> rows = ReadRows(response, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
             Assert.True(await rows.MoveNextAsync());
         }
 
         response.Dispose();
-        await handler.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await handler.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(handler.Completed.Task.IsCompleted);
     }
 

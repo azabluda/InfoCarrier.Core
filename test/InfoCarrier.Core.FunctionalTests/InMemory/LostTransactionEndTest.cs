@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory;
 
@@ -43,14 +42,14 @@ public class LostTransactionEndTest
     {
         await using var harness = new Harness();
 
-        await using IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
         string token = ((InfoCarrierTransaction)transaction).ServerTransactionId;
 
         harness.Transport.Lose(InfoCarrierOperation.CommitTransaction, beforeTheServer: true);
-        await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync());
+        await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync(TestContext.Current.CancellationToken));
         Assert.True(await harness.IsOpenAsync(token), "the lost commit must not have reached the server");
 
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(TestContext.Current.CancellationToken);
 
         Assert.False(await harness.IsOpenAsync(token), "the second commit did not reach the server");
     }
@@ -60,16 +59,16 @@ public class LostTransactionEndTest
     {
         await using var harness = new Harness();
 
-        await using IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         harness.Transport.Lose(InfoCarrierOperation.CommitTransaction, beforeTheServer: false);
-        await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync());
+        await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync(TestContext.Current.CancellationToken));
 
         // The server did commit. The client cannot know that, so it must not claim either outcome:
         // the second commit reaches a server that no longer holds the token, and that answer is
         // an exception, never a quiet success.
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => transaction.CommitAsync());
+            () => transaction.CommitAsync(TestContext.Current.CancellationToken));
         Assert.Contains("is not open on this server", thrown.Message, StringComparison.Ordinal);
     }
 
@@ -79,12 +78,12 @@ public class LostTransactionEndTest
         await using var harness = new Harness();
 
         string token;
-        await using (IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync())
+        await using (IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             token = ((InfoCarrierTransaction)transaction).ServerTransactionId;
 
             harness.Transport.Lose(InfoCarrierOperation.CommitTransaction, beforeTheServer: true);
-            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync());
+            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.CommitAsync(TestContext.Current.CancellationToken));
         }
 
         Assert.False(await harness.IsOpenAsync(token), "the dispose left the transaction open on the server");
@@ -96,12 +95,12 @@ public class LostTransactionEndTest
         await using var harness = new Harness();
 
         string token;
-        await using (IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync())
+        await using (IDbContextTransaction transaction = await harness.Context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken))
         {
             token = ((InfoCarrierTransaction)transaction).ServerTransactionId;
 
             harness.Transport.Lose(InfoCarrierOperation.RollbackTransaction, beforeTheServer: true);
-            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.RollbackAsync());
+            await Assert.ThrowsAsync<InfoCarrierTransportException>(() => transaction.RollbackAsync(TestContext.Current.CancellationToken));
         }
 
         Assert.False(await harness.IsOpenAsync(token), "the dispose left the transaction open on the server");

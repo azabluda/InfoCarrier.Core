@@ -1121,18 +1121,8 @@ public sealed class QuerySplitter
         // re-reading a failure rather than by reading this code.
         string printed = Microsoft.EntityFrameworkCore.Query.ExpressionPrinter.Print(offender);
 
-        // A BULK OPERATION GETS EF'S OTHER WORDING, and until R171 it got the query one. EF raises
-        // `NonQueryTranslationFailed*` for `ExecuteUpdate` and `ExecuteDelete` and
-        // `TranslationFailed*` for a query, and the two differ in their closing sentence: the
-        // query form offers `AsEnumerable`, which is not on offer for a bulk operation. The spec
-        // suite asserts the difference exactly — `NorthwindBulkUpdatesRelationalTestBase`'s
-        // `AssertTranslationFailed` builds
-        // `CoreStrings.NonQueryTranslationFailedWithDetails("", details)[21..]` and looks for it in
-        // the message, so the closing sentence is inside what it compares.
-        //
-        // ONLY THE `WithDetails` FORM IS SWITCHED, because `CoreStrings` ships no detail-less
-        // `NonQueryTranslationFailed`. That is not a gap to work around: with nothing to add, the
-        // two messages would be the same string anyway.
+        // EF Core 11 throws a bulk operation's specific diagnostic directly. Unlike the EF 10
+        // NonQueryTranslationFailedWithDetails wrapper, it offers no local query evaluation.
         if (serverStoreIsRelational
             && offender is MethodCallExpression bulk
             && bulk.Method.DeclaringType == typeof(EntityFrameworkQueryableExtensions)
@@ -1145,9 +1135,7 @@ public sealed class QuerySplitter
 
             if (details is not null)
             {
-                throw new InvalidOperationException(
-                    Microsoft.EntityFrameworkCore.Diagnostics.CoreStrings
-                        .NonQueryTranslationFailedWithDetails(printed, details));
+                throw new InvalidOperationException(details);
             }
         }
 
@@ -1535,7 +1523,7 @@ public sealed class QuerySplitter
                 // `IOrderedEnumerable<T>`, and the server failed to evaluate that cast on an array.
                 // `TypeNodeMapper.Nameable` names the value by that interface instead, and the
                 // far side rebuilds one.
-                || !runtime.Name.StartsWith('<')
+                || (!runtime.Name.StartsWith('<') && node.Type == runtime)
                 || allowlist.IsAllowed(runtime)
                 || ServerBoundaryAnalyzer.SequenceElementType(runtime) is not { } element
                 || element == runtime)
@@ -2631,26 +2619,6 @@ public sealed class QuerySplitter
 
             return true;
         }
-    }
-    /// <summary>
-    ///     Creates a splitter that refuses a query carrying raw SQL.
-    /// </summary>
-    /// <remarks>
-    ///     <b>A binary-compatibility overload, kept because 10.0.0 shipped this signature.</b>
-    ///     Adding an optional parameter is source-compatible and <em>binary</em> breaking: the
-    ///     compiler emits one member and the old arity disappears from the assembly, which
-    ///     <c>dotnet pack</c>'s package validation reports as <c>CP0002</c>.
-    ///     <c>Directory.Build.props</c> states the promise this keeps. Six of these reached
-    ///     <c>main</c> unnoticed because <c>dotnet pack</c> ran on <c>main</c> alone; R119 moved it
-    ///     onto the pull request. Delete when the baseline moves past 10.0.x.
-    /// </remarks>
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public QuerySplitter(
-        IModel model,
-        TypeAllowlist? allowlist,
-        IDiagnosticsLogger<DbLoggerCategory.Query>? queryLogger)
-        : this(model, allowlist, queryLogger, arbitrarySqlAllowed: false)
-    {
     }
 
 }

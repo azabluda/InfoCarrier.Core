@@ -42,13 +42,12 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
         {
             using IServiceScope scope = provider.CreateScope();
             await using NorthwindContext context = registration.Contains("factory", StringComparison.Ordinal)
-                ? await scope.ServiceProvider.GetRequiredService<IDbContextFactory<NorthwindContext>>().CreateDbContextAsync()
-                : scope.ServiceProvider.GetRequiredService<NorthwindContext>();
+                ? await scope.ServiceProvider.GetRequiredService<IDbContextFactory<NorthwindContext>>().CreateDbContextAsync(TestContext.Current.CancellationToken) : scope.ServiceProvider.GetRequiredService<NorthwindContext>();
 
             Assert.Same(provider.GetRequiredService<IInfoCarrierClient>(),
                 context.GetService<IDbContextOptions>().FindExtension<InfoCarrierOptionsExtension>()!.InfoCarrierClient);
             var rows = await context.Orders.OrderBy(order => order.Id)
-                .Select(order => new { order.Id, order.CustomerId }).ToListAsync();
+                .Select(order => new { order.Id, order.CustomerId }).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(NorthwindSeed.OrderCount, rows.Count);
             Assert.Equal("ALFKI", rows[0].CustomerId);
         }
@@ -97,7 +96,7 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
             await using ServiceProvider serverProvider = serverServices.BuildServiceProvider(validateScopes: true);
             using (IServiceScope scope = serverProvider.CreateScope())
             {
-                await scope.ServiceProvider.GetRequiredService<MappingContext>().Database.EnsureCreatedAsync();
+                await scope.ServiceProvider.GetRequiredService<MappingContext>().Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
             }
 
             var clientMapper = new UriMapper();
@@ -123,23 +122,23 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
             await using (MappingContext context = remoteFactory.CreateDbContext())
             {
                 context.Add(new MappedItem { Id = 1, Address = remoteUri });
-                Assert.Equal(1, await context.SaveChangesAsync());
+                Assert.Equal(1, await context.SaveChangesAsync(TestContext.Current.CancellationToken));
             }
             await using (MappingContext context = remoteFactory.CreateDbContext())
             {
-                Assert.Equal(remoteUri, (await context.Items.SingleAsync()).Address);
+                Assert.Equal(remoteUri, (await context.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Address);
                 Assert.Equal(remoteUri, await context.Items.Where(item => item.Address == remoteUri)
-                    .Select(item => item.Address).SingleAsync());
+                    .Select(item => item.Address).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
                 Assert.Contains(clientMapper, context.GetService<IEnumerable<IInfoCarrierValueMapper>>());
             }
             await using (MappingContext context = localFactory.CreateDbContext())
             {
                 Assert.Null(context.GetService<IDbContextOptions>().FindExtension<InfoCarrierOptionsExtension>());
-                await context.Database.EnsureCreatedAsync();
+                await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
                 context.Add(new MappedItem { Id = 1, Address = new Uri("https://local.example/item") });
-                Assert.Equal(1, await context.SaveChangesAsync());
+                Assert.Equal(1, await context.SaveChangesAsync(TestContext.Current.CancellationToken));
                 context.ChangeTracker.Clear();
-                Assert.Equal("local.example", (await context.Items.SingleAsync()).Address.Host);
+                Assert.Equal("local.example", (await context.Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Address.Host);
             }
             Assert.True(clientMapper.Writes > 0);
             Assert.True(clientMapper.Reads > 0);
@@ -147,7 +146,7 @@ public class ImplicitClientRegistrationTest(NorthwindServerFactory factory) : IC
             Assert.True(serverMapper.Reads > 0);
             using (IServiceScope scope = serverProvider.CreateScope())
             {
-                var stored = await scope.ServiceProvider.GetRequiredService<MappingContext>().Items.SingleAsync();
+                var stored = await scope.ServiceProvider.GetRequiredService<MappingContext>().Items.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Equal(remoteUri, stored.Address);
             }
         }

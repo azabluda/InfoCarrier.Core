@@ -4,7 +4,7 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
+using Microsoft.EntityFrameworkCore.TestModels.Northwind;
 
 // Internal EF Core API usage. This provider is built on EF Core internals by design
 // (CLAUDE.md), and EF Core's own providers suppress EF1001 the same way at the point of use.
@@ -26,6 +26,26 @@ namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer> fixture)
     : NorthwindJoinQueryRelationalTestBase<NorthwindQueryInfoCarrierSqliteFixture<NoopModelCustomizer>>(fixture)
 {
+    [StoreSupport(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 80, 113,
+        Justification = Upstream.GaveNoReason, Deviation = DeviationKind.SqlNotAsserted)]
+    public override async Task Join_local_bytes_closure_is_cached_correctly(bool async)
+    {
+        var ids = new byte[] { 1, 2 };
+        await AssertQueryScalar(
+            async,
+            ss => from e in ss.Set<Employee>()
+                  join id in ids on e.EmployeeID equals id
+                  select e.EmployeeID);
+
+        ids = [3];
+        await AssertQueryScalar(
+            async,
+            ss => from e in ss.Set<Employee>()
+                  join id in ids on e.EmployeeID equals id
+                  select e.EmployeeID);
+    }
+
     // -------------------------------------------------------------------------------------
     // BACKING-STORE LIMITATION — SQLite has no APPLY, and a correlated collection projection
     // needs one. EF Core's own Northwind*QuerySqliteTest overrides each of these the same way,
@@ -36,7 +56,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // -------------------------------------------------------------------------------------
 
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 36, 39,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 35, 38,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_entity(bool async)
         => Assert.Equal(
@@ -49,7 +69,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // (`NorthwindJoinQuerySqliteTest.SelectMany_with_selecting_outer_element`); this provider
     // simply was not getting far enough to need it.
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 41, 44,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 40, 43,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_element(bool async)
         => Assert.Equal(
@@ -58,7 +78,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
                 () => base.SelectMany_with_selecting_outer_element(async))).Message);
 
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 46, 50,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 45, 49,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_selecting_outer_entity_column_and_inner_column(bool async)
         => Assert.Equal(
@@ -67,7 +87,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
                 () => base.SelectMany_with_selecting_outer_entity_column_and_inner_column(async))).Message);
 
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 52, 56,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 51, 55,
         Justification = Upstream.GaveNoReason)]
     public override async Task Take_in_collection_projection_with_FirstOrDefault_on_top_level(bool async)
         => Assert.Equal(
@@ -78,7 +98,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
     // The same three EF's SQLite suite has: hoisting the collection projection lets the query
     // reach SQL, and SQLite declines the APPLY it needs.
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 19, 22,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 18, 21,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval(bool async)
         => Assert.Equal(
@@ -87,7 +107,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
                 () => base.SelectMany_with_client_eval(async))).Message);
 
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 24, 28,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 23, 27,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval_with_collection_shaper(bool async)
         => Assert.Equal(
@@ -96,7 +116,7 @@ public class NorthwindJoinQuerySqliteInfoCarrierTest(NorthwindQueryInfoCarrierSq
                 () => base.SelectMany_with_client_eval_with_collection_shaper(async))).Message);
 
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 30, 34,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindJoinQuerySqliteTest.cs", 29, 33,
         Justification = Upstream.GaveNoReason)]
     public override async Task SelectMany_with_client_eval_with_collection_shaper_ignored(bool async)
         => Assert.Equal(

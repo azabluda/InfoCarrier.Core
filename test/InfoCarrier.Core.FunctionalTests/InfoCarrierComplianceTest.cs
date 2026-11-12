@@ -1,4 +1,4 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.BulkUpdates;
@@ -24,24 +24,21 @@ namespace InfoCarrier.Core.FunctionalTests;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <strong>There are two of these now, one per test project, and that is the point.</strong>
-///         EF Core has a <c>SqliteComplianceTest</c> and an <c>InMemoryComplianceTest</c> for the
-///         same reason. This one scans the core specification assembly against Tier A;
-///         <c>RelationalInfoCarrierComplianceTest</c> scans the relational one against Tier B.
-///         Between them nothing is unaccounted for, and neither can hide a gap in the other.
+///         The core and relational scans share one test project since R136. This scan accounts
+///         for core specification bases; <c>RelationalInfoCarrierComplianceTest</c> accounts for
+///         the relational bases. Core bases assigned to Tier B are listed below so the two
+///         scans preserve their separate coverage responsibilities.
 ///     </para>
 ///     <para>
-///         <strong>It ignores no base for being inapplicable any more, and the whole old list moved
-///         to Tier B.</strong> Every entry on it was a relational base, which this project can no
-///         longer even name: it does not reference <c>EFCore.Relational.Specification.Tests</c>.
-///         The compiler established that, not a reading.
+///         The old inapplicable relational list moved to the relational scan. This project now
+///         references both specification assemblies; the former assembly-boundary explanation
+///         stopped applying when the test projects merged.
 ///     </para>
 ///     <para>
 ///         <strong>What it ignores instead is a CORE base adopted on Tier B</strong>, and each
 ///         entry says so. A base that InMemory cannot host runs on the tier that translates
 ///         (ADR-009, and CLAUDE.md's rule that "EF ships no InMemory test for this base" means move
-///         it to Tier B rather than drop it). Its class is in the other assembly, so this scan
-///         cannot see it, and the entry here is a pointer rather than an excuse.
+///         it to Tier B rather than drop it). The entry here records that assignment.
 ///     </para>
 ///     <para>
 ///         <strong>A base that is merely not built yet must stay out of this list</strong> so this
@@ -107,7 +104,6 @@ public class InfoCarrierComplianceTest : ComplianceTestBase
         typeof(ManyToManyTrackingTestBase<>),
         typeof(OptimisticConcurrencyTestBase<,>),
         typeof(PropertyValuesTestBase<>),
-        typeof(AdHocManyToManyQueryTestBase),
         typeof(AdHocMiscellaneousQueryTestBase),
         typeof(OwnedEntityQueryTestBase),
         typeof(SharedTypeQueryTestBase),
@@ -116,8 +112,6 @@ public class InfoCarrierComplianceTest : ComplianceTestBase
         typeof(UpdatesTestBase<>),
         typeof(TypeTestBase<,>),
         typeof(AdHocAdvancedMappingsQueryTestBase),
-        typeof(AdHocComplexTypeQueryTestBase),
-        typeof(AdHocJsonQueryTestBase),
         typeof(AdHocNavigationsQueryTestBase),
         typeof(AdHocQueryFiltersQueryTestBase),
         typeof(ComplexNavigationsCollectionsQueryTestBase<>),
@@ -128,7 +122,7 @@ public class InfoCarrierComplianceTest : ComplianceTestBase
         typeof(CompositeKeysQueryTestBase<>),
         typeof(FunkyDataQueryTestBase<>),
         typeof(JsonQueryTestBase<>),
-        typeof(NonSharedPrimitiveCollectionsQueryTestBase),
+        typeof(InheritanceComplexTypesQueryTestBase<>),
         typeof(NorthwindAggregateOperatorsQueryTestBase<>),
         typeof(NorthwindFunctionsQueryTestBase<>),
         typeof(NorthwindGroupByQueryTestBase<>),

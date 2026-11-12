@@ -6,22 +6,22 @@
     -->
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <!-- Engineering icon generation only; MIT-licensed portable PNG codecs and native assets. -->
-    <PackageVersion Include="SkiaSharp" Version="4.153.1" />
-    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
+    <PackageVersion Include="SkiaSharp" Version="4.156.0" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.156.0" />
     <!-- Independent JSON Schema validation in the wire-description tests only. -->
-    <PackageVersion Include="JsonSchema.Net" Version="9.4.1" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.6.0" />
 
     <!-- Server requires the matching client patch; DevServer bundles its own Server library. -->
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="11.0.0" />
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="5.0.1" />
     <!--
       A RANGE, NOT A POINT, AND IT IS THE ONE NUMBER CONSUMERS INHERIT. NuGet reads a bare
-      `Version="10.0.0"` in a nuspec as ">= 10.0.0" with no ceiling, so the package would resolve
-      against EF Core 11. This provider is built on EF internals by design (19 files carry
+      `Version="11.0.0"` in a nuspec as ">= 11.0.0" with no ceiling, so the package would resolve
+      against EF Core 12. This provider is built on EF internals by design (19 files carry
       `#pragma warning disable EF1001`), and a major EF release moves them, so an unbounded range
       trades a clear restore error for a runtime failure inside IStateManager.
 
@@ -38,81 +38,32 @@
       ceiling beside an EF Core dependency that had one. The other EF packages below are test and
       sample references and reach no nuspec.
     -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[10.0.1,11.0.0)" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="[10.0.1,11.0.0)" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="10.0.1" />
-    <!--
-      Repository-only transitive pin: bundle 2.1.14 supplies native SQLite 3.54.0, verified from
-      sqlite3_libversion(). Both shipped projects disable central transitive pinning and have
-      no SQLite dependency. The newer-numbered bundle 3.0.5 currently supplies older SQLite 3.53.4.
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="[11.0.0,12.0.0)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="[11.0.0,12.0.0)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Specification.Tests" Version="11.0.0" />
+    <!-- EF Core 11 requires bundle 3.0.5. No backing-store dependency reaches shipped packages. -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
 
-      Until 2026-11-02, samples and tests suppressed GHSA-2m69-gcr7-jv3q to retain SQLite 3.49.1.
-      The EF 10.0.1 specification store now explicitly selects SQLite's supported 15-digit real
-      to text conversion mode instead. The inherited exact decimal assertions remain unchanged;
-      the sample and unconfigured connections retain the native precision default.
-    -->
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
+    <!-- Tier C is suspended until Firebird supports EF Core 11. Its source remains in test/. -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
+    <!-- Keep repository transitive dependencies on .NET 11. Packable projects disable transitive pinning. -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0" />
+    <!-- Cryptography dependencies used by specification and design tooling. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="11.0.0" />
 
-    <!--
-      ADR-009 Tier C: Firebird, and it is TEST-ONLY. No shipped project references any of these
-      four, and none of them may ever appear in src/, because this provider references no backing
-      store.
-
-      Firebird is here for what SQLite cannot do at all: table-valued functions, which Firebird
-      spells as selectable stored procedures, and the correlated LATERAL join over one. Those are
-      the whole of UdfDbFunctionTestBase that Tier B has to leave red.
-
-      THE NATIVE BINARIES COME FROM NUGET AND NOTHING IS INSTALLED. FirebirdSql.Data.FirebirdClient
-      carries no `fbclient`, so the engine arrives as two community "native assets" packages that
-      drop Firebird 5.0.3 into the output directory, and NativeAssetManager finds the path at run
-      time. One database is one file, as SQLite's is; there is no server process, and nothing is
-      downloaded during a run. Both platform packages are referenced because CI runs on
-      ubuntu-latest and development happens on Windows.
-
-      THE LAST THREE ARE COMMUNITY PACKAGES CARRYING NATIVE CODE, published by one author, and
-      that is worth knowing rather than discovering. They run only inside this test project.
-    -->
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
-    <PackageVersion Include="FirebirdSql.EntityFrameworkCore.Firebird" Version="13.0.0" />
-    <PackageVersion Include="FirebirdDb.Embedded.NativeAssetManager" Version="1.0.6" />
-    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" Version="2.0.6" />
-    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Linux.X64" Version="2.0.6" />
-    <!--
-      This DependencyInjection entry pins transitive references in tests and samples to 10.0.14,
-      the floor required through Blazor's Microsoft.Extensions.Logging dependency. A lower pin
-      fails restore with NU1109. Microsoft.Extensions.Http remains a direct product dependency
-      at 10.0.12; the shipped projects do not apply this DependencyInjection pin.
-
-      Corrected 2026-11-02: this comment previously said transitive pins never reach a nuspec and
-      disabling pinning for packable projects causes NU1109. Central transitive pinning CAN promote
-      dependencies into a nuspec. Directory.Build.props enables it for this repository, but both
-      shipped projects explicitly disable it. Their restore graphs and packed dependency groups
-      must be checked when changing these pins.
-    -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
-    <!--
-      Test-tooling transitive pin. Xml 10.0.14 requires Pkcs >= 10.0.14 on net10.0, so this
-      one pin updates both packages past the October 2026 advisories without a separate Pkcs pin.
-      Updating the EF specification packages instead would raise the test harness's EF floor.
-      Neither cryptography package appears in either shipped project's restore graph.
-
-      Corrected 2026-11-02: this comment previously attributed Xml only to SqlClient in functional
-      tests. It arrives through EF specification/design tooling and MSBuild/Roslyn dependencies
-      in functional tests and TestUtilities; Pkcs also arrives through SqlClient.
-    -->
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.14" />
-
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <!-- Keep VSTest filters, TRX reports, and coverage collectors used by eng/ and CI. -->
+    <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.3" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.0" />
+    <PackageVersion Include="System.Text.Json" Version="11.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
 
     <!--
@@ -128,21 +79,8 @@
       one passes only when the real period happens to elapse inside the assertion's wait. That is a
       test green by accident, which is the failure mode this repository treats as a defect.
     -->
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />
 
-    <!--
-      TIER D, TEST-ONLY, AND THE STORE ARRIVES IN THE PACKAGE. Mongo2Go embeds the mongod,
-      mongoimport and mongoexport binaries for win-x64, linux-x64/arm64 and osx-x64/arm64, so a
-      run downloads nothing and installs nothing. That is the same bar Firebird met and the reason
-      PostgreSQL did not: EphemeralMongo, the obvious package for this, FETCHES the binaries at
-      first use into local app data, which ADR-009 already rejected once.
-
-      MongoDB.EntityFrameworkCore REQUIRES EF Core >= 10.0.11, above this repository's 10.0.1
-      floor. That is deliberate rather than tolerated: it makes the test project resolve EF ABOVE
-      what src/ compiles against, which is the arrangement a consumer is really in and the one
-      that would have caught the 10.1.1 defect months earlier.
-    -->
-    <PackageVersion Include="Mongo2Go" Version="5.0.0" />
-    <PackageVersion Include="MongoDB.EntityFrameworkCore" Version="10.0.4" />
+    <!-- Tier D is suspended until MongoDB supports EF Core 11. -->
   </ItemGroup>
 </Project>

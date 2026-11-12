@@ -5,8 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -34,7 +32,7 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
     private readonly NonSharedModelInfoCarrierHarness _harness = new(SqliteInfoCarrierTier.Instance);
 
     /// <inheritdoc />
-    protected override ITestStoreFactory TestStoreFactory
+    protected override ITestStoreFactory NonSharedTestStoreFactory
         => _harness.TestStoreFactory;
 
     /// <inheritdoc />
@@ -56,8 +54,7 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
             CreateContext,
             (facade, transaction) => facade.UseTestTransaction(transaction),
             async context => Assert.Contains(
-                CoreStrings.NonQueryTranslationFailedWithDetails(
-                    "", RelationalStrings.ExecuteOperationOnEntitySplitting("ExecuteDelete", "MeterReading"))[21..],
+                RelationalStrings.ExecuteOperationOnEntitySplitting("ExecuteDelete", "MeterReading"),
                 (await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 {
                     if (async)
@@ -68,7 +65,7 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
                     {
                         context.MeterReadings.ExecuteDelete();
                     }
-                })).Message));
+                })).InnerException!.Message));
     }
 
     /// <inheritdoc />
@@ -80,13 +77,14 @@ public class EntitySplittingInfoCarrierTest(NonSharedFixture fixture, ITestOutpu
         Func<string, bool>? shouldLogCategory = null,
         Func<TestStore>? createTestStore = null,
         bool usePooling = true,
-        bool useServiceProvider = true)
+        bool useServiceProvider = true,
+        bool skipValidation = false)
     {
-        Fixture = null;
-        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddOptions);
+        NonSharedFixture = null;
+        _harness.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
 
         return base.CreateContextFactory<TContext>(
             onModelCreating, onConfiguring, addServices, configureConventions,
-            shouldLogCategory, createTestStore, usePooling, useServiceProvider);
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
     }
 }

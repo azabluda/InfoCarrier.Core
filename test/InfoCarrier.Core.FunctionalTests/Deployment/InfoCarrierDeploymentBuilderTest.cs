@@ -5,7 +5,6 @@ using InfoCarrier.Core.ValueMapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Deployment;
 

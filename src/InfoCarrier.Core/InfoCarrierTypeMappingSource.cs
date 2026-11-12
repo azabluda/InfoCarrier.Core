@@ -55,7 +55,7 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
         if (clrType == typeof(string)
             || (clrType == typeof(byte[]) && elementTypeMapping == null))
         {
-            return new InfoCarrierTypeMapping(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
+            return InfoCarrierTypeMapping.Create(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
         }
 
         // A value type is a *scalar* only when EF recognises it as one — every BCL primitive,
@@ -77,7 +77,7 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
                 || dependencies.JsonValueReaderWriterSource.FindReaderWriter(
                     Nullable.GetUnderlyingType(clrType) ?? clrType) is not null))
         {
-            return new InfoCarrierTypeMapping(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
+            return InfoCarrierTypeMapping.Create(clrType, jsonValueReaderWriter: jsonValueReaderWriter);
         }
 
         // A NetTopologySuite geometry is the one reference type that has to be mapped as a
@@ -91,7 +91,7 @@ public class InfoCarrierTypeMappingSource(TypeMappingSourceDependencies dependen
             var comparer = (Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer)Activator.CreateInstance(
                 typeof(Microsoft.EntityFrameworkCore.ChangeTracking.GeometryValueComparer<>).MakeGenericType(clrType))!;
 
-            return new InfoCarrierTypeMapping(
+            return InfoCarrierTypeMapping.Create(
                 clrType,
                 comparer,
                 comparer,

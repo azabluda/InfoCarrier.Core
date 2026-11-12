@@ -3,7 +3,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -13,7 +12,7 @@ public partial class ServerParameterizationTest
     ///     An unregistered public setter helper is refused on the client, before EF renames the
     ///     selector parameter. Registration must not be inferred from the helper being public.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task An_unregistered_public_setter_helper_keeps_the_client_diagnostic()
     {
         Run run = await RunBothWays(null, InvalidSetter);
@@ -34,7 +33,7 @@ public partial class ServerParameterizationTest
     ///     produce the same selector diagnostic as a direct query, without executing an update.
     ///     The full query diagnostic still uses a different name for the value parameter.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_public_setter_helper_uses_the_backend_diagnostic()
     {
         Run run = await RunBothWays([typeof(TestExtensions)], InvalidSetter);
@@ -43,8 +42,8 @@ public partial class ServerParameterizationTest
         var direct = Assert.IsType<InvalidOperationException>(run.DirectError);
         Assert.Empty(run.OverTheWire);
         string details = RelationalStrings.InvalidPropertyInSetProperty("b => b    .MaybeScalar(x => x.Id)");
-        Assert.Contains(details, direct.Message.Replace("\r", string.Empty).Replace("\n", string.Empty), StringComparison.Ordinal);
-        Assert.Contains(details, wire.Message.Replace("\r", string.Empty).Replace("\n", string.Empty), StringComparison.Ordinal);
+        Assert.Contains(details, direct.GetBaseException().Message.Replace("\r", string.Empty).Replace("\n", string.Empty), StringComparison.Ordinal);
+        Assert.Contains(details, wire.GetBaseException().Message.Replace("\r", string.Empty).Replace("\n", string.Empty), StringComparison.Ordinal);
         Assert.Contains("@p", direct.Message, StringComparison.Ordinal);
         Assert.Contains("@Value", wire.Message, StringComparison.Ordinal);
         Assert.IsType<string>(wire.Data[InfoCarrierFaultMapper.ServerStackTraceKey]);
@@ -58,7 +57,7 @@ public partial class ServerParameterizationTest
     ///     Without an explicit cast-target registration, the client refuses at the cast and has
     ///     no backend stack. Adding a public interface to a query must not implicitly admit it.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task An_unregistered_cast_target_is_refused_before_the_filter_reaches_the_backend()
     {
         Run run = await RunBothWays(null, CastAndFilter);
@@ -74,7 +73,7 @@ public partial class ServerParameterizationTest
     ///     Registering the cast target sends the filter to EF. Both providers refuse, but the
     ///     diagnostic parameter name remains a wire difference rather than an earlier refusal.
     /// </summary>
-    [ConditionalFact]
+    [Fact]
     public async Task A_registered_cast_target_reaches_the_backend_with_its_filter()
     {
         Run run = await RunBothWays([typeof(IConfigurationEntity)], CastAndFilter);

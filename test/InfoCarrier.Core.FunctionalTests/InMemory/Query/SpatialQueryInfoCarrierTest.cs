@@ -1,9 +1,8 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.InMemory.Query;
 
@@ -74,7 +73,7 @@ public class SpatialQueryInfoCarrierTest(SpatialQueryInfoCarrierTest.InfoCarrier
     /// </remarks>
     [StoreDefect(
         "1.11",
-        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 18, 19,
+        UpstreamRepository.EfCore, "test/EFCore.InMemory.FunctionalTests/Query/SpatialQueryInMemoryTest.cs", 17, 19,
         Justification = "Sequence contains no elements",
         Skip = true)]
     public override Task GetGeometryN_with_null_argument(bool async)

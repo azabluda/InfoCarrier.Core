@@ -4,7 +4,6 @@ using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query;
 
@@ -24,7 +23,7 @@ public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 13, 17,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 11, 15,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_cross_apply_with_filter(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_cross_apply_with_filter(async));
@@ -32,7 +31,7 @@ public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 19, 23,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 17, 21,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter(async));
@@ -40,7 +39,7 @@ public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     /// <inheritdoc />
     /// <remarks>EF's own: this shape needs <c>APPLY</c>, which SQLite does not have.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 25, 29,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 23, 27,
         Justification = Upstream.GaveNoReason)]
     public override Task Include_collection_with_outer_apply_with_filter_non_equality(bool async)
         => TPTManyToManyQueryInfoCarrierTest.AssertApplyNotSupported(() => base.Include_collection_with_outer_apply_with_filter_non_equality(async));
@@ -48,7 +47,7 @@ public class NorthwindStringIncludeQueryInfoCarrierTest(NorthwindQueryInfoCarrie
     /// <inheritdoc />
     /// <remarks>EF's own: a relational provider refuses <c>Last</c> without an ordering, where InMemory answers it.</remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 31, 34,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/NorthwindStringIncludeQuerySqliteTest.cs", 29, 32,
         Justification = Upstream.GaveNoReason)]
     public override async Task Include_collection_with_last_no_orderby(bool async)
         => Assert.Equal(

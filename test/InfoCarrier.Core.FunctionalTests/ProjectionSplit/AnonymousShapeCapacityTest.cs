@@ -2,8 +2,6 @@
 
 using System.Diagnostics;
 using InfoCarrier.Core.Expressions;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.ProjectionSplit;
 
@@ -37,8 +35,8 @@ public class AnonymousShapeCapacityTest(ITestOutputHelper output)
         start.ArgumentList.Add("/Logger:console;verbosity=detailed");
         start.Environment[childFlag] = test;
         using Process child = Process.Start(start)!;
-        Task<string> stdout = child.StandardOutput.ReadToEndAsync();
-        Task<string> stderr = child.StandardError.ReadToEndAsync();
+        Task<string> stdout = child.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+        Task<string> stderr = child.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         try
         {
@@ -49,7 +47,7 @@ public class AnonymousShapeCapacityTest(ITestOutputHelper output)
             if (!child.HasExited)
             {
                 child.Kill(entireProcessTree: true);
-                await child.WaitForExitAsync();
+                await child.WaitForExitAsync(TestContext.Current.CancellationToken);
             }
         }
 

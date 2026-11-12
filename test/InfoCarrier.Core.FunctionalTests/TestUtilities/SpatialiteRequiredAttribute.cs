@@ -2,7 +2,7 @@
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
+using System.Runtime.CompilerServices;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -30,8 +30,19 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///     </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
-public sealed class SpatialiteRequiredAttribute : Attribute, ITestCondition
+public sealed class SpatialiteRequiredAttribute : FactAttribute
 {
+    /// <summary>Skips the test when this platform cannot safely load SpatiaLite.</summary>
+    public SpatialiteRequiredAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
+    {
+        Skip = "Needs SpatiaLite, which this suite loads on Windows only.";
+        SkipType = typeof(SpatialiteRequiredAttribute);
+        SkipUnless = nameof(IsAvailable);
+    }
+
     private static readonly Lazy<bool> Loaded = new(() =>
     {
         if (!OperatingSystem.IsWindows())
@@ -44,10 +55,5 @@ public sealed class SpatialiteRequiredAttribute : Attribute, ITestCondition
     });
 
     /// <inheritdoc />
-    public ValueTask<bool> IsMetAsync()
-        => new(Loaded.Value);
-
-    /// <inheritdoc />
-    public string SkipReason
-        => "Needs SpatiaLite, which this suite loads on Windows only.";
+    public static bool IsAvailable => Loaded.Value;
 }

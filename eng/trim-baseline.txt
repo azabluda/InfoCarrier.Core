@@ -352,5 +352,15 @@
 #
 # Measured with SDK 10.0.402: ours 115, total 1148.
 
-ours=115
-total=1148
+# 2026-11-12, 115 -> 116 (EF Core 11 adoption).
+#
+# EF Core 11 annotates CoreTypeMappingParameters.clrType with PublicMethods. Its
+# TypeMappingInfo.ClrType input remains unannotated, so IL2067 now reaches the provider's
+# mapping constructor. The runtime type comes from the application model; propagating the
+# annotation only moves the same unresolved requirement to that dynamic input. Retain the
+# diagnostic rather than claiming arbitrary models are statically safe. No warning is suppressed.
+#
+# Measured with SDK 11.0.100: ours 116, total 1134.
+
+ours=116
+total=1134

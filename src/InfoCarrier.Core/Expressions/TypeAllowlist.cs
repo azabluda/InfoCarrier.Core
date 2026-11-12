@@ -131,6 +131,7 @@ public sealed class TypeAllowlist
         typeof(IEnumerable<>), typeof(IEnumerator<>), typeof(IReadOnlyList<>), typeof(IReadOnlyCollection<>),
         typeof(IQueryable<>), typeof(IOrderedQueryable<>), typeof(IOrderedEnumerable<>),
         typeof(HashSet<>), typeof(ISet<>), typeof(IReadOnlySet<>), typeof(SortedSet<>),
+        typeof(System.Collections.Frozen.FrozenSet<>),
         typeof(Dictionary<,>), typeof(IDictionary<,>), typeof(IReadOnlyDictionary<,>),
         typeof(KeyValuePair<,>), typeof(IGrouping<,>), typeof(ILookup<,>),
 
@@ -143,7 +144,7 @@ public sealed class TypeAllowlist
         typeof(ReadOnlyCollection<>), typeof(Collection<>),
         typeof(ImmutableArray<>), typeof(ImmutableList<>), typeof(ImmutableHashSet<>),
         typeof(ImmutableSortedSet<>), typeof(IImmutableSet<>), typeof(IImmutableList<>),
-        typeof(Expression<>), typeof(EqualityComparer<>), typeof(Comparer<>),
+        typeof(Expression<>), typeof(EqualityComparer<>), typeof(IEqualityComparer<>), typeof(Comparer<>),
         typeof(Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<,>),
         typeof(Tuple<>), typeof(Tuple<,>), typeof(Tuple<,,>), typeof(Tuple<,,,>),
         // Up to the full nesting arity: the projection rewrite carries a row's server-evaluated

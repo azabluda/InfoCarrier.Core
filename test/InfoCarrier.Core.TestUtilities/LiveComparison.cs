@@ -4,8 +4,8 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using Xunit;
-using Xunit.Abstractions;
 using Xunit.Sdk;
+using Xunit.v3;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -156,10 +156,11 @@ public static class LiveComparison
     internal static async Task<DirectRun> RunDirectAsync(
         IXunitTestCase testCase,
         Type testClass,
-        IMessageSink diagnosticMessageSink,
-        object[] constructorArguments)
+        object?[] constructorArguments,
+        ParallelMode parallelMode,
+        ExecutionScheduler scheduler)
     {
-        DirectFixtures fixtures = Fixtures.GetOrAdd(testClass, type => new DirectFixtures(type, diagnosticMessageSink));
+        DirectFixtures fixtures = Fixtures.GetOrAdd(testClass, type => new DirectFixtures(type));
         var results = new List<DirectResult>();
 
         // Restored when this method returns: an async method restores its caller's async-locals.
@@ -176,8 +177,11 @@ public static class LiveComparison
         }
 
         using var bus = new DirectBus(results);
-        _ = await testCase.RunAsync(
-            diagnosticMessageSink, bus, arguments, new ExceptionAggregator(), new CancellationTokenSource());
+        using var cancellation = new CancellationTokenSource();
+        await using var methodFixtures = new FixtureMappingManager("Method");
+        _ = await XunitRunnerHelper.RunXunitTestCase(
+            testCase, bus, cancellation, parallelMode, scheduler, new ExceptionAggregator(),
+            ExplicitOption.Off, arguments, methodFixtures);
         return new DirectRun(results, null);
     }
 
@@ -396,11 +400,11 @@ public static class LiveComparison
     ///     A class's second set of class fixtures, for the plain-EF run: created and initialized on
     ///     the class's first test case, disposed after its last.
     /// </summary>
-    private sealed class DirectFixtures(Type testClass, IMessageSink diagnosticMessageSink)
+    private sealed class DirectFixtures(Type testClass)
     {
         private Dictionary<Type, object>? _fixtures;
 
-        public async Task<object[]> ArgumentsAsync(object[] constructorArguments)
+        public async Task<object[]> ArgumentsAsync(object?[] constructorArguments)
         {
             if (_fixtures is null)
             {
@@ -409,10 +413,7 @@ public static class LiveComparison
                     .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IClassFixture<>))
                     .Select(i => i.GenericTypeArguments[0]))
                 {
-                    // xUnit v2 builds a class fixture with no arguments or with its message sink.
-                    object fixture = fixtureType.GetConstructor([typeof(IMessageSink)]) is { } withSink
-                        ? withSink.Invoke([diagnosticMessageSink])
-                        : Activator.CreateInstance(fixtureType)
+                    object fixture = Activator.CreateInstance(fixtureType)
                             ?? throw new InvalidOperationException($"'{fixtureType}' could not be created.");
                     created[fixtureType] = fixture;
                     if (fixture is IAsyncLifetime lifetime)
@@ -461,7 +462,7 @@ public static class LiveComparison
             switch (message)
             {
                 case ITestStarting starting:
-                    _test = CurrentTest.Start(starting.Test);
+                    _test = CurrentTest.Value;
                     _outcome = "unknown";
                     _failureText = null;
                     break;

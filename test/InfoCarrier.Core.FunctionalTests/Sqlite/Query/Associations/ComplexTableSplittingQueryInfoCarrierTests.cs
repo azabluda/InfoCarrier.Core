@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.ComplexTableSplitting;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
@@ -51,7 +50,9 @@ public class ComplexTableSplittingQueryInfoCarrierFixture : ComplexTableSplittin
             SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+            arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     /// <remarks>
@@ -111,13 +112,35 @@ public class ComplexTableSplittingProjectionQueryInfoCarrierTest(
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs", 11, 12,
         Justification = Upstream.GaveNoReason)]
+    public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
+
+    /// <summary>
+    ///     <c>ComplexTableSplittingProjectionSqliteTest</c>'s two, verbatim, and the whole of
+    ///     R28's red: SQLite has no <c>APPLY</c>.
+    /// </summary>
+    /// <remarks>
+    ///     <b>Unlike R26a and R27a, this override comes from the family's own SQLite class rather
+    ///     than a sibling's</b> — EF issue #26708 disables the projection class for the two
+    ///     <em>owned</em> families but not for this one.
+    ///     <b>And there is no <c>TrackAll</c> arm to special-case.</b> R26 and R27 each had to
+    ///     short-circuit tracking, because an owned dependent projected under <c>TrackAll</c>
+    ///     reaches <c>AssertOwnedTrackingQuery</c> and the APPLY message arrives where a tracking
+    ///     message was expected. A complex type is not tracked as an entity, so no such assertion
+    ///     stands in the way and both arms raise <c>ApplyNotSupported</c> directly — measured in
+    ///     R28, not assumed from the shape.
+    /// </remarks>
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs", 14, 15,
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs", 14, 15,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexTableSplitting/ComplexTableSplittingProjectionSqliteTest.cs", 17, 18,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(

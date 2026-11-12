@@ -249,7 +249,9 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     /// </remarks>
     public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
         => AddServerContextOptions(builder)
-            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.SqliteEventId.CompositeKeyWithValueGeneration))
+            .ConfigureWarnings(w => w.Ignore(
+                Microsoft.EntityFrameworkCore.Diagnostics.SqliteEventId.CompositeKeyWithValueGeneration,
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.OwnedEntityMappedToJsonCollectionWarning))
             .UseSqlite(DirectClientConnection, b => b.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery));
 
     /// <summary>

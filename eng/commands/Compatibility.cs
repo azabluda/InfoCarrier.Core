@@ -23,7 +23,7 @@ internal static class CompatibilityCommand
             else if (args[index] == "--historical-client" && ++index < args.Length) { historicalClient = Path.GetFullPath(args[index]); }
             else { Console.Error.WriteLine("Unknown or incomplete compatibility option."); return 2; }
         }
-        string current = Path.GetFullPath("tools/InfoCarrier.CompatibilityProbe/bin/Release/net10.0/InfoCarrier.CompatibilityProbe.dll");
+        string current = Path.GetFullPath("tools/InfoCarrier.CompatibilityProbe/bin/Release/net11.0/InfoCarrier.CompatibilityProbe.dll");
         previousClient = Path.GetFullPath(previousClient);
         if (!File.Exists(previousClient) || !File.Exists(current) || historicalClient is not null && !File.Exists(historicalClient))
         {

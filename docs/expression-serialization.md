@@ -1,5 +1,10 @@
 # Expression Serialization — Research & Design
 
+**Historical research note.** The EF Core 10 questions and reference paths below record the
+pre-implementation study. Current code targets EF Core 11; use the
+[pinned adoption reference](plans/v11/adoption-checklist.md#reproduce-the-upstream-source-audit)
+and [wire contract](wire-protocol.md) when checking current APIs or serialized behavior.
+
 Status: **PRE-IMPLEMENTATION (research in progress)** · Decision frame: [ADR-001](decisions.md#adr-001-serialization-engine-greenfield-spec-only-locked-2026-07-19) (greenfield, spec-only — LOCKED), [ADR-008](decisions.md) (design direction — PROVISIONAL).
 
 This document is the specification for how InfoCarrier.Core v2 serializes

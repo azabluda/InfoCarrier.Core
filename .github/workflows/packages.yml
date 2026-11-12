@@ -1,7 +1,7 @@
 # Internal CI feed: pack every push and publish it to GitHub Packages.
 #
 # WHAT THIS IS FOR. A build of the current branch, installable, without waiting for a release.
-# MinVer gives each commit a unique ordered prerelease — 10.0.1-alpha.0.7 — so a consumer can
+# MinVer gives each commit a unique ordered prerelease — 11.0.0-alpha.0.7 — so a consumer can
 # name the exact build they are testing against and NuGet orders them correctly.
 #
 # WHAT IT IS NOT. GitHub Packages is not a public feed: consuming a NuGet package from it needs a
@@ -71,7 +71,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Restore
         run: dotnet restore InfoCarrier.Core.slnx

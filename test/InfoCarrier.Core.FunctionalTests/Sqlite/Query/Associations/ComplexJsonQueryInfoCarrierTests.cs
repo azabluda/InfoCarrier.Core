@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query.Associations.ComplexJson;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit.Abstractions;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
 
@@ -58,7 +57,9 @@ public class ComplexJsonQueryInfoCarrierFixture : ComplexJsonRelationalFixtureBa
             SqliteInfoCarrierTier.Instance,
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+            arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     /// <remarks>
@@ -94,7 +95,32 @@ public class ComplexJsonBulkUpdateQueryInfoCarrierTest(
 public class ComplexJsonCollectionQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
     ITestOutputHelper testOutputHelper)
-    : ComplexJsonCollectionRelationalTestBase<ComplexJsonQueryInfoCarrierFixture>(fixture, testOutputHelper);
+    : ComplexJsonCollectionRelationalTestBase<ComplexJsonQueryInfoCarrierFixture>(fixture, testOutputHelper)
+{
+    private readonly NonSharedModelInfoCarrierHarness _nonShared = new(SqliteInfoCarrierTier.Instance);
+
+    protected override ContextFactory<TContext> CreateContextFactory<TContext>(
+        Action<ModelBuilder>? onModelCreating = null,
+        Action<DbContextOptionsBuilder>? onConfiguring = null,
+        Func<Microsoft.Extensions.DependencyInjection.IServiceCollection, Microsoft.Extensions.DependencyInjection.IServiceCollection>? addServices = null,
+        Action<ModelConfigurationBuilder>? configureConventions = null,
+        Func<string, bool>? shouldLogCategory = null,
+        Func<TestStore>? createTestStore = null,
+        bool usePooling = true,
+        bool useServiceProvider = true,
+        bool skipValidation = false)
+    {
+        NonSharedFixture = null;
+        _nonShared.Prepare(typeof(TContext), onModelCreating, addServices, onConfiguring, configureConventions, AddNonSharedOptions);
+        return base.CreateContextFactory<TContext>(
+            onModelCreating, onConfiguring, addServices, configureConventions,
+            shouldLogCategory, createTestStore, usePooling, useServiceProvider, skipValidation);
+    }
+
+    protected override ITestStoreFactory NonSharedTestStoreFactory => _nonShared.TestStoreFactory;
+
+
+}
 
 public class ComplexJsonMiscellaneousQueryInfoCarrierTest(
     ComplexJsonQueryInfoCarrierFixture fixture,
@@ -149,13 +175,21 @@ public class ComplexJsonProjectionQueryInfoCarrierTest(
     [StoreLimit(
         UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs", 20, 21,
         Justification = Upstream.GaveNoReason)]
+    public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
+        => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+            () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
+
+    /// <inheritdoc cref="SelectMany_associate_collection" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs", 23, 24,
+        Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
             () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
 
     /// <inheritdoc cref="SelectMany_associate_collection" />
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs", 23, 24,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/ComplexJson/ComplexJsonProjectionSqliteTest.cs", 26, 27,
         Justification = Upstream.GaveNoReason)]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
         => NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(

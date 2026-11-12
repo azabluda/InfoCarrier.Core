@@ -6,8 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
-using Xunit.Abstractions;
 using Xunit.Sdk;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite.Query.Associations;
@@ -47,7 +45,9 @@ public class OwnedNavigationsQueryInfoCarrierFixture : OwnedNavigationsRelationa
             ContextType,
             (modelBuilder, context) => OnModelCreating(modelBuilder, context),
             onAddOptions: AssociationsWarnings.ThrowOnUnorderedRowLimiting,
-            configureConventions: ConfigureConventions);
+            configureConventions: ConfigureConventions,
+            relationalClientStore: true,
+            arbitrarySqlExecution: true);
 
     /// <inheritdoc />
     /// <remarks>
@@ -90,7 +90,7 @@ public class OwnedNavigationsCollectionQueryInfoCarrierTest(
     ///     'no CROSS APPLY'"</i>. Reason matched before the override was taken (A63).
     /// </remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsCollectionSqliteTest.cs", 12, 15,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsCollectionSqliteTest.cs", 11, 14,
         Justification = "Base test expects \"can't track owned entities\" exception, but with SQLite we get \"no CROSS APPLY\"")]
     public override Task Distinct_projected(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
@@ -146,13 +146,31 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.BorrowedFromAnotherBase,
         DeviationNote = BorrowedFromOwnedJson)]
-    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+    public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
         => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
             ? Task.CompletedTask
             : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
-                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+                () => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
 
-    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    /// <summary>
+    ///     The same APPLY limit in the same two arms, but <b>EF ships no
+    ///     <c>OwnedNavigationsProjectionSqliteTest</c> to take it from.</b> That whole class is
+    ///     commented out upstream, for EF issue #26708 (<i>"Stop generating composite keys for
+    ///     owned collections on SQLite"</i>), so there is no override there to adopt.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>OwnedJsonProjectionSqliteTest</c> is the nearest statement of the same limit and
+    ///         is where these two bodies come from, character for character including the
+    ///         <c>TrackAll</c> arm. C20 and C57 already borrowed from there for the same reason.
+    ///     </para>
+    ///     <para>
+    ///         <b>Worth recording rather than quietly enjoying: the rest of this class passes
+    ///         here.</b> R26 measured it with no override at all and only these two tests failed,
+    ///         in both arms. That is an observation about a class EF does not run, not a claim
+    ///         that #26708 is fixed, and nothing here depends on which it is.
+    ///     </para>
+    /// </remarks>
     [StoreLimit(
         UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 31, 34,
         Case = nameof(QueryTrackingBehavior.TrackAll),
@@ -162,6 +180,26 @@ public class OwnedNavigationsProjectionQueryInfoCarrierTest(
         DeviationNote = BorrowedFromOwnedJson)]
     [StoreLimit(
         UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 31, 34,
+        Case = nameof(QueryTrackingBehavior.NoTracking),
+        Justification = Upstream.GaveNoReason,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
+    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
+        => queryTrackingBehavior is QueryTrackingBehavior.TrackAll
+            ? Task.CompletedTask
+            : NavigationsCollectionQueryInfoCarrierTest.AssertApplyNotSupported(
+                () => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
+
+    /// <inheritdoc cref="Select_subquery_required_related_FirstOrDefault" />
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 36, 39,
+        Case = nameof(QueryTrackingBehavior.TrackAll),
+        Justification = OwnedJsonTrackAllReason,
+        Skip = true,
+        Deviation = DeviationKind.BorrowedFromAnotherBase,
+        DeviationNote = BorrowedFromOwnedJson)]
+    [StoreLimit(
+        UpstreamRepository.EfCore, OwnedJsonProjectionSqlite, 36, 39,
         Case = nameof(QueryTrackingBehavior.NoTracking),
         Justification = Upstream.GaveNoReason,
         Deviation = DeviationKind.BorrowedFromAnotherBase,
@@ -207,7 +245,7 @@ public class OwnedNavigationsSetOperationsQueryInfoCarrierTest(
     ///     what it means upstream, and the paragraph is no longer needed.
     /// </remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsSetOperationsSqliteTest.cs", 12, 13,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsSetOperationsSqliteTest.cs", 11, 13,
         Justification = "SQL APPLY not supported in SQLite - different exception message from the one expected in the base class")]
     public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
         => Assert.ThrowsAsync<EqualException>(() => base.Over_associate_collection_projected(queryTrackingBehavior));

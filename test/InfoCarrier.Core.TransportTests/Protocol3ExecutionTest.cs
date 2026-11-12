@@ -34,15 +34,15 @@ public class Protocol3ExecutionTest(NorthwindServerFactory factory) : IClassFixt
             .OrderBy(product => product.Id).Take(3)
             .Select(product => product.Name.ToUpper() + ":" + (product.UnitsInStock + 2));
 
-        string[] expected = await Query(server).ToArrayAsync();
+        string[] expected = await Query(server).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(expected);
-        Assert.Equal(expected, await Query(client).ToArrayAsync());
+        Assert.Equal(expected, await Query(client).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(await server.Products.FromSqlRaw("SELECT * FROM Products WHERE Id > {0}", 1)
-                .OrderBy(product => product.Id).Select(product => product.Id).ToArrayAsync(),
+                .OrderBy(product => product.Id).Select(product => product.Id).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken),
             await client.Products.FromSqlRaw("SELECT * FROM Products WHERE Id > {0}", 1)
-                .OrderBy(product => product.Id).Select(product => product.Id).ToArrayAsync());
-        Assert.Equal(await server.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Products").ToArrayAsync(),
-            await client.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Products").ToArrayAsync());
+                .OrderBy(product => product.Id).Select(product => product.Id).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(await server.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Products").ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken),
+            await client.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Products").ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(3, serializer.Operations.Count);
         Assert.All(serializer.Operations, operation => Assert.Equal(Old.InfoCarrierOperation.Query, operation));
     }
@@ -59,7 +59,7 @@ public class Protocol3ExecutionTest(NorthwindServerFactory factory) : IClassFixt
         int before = counter.Reads;
 
         InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.Products.FromSqlRaw("SELECT * FROM Products").ToArrayAsync());
+            client.Products.FromSqlRaw("SELECT * FROM Products").ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("SQL", failure.Message, StringComparison.Ordinal);
         Assert.Equal(Old.InfoCarrierOperation.Query, Assert.Single(serializer.Operations));
@@ -72,18 +72,18 @@ public class Protocol3ExecutionTest(NorthwindServerFactory factory) : IClassFixt
         using HttpClient http = factory.CreateClient();
         var serializer = new Protocol3Serializer();
         await using NorthwindContext client = CreateContext(http, serializer);
-        int[] expected = await client.Products.OrderBy(product => product.Id).Select(product => product.Id).Take(3).ToArrayAsync();
+        int[] expected = await client.Products.OrderBy(product => product.Id).Select(product => product.Id).Take(3).ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Post, "infocarrier")
         {
             Content = new ByteArrayContent(serializer.LastQueryBody!),
         };
         request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
         request.Headers.Add("InfoCarrier-Protocol-Version", "3");
-        using HttpResponseMessage response = await http.SendAsync(request);
+        using HttpResponseMessage response = await http.SendAsync(request, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        await using Stream source = await response.Content.ReadAsStreamAsync();
+        await using Stream source = await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
         var frames = new List<OldFrames.QueryStreamFrame>();
-        await foreach (OldFrames.QueryStreamFrame frame in OldFrames.QueryStreamFrameCodec.ReadAsync(source))
+        await foreach (OldFrames.QueryStreamFrame frame in OldFrames.QueryStreamFrameCodec.ReadAsync(source, TestContext.Current.CancellationToken))
         {
             frames.Add(frame);
         }
@@ -104,14 +104,14 @@ public class Protocol3ExecutionTest(NorthwindServerFactory factory) : IClassFixt
         client.Customers.Add(new Customer { Id = id, CompanyName = "New", City = "A", Country = "X" });
         client.Customers.Add(new Customer { Id = "ALFKI", CompanyName = "Duplicate", City = "B", Country = "X" });
 
-        DbUpdateException failure = await Assert.ThrowsAsync<DbUpdateException>(() => client.SaveChangesAsync());
+        DbUpdateException failure = await Assert.ThrowsAsync<DbUpdateException>(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal("ALFKI", Assert.IsType<Customer>(Assert.Single(failure.Entries).Entity).Id);
         Assert.Equal(Old.InfoCarrierOperation.SaveChanges, Assert.Single(serializer.Operations));
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
         NorthwindContext database = scope.ServiceProvider.GetRequiredService<NorthwindContext>();
-        Assert.False(await database.Customers.AnyAsync(customer => customer.Id == id));
-        Assert.NotEqual("Duplicate", (await database.Customers.SingleAsync(customer => customer.Id == "ALFKI")).CompanyName);
+        Assert.False(await database.Customers.AnyAsync(customer => customer.Id == id, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.NotEqual("Duplicate", (await database.Customers.SingleAsync(customer => customer.Id == "ALFKI", cancellationToken: TestContext.Current.CancellationToken)).CompanyName);
     }
 
     [Fact]
@@ -125,64 +125,64 @@ public class Protocol3ExecutionTest(NorthwindServerFactory factory) : IClassFixt
         int id;
         await using (NorthwindContext client = CreateContext(http, serializer))
         {
-            await using IDbContextTransaction transaction = await client.Database.BeginTransactionAsync();
+            await using IDbContextTransaction transaction = await client.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
             Assert.True(transaction.SupportsSavepoints);
             var retained = new Product { Name = name, UnitPrice = 2.5m, UnitsInStock = 3, CategoryId = 1 };
             var second = new Product { Name = name + "-second", UnitPrice = 7m, UnitsInStock = 4, CategoryId = 1 };
             client.AddRange(retained, second);
-            Assert.Equal(2, await client.SaveChangesAsync());
+            Assert.Equal(2, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
             id = retained.Id;
             Assert.True(id > 0);
             Assert.True(second.Id > 0);
             Assert.NotEqual(id, second.Id);
 
-            await transaction.CreateSavepointAsync("retained");
+            await transaction.CreateSavepointAsync("retained", TestContext.Current.CancellationToken);
             client.Products.Add(new Product { Name = name + "-discarded", CategoryId = 1 });
-            Assert.Equal(1, await client.SaveChangesAsync());
-            await transaction.RollbackToSavepointAsync("retained");
-            await transaction.ReleaseSavepointAsync("retained");
-            await transaction.CommitAsync();
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
+            await transaction.RollbackToSavepointAsync("retained", TestContext.Current.CancellationToken);
+            await transaction.ReleaseSavepointAsync("retained", TestContext.Current.CancellationToken);
+            await transaction.CommitAsync(TestContext.Current.CancellationToken);
         }
 
         await using (AsyncServiceScope scope = host.Services.CreateAsyncScope())
         {
             NorthwindContext database = scope.ServiceProvider.GetRequiredService<NorthwindContext>();
-            Product retained = await database.Products.SingleAsync(product => product.Id == id);
+            Product retained = await database.Products.SingleAsync(product => product.Id == id, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(name, retained.Name);
             Assert.Equal(2.5m, retained.UnitPrice);
             Assert.Equal(3, retained.UnitsInStock);
-            Assert.Equal(7m, (await database.Products.SingleAsync(product => product.Name == name + "-second")).UnitPrice);
-            Assert.False(await database.Products.AnyAsync(product => product.Name == name + "-discarded"));
+            Assert.Equal(7m, (await database.Products.SingleAsync(product => product.Name == name + "-second", cancellationToken: TestContext.Current.CancellationToken)).UnitPrice);
+            Assert.False(await database.Products.AnyAsync(product => product.Name == name + "-discarded", cancellationToken: TestContext.Current.CancellationToken));
         }
 
         await using (NorthwindContext client = CreateContext(http, serializer))
         {
-            Product product = await client.Products.SingleAsync(product => product.Id == id);
+            Product product = await client.Products.SingleAsync(product => product.Id == id, cancellationToken: TestContext.Current.CancellationToken);
             product.UnitsInStock = 19;
-            Assert.Equal(1, await client.SaveChangesAsync());
-            await using IDbContextTransaction transaction = await client.Database.BeginTransactionAsync();
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
+            await using IDbContextTransaction transaction = await client.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
             product.Name = name + "-rolled-back";
-            Assert.Equal(1, await client.SaveChangesAsync());
-            await transaction.RollbackAsync();
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
+            await transaction.RollbackAsync(TestContext.Current.CancellationToken);
         }
 
         await using (AsyncServiceScope scope = host.Services.CreateAsyncScope())
         {
             NorthwindContext database = scope.ServiceProvider.GetRequiredService<NorthwindContext>();
-            Product retained = await database.Products.SingleAsync(product => product.Id == id);
+            Product retained = await database.Products.SingleAsync(product => product.Id == id, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(name, retained.Name);
             Assert.Equal(19, retained.UnitsInStock);
         }
 
         await using (NorthwindContext client = CreateContext(http, serializer))
         {
-            client.Products.Remove(await client.Products.SingleAsync(product => product.Id == id));
-            Assert.Equal(1, await client.SaveChangesAsync());
+            client.Products.Remove(await client.Products.SingleAsync(product => product.Id == id, cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(1, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
         }
         await using (AsyncServiceScope scope = host.Services.CreateAsyncScope())
         {
             NorthwindContext database = scope.ServiceProvider.GetRequiredService<NorthwindContext>();
-            Assert.False(await database.Products.AnyAsync(product => product.Id == id));
+            Assert.False(await database.Products.AnyAsync(product => product.Id == id, cancellationToken: TestContext.Current.CancellationToken));
         }
 
         foreach (Old.InfoCarrierOperation operation in Enum.GetValues<Old.InfoCarrierOperation>())

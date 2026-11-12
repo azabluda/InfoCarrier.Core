@@ -208,7 +208,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
             foreach (DynamicPropertyValue value in ChangeEntryMapper.ReadValues(change.SerializedValues))
             {
-                if (entityType.FindProperty(value.Name) is not { } property)
+                if (ChangeEntryMapper.FindProperty(entityType, value.Name) is not { } property)
                 {
                     if (entityType.FindComplexProperty(value.Name) is { } complexProperty)
                     {
@@ -575,12 +575,22 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             // written until the state is, so the entry lands under the key it actually has.
             foreach ((IProperty property, object? value) in replay.Shadow)
             {
-                entry.Property(property.Name).CurrentValue = value;
+                entry.GetInfrastructure()[property] = value;
             }
 
             try
             {
                 entry.State = state;
+
+                // Added-state value generation must not replace an explicitly cleared complex discriminator.
+                foreach ((IProperty property, object? value) in replay.Shadow)
+                {
+                    if (property.DeclaringType is IComplexType complex
+                        && complex.FindDiscriminatorProperty() == property)
+                    {
+                        entry.GetInfrastructure()[property] = value;
+                    }
+                }
             }
             catch (InvalidOperationException failure)
             {
@@ -1354,18 +1364,12 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         var source = _context.GetService<IStructuralTypeMaterializerSource>();
         var materializationContext = new MaterializationContext(new ValueBuffer(buffer), _context);
 
-        // AROUND EF'S DEFECT, docs/upstream-defects.md 1.1 (#52). EF's full materializer fills a
-        // property-bag complex type's primitive-collection member through `Expression.Property` on
-        // the `Item[string]` indexer, which .NET refuses. The empty materializer does EF's own
-        // constructor binding and fills nothing, so it never reaches that branch; the values then go
-        // on the object as the full materializer would have put them, and the caller sets the
-        // complex values through their members, as it does for every entity. Only where the
-        // constructor takes no property value, because only the full materializer can bind one.
-        if (entityType.ServiceOnlyConstructorBinding is not null && HasPropertyBagComplexType(entityType))
+        // EF 11 fixes ordinary complex property bags, but its full materializer still fails
+        // while constructing a property-bag complex collection's Item[string] member.
+        if (entityType.ServiceOnlyConstructorBinding is not null && HasPropertyBagComplexCollection(entityType))
         {
             object instance = runtimeType.GetOrCreateEmptyMaterializer(source)(materializationContext);
             var shadowWrittenLater = new List<(IProperty Property, object? Value)>();
-
             foreach (IProperty property in entityType.GetProperties())
             {
                 if (property.GetIndex() is >= 0 and var index)
@@ -1380,9 +1384,11 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         return runtimeType.GetOrCreateMaterializer(source)(materializationContext);
     }
 
-    private static bool HasPropertyBagComplexType(ITypeBase type)
-        => type.GetComplexProperties().Any(
-            p => p.ComplexType.IsPropertyBag || HasPropertyBagComplexType(p.ComplexType));
+    private static bool HasPropertyBagComplexCollection(ITypeBase type)
+        => type.GetComplexProperties().Any(property =>
+            (property.IsCollection && property.ComplexType.IsPropertyBag)
+            || HasPropertyBagComplexCollection(property.ComplexType));
+
 
     /// <summary>
     ///     Gives each member of a property-bag complex value the CLR type its model declares (#52).

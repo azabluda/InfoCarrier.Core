@@ -1,10 +1,9 @@
-﻿// Licensed under the MIT license. See license.txt file in the project root for license information.
+// Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Xunit;
 
 namespace InfoCarrier.Core.FunctionalTests.Sqlite;
 
@@ -45,7 +44,7 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///     override for the same test.
     /// </remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs", 15, 16,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs", 12, 14,
         Justification = "Disabled: SQLite database is case-sensitive",
         Skip = true)]
     public override Task Can_insert_and_read_back_with_case_insensitive_string_key()
@@ -75,7 +74,7 @@ public class CustomConvertersInfoCarrierTest(CustomConvertersInfoCarrierTest.Cus
     ///     </para>
     /// </remarks>
     [StoreLimit(
-        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs", 131, 134,
+        UpstreamRepository.EfCore, "test/EFCore.Sqlite.FunctionalTests/CustomConvertersSqliteTest.cs", 129, 132,
         Justification = Upstream.GaveNoReason)]
     public override void Value_conversion_on_enum_collection_contains()
         => Assert.Contains(

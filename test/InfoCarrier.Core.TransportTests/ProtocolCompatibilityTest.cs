@@ -32,13 +32,13 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
         };
         if (streamed) { request.Headers.Add("InfoCarrier-Operation", "Query"); }
 
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(InfoCarrierEnvelope.CurrentProtocolVersion.ToString(),
             Assert.Single(response.Headers.GetValues("InfoCarrier-Protocol-Version")));
-        string detail = await response.Content.ReadAsStringAsync();
+        string detail = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains($"client {(streamed ? 0 : 2)}", detail);
         Assert.Contains($"server {InfoCarrierEnvelope.CurrentProtocolVersion}", detail);
         Assert.Contains("Upgrade the client", detail);
@@ -51,9 +51,9 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
         using HttpClient client = factory.CreateClient();
         using var request = new StringContent("""{"operation":2,"payload":"bnVsbA=="}""",
             System.Text.Encoding.UTF8, "application/json");
-        using HttpResponseMessage response = await client.PostAsync("infocarrier", request);
+        using HttpResponseMessage response = await client.PostAsync("infocarrier", request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("client 0", await response.Content.ReadAsStringAsync());
+        Assert.Contains("client 0", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.True(response.Headers.Contains("InfoCarrier-Protocol-Version"));
     }
 
@@ -73,10 +73,10 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
         request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
         if (version != 0) { request.Headers.Add("InfoCarrier-Protocol-Version", version.ToString()); }
 
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(version.ToString(), Assert.Single(response.Headers.GetValues("InfoCarrier-Client-Protocol-Version")));
-        Assert.Contains($"client {version}", await response.Content.ReadAsStringAsync());
+        Assert.Contains($"client {version}", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, ((CountingServer)server).Calls);
     }
 
@@ -87,9 +87,8 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
             factory.CreateClient(), new SystemTextJsonInfoCarrierSerializer());
         InfoCarrierProtocolException exception = await Assert.ThrowsAsync<InfoCarrierProtocolException>(async () =>
         {
-            await using IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query,
-                async (stream, token) => await stream.WriteAsync(
-                    System.Text.Encoding.UTF8.GetBytes(OldStreamRequest), token));
+            await using IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query, async (stream, token) => await stream.WriteAsync(
+                    System.Text.Encoding.UTF8.GetBytes(OldStreamRequest), token), TestContext.Current.CancellationToken);
         });
         Assert.Equal(0, exception.ClientVersion);
         Assert.Equal(InfoCarrierEnvelope.CurrentProtocolVersion, exception.ServerVersion);
@@ -104,9 +103,8 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
         var transport = (IInfoCarrierStreamTransport)new HttpInfoCarrierTransport(http, new SystemTextJsonInfoCarrierSerializer());
         await Assert.ThrowsAsync<InfoCarrierTransportException>(async () =>
         {
-            await using IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query,
-                async (stream, token) => await stream.WriteAsync(
-                    System.Text.Encoding.UTF8.GetBytes(OldStreamRequest), token));
+            await using IInfoCarrierResponse response = await transport.SendAsync(InfoCarrierOperation.Query, async (stream, token) => await stream.WriteAsync(
+                    System.Text.Encoding.UTF8.GetBytes(OldStreamRequest), token), TestContext.Current.CancellationToken);
         });
         Assert.Equal(0, handler.Executions);
     }
@@ -130,7 +128,7 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
 
         InfoCarrierProtocolException exception = synchronous
             ? Assert.Throws<InfoCarrierProtocolException>(() => client.BeginTransaction())
-            : await Assert.ThrowsAsync<InfoCarrierProtocolException>(() => client.BeginTransactionAsync());
+            : await Assert.ThrowsAsync<InfoCarrierProtocolException>(() => client.BeginTransactionAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(InfoCarrierEnvelope.CurrentProtocolVersion, exception.ClientVersion);
         Assert.Equal(remote, exception.ServerVersion);
@@ -152,7 +150,7 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
         };
         InfoCarrierProtocolException exception = synchronous
             ? Assert.Throws<InfoCarrierProtocolException>(() => transport.Send(request))
-            : await Assert.ThrowsAsync<InfoCarrierProtocolException>(() => transport.SendAsync(request));
+            : await Assert.ThrowsAsync<InfoCarrierProtocolException>(() => transport.SendAsync(request, TestContext.Current.CancellationToken));
         Assert.Equal(2, exception.ClientVersion);
         Assert.Equal(InfoCarrierEnvelope.CurrentProtocolVersion, exception.ServerVersion);
     }
@@ -165,7 +163,7 @@ public class ProtocolCompatibilityTest(NorthwindServerFactory factory) : IClassF
     {
         await using var source = new MemoryStream(System.Text.Encoding.UTF8.GetBytes($"[[0,{version},0,false,null],[3]]"));
         InfoCarrierProtocolException exception = await Assert.ThrowsAsync<InfoCarrierProtocolException>(
-            async () => await QueryStreamFrameCodec.ReadAsync(source).ToListAsync());
+            async () => await QueryStreamFrameCodec.ReadAsync(source, TestContext.Current.CancellationToken).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(version, exception.ServerVersion);
     }
 
