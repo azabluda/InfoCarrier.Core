@@ -3,6 +3,7 @@
 ![InfoCarrier.Core: EF Core in your client, real database on the server](docs/assets/infocarrier-core-banner.png)
 
 [![Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
+[![EF parity](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fazabluda%2FInfoCarrier.Core%2Fbadges%2Fspec-suite.json)](https://github.com/azabluda/InfoCarrier.Core/actions/workflows/build.yml)
 [![NuGet](https://img.shields.io/nuget/v/InfoCarrier.Core)](https://www.nuget.org/packages/InfoCarrier.Core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](license.txt)
 
