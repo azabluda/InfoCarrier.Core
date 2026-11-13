@@ -815,6 +815,31 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       migrations. Evaluate the design before stable version 11 publication. The owner requested
       [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262) on 2026-10-29 to track this work.
 
+## SQLite process isolation ([#282](https://github.com/azabluda/InfoCarrier.Core/issues/282))
+
+- [x] **SQLI1. Isolate database ownership by test process.** Preserve fixture sharing and parallel
+      collections inside each process. Place normal and direct-comparison connections in one unique
+      run directory. Retain an exclusive ownership file until process exit, serialize startup
+      publication and reclamation, and remove abandoned databases with all journal files together.
+      Reproduce interference with coordinated processes before the fix; verify closed and open
+      databases, retained mutations, comparison connections, abrupt exit, incomplete publication,
+      unrelated files, long fixture names and simultaneous startup afterward. Preserve Windows
+      extended-length connection paths for database and journal creation. Run overlapping filtered suites, then the
+      full functional and slow comparison suites sequentially. Update the shared-directory guidance
+      only after isolation checks pass. The owner approved this scope on 2026-11-13.
+
+      Validated 2026-11-13 on Windows: before isolation, the coordinated regression observed the
+      first process's rows replaced by the second process's seed. The added long-name regression
+      also failed before extended-length Windows paths were applied. Final focused validation
+      **Passed: 5, Failed: 0, Total: 5**. Overlapping Northwind Where and Select runs reported
+      **Passed: 424, Failed: 0, Total: 424** and **Passed: 390, Failed: 0, Total: 390**.
+      Complete functional **Passed: 30238, Failed: 0, Total: 30470** (232 skipped), followed
+      sequentially by slow comparison **Passed: 28205, Failed: 0, Total: 28371** (166 skipped).
+      The strict Release build passed with zero errors and four NU1900 warnings from an unavailable
+      package-audit feed. Changed documentation links, file hygiene and whitespace checks passed.
+      Linux lease and cleanup validation remains with continuous integration. No product code,
+      dependency versions, pooling settings, suite parallelism or wire contract changed.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

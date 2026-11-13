@@ -31,6 +31,7 @@
     <AssemblyName>InfoCarrier.Core.FunctionalTests</AssemblyName>
     <IsPackable>false</IsPackable>
     <OutputType>Exe</OutputType>
+    <StartupObject>InfoCarrier.Core.FunctionalTests.SqliteIsolationChild</StartupObject>
     <!--
       Not a documented API, but the doc file is generated anyway: IDE0005 (unnecessary using) does
       not run without one. The doc-comment warnings that come with it (1254 in this repository) are

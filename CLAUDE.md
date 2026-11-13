@@ -646,19 +646,28 @@ crosses this wire. A non-relational backend tier is recorded as future scope wit
 
 ### The test stores, and flakiness
 
-**Run only one functional-test process per working directory.** The startup sweep removes database
-files left by earlier runs. A second process can mistake the first process's temporarily closed
-databases for stale files and remove them. This was reproduced during EF Core 11 timing work on
-2026-11-12. Run timing probes and the slow suite sequentially; a concurrent run requires an isolated
-working directory. Transport and engineering projects use separate output directories.
+**Functional-test processes can share a working directory.** Each process owns a unique
+`.infocarrier-sqlite/run-<guid>/` directory, with fixture names shared only within that run.
+The server and direct comparison client use the same run-local path. `SqliteTestRun` retains an
+exclusive ownership file until process exit; startup cleanup acquires that file before deleting
+an abandoned directory, including its database, write-ahead log and shared-memory files. A startup
+lock serializes directory publication and cleanup. Fixture disposal never releases run ownership.
+Legacy database files outside run directories are left untouched.
 
-The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF Core's own
-`SqliteTestStore` is. **Do not move it back to `Mode=Memory;Cache=Shared`**: that makes the
+This replaces the 2026-11-12 restriction to one process per working directory. The former startup
+sweep could delete another process's temporarily closed database; shared filenames also allowed
+recreation and reseeding. The coordinated regression and overlapping filtered runs verified
+isolation on 2026-11-13. Test collections remain parallel within each process.
+
+The Tier B store is **file-backed** (`<StoreName>.db` in its run directory), as EF Core's own
+`SqliteTestStore` is. Windows connection strings use extended-length paths so long fixture names
+and their journal suffixes remain usable. **Do not move it back to `Mode=Memory;Cache=Shared`**: that makes the
 database's lifetime a connection's, which makes test-class disposal order load-bearing and has
 already produced a 698-test phantom failure. For the same reason **the store must not delete its file
 on disposal, and must not release its `Created` entry either** — either one reintroduces the
 coupling, and the second half produced a nine-test intermittent once the suite passed ten thousand
-tests. `DisposeAsync` now releases nothing; stale files are swept once at startup instead.
+tests. `DisposeAsync` does not delete files or release initialization entries; abandoned run
+directories are reclaimed at a later process's startup instead.
 
 **The runtime culture is pinned to invariant** by a `[ModuleInitializer]`. On an `en-SE` machine nine
 spec tests fail on the decimal separator, none of them this provider's, which made the suite total a

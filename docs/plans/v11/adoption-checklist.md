@@ -116,16 +116,23 @@ protocol 4 client checks passed. The expanded protocol 3 application passed its 
 including independently read database effects. The [wire assessment](../../wire-protocol.md#contract-evolution)
 records the added complex shadow data and why existing field meanings remain compatible.
 
-Timing runs and the slow suite must run sequentially in a shared working directory. An overlapping
+During adoption, timing runs and the slow suite ran sequentially in a shared working directory. An overlapping
 timing probe reproduced startup cleanup deleting another test process's database files. That slow
 run was stopped and discarded; its failures are not evidence of a production regression. The
-replacement slow run uses the directory exclusively.
+replacement slow run used the directory exclusively.
+
+The shared-directory restriction was removed on 2026-11-13 by
+[issue #282](https://github.com/azabluda/InfoCarrier.Core/issues/282). Each process now owns a unique
+database directory with an exclusive lease retained until process exit. Cleanup only reclaims
+abandoned runs. A coordinated regression covers temporarily closed databases, initialization,
+comparison connections and crash cleanup; overlapping filtered suites also passed. This changes
+test database ownership, not the adoption timing findings.
 
 Test collections remain parallel. Result timestamps show a peak of 12 overlapping test cases in
 both the complete functional run and the slow comparison. No assembly-wide parallelism disable
 was added. The custom comparison executor forwards xUnit's parallel mode, scheduler, and each
-test case's existing parallelism setting. Separate suite processes are serialized only when
-they share a working directory and its database cleanup.
+test case's existing parallelism setting. During adoption, separate suite processes were serialized
+when sharing a working directory; the run isolation described above removes that restriction.
 
 The final `Measure.cs` run completed before the machine reboot: zero failures in 30,468 cases,
 with 30,236 passed and 232 skipped. The last full slow run found seven SQL differences in

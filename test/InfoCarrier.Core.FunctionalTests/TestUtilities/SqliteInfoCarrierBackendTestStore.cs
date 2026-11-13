@@ -35,8 +35,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         A file's lifetime is its own. No connection has to be held, nothing is destroyed by
 ///         closing one, and every context opens its own — so the store no longer shares a single
 ///         <see cref="SqliteConnection" /> across concurrent contexts either. The files land in
-///         the test output directory, which is git-ignored, exactly as EF's <c>northwind.db</c>
-///         does.
+///         a unique run directory under <c>.infocarrier-sqlite</c> in the working directory.
+///         This replaced shared output filenames on 2026-11-13: another process could delete a
+///         temporarily closed database during startup, or recreate it during initialization.
+///         An exclusive run lease now protects the whole directory, including WAL and SHM files.
 ///     </para>
 /// </remarks>
 public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
@@ -46,12 +48,8 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
     private static readonly ConcurrentDictionary<string, bool> Created = new();
 
-    // Runs before the first store of this process exists, so everything it finds is stale.
-    private static readonly Lazy<bool> Swept = new(() =>
-    {
-        SweepStaleFiles();
-        return true;
-    });
+    // One run owns all fixture files until process exit, including connection-free intervals.
+    private static readonly Lazy<SqliteTestRun> Run = new(() => new SqliteTestRun());
 
     private readonly string _path;
     private readonly string _connectionString;
@@ -65,15 +63,27 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         SharedTestStoreProperties testStoreProperties)
         : base(name, shared, testStoreProperties)
     {
-        _ = Swept.Value;
-
         // A shared store is identified by its name, so every fixture asking for that name gets
         // the same file. An unshared one asked for isolation and gets a file of its own — the
         // smoke tests create a store per test and would otherwise trample each other.
-        _path = Path.GetFullPath(shared ? $"{name}.db" : $"{name}.{Guid.NewGuid():N}.db");
+        string filename = shared ? $"{name}.db" : $"{name}.{Guid.NewGuid():N}.db";
+        if (Path.GetFileName(filename) != filename)
+        {
+            throw new ArgumentException("A store name must be a filename, not a path.", nameof(name));
+        }
+        _path = Path.Combine(Run.Value.DirectoryPath, filename);
+        // SQLite must also create journal siblings. The run directory can push their paths
+        // past MAX_PATH on Windows; its extended-length prefix preserves the fixture filenames.
+        string dataSource = _path;
+        if (OperatingSystem.IsWindows() && !dataSource.StartsWith(@"\\?\", StringComparison.Ordinal))
+        {
+            dataSource = dataSource.StartsWith(@"\\", StringComparison.Ordinal)
+                ? @"\\?\UNC\" + dataSource[2..]
+                : @"\\?\" + dataSource;
+        }
         _connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = _path,
+            DataSource = dataSource,
             Cache = SqliteCacheMode.Private,
 
             // POOLING OFF, AND THIS CLOSES AN INTERMITTENT RATHER THAN TIDYING SOMETHING.
@@ -96,50 +106,6 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
             // cannot be shown to have stopped.
             Pooling = false,
         }.ToString();
-    }
-
-    /// <summary>
-    ///     Removes the database files a <em>previous</em> run left behind, once per process.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         Nothing is deleted when a store is disposed. Doing that made disposal order
-    ///         load-bearing again — the very thing making the store file-backed was meant to end —
-    ///         and the test that ran next got "no such table". Sweeping at startup instead is safe
-    ///         by construction: no store of this run has been created yet, so every file present is
-    ///         stale, and each store deletes and recreates its own file at initialization anyway.
-    ///     </para>
-    ///     <para>
-    ///         <b>A database here is three files, not one, and the sweep has to take all three.</b>
-    ///         EF's <c>SqliteDatabaseCreator.Create</c> runs <c>PRAGMA journal_mode = 'wal'</c>, so
-    ///         every store in this suite is a WAL database: the committed content lives in
-    ///         <c>&lt;name&gt;.db-wal</c> until a checkpoint folds it back, and the <c>.db</c>
-    ///         itself can be a 4 KB shell. Matching only <c>*.db</c> therefore swept a third of
-    ///         each database and left the rest. <b>14,971 <c>-wal</c> and 14,946 <c>-shm</c> files
-    ///         had accumulated against 76 <c>.db</c></b> when this was found, none of them ever
-    ///         collected by anything. And a fresh <c>.db</c> opened beside a stale <c>-wal</c> and
-    ///         <c>-shm</c> answers <c>SQLite Error 1: 'no such table'</c> — reproducible in
-    ///         isolation: delete only the <c>.db</c>, reopen the path, and the WAL is silently
-    ///         discarded.
-    ///     </para>
-    /// </remarks>
-    private static void SweepStaleFiles()
-    {
-        // "*.db*", not "*.db": the -wal and -shm siblings are part of the database. See above.
-        foreach (string stale in Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.db*"))
-        {
-            try
-            {
-                File.Delete(stale);
-            }
-            catch (IOException)
-            {
-                // A file another process holds is not ours to reclaim.
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
-        }
     }
 
     /// <inheritdoc />
@@ -332,8 +298,8 @@ public class SqliteInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
 
             using DbContext context = createContext();
 
-            // A file survives the process that made it, so a previous run's database would
-            // otherwise be seeded a second time. `EnsureDeleted` on SQLite deletes the file.
+            // A shared file survives individual fixtures within this run. Rebuild only when
+            // this run's guard requires initialization; another run always has a different path.
             await context.Database.EnsureDeletedAsync().ConfigureAwait(false);
             await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
 

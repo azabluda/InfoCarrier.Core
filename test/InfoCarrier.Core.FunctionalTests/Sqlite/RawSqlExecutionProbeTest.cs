@@ -129,9 +129,9 @@ public class RawSqlExecutionProbeTest
         Assert.NotEqual(Sql, generated.Trim());
     }
 
-    // An in-memory database held open by one connection, so this probe touches no file. The Tier B
-    // store sweeps `*.db*` out of the working directory once per process at a moment this class
-    // does not control, and a probe that owned a file would be racing it.
+    // An in-memory database held open by one connection needs no filesystem ownership or cleanup.
+    // Before run isolation on 2026-11-13, this also avoided racing Tier B's working-directory
+    // sweep. That sweep is gone; the self-contained raw-SQL probe still needs no file.
     private static SqliteConnection OpenProbeDatabase()
     {
         var connection = new SqliteConnection("Data Source=:memory:");
