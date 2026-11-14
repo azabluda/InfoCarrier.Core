@@ -46,6 +46,24 @@ minutes for `/ready`. Ports 8081 and 8080 bind to loopback. Cleanup removes only
 container. Each fixture owns a separate generated database. Test collections remain parallel.
 An unavailable emulator fails the tests instead of silently skipping them.
 
+Fixtures do not start or stop containers. Before database setup, custom fixtures, inherited/direct
+test stores, and standalone named-store tests check endpoint reachability with a five-second timeout.
+If the endpoint cannot be reached, the error names it and gives both `start podman` and `start docker`
+launcher commands. Database cleanup is not attempted after a failed startup check. A received HTTP
+response leaves authentication and service validation to the provider; ordinary provider failures
+are not rewritten as missing-container errors. Test cancellation keeps its cancellation exception.
+Failed checks are not cached, so starting the emulator and rerunning tests in the same host works.
+
+The stopped-container check intentionally failed five cases across all startup paths, each with
+the endpoint and both launch commands. After explicit startup, the focused run reported Passed: 11,
+Failed: 0, Total: 11, including six standalone diagnostic controls. Logs are under
+`artifacts/cosmos-suite-audit/emulator-*`. These negative startup checks are not part of the normal
+suite's failure count, and the diagnostic controls do not require an emulator.
+The complete normal check then reported Cosmos Passed: 447, Failed: 0, Total: 489, with the same
+42 upstream skips; functional Passed: 30350, Failed: 0, Total: 30583. The combined measurement was
+FAILING: 0, TOTAL: 31072, with no broken tests and unchanged failure reasons. Evidence is under
+`artifacts/measure/cosmos-emulator-diagnostics*`.
+
 The client uses gateway transport and accepts the emulator certificate only on loopback HTTPS.
 The embedded key is Microsoft's public emulator key, not an Azure credential. Neither
 `AZURE_COSMOS_BYPASS_QUERY_PARSING` nor `AZURE_COSMOS_OPTIMISTIC_DIRECT_EXECUTION_ENABLED` is set.
@@ -232,7 +250,10 @@ GitHub Actions passed for the first official-suite expansion `4b85adb6` in
 Cosmos runs reported Passed: 335, Failed: 0, Total: 361, with 26 official skips. The Linux functional
 suite reported Passed: 30346, Failed: 0, Total: 30583, with 237 existing platform skips. Transport
 reported Passed: 395, Failed: 0, Total: 395; engineering reported Passed: 61, Failed: 0, Total: 61.
-Checks for the second, complex-property expansion are pending. Emulator testing does not establish full Azure service
+The second, complex-property expansion `3216fc67` also passed
+[Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43614289673) and
+[Coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43614289709).
+Checks for the startup-diagnostic change are pending. Emulator testing does not establish full Azure service
 parity, distributed-query coverage, official MongoDB support, or release approval.
 
 Second expansion validation, November 14, 2026, Windows host and the same Podman Linux emulator:

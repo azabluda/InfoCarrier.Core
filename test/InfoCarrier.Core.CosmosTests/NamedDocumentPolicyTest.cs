@@ -18,6 +18,7 @@ public class NamedDocumentPolicyTest
     [InlineData(true)]
     public async Task Cosmos_repairs_stubs_without_enabling_document_repair_on_inmemory(bool clientsFirst)
     {
+        await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         string database = "icc-policy-" + Guid.NewGuid().ToString("N");
         string memoryName = "named-policy-" + Guid.NewGuid().ToString("N");
         var probe = new MemoryReadProbe();
@@ -67,7 +68,7 @@ public class NamedDocumentPolicyTest
         {
             foreach (string name in new[] { "cosmos", "memory" })
             {
-                // Both stores need non-relational query rules; only Mongo needs document repair.
+                // Both stores need non-relational query rules; only Cosmos needs document repair.
                 builder.Services.AddInfoCarrierClient(name, o => o.WithEndpoint("http://localhost/" + name)
                     .WithServerUsesRelationalQueryRules(false))
                     .ConfigurePrimaryHttpMessageHandler(() => app!.GetTestServer().CreateHandler());

@@ -19,6 +19,7 @@ public class DocumentStoreFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
+        await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         var services = new ServiceCollection();
         services.AddDbContext<ShopServerContext>(options => CosmosEmulator.Configure(options, DatabaseName));
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<ShopServerContext>());

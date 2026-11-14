@@ -106,6 +106,7 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
     : InfoCarrierBackendTestStore(name, shared, properties)
 {
     private readonly string _database = "icc-assoc-" + Guid.NewGuid().ToString("N");
+    private bool _emulatorAvailable;
     public override bool ServerStoreIsRelational => false;
     protected override IServiceCollection AddServices(IServiceCollection services)
         => services.AddEntityFrameworkCosmos().AddSingleton<TestStoreIndex>();
@@ -114,6 +115,13 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => CosmosEmulator.Configure(base.AddProviderOptions(builder), _database)
             .ConfigureWarnings(warnings => warnings.Ignore(CosmosEventId.NoPartitionKeyDefined));
+    public override async Task<TestStore> InitializeAsync(IServiceProvider? serviceProvider, Func<DbContext>? createContext,
+        Func<DbContext, Task>? seed = null, Func<DbContext, Task>? clean = null)
+    {
+        await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
+        _emulatorAvailable = true;
+        return await base.InitializeAsync(serviceProvider, createContext, seed, clean);
+    }
     public override async Task CleanAsync(DbContext context, bool createTables = true)
     {
         await context.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
@@ -121,12 +129,15 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
     }
     public override async ValueTask DisposeAsync()
     {
-        using Microsoft.Azure.Cosmos.CosmosClient client = CosmosEmulator.Client();
-        try
+        if (_emulatorAvailable)
         {
-            await client.GetDatabase(_database).DeleteAsync();
+            using Microsoft.Azure.Cosmos.CosmosClient client = CosmosEmulator.Client();
+            try
+            {
+                await client.GetDatabase(_database).DeleteAsync();
+            }
+            catch (Microsoft.Azure.Cosmos.CosmosException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
         }
-        catch (Microsoft.Azure.Cosmos.CosmosException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
         await base.DisposeAsync();
     }
 }
