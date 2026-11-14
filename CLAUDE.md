@@ -96,8 +96,10 @@ comparison. Store-specific classes remain under `FunctionalTests/TestUtilities/`
 
 ### Which tier a base belongs to, and it belongs to exactly one
 
-Running a base on two tiers is duplication, not coverage. When a base could go either way, the tier
-that *translates* is the one whose green means more.
+For Tiers A through C, running a base on two tiers is duplication, not coverage. When a base could
+go either way, the tier that *translates* is the one whose green means more. The owner's November 14
+Cosmos expansion is an explicit exception: adopt every applicable official Cosmos behavior test
+through InfoCarrier, even when another tier already inherits its specification base.
 
 - **Tier A** hosts what InMemory can. **"EF ships no InMemory test for this base" means move it to
   Tier B, not drop it.** Only "EF ships no test for it on any store we have" justifies leaving a
@@ -108,10 +110,11 @@ that *translates* is the one whose green means more.
   leave red. Firebird has both and meets the no-installation, no-container bar: the engine is a
   NuGet package of native assets and one database is one `.fdb` file in the test output. **Only a
   base that NEEDS a table-valued function or `APPLY` belongs here.**
-- **Tier D exists to prove a negative that no relational tier can** — that this provider is not
-  relational-only (#51). **A base whose tests mostly RUN on the store earns its place; one that is
-  mostly overridden into "not supported" teaches nothing about the wire.** A compliance test
-  demanding every base be adopted against a document store would misread the tier.
+- **Tier D tests document-store behavior.** The owner expanded its original narrow scope on
+  November 14 to all applicable official Cosmos tests through InfoCarrier. Account for application
+  queries, writes, and failures, including upstream refusals and Linux-emulator skips. Explain
+  exclusions of provider-internal tests individually; a failing application query is not an exclusion.
+  The old requirement that a base mostly succeed does not restrict this Cosmos expansion.
 
 ADR-009 and its dated amendments carry the reasoning for all four, including why PostgreSQL was the
 better store for Tier C on the evidence and was still not chosen.

@@ -199,10 +199,23 @@ it reports unchecked references; it does not claim those line checks passed.
 - [x] Complete local suite, portability, transport, trimming, dependency, and wire validation.
 - [x] Run the vNext tier from Windows and Linux test hosts against the same Podman Linux emulator, with upstream's aggregate skips.
 - [x] Verify the earlier default-query classic-emulator suite on Linux Docker in GitHub Actions.
-- [ ] Verify the aligned vNext tier and upstream skips on Linux Docker in GitHub Actions.
+- [x] Verify the aligned vNext tier and upstream skips on Linux Docker in GitHub Actions (`0b2a553e`).
 - [ ] Owner decision: retain Cosmos temporarily or permanently. This decision remains separate from implementation acceptance.
 
 See [the validation record](cosmos-document-tier.md) for scope and the production change review.
+
+### Expanded official Cosmos suite, November 14, 2026
+
+The owner's later request is all applicable official Cosmos tests through InfoCarrier. The original
+six-family validation above does not complete this larger scope.
+
+- [x] Discover the complete pinned upstream runner inventory without executing its tests directly.
+- [x] Adopt arithmetic, comparison, logical, GUID, enum, and all scalar storage families with official mappings and referenced expectations.
+- [x] Reproduce and fix the nonrelational terminal-projection failure found by the wider tests, with independent document regressions.
+- [x] Validate the first expansion locally with the full functional/Cosmos run, transport, trimming, strict builds, and documentation checks.
+- [ ] Complete the remaining class-by-class applicability review and test adoption listed in the
+  [expanded scope](cosmos-document-tier.md#expanded-official-test-scope).
+- [ ] Validate the fully expanded suite on Windows/Podman and Linux/Docker, including coverage.
 
 ## What #99 says that is no longer true
 

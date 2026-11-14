@@ -45,7 +45,8 @@ Query results and service responses are not rewritten to accommodate the emulato
 
 ## Upstream skips and coverage limits
 
-EF Core 11 skips four aggregate methods on the Linux emulator. One has two tracking cases.
+For the original owned-navigation families, EF Core 11 skips four aggregate methods on the Linux
+emulator. One has two tracking cases.
 The direct and wire variants therefore report ten skipped test cases. The adopted overrides name
 the exact upstream source ranges and retain its skip message and justification. The defect is
 recorded in [the upstream-defect register](../../upstream-defects.md#21-linux-cosmos-emulator-misprocesses-aggregate-subqueries),
@@ -67,7 +68,8 @@ required/optional query-body mix-ups remain documented on the relevant override 
 
 | Area | Checks |
 |---|---|
-| Queries | Six inherited owned-navigation families, direct and through the wire, subject to the upstream skips |
+| Queries | Six inherited owned-navigation families with direct controls, plus arithmetic, comparison, logical, GUID, and enum families through InfoCarrier |
+| Scalar storage | All 16 official scalar type families through InfoCarrier, subject to their upstream primitive-collection skips |
 | Writes | Insert, read, scalar update, nested replacement, collection update/removal, optional-reference removal, root deletion |
 | Stored shape | Independent Cosmos client reads verify nested objects, arrays, and deeper references |
 | Incomplete documents | Attached stubs and scalar-only changes preserve independently read nested values |
@@ -77,9 +79,55 @@ required/optional query-body mix-ups remain documented on the relevant override 
 | Failures | Explicit transaction refusal and missing-document update outcomes, with direct controls |
 | Other providers | InMemory and SQLite cover synchronous/asynchronous repair, context filters, and real SQLite transactions |
 
+## Expanded official-test scope
+
+The owner subsequently requested all applicable official Cosmos tests through InfoCarrier, rather
+than every official test executing directly against Cosmos. The earlier six-family tier is not
+complete against that request. ADR-009 records the expanded scope and the exception to tier deduplication.
+
+Discovery of the pinned official Cosmos assembly found 7,374 cases across 122 concrete test classes.
+That inventory includes provider infrastructure, model construction, SQL baselines, and application
+behavior; it is not a count of cases already adopted or a final applicability decision. Discovery
+used the official runner without executing tests or contacting the emulator. Its output remains
+under `artifacts/cosmos-suite-audit/`, together with the source build and class inventory.
+
+The first expansion inherits the arithmetic, comparison, logical, GUID, and enum specification
+families with the official Cosmos basic-types mapping. It also adopts all 16 official scalar
+storage families, using their exact values and mappings. Behavioral assertions remain inherited.
+Cosmos-specific refusals and primitive-collection skips carry exact upstream source references.
+The scalar storage families retain 13 Linux-emulator aggregate skips and three provider-design
+skips: converted GUID/byte-array collection elements and byte equality inside primitive collections.
+No golden SQL baselines are copied. The upstream `Check_all_tests_overridden` checks exist to enforce
+those baselines, so they are not adopted as application behavior tests.
+
+Verified exclusions from the upstream inventory:
+
+| Official class or method | Reason |
+|---|---|
+| `CosmosApiConsistencyTest` | Reflects over the Cosmos provider assembly, its fluent API signatures, and provider service registrations. It executes no application query or update through a context. InfoCarrier cannot change these third-party API surfaces. |
+| `ConnectionSpecificationTest` | Calls the directly resolved Cosmos `IDatabaseCreator` to verify `UseCosmos` connection-string configuration and missing-connection validation. InfoCarrier clients use `UseInfoCarrier` and have no Cosmos connection. This excludes those two configuration checks, not application connection failures. |
+| Query-family `Check_all_tests_overridden` methods | Require every shared method to have an override for SQL-baseline assertions. Inheriting unchanged behavioral tests is intentional here. |
+
+These decisions follow the pinned [API consistency class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/CosmosApiConsistencyTest.cs)
+and [connection configuration class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/ConnectionSpecificationTest.cs).
+Remaining inventory entries still require explicit adoption or a reviewed exclusion.
+
+Remaining work is explicitly open:
+
+- [ ] Review every remaining official class and record a specific applicability decision.
+- [ ] Adopt applicable Northwind, association, complex/JSON, primitive-collection, and other query tests.
+- [ ] Adopt remaining scalar translations, full-text/vector behavior, and application-level extension tests.
+- [ ] Adopt applicable tracking, keys, conversions, concurrency, updates, and failure tests.
+- [ ] Review direct Cosmos service, model-building, design-time, logging, session, and transaction tests
+  individually. Provider-internal assertions may be excluded; ordinary application failures may not.
+- [ ] Validate the complete expanded suite on Windows/Podman and Linux/Docker, including coverage.
+
+Do not count missing families as unsupported tests or describe this first expansion as the complete
+official suite. The previous passing results below describe the earlier, smaller scope.
+
 ## Production change review
 
-The only production change from the Cosmos implementation is incomplete-document repair in
+The original production change from the Cosmos implementation is incomplete-document repair in
 `ServerSaveChangesExecutor`. It uses the original context and provider services with an isolated
 query tracker, retaining the application's connection, transaction, and query-filter state.
 Provider-owned query compilation and caching retain parameterized keys.
@@ -95,6 +143,24 @@ The official MongoDB provider 10.0.4 baseline and the port both reported Passed:
 Total: 237, with identical test names and outcomes. Evidence remains under
 `artifacts/mongo-v10-portability/`. This supports the algorithm on those MongoDB models, but does
 not establish MongoDB 11 compatibility or authenticate an unofficial package.
+
+The first wider query tests also exposed an InfoCarrier projection failure: a reconstructed
+terminal row limit always used `EF.Constant`, which Cosmos does not support. `QuerySplitter` now
+uses that forced-constant marker only for deployments using relational query rules. Nonrelational
+deployments receive an ordinary `Take` count; the provider chooses its representation. Server-side
+row limits, ordering, and client projection reconstruction remain intact. There is no Cosmos name,
+package dependency, or provider-type test in the production change.
+
+Six independent document tests compare projected `First`, `FirstOrDefault`, `Last`, `LastOrDefault`,
+`Single`, and `SingleOrDefault` with direct Cosmos execution. They also inspect wire responses for
+unrequested rows. Before the fix, four failed and two passed. The complete scalar/projection/audit
+subset then reported Passed: 46, Failed: 0, Total: 46. This is evidence for the nonrelational path,
+not proof that every document provider supports every count representation. The MongoDB 10
+experiment above predates this query change and does not validate it.
+
+The query fix changes an existing expression's count representation, with the same bounded-row
+meaning. It adds no wire node, message, field, or protocol version. The transport and historical
+protocol regressions pass without changing their payload expectations.
 
 ## Results
 
@@ -120,5 +186,24 @@ a query-execution workaround or installing a Windows emulator. The original impl
 functional, transport, trimming, and wire checks remain recorded in the pull request. This
 emulator-alignment revision changes no production code or wire contract.
 
-Updated GitHub Actions checks are pending. Emulator testing does not establish full Azure service
+First official-suite expansion, November 14, 2026, Windows host and the same Podman Linux emulator:
+
+| Check | Actual result |
+|---|---|
+| Full assembled Cosmos tier | Passed: 335, Failed: 0, Total: 361; 26 referenced upstream skips |
+| Full functional suite after the query fix | Passed: 30350, Failed: 0, Total: 30583; 233 existing skips |
+| Combined measurement | FAILING: 0, TOTAL: 30944 |
+| Transport and protocol regressions | Passed: 395, Failed: 0, Total: 395 |
+| Final terminal-projection payload assertions | Passed: 6, Failed: 0, Total: 6 |
+| Strict full Release build | Five documented framework Razor warnings, zero errors |
+| Final strict Cosmos build | Zero warnings, zero errors |
+| Clean trimming check | 116 InfoCarrier warnings, matching the baseline |
+| Documentation links | Zero broken links in 114 Markdown files |
+
+The combined run's failure-name and failure-reason files are empty. Its logs are under
+`artifacts/measure/cosmos-official-expansion*`; focused evidence is under `artifacts/cosmos-suite-audit/`.
+These results validate the assembled first expansion, not the outstanding full official-suite request.
+
+GitHub Actions passed for the earlier container-alignment commit `0b2a553e`. Checks for the first
+official-suite expansion are pending. Emulator testing does not establish full Azure service
 parity, distributed-query coverage, official MongoDB support, or release approval.

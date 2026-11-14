@@ -911,6 +911,20 @@ entries and unchanged scalar values from storage. The previous assumption that a
 tracking query would always materialize missing owned entries failed on Cosmos when the root was
 already tracked. The earlier client and server document-policy switches remain required.
 
+### Amendment 2026-11-14: all applicable official Cosmos tests through InfoCarrier
+
+The owner explicitly expanded the provisional Cosmos tier beyond the six owned-navigation families:
+"All applicable official tests through InfoCarrier." This supersedes the narrow document-tier scope
+and the one-base-one-tier rule for this Cosmos work. It does not change the allocation of Tiers A-C
+or restore MongoDB. Application behavior remains applicable even when Cosmos refuses a query.
+
+The earlier reasons for avoiding duplication still apply to general specification coverage. They
+do not satisfy this new goal: testing the application's behavior against the actual document provider.
+Inherit shared specification tests where possible, reproduce meaningful Cosmos expectations with
+exact references, retain official Linux-emulator skips, and explain each provider-internal exclusion.
+Do not copy SQL baselines or replace behavioral assertions with successful no-op overrides.
+An initial inventory or a passing subset does not establish completion of this expanded scope.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

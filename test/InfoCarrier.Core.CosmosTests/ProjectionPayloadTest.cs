@@ -12,6 +12,52 @@ public class ProjectionPayloadTest(DocumentStoreFixture fixture) : IClassFixture
 {
     private static string Scramble(string postcode) => "#" + postcode;
 
+    [Theory]
+    [InlineData("First", "#10115")]
+    [InlineData("FirstOrDefault", "#10115")]
+    [InlineData("Last", "#20095")]
+    [InlineData("LastOrDefault", "#20095")]
+    [InlineData("Single", "#1100")]
+    [InlineData("SingleOrDefault", "#1100")]
+    public async Task A_terminal_projection_bounds_document_rows_without_relational_markers(string terminal, string expected)
+    {
+        var requests = new List<string>();
+        var responses = new List<string>();
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var server = new InfoCarrierEnvelopeServer(new InProcessInfoCarrierServer(fixture.ServerProvider), serializer);
+        DbContextOptions<ShopClientContext> options = new DbContextOptionsBuilder<ShopClientContext>()
+            .UseInfoCarrier(new TransportInfoCarrierClient(new RecordingTransport(server, requests, responses), serializer),
+                deployment => deployment.ServerUsesRelationalQueryRules = false)
+            .Options;
+        await using var client = new ShopClientContext(options);
+        await using ShopServerContext direct = fixture.CreateBackend();
+
+        async Task<string?> Execute(IQueryable<Customer> customers)
+        {
+            if (terminal.StartsWith("Single", StringComparison.Ordinal))
+                customers = customers.Where(customer => customer.Id == "bob");
+            IQueryable<string> query = customers.OrderBy(customer => customer.Id)
+                .Select(customer => Scramble(customer.Address.Postcode));
+            return terminal switch
+            {
+                "First" => await query.FirstAsync(TestContext.Current.CancellationToken),
+                "FirstOrDefault" => await query.FirstOrDefaultAsync(TestContext.Current.CancellationToken),
+                "Last" => await query.LastAsync(TestContext.Current.CancellationToken),
+                "LastOrDefault" => await query.LastOrDefaultAsync(TestContext.Current.CancellationToken),
+                "Single" => await query.SingleAsync(TestContext.Current.CancellationToken),
+                "SingleOrDefault" => await query.SingleOrDefaultAsync(TestContext.Current.CancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(terminal)),
+            };
+        }
+
+        Assert.Equal(expected, await Execute(direct.Customers.AsNoTracking()));
+        Assert.Equal(expected, await Execute(client.Customers.AsNoTracking()));
+        string response = Readable(responses);
+        Assert.Contains("\"" + expected[1..] + "\"", response);
+        foreach (string postcode in new[] { "10115", "1100", "20095" }.Where(value => value != expected[1..]))
+            Assert.DoesNotContain("\"" + postcode + "\"", response);
+    }
+
     [Fact]
     public async Task An_untranslatable_projection_does_not_drag_the_whole_document_over()
     {
