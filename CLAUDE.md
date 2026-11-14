@@ -279,27 +279,28 @@ Three levels, because each one hides a mistake the level below it catches:
 
 **Never state a verdict from partial output**, and **read the reasons diff, not the count**.
 
-**Which gate to run before which commit.** `dotnet run --file eng/Measure.cs --` says nothing about trimming and the trim
-gate says nothing about behaviour. They are separate axes, and one change was committed green on one
-while failing the other in CI. **And neither says anything about Native AOT**: trimming does not ask
-whether code can be *generated*, so the 59 IL3050 diagnostics a `PublishAot` publish reports are
-invisible to `TrimRatchet.cs`. Nothing gates that axis, because Native AOT is not supported.
+**Validation policy, owner instruction November 14, 2026.** Prefer GitHub Actions for full
+normal and slow suites across development work. Run focused tests and relevant controls locally,
+then commit and push a locally green batch. Continue independent work while CI runs; do not
+rerun complete suites locally merely to duplicate CI. The owner accepts temporary failures on
+the development branch. This does not weaken required checks or authorize merging into `main`.
+Run a full local suite only when the owner requests it or a specific diagnosis requires it.
 
-| Change touches | Run |
-|---|---|
-| `src/` | **both** `dotnet run --file eng/Measure.cs --` and `dotnet run --file eng/TrimRatchet.cs --` |
-| `test/` only | `dotnet run --file eng/Measure.cs --` |
-| `docs/`, `eng/` text only | neither |
-| **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
+| Change touches | Local check | GitHub validation |
+|---|---|---|
+| `src/` | focused regressions and relevant controls; compile affected projects in Release with warnings as errors | full applicable suites, build, trim ratchet |
+| `test/` | changed batch and relevant controls | full applicable suites |
+| `eng/` code | focused engineering tests and affected command checks | required workflows |
+| docs or configuration | relevant hygiene and structural checks | required workflows |
+| a public signature in `src/` | package validation as well | package gate |
 
-**Owner's Cosmos-initiative exception, November 14, 2026:** adopt one batch, run that batch and
-its relevant controls locally, then push when those focused tests pass. Continue the next batch
-while CI runs the complete suites. Do not rerun `Measure.cs`, complete functional suites, or the
-complete Cosmos suite locally for each adoption batch. Use focused regressions for any fixes;
-let the required GitHub Actions checks supply full validation. Before completing the pull request,
-run the existing slow SQLite and Firebird comparisons on the final commit, preferably in GitHub
-Actions, and review their results. This exception supersedes the local full-suite table for this
-Cosmos initiative; it does not change required CI checks or authorize merging.
+Before completing a pull request, run applicable slow comparisons on the final commit in GitHub
+Actions and review their results. For Cosmos adoption, this includes the existing SQLite and
+Firebird slow comparisons. Full local `Measure.cs` runs remain useful when their complete
+measurement is specifically the deliverable; they are not the default pre-push gate.
+
+Behaviour, trimming, and package compatibility are separate checks. Native AOT remains unsupported;
+a successful trim ratchet does not establish Native AOT support.
 
 **The pack gate runs on the PR too.** Package validation compares the assembly with the last
 published stable, which `PackageValidationBaselineVersion` in `Directory.Build.props` names, and
@@ -311,12 +312,12 @@ turned it red on merge, because only the `main`-only `Packages` workflow packed.
 *fast-gate* job now packs as well. Run the pack line locally anyway before pushing a
 public-signature change; it takes seconds and needs no network beyond the baseline package.
 
-The trim ratchet is a clean publish: ~41 s in CI, about a minute locally. That is cheap enough that
+The trim ratchet is a clean publish. GitHub runs it for product-code changes;
 "product code changed" is the whole trigger — do not try to judge whether a change *looks*
 reflective, because `WireGrouping` did not look like five warnings.
 
-**And the build itself is a gate.** Warnings are errors when `CI=true`, so before any commit that
-touches code: `CI=true dotnet build InfoCarrier.Core.slnx --configuration Release`.
+**And the build itself is a gate.** Warnings are errors when `CI=true`. Compile affected projects
+locally in Release with warnings as errors; GitHub runs the full solution build.
 
 **IT ONLY CHECKS WHAT IT RECOMPILES.** MSBuild is incremental: a project already built by an earlier
 non-`CI` command is *up to date*, so the `CI=true` run skips it and reports `5 Warning(s), 0
