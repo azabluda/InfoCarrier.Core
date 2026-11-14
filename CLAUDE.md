@@ -65,20 +65,29 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in Measure.cs
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
-# Tier D (MongoDB) is suspended pending an EF Core 11 provider.
+# Document tier: start the emulator, then test Cosmos. MongoDB stays disabled.
+dotnet run --file eng/CosmosEmulator.cs -- start podman # use docker on Linux CI
+dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
+dotnet run --file eng/CosmosEmulator.cs -- stop podman
 ```
 
 ### Where the tests live
 
-**The active specification suite is one project**, `test/InfoCarrier.Core.FunctionalTests`:
+**InMemory and relational specification tests share one project**, `test/InfoCarrier.Core.FunctionalTests`:
 `InMemory/` is Tier A, `Sqlite/` is Tier B, and `Firebird/` is Tier C.
 `eng/Measure.cs` reports one combined result.
 All active projects target .NET 11 and use EF Core 11 without EF Core 10 overrides.
 
-**Tier C runs with Firebird provider 14.0.0-rc1 on EF Core 11.** Tier D remains suspended:
-the MongoDB project is outside the solution and refuses direct builds. Restore it only when its
-provider supports EF Core 11; update dependencies, compliance exclusions, workflows, and measurements
-together. Do not introduce a mixed EF Core 10/11 graph to restore coverage.
+**Tier C runs with Firebird provider 14.0.0-rc1 on EF Core 11.** The provisional document tier is
+`test/InfoCarrier.Core.CosmosTests`, using Microsoft's Cosmos 11.0.0 provider and a pinned Linux
+emulator image. Podman runs it locally; Docker runs it in CI. The owner has not decided whether
+Cosmos is temporary or permanent. See [the validation record](docs/plans/v11/cosmos-document-tier.md).
+Cosmos always runs in a Linux vNext container. Windows tests run directly on Windows against
+Podman; Linux tests use the same image with Docker in CI. Adopt EF Core 11's Linux-emulator skips
+with exact upstream references on both test hosts. Do not enable SDK query-execution overrides
+or install a native Windows emulator to make this tier pass.
+The retained MongoDB project stays outside the solution and refuses direct builds. Do not remove
+its source or introduce a mixed EF Core 10/11 graph to restore it.
 
 **`test/InfoCarrier.Core.TestUtilities` is the store-neutral harness**: client and server shells,
 fixtures, transport, geometry mapping, SQL capture, culture, and override auditing. Current-test
@@ -87,8 +96,10 @@ comparison. Store-specific classes remain under `FunctionalTests/TestUtilities/`
 
 ### Which tier a base belongs to, and it belongs to exactly one
 
-Running a base on two tiers is duplication, not coverage. When a base could go either way, the tier
-that *translates* is the one whose green means more.
+For Tiers A through C, running a base on two tiers is duplication, not coverage. When a base could
+go either way, the tier that *translates* is the one whose green means more. The owner's November 14
+Cosmos expansion is an explicit exception: adopt every applicable official Cosmos behavior test
+through InfoCarrier, even when another tier already inherits its specification base.
 
 - **Tier A** hosts what InMemory can. **"EF ships no InMemory test for this base" means move it to
   Tier B, not drop it.** Only "EF ships no test for it on any store we have" justifies leaving a
@@ -99,10 +110,11 @@ that *translates* is the one whose green means more.
   leave red. Firebird has both and meets the no-installation, no-container bar: the engine is a
   NuGet package of native assets and one database is one `.fdb` file in the test output. **Only a
   base that NEEDS a table-valued function or `APPLY` belongs here.**
-- **Tier D exists to prove a negative that no relational tier can** — that this provider is not
-  relational-only (#51). **A base whose tests mostly RUN on the store earns its place; one that is
-  mostly overridden into "not supported" teaches nothing about the wire.** A compliance test
-  demanding every base be adopted against a document store would misread the tier.
+- **Tier D tests document-store behavior.** The owner expanded its original narrow scope on
+  November 14 to all applicable official Cosmos tests through InfoCarrier. Account for application
+  queries, writes, and failures, including upstream refusals and Linux-emulator skips. Explain
+  exclusions of provider-internal tests individually; a failing application query is not an exclusion.
+  The old requirement that a base mostly succeed does not restrict this Cosmos expansion.
 
 ADR-009 and its dated amendments carry the reasoning for all four, including why PostgreSQL was the
 better store for Tier C on the evidence and was still not chosen.
@@ -154,8 +166,9 @@ therefore blind to a store with no columns. It is gated on `UseNonRelationalServ
 relational deployment's payload is unchanged. **That client gate is not the whole fix**, because
 `Expand` can only send what the client's change tracker holds: a client that ATTACHED A STUB sends
 a bare root even with the switch on. `AddInfoCarrierServerDocumentStore()` completes an incomplete
-change set with a keyed query before the write, and EF's identity resolution makes that a repair
-rather than a clobber. It reads only where the change set omits an owned navigation the model
+change set with a keyed query before the write. Its isolated query tracker retains the original
+context and transaction; the merge preserves changes, deletions and original concurrency values.
+It reads only where the change set omits an owned navigation the model
 declares, and never for an insert or a delete. **The server is TOLD rather than sniffing**:
 `IsRelational()` is false for InMemory too. ADR-009's 2026-09-10 and 2026-09-11 amendments are the
 reading.
@@ -198,7 +211,7 @@ abstract test is not audited**, because it has no expectation to change. Its out
 every override with its label, reference, skip and deviation, counted by kind. **A CI runner has no
 `subrepos/`**, so there the line check counts what it could not check; a local run checks all.
 
-**Every Tier D reference is self-hosted, and that is a finding.** MongoDB's own
+**The retained MongoDB tier's references are self-hosted.** MongoDB's own
 `MongoComplianceTest` lists all six `OwnedNavigations` bases in `IgnoredTestBases` under *"Test
 bases added in EF10+"*, which means "we have not run this base", NOT "the store cannot do this".
 **The control is a conflict of interest** — a worse-wired control fails more and makes InfoCarrier
@@ -225,8 +238,8 @@ claimed one. `Other` counts since the amendment of 2026-09-28.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `dotnet run --file eng/Measure.cs --`, which runs
 every project in its own `projects` list and adds the figures. **That list currently holds the active
-spec project. Tier D is suspended pending an EF Core 11 provider. Add a restored tier to the
-measurement list when its dependency graph is compatible.** `InfoCarrier.Core.TransportTests` is
+spec project and the provisional Cosmos project. Start its emulator before measuring.
+The retained MongoDB project remains disabled.** `InfoCarrier.Core.TransportTests` is
 deliberately absent: it is this repository's own HTTP-transport suite, not a spec project, and the
 spec-suite badge counts spec tests. **So a `src/` change needs the transport line above as well as
 `Measure.cs`.**
@@ -278,6 +291,15 @@ invisible to `TrimRatchet.cs`. Nothing gates that axis, because Native AOT is no
 | `test/` only | `dotnet run --file eng/Measure.cs --` |
 | `docs/`, `eng/` text only | neither |
 | **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
+
+**Owner's Cosmos-initiative exception, November 14, 2026:** adopt one batch, run that batch and
+its relevant controls locally, then push when those focused tests pass. Continue the next batch
+while CI runs the complete suites. Do not rerun `Measure.cs`, complete functional suites, or the
+complete Cosmos suite locally for each adoption batch. Use focused regressions for any fixes;
+let the required GitHub Actions checks supply full validation. Before completing the pull request,
+run the existing slow SQLite and Firebird comparisons on the final commit, preferably in GitHub
+Actions, and review their results. This exception supersedes the local full-suite table for this
+Cosmos initiative; it does not change required CI checks or authorize merging.
 
 **The pack gate runs on the PR too.** Package validation compares the assembly with the last
 published stable, which `PackageValidationBaselineVersion` in `Directory.Build.props` names, and

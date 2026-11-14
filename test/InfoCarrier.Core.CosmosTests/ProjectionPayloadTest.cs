@@ -1,0 +1,153 @@
+// Licensed under the MIT license. See license.txt file in the project root for license information.
+
+using System.Text;
+using System.Text.RegularExpressions;
+using InfoCarrier.Core.Common;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace InfoCarrier.Core.CosmosTests;
+
+public class ProjectionPayloadTest(DocumentStoreFixture fixture) : IClassFixture<DocumentStoreFixture>
+{
+    private static string Scramble(string postcode) => "#" + postcode;
+
+    [Theory]
+    [InlineData("First", "#10115")]
+    [InlineData("FirstOrDefault", "#10115")]
+    [InlineData("Last", "#20095")]
+    [InlineData("LastOrDefault", "#20095")]
+    [InlineData("Single", "#1100")]
+    [InlineData("SingleOrDefault", "#1100")]
+    public async Task A_terminal_projection_bounds_document_rows_without_relational_markers(string terminal, string expected)
+    {
+        var requests = new List<string>();
+        var responses = new List<string>();
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var server = new InfoCarrierEnvelopeServer(new InProcessInfoCarrierServer(fixture.ServerProvider), serializer);
+        DbContextOptions<ShopClientContext> options = new DbContextOptionsBuilder<ShopClientContext>()
+            .UseInfoCarrier(new TransportInfoCarrierClient(new RecordingTransport(server, requests, responses), serializer),
+                deployment => deployment.ServerUsesRelationalQueryRules = false)
+            .Options;
+        await using var client = new ShopClientContext(options);
+        await using ShopServerContext direct = fixture.CreateBackend();
+
+        async Task<string?> Execute(IQueryable<Customer> customers)
+        {
+            if (terminal.StartsWith("Single", StringComparison.Ordinal))
+                customers = customers.Where(customer => customer.Id == "bob");
+            IQueryable<string> query = customers.OrderBy(customer => customer.Id)
+                .Select(customer => Scramble(customer.Address.Postcode));
+            return terminal switch
+            {
+                "First" => await query.FirstAsync(TestContext.Current.CancellationToken),
+                "FirstOrDefault" => await query.FirstOrDefaultAsync(TestContext.Current.CancellationToken),
+                "Last" => await query.LastAsync(TestContext.Current.CancellationToken),
+                "LastOrDefault" => await query.LastOrDefaultAsync(TestContext.Current.CancellationToken),
+                "Single" => await query.SingleAsync(TestContext.Current.CancellationToken),
+                "SingleOrDefault" => await query.SingleOrDefaultAsync(TestContext.Current.CancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(terminal)),
+            };
+        }
+
+        Assert.Equal(expected, await Execute(direct.Customers.AsNoTracking()));
+        Assert.Equal(expected, await Execute(client.Customers.AsNoTracking()));
+        string response = Readable(responses);
+        Assert.Contains("\"" + expected[1..] + "\"", response);
+        foreach (string postcode in new[] { "10115", "1100", "20095" }.Where(value => value != expected[1..]))
+            Assert.DoesNotContain("\"" + postcode + "\"", response);
+    }
+
+    [Fact]
+    public async Task An_untranslatable_projection_does_not_drag_the_whole_document_over()
+    {
+        var requests = new List<string>();
+        var responses = new List<string>();
+
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var envelopeServer = new InfoCarrierEnvelopeServer(
+            new InProcessInfoCarrierServer(fixture.ServerProvider), serializer);
+
+        DbContextOptions<ShopClientContext> options = new DbContextOptionsBuilder<ShopClientContext>()
+            .UseInfoCarrier(
+                new TransportInfoCarrierClient(
+                    new RecordingTransport(envelopeServer, requests, responses), serializer))
+            .Options;
+
+        await using var context = new ShopClientContext(options);
+
+        List<string> scrambled = await context.Customers
+            .AsNoTracking()
+            .OrderBy(c => c.Id)
+            .Select(c => Scramble(c.Address.Postcode))
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        // The answer is right, which is what the specification test also checks.
+        Assert.Equal(["#10115", "#1100", "#20095"], scrambled);
+
+        string response = Readable(responses);
+
+        // THE POINT. The query asked for postcodes; cities are the part of the same owned document
+        // it did not ask for. Their absence is what says the projection was pushed down rather than
+        // the document pulled over.
+        Assert.DoesNotContain("Berlin", response);
+        Assert.DoesNotContain("Lisbon", response);
+        Assert.DoesNotContain("Hamburg", response);
+
+        // And the postcodes DID come back, so the absence above is not an empty response.
+        Assert.Contains("10115", response);
+
+        // The store never saw the method it cannot translate: the split cut it before the wire.
+        Assert.DoesNotContain(nameof(Scramble), Readable(requests));
+    }
+
+    private static string Readable(IEnumerable<string> envelopes)
+    {
+        var text = new StringBuilder();
+
+        foreach (string envelope in envelopes)
+        {
+            text.AppendLine(envelope);
+
+            foreach (Match match in Base64Blob.Matches(envelope))
+            {
+                try
+                {
+                    text.AppendLine(Encoding.UTF8.GetString(Convert.FromBase64String(match.Value)));
+                }
+                catch (FormatException)
+                {
+                    // Not base64 after all. The raw line above already carries it.
+                }
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private static readonly Regex Base64Blob = new("[A-Za-z0-9+/]{24,}={0,2}", RegexOptions.Compiled);
+
+    private sealed class RecordingTransport(
+        InfoCarrierEnvelopeServer server,
+        List<string> requests,
+        List<string> responses)
+        : IInfoCarrierTransport
+    {
+        public InfoCarrierEnvelope Send(InfoCarrierEnvelope request)
+        {
+            requests.Add(Encoding.UTF8.GetString(request.Payload));
+            InfoCarrierEnvelope response = server.Dispatch(request);
+            responses.Add(Encoding.UTF8.GetString(response.Payload));
+            return response;
+        }
+
+        public async Task<InfoCarrierEnvelope> SendAsync(
+            InfoCarrierEnvelope request, CancellationToken cancellationToken = default)
+        {
+            requests.Add(Encoding.UTF8.GetString(request.Payload));
+            InfoCarrierEnvelope response = await server.DispatchAsync(request, cancellationToken);
+            responses.Add(Encoding.UTF8.GetString(response.Payload));
+            return response;
+        }
+    }
+}

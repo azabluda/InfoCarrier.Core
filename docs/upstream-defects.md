@@ -470,7 +470,100 @@ seconds and documents inaccurate subsecond results. The adopted override retains
 but its category is a defect because the original query returns an incorrect value rather than
 refusing translation. No external report has been filed.
 
+### 1.17 Cosmos nullable collection minimum differs from the common specification
+
+The pinned EF Core 11 `PrimitiveCollectionsQueryCosmosTest` expects `EqualException` for
+`Inline_collection_of_nullable_value_type_with_null_Min`. Its comment explains that Cosmos sorts
+null before numbers for `MIN`, while the relational aggregate ignores nulls. The adopted test keeps
+that explicit comparison failure. This is a documented Cosmos semantic difference that produces
+a different answer from the common specification, not a deliberate translation refusal.
+The source is [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/PrimitiveCollectionsQueryCosmosTest.cs#L436).
+No external report has been filed.
+
+### 1.18 Cosmos nullable collection indexing comparison differs from the common specification
+
+The pinned EF Core 11 `PrimitiveCollectionsQueryCosmosTest` expects `EqualException` for
+`Nullable_reference_column_collection_index_equals_nullable_column`. The query compares an indexed
+nullable string collection element with a nullable scalar property. The adopted override preserves
+the official comparison failure; it does not turn the wrong result into a translation limitation.
+The source is [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/PrimitiveCollectionsQueryCosmosTest.cs#L1453).
+No external report has been filed.
+
+### 1.19 Cosmos keyless view and defining-query results differ from the common specification
+
+The pinned EF Core 11 Northwind keyless suite expects `EqualException` for
+`KeylessEntity_by_database_view` and `KeylessEntity_with_nav_defining_query` in asynchronous mode.
+Its comments state that views and defining queries are unsupported. The adopted overrides retain
+the exact result-comparison failures instead of classifying an incorrect common-specification answer
+as a translation refusal. Their synchronous cases execute the query and assert the standard Cosmos
+synchronous-operation refusal; upstream leaves those arms empty.
+See [the official overrides](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/NorthwindKeylessEntitiesQueryCosmosTest.cs).
+No external report has been filed.
+
+### 1.20 Cosmos funcletized projection differs from the common specification
+
+The pinned EF Core 11 Northwind selection suite expects `EqualException` for the asynchronous
+`Select_with_complex_expression_that_can_be_funcletized` case. The adopted override preserves
+that explicit result-comparison failure. It does not label the incorrect result as a translation
+limitation. The synchronous arm also executes and checks the provider refusal instead of retaining
+upstream's empty body. See [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/NorthwindSelectQueryCosmosTest.cs#L1977).
+No external report has been filed.
+
 ## 2. Already reported
+
+### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries
+
+The vNext emulator returns incorrect results or raises `RewrittenAggregateProjections was not an
+array` for aggregate subqueries. This is tracked by
+[Azure/azure-cosmos-db-emulator-docker#330](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/330).
+EF Core 11 skips the affected owned-navigation tests when using the Linux emulator. The Cosmos
+tier adopts those same skips, with exact references to the pinned upstream tests. They apply to
+both direct and wire cases, regardless of whether the test process runs on Windows or Linux.
+These are emulator coverage gaps, not evidence that hosted Cosmos or InfoCarrier requires query
+execution overrides. No SDK query-execution switch is enabled.
+
+### 2.2 Upstream Linux-emulator skips for structural equality
+
+The pinned EF Core 11 `ComplexPropertiesStructuralEqualityCosmosTest` skips eight comparisons on
+the Linux emulator, citing [emulator issue #288](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/288):
+"Complex-type equality comparisons return no results." These cover inline and parameterized nested
+objects and collections, plus four collection `Contains` variants.
+
+The issue was closed as completed on September 9, 2026. The pinned official suite still skips these
+methods. This tier follows that explicit upstream choice on both test hosts; it does not claim a
+fresh reproduction against the selected October emulator image. The coverage gap remains visible.
+
+### 2.3 Linux-emulator projection ordering
+
+The pinned EF Core 11 complex-property projection suite skips
+`Select_optional_associate_and_ints`, citing [emulator issue #335](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/335).
+The report describes projection members returned in a different order than the select list. It
+remained open when checked November 14, 2026. Both tracking cases retain the official Linux-emulator
+skip, without a query-execution switch or a rewritten result. This is an upstream skip, not a new
+locally reproduced failure or a report filed by this repository.
+
+### 2.4 Upstream Linux-emulator skip for ordering by expressions
+
+The pinned EF Core 11 Northwind selection suite skips `Reverse_after_orderby_thenby` on the Linux
+emulator, citing [emulator issue #238](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/238):
+"ORDER BY with expressions/functions not supported." The adopted tier retains that upstream skip
+on both hosts. This records the pinned test's exclusion, not a new reproduction or a claim about
+the report's current status. See [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/NorthwindSelectQueryCosmosTest.cs#L1731).
+
+### 2.5 Upstream Linux-emulator skips for EXISTS, ANY, and ALL subqueries
+
+The pinned EF Core 11 aggregate suite skips `Where_subquery_where_any` and
+`Where_subquery_where_all` on the Linux emulator. Its source cites
+[emulator issue #289](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/289):
+"EXISTS/ANY/ALL subqueries cause internal server error." The adopted tier keeps those skips.
+This records the pinned source's decision, not a fresh reproduction or a current issue-status claim.
+
+### 2.6 Upstream emulator skip for ordering with DISTINCT
+
+The pinned EF Core 11 aggregate suite skips `OrderBy_Distinct`, with the exact reason
+"Fails on emulator https://github.com/Azure/azure-cosmos-dotnet-v3/issues/4339". The adopted tier
+retains that skip, referring to [the existing SDK report](https://github.com/Azure/azure-cosmos-dotnet-v3/issues/4339).
+This is an upstream coverage gap, not a fresh reproduction or a report filed here.
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
 reader meeting one of these numbers in a comment can see what it covers.

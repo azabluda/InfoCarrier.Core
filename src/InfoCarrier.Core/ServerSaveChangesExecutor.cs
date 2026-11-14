@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
 
@@ -57,11 +58,11 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///     <see cref="LoadDocumentAsync{TEntity}" />, whose type argument only the model knows.
     /// </summary>
     private static readonly MethodInfo LoadDocumentMethod =
-        ((Func<DbContext, LambdaExpression, CancellationToken, Task>)LoadDocumentAsync<object>)
+        ((Func<DbContext, LambdaExpression, object?[], CancellationToken, Task>)LoadDocumentAsync<object>)
             .Method.GetGenericMethodDefinition();
 
     private static readonly MethodInfo LoadDocumentSyncMethod =
-        ((Action<DbContext, LambdaExpression>)LoadDocument<object>)
+        ((Action<DbContext, LambdaExpression, object?[]>)LoadDocument<object>)
             .Method.GetGenericMethodDefinition();
 
     private readonly DbContext _context = context;
@@ -779,11 +780,12 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         looking the same, and both are repaired the same way.
     ///     </para>
     ///     <para>
-    ///         <b>The repair is a query, and EF's own identity resolution is what makes it a
-    ///         repair rather than a clobber.</b> A tracked entity is never overwritten by a query,
-    ///         so the client's values win wherever the client sent any, and the store fills in
-    ///         only what nobody is holding. A removed element stays removed: its <c>Deleted</c>
-    ///         entry is already in the identity map under the key the query returns.
+    ///         The query uses a separate identity map with the original context and transaction.
+    ///         The merge preserves modified properties, keys, concurrency values, and deleted entries;
+    ///         it supplies absent owned entries and unchanged scalar values from storage.
+    ///         Until November 14, 2026 this relied on the query's ordinary identity resolution.
+    ///         Cosmos skips an owned graph when the root is already tracked, so that query alone
+    ///         left incomplete documents incomplete.
     ///     </para>
     ///     <para>
     ///         <b>It reads only where something could actually be missing.</b> A root whose change
@@ -882,11 +884,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         on the tracked root, and a document store serializes the object.
     ///     </para>
     ///     <para>
-    ///         <b>The key travels as an array element rather than as a constant</b>, so that the
-    ///         tree has one shape per entity type instead of one per key value. EF parameterizes an
-    ///         evaluatable subtree and leaves a bare <c>ConstantExpression</c> alone, and a
-    ///         constant key would put an entry in the compiled-query cache for every row a server
-    ///         ever writes.
+    ///         Keys are explicit query parameters, so EF caches one query shape per model and
+    ///         entity type rather than a compiled query for every document key. The provider's own
+    ///         cache-key generator also preserves provider options and execution-mode differences.
     ///     </para>
     /// </remarks>
     private Task LoadDocumentAsync(IEntityType entityType, object?[] keyValues, CancellationToken cancellationToken)
@@ -910,31 +910,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 + "document from the client instead, with UseNonRelationalServerStore().");
         }
 
-        IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
-        ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
-        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
-        Expression? body = null;
-
-        for (int i = 0; i < keyProperties.Count; i++)
-        {
-            Expression member = keyProperties[i].PropertyInfo is { } clrProperty
-                ? Expression.Property(parameter, clrProperty)
-                : Expression.Call(
-                    EfPropertyMethod.MakeGenericMethod(keyProperties[i].ClrType),
-                    parameter,
-                    Expression.Constant(keyProperties[i].Name));
-
-            Expression comparison = Expression.Equal(
-                member,
-                Expression.Convert(
-                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
-
-            body = body is null ? comparison : Expression.AndAlso(body, comparison);
-        }
-
         return (Task)LoadDocumentMethod
             .MakeGenericMethod(entityType.ClrType)
-            .Invoke(null, [_context, Expression.Lambda(body!, parameter), cancellationToken])!;
+            .Invoke(null, [_context, DocumentPredicate(entityType), keyValues, cancellationToken])!;
     }
 
     private void LoadDocument(IEntityType entityType, object?[] keyValues)
@@ -944,9 +922,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw CannotCompleteDocument(entityType);
         }
 
-        LambdaExpression predicate = DocumentPredicate(entityType, keyValues);
+        LambdaExpression predicate = DocumentPredicate(entityType);
         LoadDocumentSyncMethod.MakeGenericMethod(entityType.ClrType)
-            .Invoke(null, [_context, predicate]);
+            .Invoke(null, [_context, predicate, keyValues]);
     }
 
     private static InvalidOperationException CannotCompleteDocument(IEntityType entityType)
@@ -960,11 +938,10 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             + " Writing it would lose the parts the change set did not name. Send the whole "
             + "document from the client instead, with UseNonRelationalServerStore().");
 
-    private static LambdaExpression DocumentPredicate(IEntityType entityType, object?[] keyValues)
+    private static LambdaExpression DocumentPredicate(IEntityType entityType)
     {
         IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
         ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
-        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
         Expression? body = null;
         for (int i = 0; i < keyProperties.Count; i++)
         {
@@ -976,8 +953,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                     Expression.Constant(keyProperties[i].Name));
             Expression comparison = Expression.Equal(
                 member,
-                Expression.Convert(
-                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
+                new QueryParameterExpression(DocumentKeyParameter(i), keyProperties[i].ClrType));
             body = body is null ? comparison : Expression.AndAlso(body, comparison);
         }
 
@@ -994,11 +970,18 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicFields
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
         DbContext context,
-        LambdaExpression predicate)
+        LambdaExpression predicate,
+        object?[] keyValues)
         where TEntity : class
-        => _ = context.Set<TEntity>()
-            .Where((Expression<Func<TEntity, bool>>)predicate)
-            .FirstOrDefault();
+    {
+        QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, default);
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Take(1).Expression;
+        Func<QueryContext, IEnumerable<TEntity>> execute = DocumentQuery<IEnumerable<TEntity>>(context, query, async: false);
+        foreach (TEntity entity in execute(queryContext))
+        {
+            MergeDocumentEntries(context, queryContext.TryGetEntry(entity)!.StateManager);
+        }
+    }
 
     /// <remarks>
     ///     <para>
@@ -1018,7 +1001,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         <c>eng/trim-baseline.txt</c> has described that premise since it was written.
     ///     </para>
     /// </remarks>
-    private static Task LoadDocumentAsync<
+    private static async Task LoadDocumentAsync<
         [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
             System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicConstructors
@@ -1029,11 +1012,79 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
         DbContext context,
         LambdaExpression predicate,
+        object?[] keyValues,
         CancellationToken cancellationToken)
         where TEntity : class
-        => context.Set<TEntity>()
-            .Where((Expression<Func<TEntity, bool>>)predicate)
-            .FirstOrDefaultAsync(cancellationToken);
+    {
+        QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, cancellationToken);
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Take(1).Expression;
+        Func<QueryContext, IAsyncEnumerable<TEntity>> execute = DocumentQuery<IAsyncEnumerable<TEntity>>(context, query, async: true);
+        await foreach (TEntity entity in execute(queryContext).WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            MergeDocumentEntries(context, queryContext.TryGetEntry(entity)!.StateManager);
+        }
+    }
+
+    private static string DocumentKeyParameter(int index) => "__infocarrier_documentKey" + index;
+
+    private static QueryContext CreateDocumentQueryContext(DbContext context, object?[] keyValues, CancellationToken cancellationToken)
+    {
+        QueryContext queryContext = context.GetService<IQueryContextFactory>().Create();
+        // Use the original context, provider services, filters, connection and transaction. Only
+        // identity resolution is isolated, so an already tracked root cannot suppress its owned graph.
+        queryContext.InitializeStateManager(standAlone: true);
+        queryContext.CancellationToken = cancellationToken;
+        for (int i = 0; i < keyValues.Length; i++)
+        {
+            queryContext.Parameters.Add(DocumentKeyParameter(i), keyValues[i]);
+        }
+        return queryContext;
+    }
+
+    private static Func<QueryContext, TResult> DocumentQuery<TResult>(DbContext context, Expression query, bool async)
+        => context.GetService<ICompiledQueryCache>().GetOrAddQuery(
+            (typeof(ServerSaveChangesExecutor), context.GetService<ICompiledQueryCacheKeyGenerator>().GenerateCacheKey(query, async)),
+            () => async
+                ? context.GetService<IQueryCompiler>().CreateCompiledAsyncQuery<TResult>(query)
+                : context.GetService<IQueryCompiler>().CreateCompiledQuery<TResult>(query));
+
+    private static void MergeDocumentEntries(DbContext context, IStateManager reader)
+    {
+        IStateManager target = context.GetService<IStateManager>();
+        // Cosmos can skip the entire owned graph when its root is already tracked. Read into a
+        // separate tracker, retaining shadow keys, then let fixup connect only absent entries.
+        // Existing modified and deleted entries win, including their original concurrency values.
+        try
+        {
+            foreach (InternalEntityEntry source in reader.Entries.ToList())
+            {
+                IKey key = source.EntityType.FindPrimaryKey()!;
+                object?[] values = [.. key.Properties.Select(source.GetCurrentValue)];
+                if (target.TryGetEntry(key, values) is { } existing)
+                {
+                    if (existing.EntityState is EntityState.Modified or EntityState.Unchanged)
+                    {
+                        foreach (IProperty property in source.EntityType.GetProperties())
+                        {
+                            if (!property.IsKey() && !property.IsConcurrencyToken && !existing.IsModified(property))
+                            {
+                                existing.SetProperty(property, source[property], isMaterialization: false, setModified: false);
+                                existing.SetOriginalValue(property, source[property], skipChangeDetection: true);
+                            }
+                        }
+                    }
+                    continue;
+                }
+                InternalEntityEntry entry = target.GetOrCreateEntry(source.Entity, source.EntityType);
+                foreach (IProperty property in source.EntityType.GetProperties())
+                {
+                    entry[property] = source[property];
+                }
+                entry.SetEntityState(EntityState.Unchanged);
+            }
+        }
+        finally { reader.Clear(resetting: false); }
+    }
 
     /// <summary>
     ///     The document root this entry belongs to, and the key values the store knows it by.

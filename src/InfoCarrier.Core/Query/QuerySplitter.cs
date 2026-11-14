@@ -91,7 +91,8 @@ public sealed class QuerySplitter
 
     /// <summary>
     ///     <see cref="EF.Constant{T}(T)" />, so the row limit reaches SQL as <c>LIMIT 1</c> and not as
-    ///     a parameter.
+    ///     a parameter on relational stores. Nonrelational stores receive an ordinary count,
+    ///     because their provider need not support forced constantization.
     /// </summary>
     /// <remarks>
     ///     EF's own client writes the limit of a <c>First()</c> as a literal and parameterizes a
@@ -546,7 +547,7 @@ public sealed class QuerySplitter
     ///         of the rows can go.
     ///     </para>
     /// </remarks>
-    private static (Expression Residual, IReadOnlyList<Expression> Augmented) WithRowLimitForTerminalOperator(
+    private (Expression Residual, IReadOnlyList<Expression> Augmented) WithRowLimitForTerminalOperator(
         Expression residual,
         IReadOnlyList<ParameterExpression> parameters,
         IReadOnlyList<Expression> augmented)
@@ -640,10 +641,16 @@ public sealed class QuerySplitter
                 }
 
                 var limited = new List<Expression>(augmented);
+                Expression count = Expression.Constant(rows);
+                if (ServerStoreIsRelational)
+                {
+                    count = Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), count);
+                }
+
                 limited[i] = Expression.Call(
                     TakeMethod.MakeGenericMethod(element),
                     shipped,
-                    Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), Expression.Constant(rows)));
+                    count);
 
                 return (new UnpagingVisitor(paging).Visit(residual)!, limited);
             }
