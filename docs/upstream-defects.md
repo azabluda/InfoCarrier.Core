@@ -565,6 +565,14 @@ The pinned EF Core 11 aggregate suite skips `OrderBy_Distinct`, with the exact r
 retains that skip, referring to [the existing SDK report](https://github.com/Azure/azure-cosmos-dotnet-v3/issues/4339).
 This is an upstream coverage gap, not a fresh reproduction or a report filed here.
 
+### 2.7 Upstream Linux-emulator paging exclusion
+
+The pinned EF Core 11 miscellaneous Northwind suite excludes its variable-size paging tests
+on the Linux emulator. Its source cites [emulator issue #285](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/285),
+"MaxItemCount not respected". The adopted tier retains only those conditional exclusions.
+The exact-size, point-filter, and subquery-refusal paging tests remain active. This records
+upstream's decision, not a fresh reproduction or a claim about the issue's current status.
+
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
 reader meeting one of these numbers in a comment can see what it covers.
 

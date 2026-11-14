@@ -409,3 +409,34 @@ Fourth expansion validation, November 14, 2026, under the focused local batch po
 The remaining Northwind miscellaneous class and the wider official inventory still require work.
 Logs and parity inventories are under `artifacts/cosmos-suite-audit/northwind-*`. The stopped full
 local measurement is not reported as a passing run. Full-suite validation belongs to GitHub Actions.
+
+
+## Miscellaneous Northwind batch, November 15, 2026
+
+Adopted the pinned official miscellaneous query family, without SQL baselines. The focused
+batch and override audit passed: Passed: 891, Failed: 0, Total: 944 (53 upstream skips).
+The two variable-page-size tests retain the official Linux-emulator exclusion; exact-size,
+point-filter, and subquery-refusal paging remain active. Concurrent-query tests use the fixture's
+backend database instead of asking the database-free client to create one. The upstream
+`OrderBy_multiple_queries` override calls another test; the adapter executes its matching base
+method, which already asserts translation refusal.
+
+Paging exposed a generic asynchronous-terminal gap. Registered static methods taking a query
+and returning `Task<T>` can now remain on the server. Planning and execution use the awaited
+result type instead of treating the task as a result row. No Cosmos type or provider-name test
+was added to production code. The test fixture explicitly registers the Cosmos paging method
+host, exact page/task result types, and cancellation-token type; automatic permissions remain
+unchanged.
+
+Non-cancellable token constants use the existing value-type construction expression representation,
+so serialization does not inspect their runtime wait handles. Boxed tokens retain their declared
+expression type. Request cancellation still travels through the transport. No expression node
+or wire field was added. Focused shared splitter/serializer tests passed: Passed: 71, Failed: 0,
+Total: 71. Focused transport cancellation and compatibility checks passed: Passed: 47, Failed: 0,
+Total: 47. GitHub supplies complete normal and slow validation under the owner's validation policy.
+
+These changes concern query execution and transport, rather than Cosmos storage semantics.
+They should apply to any provider exposing an equivalent registered asynchronous terminal,
+including a future MongoDB provider. That prediction is not MongoDB validation. Existing document
+repair changes remain provider-neutral; no new document-write repair was introduced in this batch.
+Full official Cosmos adoption remains incomplete.

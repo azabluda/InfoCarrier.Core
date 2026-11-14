@@ -11,6 +11,27 @@ namespace InfoCarrier.Core.CosmosTests.Query;
 public class NorthwindProjectionControlTest(NorthwindFixture<NoopModelCustomizer> fixture)
     : IClassFixture<NorthwindFixture<NoopModelCustomizer>>
 {
+    // Official EF Core 11 miscellaneous suite, lines 4980-5009.
+    [Fact]
+    public async Task Paging_preserves_entity_results_in_the_direct_store()
+    {
+        using var context = ((InfoCarrierTestStore)fixture.TestStore).Backend.CreateDbContext();
+        var customers = context.Set<Microsoft.EntityFrameworkCore.TestModels.Northwind.Customer>();
+        int count = await customers.CountAsync(TestContext.Current.CancellationToken);
+#pragma warning disable EF9102 // Direct control for official experimental paging tests.
+        var all = await customers.OrderBy(c => c.CustomerID)
+            .ToPageAsync(count, null, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(count, all.Values.Count);
+        Assert.Equal("ALFKI", all.Values[0].CustomerID);
+        Assert.Equal("WOLZA", all.Values[^1].CustomerID);
+        Assert.Null(all.ContinuationToken);
+        var filtered = await customers.Where(c => c.CustomerID == "ALFKI")
+            .ToPageAsync(10, null, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal("ALFKI", Assert.Single(filtered.Values).CustomerID);
+        Assert.Null(filtered.ContinuationToken);
+#pragma warning restore EF9102
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

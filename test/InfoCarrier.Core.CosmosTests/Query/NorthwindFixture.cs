@@ -11,6 +11,8 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 using NorthwindCustomer = Microsoft.EntityFrameworkCore.TestModels.Northwind.Customer;
 using Xunit;
 
+#pragma warning disable EF9102 // Explicit test registrations for official experimental paging tests.
+
 namespace InfoCarrier.Core.CosmosTests.Query;
 
 public class NorthwindFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TModelCustomizer>
@@ -33,11 +35,18 @@ public class NorthwindFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TMod
         }
     }
 
+    public void NoSyncTest(Action test)
+    {
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(test);
+        Assert.Equal("Azure Cosmos DB does not support synchronous I/O. Make sure to use and correctly await only async methods when using Entity Framework Core to access Azure Cosmos DB.", error.Message);
+    }
+
     protected override ITestStoreFactory TestStoreFactory => _factory ??= InfoCarrierTestStoreFactory.Create(
         new CosmosTier(), ContextType, OnModelCreating,
         copyDbContextParameters: (client, server) =>
             ((NorthwindContext)server).TenantPrefix = ((NorthwindContext)client).TenantPrefix,
         configureConventions: ConfigureConventions,
+        allowedTypes: [typeof(CosmosPage<Order>), typeof(Task<CosmosPage<Order>>), typeof(CancellationToken), typeof(Task<CosmosPage<NorthwindCustomer>>), typeof(Task<CosmosPage<string>>), typeof(CosmosQueryableExtensions), typeof(CosmosPage<NorthwindCustomer>), typeof(CosmosPage<string>)],
         configureServer: options => options.WithStoresOwnedDataInsideOwner(true));
 
     protected override bool ShouldLogCategory(string logCategory)
@@ -115,3 +124,5 @@ public class NorthwindFixture<TModelCustomizer> : NorthwindQueryFixtureBase<TMod
             modelBuilder.Entity<Product>().Property(e => e.ProductName).Metadata.GetContainingIndexes().Single());
     }
 }
+
+#pragma warning restore EF9102

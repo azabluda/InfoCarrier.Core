@@ -145,6 +145,15 @@ public class ExpressionToNodeTranslator(
     /// <inheritdoc />
     protected override Expression VisitConstant(ConstantExpression node)
     {
+        // Provider terminal expressions carry a non-cancellable token placeholder.
+        // Cancellation itself travels separately with the transport request.
+        if (node.Value is CancellationToken token && !token.CanBeCanceled)
+        {
+            Expression value = Expression.New(typeof(CancellationToken));
+            _result = Translate(node.Type == typeof(CancellationToken) ? value : Expression.Convert(value, node.Type));
+            return node;
+        }
+
         // A constant is the one expression node whose `Type` is a *runtime* type rather than a
         // declared one — EF's funcletizer types it by the value it holds. So it is the one node
         // that can name a non-public implementation type, and `IPAddress.Loopback` does exactly

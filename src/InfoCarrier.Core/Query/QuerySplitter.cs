@@ -305,7 +305,7 @@ public sealed class QuerySplitter
         {
             // Nothing to do on the client. Keep the residual an identity so callers have one
             // shape to handle, and flag it so they can skip the work entirely.
-            ParameterExpression only = Expression.Parameter(query.Type, "server");
+            ParameterExpression only = Expression.Parameter(UnwrapTask(query.Type), "server");
             return new SplitQuery(
                 [ToServerQuery(query)],
                 Expression.Lambda(only, only),
@@ -691,10 +691,15 @@ public sealed class QuerySplitter
         }
     }
 
+    private static Type UnwrapTask(Type type)
+        => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>)
+            ? type.GetGenericArguments()[0]
+            : type;
+
     private static ServerQuery ToServerQuery(Expression query)
     {
         bool sequence = typeof(IQueryable).IsAssignableFrom(query.Type);
-        return new ServerQuery(query, sequence ? ElementTypeOf(query.Type) : query.Type, !sequence);
+        return new ServerQuery(query, sequence ? ElementTypeOf(query.Type) : UnwrapTask(query.Type), !sequence);
     }
 
     private static Type ElementTypeOf(Type queryableType)
