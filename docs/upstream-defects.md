@@ -483,6 +483,26 @@ both direct and wire cases, regardless of whether the test process runs on Windo
 These are emulator coverage gaps, not evidence that hosted Cosmos or InfoCarrier requires query
 execution overrides. No SDK query-execution switch is enabled.
 
+### 2.2 Upstream Linux-emulator skips for structural equality
+
+The pinned EF Core 11 `ComplexPropertiesStructuralEqualityCosmosTest` skips eight comparisons on
+the Linux emulator, citing [emulator issue #288](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/288):
+"Complex-type equality comparisons return no results." These cover inline and parameterized nested
+objects and collections, plus four collection `Contains` variants.
+
+The issue was closed as completed on September 9, 2026. The pinned official suite still skips these
+methods. This tier follows that explicit upstream choice on both test hosts; it does not claim a
+fresh reproduction against the selected October emulator image. The coverage gap remains visible.
+
+### 2.3 Linux-emulator projection ordering
+
+The pinned EF Core 11 complex-property projection suite skips
+`Select_optional_associate_and_ints`, citing [emulator issue #335](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/335).
+The report describes projection members returned in a different order than the select list. It
+remained open when checked November 14, 2026. Both tracking cases retain the official Linux-emulator
+skip, without a query-execution switch or a rewritten result. This is an upstream skip, not a new
+locally reproduced failure or a report filed by this repository.
+
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
 reader meeting one of these numbers in a comment can see what it covers.
 

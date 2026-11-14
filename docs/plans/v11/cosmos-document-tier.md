@@ -33,7 +33,15 @@ dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.cspro
 dotnet run --file eng/CosmosEmulator.cs -- stop podman
 ```
 
-Use `docker` instead of `podman` in the lifecycle command on Linux CI. Startup waits up to three
+Use `docker` instead of `podman` in the lifecycle command on Linux CI, or locally with Docker
+Desktop running Linux containers. The runtime argument selects the executable; the operating
+system resolves it through its normal executable search, including `PATH`. PowerShell aliases
+are not used. Docker selects its engine through its
+[active context and connection settings](https://docs.docker.com/engine/manage-resources/contexts/).
+Inspect these with `docker context ls` and `docker info`. Windows tests against Docker Desktop
+have not been validated on this machine; Windows/Podman and Linux/Docker have been validated.
+
+Startup waits up to three
 minutes for `/ready`. Ports 8081 and 8080 bind to loopback. Cleanup removes only the task-owned
 container. Each fixture owns a separate generated database. Test collections remain parallel.
 An unavailable emulator fails the tests instead of silently skipping them.
@@ -68,7 +76,7 @@ required/optional query-body mix-ups remain documented on the relevant override 
 
 | Area | Checks |
 |---|---|
-| Queries | Six inherited owned-navigation families with direct controls, plus arithmetic, comparison, logical, GUID, and enum families through InfoCarrier |
+| Queries | Six owned-navigation families with direct controls, six complex-property families, plus arithmetic, comparison, logical, GUID, and enum families through InfoCarrier |
 | Scalar storage | All 16 official scalar type families through InfoCarrier, subject to their upstream primitive-collection skips |
 | Writes | Insert, read, scalar update, nested replacement, collection update/removal, optional-reference removal, root deletion |
 | Stored shape | Independent Cosmos client reads verify nested objects, arrays, and deeper references |
@@ -97,6 +105,20 @@ storage families, using their exact values and mappings. Behavioral assertions r
 Cosmos-specific refusals and primitive-collection skips carry exact upstream source references.
 The scalar storage families retain 13 Linux-emulator aggregate skips and three provider-design
 skips: converted GUID/byte-array collection elements and byte equality inside primitive collections.
+
+The second expansion adopts all six complex-property association families: collection, miscellaneous,
+primitive collection, projection, set operations, and structural equality. It includes seven additional
+Cosmos-specific scenarios, not only the inherited common bases. Comparing official discovery with
+the adopted run gives identical names for all 122 behavior cases, after normalizing class names and
+excluding the six SQL-baseline completeness checks. The focused run, including the override audit,
+reported Passed: 107, Failed: 0, Total: 123, with 16 official skips. No production change is required.
+
+Five skipped cases concern aggregate subqueries, eight concern structural equality, two concern
+projection ordering, and one concerns an entity collection crossing document boundaries. The
+[defect register](../../upstream-defects.md) distinguishes the open projection-order report from the
+closed structural-equality report that the pinned official suite still cites. Retaining that upstream
+skip is not a fresh claim that the selected image still fails. Required/optional nested projection
+mix-ups in the upstream test bodies are corrected, with explicit deviation notes on both overrides.
 No golden SQL baselines are copied. The upstream `Check_all_tests_overridden` checks exist to enforce
 those baselines, so they are not adopted as application behavior tests.
 
@@ -122,8 +144,8 @@ Remaining work is explicitly open:
   individually. Provider-internal assertions may be excluded; ordinary application failures may not.
 - [ ] Validate the complete expanded suite on Windows/Podman and Linux/Docker, including coverage.
 
-Do not count missing families as unsupported tests or describe this first expansion as the complete
-official suite. The previous passing results below describe the earlier, smaller scope.
+Do not count missing families as unsupported tests or describe these expansions as the complete
+official suite. The dated results below identify their tested scope.
 
 ## Production change review
 
@@ -204,6 +226,27 @@ The combined run's failure-name and failure-reason files are empty. Its logs are
 `artifacts/measure/cosmos-official-expansion*`; focused evidence is under `artifacts/cosmos-suite-audit/`.
 These results validate the assembled first expansion, not the outstanding full official-suite request.
 
-GitHub Actions passed for the earlier container-alignment commit `0b2a553e`. Checks for the first
-official-suite expansion are pending. Emulator testing does not establish full Azure service
+GitHub Actions passed for the first official-suite expansion `4b85adb6` in
+[Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43606161151) and
+[Coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43606161152). Both Linux Docker
+Cosmos runs reported Passed: 335, Failed: 0, Total: 361, with 26 official skips. The Linux functional
+suite reported Passed: 30346, Failed: 0, Total: 30583, with 237 existing platform skips. Transport
+reported Passed: 395, Failed: 0, Total: 395; engineering reported Passed: 61, Failed: 0, Total: 61.
+Checks for the second, complex-property expansion are pending. Emulator testing does not establish full Azure service
 parity, distributed-query coverage, official MongoDB support, or release approval.
+
+Second expansion validation, November 14, 2026, Windows host and the same Podman Linux emulator:
+
+- Full assembled Cosmos tier: Passed: 441, Failed: 0, Total: 483; 42 referenced upstream skips.
+- Full functional suite: Passed: 30350, Failed: 0, Total: 30583; 233 existing skips.
+- Combined measurement: FAILING: 0, TOTAL: 31066. Failure-name and failure-reason files are empty;
+  the comparison with the first expansion reports no broken tests and unchanged failure reasons.
+- Official complex-property case comparison: 122 upstream behavior cases, 122 adopted cases, no
+  missing or additional names after class-name normalization and SQL-baseline-check exclusion.
+- Strict full Release build: five documented framework Razor warnings, zero errors.
+- Final remote exception-type and message checks: Passed: 2, Failed: 0, Total: 2; the final strict
+  Cosmos build reported zero warnings and errors.
+
+Logs remain under `artifacts/measure/cosmos-official-complex*` and `artifacts/cosmos-suite-audit/complex-*`.
+This extension changes tests and internal documentation only. It does not complete the remaining
+official-suite adoption checklist, change the wire contract, or enable MongoDB.
