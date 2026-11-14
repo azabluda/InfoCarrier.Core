@@ -292,6 +292,15 @@ invisible to `TrimRatchet.cs`. Nothing gates that axis, because Native AOT is no
 | `docs/`, `eng/` text only | neither |
 | **a public signature in `src/`** | **`dotnet pack InfoCarrier.Core.slnx --no-build --configuration Release`** as well |
 
+**Owner's Cosmos-initiative exception, November 14, 2026:** adopt one batch, run that batch and
+its relevant controls locally, then push when those focused tests pass. Continue the next batch
+while CI runs the complete suites. Do not rerun `Measure.cs`, complete functional suites, or the
+complete Cosmos suite locally for each adoption batch. Use focused regressions for any fixes;
+let the required GitHub Actions checks supply full validation. Before completing the pull request,
+run the existing slow SQLite and Firebird comparisons on the final commit, preferably in GitHub
+Actions, and review their results. This exception supersedes the local full-suite table for this
+Cosmos initiative; it does not change required CI checks or authorize merging.
+
 **The pack gate runs on the PR too.** Package validation compares the assembly with the last
 published stable, which `PackageValidationBaselineVersion` in `Directory.Build.props` names, and
 `docs/versioning.md` says when it moves. This said "the published `10.0.0`" until 2026-09-22, after

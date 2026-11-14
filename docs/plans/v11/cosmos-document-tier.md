@@ -218,8 +218,48 @@ remains a follow-up after completing the applicable suite.
    Docker-compatible endpoint discovery and cleanup need local validation before replacing the
    explicit launcher. Keep the pinned image, upstream emulator behavior, and test parallelism.
 
-The parallel workflow change requires GitHub validation and a measured comparison before the
-next adoption batch. The Testcontainers option is not implemented by this change.
+The parallel workflow validation and timing comparison completed before the next batch was pushed.
+The Testcontainers option is not implemented by this change.
+
+Both parallel workflows passed for `202e3b0f`. The successful sequential baseline is `be7e11a7`.
+The specification and product code are identical across this timing comparison; the parallelism
+commit adds only workflow/gate changes, engineering tests, and documentation.
+
+| Workflow execution span | Sequential | Parallel | Observed change |
+|---|---:|---:|---:|
+| Build & Test | 13m 14s | 15m 28s | 2m 14s slower |
+| Coverage | 21m 05s | 18m 45s | 2m 20s faster |
+
+Execution spans run from the first job start to the last job completion. Initial queue time was
+two versus three seconds for Build & Test, and three seconds in both coverage runs. Coverage
+improved by about 11.1% in this comparison. Normal functional test execution increased from
+10m 34s to 14m 19s, outweighing the overlap; normal-build improvement is not established by this
+pair. The coverage functional step was similar, 16m 10s versus 15m 54s. The separate Cosmos jobs
+finished within three minutes while functional testing continued. These are single-run observations,
+not an explanation of the functional slowdown.
+
+The combined parallel specification report retained Passed: 31866, Failed: 0, Total: 32316.
+The required aggregate checks passed, and coverage reports were combined successfully. Evidence is
+under `artifacts/cosmos-suite-audit/ci-sequential-timings.json` and `ci-parallel-timings.json`.
+The runs are [sequential build](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43632624152),
+[sequential coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43632624154),
+[parallel build](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43634592305), and
+[parallel coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43634592263).
+
+## Local batch validation policy
+
+On November 14, 2026, the owner replaced repeated full local measurements for this initiative with
+a focused loop: adopt a batch, run its cases and relevant controls locally, push when green, and
+continue the next batch while CI runs the full suites. Production fixes need focused regressions,
+but the complete functional and Cosmos suites are delegated to the required GitHub Actions checks.
+The `cosmos-northwind-batch` full local measurement was stopped under this instruction; its partial
+logs are not a completed validation result.
+
+Before completing the pull request, run the existing slow SQLite and Firebird comparisons against
+the final commit and review their outcomes. The manual GitHub Actions workflow can run both on
+separate Windows runners and retain the exact tested revision and diagnostic artifacts. It remains
+an optional workflow, not an automatically required merge check. The current workflow offers no
+Cosmos slow-comparison selection; Cosmos direct controls remain part of its ordinary test suite.
 
 ## Production change review
 
@@ -347,5 +387,25 @@ Third expansion validation, November 14, 2026, Windows host and the same Podman 
 Logs remain under `artifacts/measure/cosmos-expanded-bases*` and `artifacts/cosmos-suite-audit/`.
 The dated class inventory records 52 implemented official classes, eight reviewed exclusions,
 and 62 entries still needing review and possible adoption. Those entries are not all distinct
-specification bases. The complete official-suite milestone remains open, and Linux Docker
-validation of this expansion is pending.
+specification bases. The complete official-suite milestone remains open. Linux Docker validation
+passed normally and with coverage in the sequential and parallel runs linked above.
+
+Fourth expansion validation, November 14, 2026, under the focused local batch policy:
+
+- Adopted Northwind filtering, selection, keyless-entity, and aggregate families, including the
+  additional official value-property projection. No production changes are needed.
+- Focused batch, override audit, and two direct projection controls: Passed: 1275, Failed: 0,
+  Total: 1323, with 48 upstream skips or explicitly reported upstream no-op arms.
+- All four method inventories match the official classes. Their 1320 behavior cases correspond
+  to 1314 official cases after excluding SQL-baseline checks; six additional reported cases come
+  from enumerating data on upstream skipped theories. The other three cases are the audit and
+  direct controls. The official aggregate `Distinct_Scalar` CI exclusion adds two skips on GitHub.
+- The copied SQL-injection scenario retains the common base's input and result assertions;
+  no golden SQL strings are copied. Driver failures preserve their remote exception type.
+- One projection refuses translation in both execution modes. Independent direct Cosmos queries
+  verify both refusals. Its synchronous assertion is stronger than upstream's empty arm; the
+  adopted method does not demand the wrong synchronous-I/O error.
+
+The remaining Northwind miscellaneous class and the wider official inventory still require work.
+Logs and parity inventories are under `artifacts/cosmos-suite-audit/northwind-*`. The stopped full
+local measurement is not reported as a passing run. Full-suite validation belongs to GitHub Actions.
