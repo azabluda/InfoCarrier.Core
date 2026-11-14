@@ -145,20 +145,86 @@ jobs:
       - name: Trim ratchet (Blazor publish)
         run: dotnet run --file eng/TrimRatchet.cs --
 
-  # THE SPEC SUITE, GREEN, AND `dotnet test`'S OWN EXIT CODE IS THE GATE (2026-09-15). Until then
-  # the suite was red on purpose and this job gated on the DIRECTION of the failure count against
-  # test/known-failures.txt. Now every override of a specification test says what the store does and
-  # where that is shown, and OverrideAudit, a test inside each project, fails the run on one that
-  # does not (docs/test-policy.md). So a red test fails the step, and a crashed test
-  # host does too, which was the other thing the ratchet's total guarded.
-  #
-  # `Spec tests` IS A REQUIRED CHECK IN THE `main` RULESET, BY THIS EXACT NAME. It was `Spec ratchet`
-  # until 2026-09-15 and was renamed here and in the ruleset together; a job renamed alone leaves
-  # every pull request waiting for a check that never reports. Not `Spec suite`, which is the name of
-  # the report's check run below.
+  # Independent runners keep the functional workload and Cosmos emulator from competing.
+  functional-tests:
+    name: Functional tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore ${{ env.TEST_PROJECT }}
+      - name: Build
+        run: dotnet build ${{ env.TEST_PROJECT }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
+      - name: Test (full suite, Tiers A-C)
+        timeout-minutes: 90
+        env:
+          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
+        run: >
+          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
+          --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
+      - name: Upload functional results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spec-functional-results
+          path: artifacts/test-results
+          if-no-files-found: error
+
+  cosmos-tests:
+    name: Cosmos tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
+      - name: Build
+        run: dotnet build test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-restore --configuration Release -p:TreatWarningsAsErrors=true
+      - name: Start Cosmos emulator (Docker)
+        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
+      - name: Test (Cosmos document tier and direct controls)
+        env:
+          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
+        run: >
+          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
+          --no-build --configuration Release --logger "trx;LogFileName=cosmos.trx"
+          --results-directory artifacts/test-results
+      - name: Cosmos startup and failure logs
+        if: failure()
+        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
+      - name: Stop Cosmos emulator
+        if: always()
+        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
+      - name: Upload Cosmos results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spec-cosmos-results
+          path: artifacts/test-results
+          if-no-files-found: error
+
+  # Keep the required check name. Failed, cancelled, or skipped workers must fail this aggregate.
+  # SuiteSummary and the existing reports combine both result sets after the workers finish.
   spec-tests:
     name: Spec tests
     runs-on: ubuntu-latest
+    needs: [functional-tests, cosmos-tests]
+    if: always()
 
     # Write access is for the `badges` branch only -- see the last step. Stated on the job rather
     # than the workflow so the fast gate keeps the read-only default. `checks: write` is for the
@@ -180,45 +246,13 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
-        run: dotnet restore ${{ env.SOLUTION }}
-
-      - name: Build
-        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
-
-      # Named explicitly and not run through the solution: the solution also holds
-      # InfoCarrier.Core.TransportTests, which is not part of this number.
-      #
-      # INFOCARRIER_OVERRIDE_REASONS makes OverrideAuditTest write the reason of every override beside
-      # the TRX, which eng/SuiteSummary.cs joins with the results for the EF parity badge.
-      - name: Test (full suite, Tiers A-C)
-        id: tiers-a-c
-        timeout-minutes: 90
-        env:
-          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
-        run: >
-          dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
-          --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
-
-      - name: Start Cosmos emulator (Docker)
-        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
-
-      - name: Test (Cosmos document tier and direct controls)
-        id: cosmos
-        env:
-          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
-        run: >
-          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
-          --no-build --configuration Release --logger "trx;LogFileName=cosmos.trx"
-          --results-directory artifacts/test-results
-
-      - name: Cosmos startup and failure logs
-        if: failure()
-        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
-
-      - name: Stop Cosmos emulator
+      - name: Download independent suite results
         if: always()
-        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
+        uses: actions/download-artifact@v8
+        with:
+          pattern: spec-*-results
+          merge-multiple: true
+          path: artifacts/test-results
 
       # Reports and decides nothing: EF parity for the badge, and the counters and the failing names
       # for the run summary. `always()`, because a red run still has numbers worth publishing.
@@ -228,6 +262,13 @@ jobs:
           dotnet run --file eng/SuiteSummary.cs --
           artifacts/test-results/results.trx
           artifacts/test-results/cosmos.trx
+
+      - name: Require successful test jobs
+        if: always()
+        run: >
+          dotnet run --file eng/RequireSuccessfulJobs.cs --
+          "functional=${{ needs.functional-tests.result }}"
+          "cosmos=${{ needs.cosmos-tests.result }}"
 
       - name: Upload results
         if: always()
@@ -327,7 +368,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TESTS_PASSED: ${{ steps.tiers-a-c.outcome == 'success' && steps.cosmos.outcome == 'success' }}
+          TESTS_PASSED: ${{ needs.functional-tests.result == 'success' && needs.cosmos-tests.result == 'success' }}
         run: |
           set -euo pipefail
           . artifacts/test-results/counters.env

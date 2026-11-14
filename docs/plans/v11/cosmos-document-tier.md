@@ -198,23 +198,28 @@ Remaining work is explicitly open:
 Do not count missing families as unsupported tests or describe these expansions as the complete
 official suite. The dated results below identify their tested scope.
 
-## Follow-ups after the complete applicable suite
+## CI parallelization and remaining follow-up
 
-The owner requested these after completing the current test-adoption milestone:
+The owner subsequently moved CI parallelization ahead of the next adoption batch. Testcontainers
+remains a follow-up after completing the applicable suite.
 
-1. Split functional and Cosmos validation into parallel GitHub Actions jobs on separate runners.
-   Apply the same separation to coverage collection, then aggregate the result and coverage artifacts.
-   Preserve the required `Spec tests` and `Coverage report` verdicts, combined reporting, and badge
-   correctness. Measure the elapsed-time change; separate runners avoid competition between SQLite
-   and the Cosmos emulator. The current workflows run functional tests before Cosmos on one runner
-   per workflow; build validation and coverage already have separate runners.
+1. Split functional and Cosmos validation into parallel GitHub Actions jobs on separate runners,
+   with a separate job combining results. Coverage collection uses independent functional and
+   Cosmos matrix runners, followed by one merge/report job. Transport and engineering coverage
+   remain sequential after Cosmos on its runner. The required `Spec tests` and `Coverage report`
+   names, combined test artifact, fork report, coverage report, and badge remain intact.
+   `eng/RequireSuccessfulJobs.cs` rejects failed, cancelled, skipped, or missing worker results;
+   aggregation must not turn an unsuccessful worker into a green required check. The owner requested
+   timings from the sequential `be7e11a7` run before pushing this optimization. Compare execution
+   time separately from queue/setup time, and retain the raw job and step timestamps under artifacts.
 2. Explore Testcontainers for automatic emulator startup, readiness, and cleanup, following the
    official EF Core approach. Verify Windows tests against the owner's Podman machine and Linux
    tests against Docker, including cleanup after failures. The Podman machine must still be running;
    Docker-compatible endpoint discovery and cleanup need local validation before replacing the
    explicit launcher. Keep the pinned image, upstream emulator behavior, and test parallelism.
 
-These are recorded follow-ups, not changes included in the current milestone.
+The parallel workflow change requires GitHub validation and a measured comparison before the
+next adoption batch. The Testcontainers option is not implemented by this change.
 
 ## Production change review
 
