@@ -470,6 +470,25 @@ seconds and documents inaccurate subsecond results. The adopted override retains
 but its category is a defect because the original query returns an incorrect value rather than
 refusing translation. No external report has been filed.
 
+### 1.17 Cosmos nullable collection minimum differs from the common specification
+
+The pinned EF Core 11 `PrimitiveCollectionsQueryCosmosTest` expects `EqualException` for
+`Inline_collection_of_nullable_value_type_with_null_Min`. Its comment explains that Cosmos sorts
+null before numbers for `MIN`, while the relational aggregate ignores nulls. The adopted test keeps
+that explicit comparison failure. This is a documented Cosmos semantic difference that produces
+a different answer from the common specification, not a deliberate translation refusal.
+The source is [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/PrimitiveCollectionsQueryCosmosTest.cs#L436).
+No external report has been filed.
+
+### 1.18 Cosmos nullable collection indexing comparison differs from the common specification
+
+The pinned EF Core 11 `PrimitiveCollectionsQueryCosmosTest` expects `EqualException` for
+`Nullable_reference_column_collection_index_equals_nullable_column`. The query compares an indexed
+nullable string collection element with a nullable scalar property. The adopted override preserves
+the official comparison failure; it does not turn the wrong result into a translation limitation.
+The source is [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/PrimitiveCollectionsQueryCosmosTest.cs#L1453).
+No external report has been filed.
+
 ## 2. Already reported
 
 ### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries

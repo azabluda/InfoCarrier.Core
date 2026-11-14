@@ -94,8 +94,9 @@ required/optional query-body mix-ups remain documented on the relevant override 
 
 | Area | Checks |
 |---|---|
-| Queries | Six owned-navigation families with direct controls, six complex-property families, plus arithmetic, comparison, logical, GUID, and enum families through InfoCarrier |
+| Queries | Owned-navigation families with direct controls, complex-property families, all basic scalar translations, Northwind functions, primitive collections, Find, and bounded document projections |
 | Scalar storage | All 16 official scalar type families through InfoCarrier, subject to their upstream primitive-collection skips |
+| Complex tracking | References and collections, state transitions, original/current values, change detection, and persistence with the official synchronous skips |
 | Writes | Insert, read, scalar update, nested replacement, collection update/removal, optional-reference removal, root deletion |
 | Stored shape | Independent Cosmos client reads verify nested objects, arrays, and deeper references |
 | Incomplete documents | Attached stubs and scalar-only changes preserve independently read nested values |
@@ -140,6 +141,31 @@ mix-ups in the upstream test bodies are corrected, with explicit deviation notes
 No golden SQL baselines are copied. The upstream `Check_all_tests_overridden` checks exist to enforce
 those baselines, so they are not adopted as application behavior tests.
 
+The third expansion adopts the remaining eleven basic translation families: bitwise, byte array,
+date, date/time, date/time offset, time, time span, math, string, and both miscellaneous families.
+Their 319 behavior-case names match the pinned official inventory exactly after excluding SQL
+baseline completeness checks. It also adopts all three `Find` variants, built-in data types,
+complex-type tracking, Northwind database functions and general functions, and primitive collections.
+The tracking and primitive-collection adapters include the additional official Cosmos-specific cases.
+
+Synchronous calls continue through InfoCarrier's synchronous server contract. The `Find` and
+Northwind tests assert the official Cosmos synchronous refusal rather than redirecting calls to
+asynchronous execution. Complex tracking preserves the official synchronous skips. Its execution
+helper uses separate contexts and cleans the database, matching upstream's transaction-free setup.
+Two upstream `Find` theory skips now enumerate all three inherited cancellation modes instead of
+one collapsed skipped case, adding twelve reported skips across the three variants. Two built-in
+type theory skips similarly enumerate both inherited execution modes, adding two reported skips.
+These discovery differences add no behavior claim or new skipped method.
+
+Primitive-collection tests that build a model per test use the existing store-neutral harness,
+relocated from the functional project into `TestUtilities`. The namespace and implementation stay
+the same. Its Cosmos adapter explicitly enables the document policy for deferred server models.
+The shared fixture registers the official custom collection type and `CosmosDbFunctionsExtensions`
+on both halves. These are explicit test configuration grants, not expanded production allowlist
+inference. The two official wrong-result assertions are recorded separately in the
+[defect register](../../upstream-defects.md#117-cosmos-nullable-collection-minimum-differs-from-the-common-specification).
+No production code or wire format changes are needed for this expansion.
+
 Verified exclusions from the upstream inventory:
 
 | Official class or method | Reason |
@@ -147,10 +173,17 @@ Verified exclusions from the upstream inventory:
 | `CosmosApiConsistencyTest` | Reflects over the Cosmos provider assembly, its fluent API signatures, and provider service registrations. It executes no application query or update through a context. InfoCarrier cannot change these third-party API surfaces. |
 | `ConnectionSpecificationTest` | Calls the directly resolved Cosmos `IDatabaseCreator` to verify `UseCosmos` connection-string configuration and missing-connection validation. InfoCarrier clients use `UseInfoCarrier` and have no Cosmos connection. This excludes those two configuration checks, not application connection failures. |
 | Query-family `Check_all_tests_overridden` methods | Require every shared method to have an override for SQL-baseline assertions. Inheriting unchanged behavioral tests is intentional here. |
+| `FullTextSearchTranslationsCosmosTest`, `HybridSearchCosmosTest` | Both official classes require `IsNotEmulator`. These application features remain outside the selected emulator scope, rather than being classified as provider internals. |
+| `VectorSearchTranslationsCosmosByteTest`, `VectorSearchTranslationsCosmosSByteTest`, `VectorSearchTranslationsCosmosFloatTest`, `VectorSearchTranslationsCosmosMixedTest` | Each official class requires `IsNotLinuxEmulator`. The same exclusion applies on both test hosts because both use the Linux emulator. |
 
 These decisions follow the pinned [API consistency class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/CosmosApiConsistencyTest.cs)
 and [connection configuration class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/ConnectionSpecificationTest.cs).
 Remaining inventory entries still require explicit adoption or a reviewed exclusion.
+
+The search exclusions follow the pinned [full-text class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/Translations/FullTextSearchTranslationsCosmosTest.cs#L9),
+[hybrid class](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/Translations/HybridSearchTranslationsCosmosTest.cs#L9),
+and [four vector classes](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/Translations/VectorSearchTranslationsCosmosTest.cs).
+They do not exclude the separate ad hoc search classes, which need their own review.
 
 Remaining work is explicitly open:
 
@@ -164,6 +197,24 @@ Remaining work is explicitly open:
 
 Do not count missing families as unsupported tests or describe these expansions as the complete
 official suite. The dated results below identify their tested scope.
+
+## Follow-ups after the complete applicable suite
+
+The owner requested these after completing the current test-adoption milestone:
+
+1. Split functional and Cosmos validation into parallel GitHub Actions jobs on separate runners.
+   Apply the same separation to coverage collection, then aggregate the result and coverage artifacts.
+   Preserve the required `Spec tests` and `Coverage report` verdicts, combined reporting, and badge
+   correctness. Measure the elapsed-time change; separate runners avoid competition between SQLite
+   and the Cosmos emulator. The current workflows run functional tests before Cosmos on one runner
+   per workflow; build validation and coverage already have separate runners.
+2. Explore Testcontainers for automatic emulator startup, readiness, and cleanup, following the
+   official EF Core approach. Verify Windows tests against the owner's Podman machine and Linux
+   tests against Docker, including cleanup after failures. The Podman machine must still be running;
+   Docker-compatible endpoint discovery and cleanup need local validation before replacing the
+   explicit launcher. Keep the pinned image, upstream emulator behavior, and test parallelism.
+
+These are recorded follow-ups, not changes included in the current milestone.
 
 ## Production change review
 
@@ -253,7 +304,10 @@ reported Passed: 395, Failed: 0, Total: 395; engineering reported Passed: 61, Fa
 The second, complex-property expansion `3216fc67` also passed
 [Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43614289673) and
 [Coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43614289709).
-Checks for the startup-diagnostic change are pending. Emulator testing does not establish full Azure service
+The startup-diagnostic change `8b0a5f1f` passed
+[Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43620003370) and
+[Coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43620003405).
+Emulator testing does not establish full Azure service
 parity, distributed-query coverage, official MongoDB support, or release approval.
 
 Second expansion validation, November 14, 2026, Windows host and the same Podman Linux emulator:
@@ -271,3 +325,22 @@ Second expansion validation, November 14, 2026, Windows host and the same Podman
 Logs remain under `artifacts/measure/cosmos-official-complex*` and `artifacts/cosmos-suite-audit/complex-*`.
 This extension changes tests and internal documentation only. It does not complete the remaining
 official-suite adoption checklist, change the wire contract, or enable MongoDB.
+
+Third expansion validation, November 14, 2026, Windows host and the same Podman Linux emulator:
+
+- Full assembled Cosmos tier: Passed: 1520, Failed: 0, Total: 1733; 213 official skips.
+- Full functional suite after the shared harness relocation: Passed: 30350, Failed: 0,
+  Total: 30583; 233 existing skips.
+- Combined measurement: FAILING: 0, TOTAL: 32316. Failure-name and failure-reason files are empty;
+  there are no broken tests and failure reasons are unchanged from the startup-diagnostic baseline.
+- Strict Release solution build: five documented framework Razor warnings, zero errors.
+- The eleven new basic translation families match all 319 official behavior-case names.
+  Complex tracking matches all 289 official cases, and primitive collections match all 176 behavior
+  cases after excluding the SQL-baseline completeness check. All three Find variants and built-in
+  types have identical method inventories; their additional reported cases enumerate official skips.
+
+Logs remain under `artifacts/measure/cosmos-expanded-bases*` and `artifacts/cosmos-suite-audit/`.
+The dated class inventory records 52 implemented official classes, eight reviewed exclusions,
+and 62 entries still needing review and possible adoption. Those entries are not all distinct
+specification bases. The complete official-suite milestone remains open, and Linux Docker
+validation of this expansion is pending.

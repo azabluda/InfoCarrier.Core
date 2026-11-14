@@ -99,7 +99,10 @@ public abstract class DocumentAssociationFixture : OwnedNavigationsFixtureBase
 internal sealed class CosmosTier : InfoCarrierTier
 {
     public override InfoCarrierBackendTestStore CreateBackend(string name, bool shared, SharedTestStoreProperties properties)
-        => new CosmosBackendStore(name, shared, properties);
+        => new CosmosBackendStore(name, shared, properties with
+        {
+            ConfigureServer = properties.ConfigureServer ?? (options => options.WithStoresOwnedDataInsideOwner(true)),
+        });
 }
 
 internal sealed class CosmosBackendStore(string name, bool shared, SharedTestStoreProperties properties)

@@ -217,6 +217,8 @@ six-family validation above does not complete this larger scope.
 - [x] Adopt all six complex-property query families, including the seven additional Cosmos-specific scenarios; compare discovered case names with the official runner.
 - [x] Validate the complex-property expansion locally with the complete functional/Cosmos measurement, strict builds, and remote exception checks.
 - [x] Report an unavailable emulator with its endpoint and explicit Podman/Docker startup commands; verify stopped-container failures and healthy startup across every initialization path.
+- [x] Adopt the remaining basic translations, all three Find variants, built-in data types, complex tracking, Northwind function families, and primitive collections with official mappings and referenced expectations.
+- [x] Record separate-runner CI parallelization and Testcontainers lifecycle management as follow-ups after the complete applicable suite.
 - [ ] Complete the remaining class-by-class applicability review and test adoption listed in the
   [expanded scope](cosmos-document-tier.md#expanded-official-test-scope).
 - [ ] Validate the fully expanded suite on Windows/Podman and Linux/Docker, including coverage.

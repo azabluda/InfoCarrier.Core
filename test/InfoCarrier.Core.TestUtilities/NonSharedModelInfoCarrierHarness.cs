@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
 /// <summary>
-///     The Tier A harness for EF's <c>NonSharedModelTestBase</c> suites — the <c>AdHoc*</c> query
+///     The store-neutral harness for EF's <c>NonSharedModelTestBase</c> suites — the <c>AdHoc*</c> query
 ///     bases and everything else that builds its model per test.
 /// </summary>
 /// <remarks>
