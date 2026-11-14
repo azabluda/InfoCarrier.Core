@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.Associations;
 using Microsoft.EntityFrameworkCore.Query.Associations.OwnedNavigations;
 using Xunit;
+using Xunit.Sdk;
 
 namespace InfoCarrier.Core.CosmosTests.Associations;
 
@@ -12,6 +13,16 @@ public abstract class CollectionTests<TFixture>(TFixture fixture) : OwnedNavigat
     where TFixture : DocumentAssociationFixture, new()
 {
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsCollectionCosmosTest.cs";
+    // This tier always targets the Linux emulator, even when the test host is Windows.
+    [StoreDefect("2.1", UpstreamRepository.EfCore, Source, 42, 58, Skip = true,
+        Justification = "Aggregates over subqueries return null result set")]
+    public override Task Where() => throw SkipException.ForSkip("Not supported on the Linux Cosmos emulator");
+
+    [StoreDefect("2.1", UpstreamRepository.EfCore, Source, 181, 197, Skip = true,
+        Justification = "Aggregates over subqueries return null result set")]
+    public override Task Select_within_Select_within_Select_with_aggregates()
+        => throw SkipException.ForSkip("Not supported on the Linux Cosmos emulator");
+
     [StoreLimit(UpstreamRepository.EfCore, Source, 60, 74, Justification = "'ORDER BY' is not supported in subqueries.",
         Deviation = DeviationKind.StoreExceptionAsData, DeviationNote = "The wire represents CosmosException as InfoCarrierServerException.")]
     public override async Task OrderBy_ElementAt()
@@ -61,11 +72,24 @@ public abstract class SetOperationsTests<TFixture>(TFixture fixture) : OwnedNavi
     where TFixture : DocumentAssociationFixture, new()
 {
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsSetOperationsCosmosTest.cs";
+    [StoreDefect("2.1", UpstreamRepository.EfCore, Source, 36, 57, Skip = true, Justification = Upstream.GaveNoReason)]
+    public override Task Over_assocate_collection_Select_nested_with_aggregates_projected(QueryTrackingBehavior queryTrackingBehavior)
+        => throw SkipException.ForSkip("Not supported on the Linux Cosmos emulator");
+
     [StoreLimit(UpstreamRepository.EfCore, Source, 33, 34, Justification = "#37918")]
     public override Task Over_associate_collection_projected(QueryTrackingBehavior queryTrackingBehavior)
         => Assert.ThrowsAsync<InvalidOperationException>(() => base.Over_associate_collection_projected(queryTrackingBehavior));
     [StoreLimit(UpstreamRepository.EfCore, Source, 77, 78, Justification = Upstream.GaveNoReason)]
     public override Task Over_different_collection_properties() => AssertTranslationFailed(base.Over_different_collection_properties);
+}
+
+public abstract class PrimitiveCollectionTests<TFixture>(TFixture fixture) : OwnedNavigationsPrimitiveCollectionTestBase<TFixture>(fixture)
+    where TFixture : DocumentAssociationFixture, new()
+{
+    private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsPrimitiveCollectionCosmosTest.cs";
+    [StoreDefect("2.1", UpstreamRepository.EfCore, Source, 75, 92, Skip = true,
+        Justification = "Aggregates over subqueries return null result set")]
+    public override Task Select_Sum() => throw SkipException.ForSkip("Not supported on the Linux Cosmos emulator");
 }
 
 public abstract class ProjectionTests<TFixture>(TFixture fixture) : OwnedNavigationsProjectionTestBase<TFixture>(fixture)

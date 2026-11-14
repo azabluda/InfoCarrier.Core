@@ -897,6 +897,13 @@ Database creation, mutation, and cleanup remain fixture-local; test collections 
 This introduces an explicit container-runtime prerequisite, accepted by the owner's authorization.
 The same immutable emulator image is used with both runtimes.
 
+The owner's later clarification on the same date keeps Cosmos in a Linux container on both test
+hosts. Windows tests run directly on Windows and connect to Podman; Linux CI tests connect to
+Docker. The tier uses the vNext emulator and adopts EF Core 11's same Linux-emulator aggregate
+skips, with exact upstream references. The test host's operating system does not change the
+database's limitations. No native Windows emulator is installed and no SDK query-execution
+override is enabled. The earlier classic-image and query-mode experiments are superseded.
+
 Document repair now reads into an isolated EF query tracker while retaining the application's
 original context, provider services, connection, query filters, and transaction. The merge keeps
 modified values, deleted entries, keys, and original concurrency values, and fills absent owned

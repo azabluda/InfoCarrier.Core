@@ -45,7 +45,7 @@ jobs:
       - name: Test functional suite with coverage
         run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
 
-      # Provision the classic emulator after the functional workload releases its resources.
+      # Provision the emulator after the functional workload releases its resources.
       - name: Start Cosmos emulator (Docker)
         run: dotnet run --file eng/CosmosEmulator.cs -- start docker
 

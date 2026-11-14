@@ -82,6 +82,10 @@ All active projects target .NET 11 and use EF Core 11 without EF Core 10 overrid
 `test/InfoCarrier.Core.CosmosTests`, using Microsoft's Cosmos 11.0.0 provider and a pinned Linux
 emulator image. Podman runs it locally; Docker runs it in CI. The owner has not decided whether
 Cosmos is temporary or permanent. See [the validation record](docs/plans/v11/cosmos-document-tier.md).
+Cosmos always runs in a Linux vNext container. Windows tests run directly on Windows against
+Podman; Linux tests use the same image with Docker in CI. Adopt EF Core 11's Linux-emulator skips
+with exact upstream references on both test hosts. Do not enable SDK query-execution overrides
+or install a native Windows emulator to make this tier pass.
 The retained MongoDB project stays outside the solution and refuses direct builds. Do not remove
 its source or introduce a mixed EF Core 10/11 graph to restore it.
 

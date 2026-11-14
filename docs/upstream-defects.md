@@ -472,6 +472,17 @@ refusing translation. No external report has been filed.
 
 ## 2. Already reported
 
+### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries
+
+The vNext emulator returns incorrect results or raises `RewrittenAggregateProjections was not an
+array` for aggregate subqueries. This is tracked by
+[Azure/azure-cosmos-db-emulator-docker#330](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/330).
+EF Core 11 skips the affected owned-navigation tests when using the Linux emulator. The Cosmos
+tier adopts those same skips, with exact references to the pinned upstream tests. They apply to
+both direct and wire cases, regardless of whether the test process runs on Windows or Linux.
+These are emulator coverage gaps, not evidence that hosted Cosmos or InfoCarrier requires query
+execution overrides. No SDK query-execution switch is enabled.
+
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
 reader meeting one of these numbers in a comment can see what it covers.
 

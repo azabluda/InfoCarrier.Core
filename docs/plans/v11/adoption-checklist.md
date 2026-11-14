@@ -197,7 +197,9 @@ it reports unchecked references; it does not claim those line checks passed.
 - [x] Add a separate official Cosmos 11.0.0 test project without changing or enabling retained MongoDB source.
 - [x] Add complete document tests, six inherited query families, direct controls, and pinned Podman/Docker lifecycle commands.
 - [x] Complete local suite, portability, transport, trimming, dependency, and wire validation.
-- [ ] Verify the same suite on Linux Docker in GitHub Actions.
+- [x] Run the vNext tier from Windows and Linux test hosts against the same Podman Linux emulator, with upstream's aggregate skips.
+- [x] Verify the earlier default-query classic-emulator suite on Linux Docker in GitHub Actions.
+- [ ] Verify the aligned vNext tier and upstream skips on Linux Docker in GitHub Actions.
 - [ ] Owner decision: retain Cosmos temporarily or permanently. This decision remains separate from implementation acceptance.
 
 See [the validation record](cosmos-document-tier.md) for scope and the production change review.

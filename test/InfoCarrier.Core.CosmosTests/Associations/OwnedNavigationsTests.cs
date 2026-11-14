@@ -13,13 +13,13 @@ namespace InfoCarrier.Core.CosmosTests.Associations;
 
 public class CollectionTest(CollectionFixture fixture) : CollectionTests<CollectionFixture>(fixture);
 public class MiscellaneousTest(MiscellaneousFixture fixture) : OwnedNavigationsMiscellaneousTestBase<MiscellaneousFixture>(fixture);
-public class PrimitiveCollectionTest(PrimitiveCollectionFixture fixture) : OwnedNavigationsPrimitiveCollectionTestBase<PrimitiveCollectionFixture>(fixture);
+public class PrimitiveCollectionTest(PrimitiveCollectionFixture fixture) : PrimitiveCollectionTests<PrimitiveCollectionFixture>(fixture);
 public class ProjectionTest(ProjectionFixture fixture) : ProjectionTests<ProjectionFixture>(fixture);
 public class SetOperationsTest(SetOperationsFixture fixture) : SetOperationsTests<SetOperationsFixture>(fixture);
 public class StructuralEqualityTest(StructuralEqualityFixture fixture) : StructuralEqualityTests<StructuralEqualityFixture>(fixture);
 public class DirectCollectionTest(DirectCollectionFixture fixture) : CollectionTests<DirectCollectionFixture>(fixture);
 public class DirectMiscellaneousTest(DirectMiscellaneousFixture fixture) : OwnedNavigationsMiscellaneousTestBase<DirectMiscellaneousFixture>(fixture);
-public class DirectPrimitiveCollectionTest(DirectPrimitiveCollectionFixture fixture) : OwnedNavigationsPrimitiveCollectionTestBase<DirectPrimitiveCollectionFixture>(fixture);
+public class DirectPrimitiveCollectionTest(DirectPrimitiveCollectionFixture fixture) : PrimitiveCollectionTests<DirectPrimitiveCollectionFixture>(fixture);
 public class DirectProjectionTest(DirectProjectionFixture fixture) : ProjectionTests<DirectProjectionFixture>(fixture)
 {
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsProjectionCosmosTest.cs";
