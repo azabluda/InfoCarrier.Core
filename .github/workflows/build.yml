@@ -23,7 +23,7 @@ env:
   DOTNET_VERSION: '11.0.x'
   SOLUTION: InfoCarrier.Core.slnx
 
-  # Tiers A, B, and C run here. MongoDB remains suspended pending an EF Core 11 provider.
+  # Tiers A-C share the functional project. Cosmos runs separately; MongoDB remains disabled.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
@@ -200,7 +200,25 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
-      # Tier C runs in the functional suite. Tier D still needs an EF Core 11 provider.
+      - name: Start Cosmos emulator (Docker)
+        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
+
+      - name: Test (Cosmos document tier and direct controls)
+        id: cosmos
+        env:
+          INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
+        run: >
+          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
+          --no-build --configuration Release --logger "trx;LogFileName=cosmos.trx"
+          --results-directory artifacts/test-results
+
+      - name: Cosmos startup and failure logs
+        if: failure()
+        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
+
+      - name: Stop Cosmos emulator
+        if: always()
+        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
 
       # Reports and decides nothing: EF parity for the badge, and the counters and the failing names
       # for the run summary. `always()`, because a red run still has numbers worth publishing.
@@ -209,6 +227,7 @@ jobs:
         run: >
           dotnet run --file eng/SuiteSummary.cs --
           artifacts/test-results/results.trx
+          artifacts/test-results/cosmos.trx
 
       - name: Upload results
         if: always()
@@ -260,7 +279,7 @@ jobs:
         uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a  # v3.2.0
         with:
           name: Spec suite
-          path: artifacts/test-results/results.trx
+          path: artifacts/test-results/*.trx
           reporter: dotnet-trx
           use-actions-summary: 'false'
           list-suites: 'failed'
@@ -308,7 +327,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TESTS_PASSED: ${{ steps.tiers-a-c.outcome == 'success' }}
+          TESTS_PASSED: ${{ steps.tiers-a-c.outcome == 'success' && steps.cosmos.outcome == 'success' }}
         run: |
           set -euo pipefail
           . artifacts/test-results/counters.env

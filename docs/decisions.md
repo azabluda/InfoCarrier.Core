@@ -878,6 +878,32 @@ as a `Deviation`.
 **`eng/tier-d-control.py`, `test/tier-d-overrides.txt` and `test/tier-d-control-pending.txt` are
 deleted.** Tier D stays in the ratchet at zero failures until the other tiers are converted.
 
+### Amendment 2026-11-14: provisional Cosmos document tier, MongoDB retained
+
+The owner authorized Cosmos implementation and full local and Linux CI validation using Podman
+locally and Docker in CI. The choice of a permanent or temporary document provider remains open.
+`test/InfoCarrier.Core.DocumentStoreTests` retains its MongoDB source, remains outside the solution,
+and continues to reject direct builds. No unofficial MongoDB package is restored or executed.
+
+The new `InfoCarrier.Core.CosmosTests` project uses Microsoft's official Cosmos 11.0.0 provider.
+It runs the six owned-navigation specification families and direct Cosmos controls, plus document
+writes, incomplete-document repair, named policy isolation, projections, generated keys, and failures.
+Provider overrides cite the matching EF Core 11 Cosmos source. They do not reuse MongoDB outcomes.
+The [validation record](plans/v11/cosmos-document-tier.md) describes scope and remaining limits.
+
+The earlier MongoDB process-isolation findings remain scoped to that provider and its harness.
+Cosmos uses a single externally managed emulator with a distinct generated database per fixture.
+Database creation, mutation, and cleanup remain fixture-local; test collections remain parallel.
+This introduces an explicit container-runtime prerequisite, accepted by the owner's authorization.
+The same immutable emulator image is used with both runtimes.
+
+Document repair now reads into an isolated EF query tracker while retaining the application's
+original context, provider services, connection, query filters, and transaction. The merge keeps
+modified values, deleted entries, keys, and original concurrency values, and fills absent owned
+entries and unchanged scalar values from storage. The previous assumption that an ordinary
+tracking query would always materialize missing owned entries failed on Cosmos when the root was
+already tracked. The earlier client and server document-policy switches remain required.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot

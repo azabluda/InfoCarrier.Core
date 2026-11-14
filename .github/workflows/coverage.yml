@@ -41,12 +41,24 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
 
-      # The functional project includes restored Firebird Tier C alongside Tiers A and B.
+      - name: Start Cosmos emulator (Docker)
+        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
+
+      # Keep functional processes sequential. Each project owns its own output directory.
       - name: Test with coverage
-        run: >
-          dotnet test ${{ env.SOLUTION }} --no-build --configuration Release
-          --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings
-          --results-directory artifacts/coverage/raw
+        run: |
+          dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+          dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+          dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+
+      - name: Cosmos failure logs
+        if: failure()
+        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
+
+      - name: Stop Cosmos emulator
+        if: always()
+        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
 
       - name: Merge and render coverage
         run: |
