@@ -50,7 +50,10 @@
     <!-- EF Core 11 requires bundle 3.0.5. No backing-store dependency reaches shipped packages. -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
 
-    <!-- Tier C is suspended until Firebird supports EF Core 11. Its source remains in test/. -->
+    <!-- Tier C is test-only. The embedded engine needs no installation or server process. -->
+    <PackageVersion Include="FirebirdSql.EntityFrameworkCore.Firebird" Version="14.0.0-rc1" />
+    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Windows.X64" Version="2.0.6" />
+    <PackageVersion Include="FirebirdDb.Embedded.V5.NativeAssets.Linux.X64" Version="2.0.6" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
     <!-- Keep repository transitive dependencies on .NET 11. Packable projects disable transitive pinning. -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />

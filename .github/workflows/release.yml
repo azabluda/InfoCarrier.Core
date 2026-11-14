@@ -78,7 +78,7 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
-      # Tiers C and D are suspended until their providers support EF Core 11.
+      # Tier C runs in the functional suite. Tier D still needs an EF Core 11 provider.
 
       - name: Trim ratchet (Blazor publish)
         run: dotnet run --file eng/TrimRatchet.cs --

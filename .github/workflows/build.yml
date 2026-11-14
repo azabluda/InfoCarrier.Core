@@ -23,7 +23,7 @@ env:
   DOTNET_VERSION: '11.0.x'
   SOLUTION: InfoCarrier.Core.slnx
 
-  # Tiers A and B run here. Firebird and MongoDB are suspended pending EF Core 11 providers.
+  # Tiers A, B, and C run here. MongoDB remains suspended pending an EF Core 11 provider.
   TEST_PROJECT: test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj
 
   # Warnings are errors here and nowhere else. Directory.Build.props reads this, so a new warning
@@ -191,8 +191,8 @@ jobs:
       #
       # INFOCARRIER_OVERRIDE_REASONS makes OverrideAuditTest write the reason of every override beside
       # the TRX, which eng/SuiteSummary.cs joins with the results for the EF parity badge.
-      - name: Test (full suite, Tiers A-B)
-        id: tiers-a-b
+      - name: Test (full suite, Tiers A-C)
+        id: tiers-a-c
         timeout-minutes: 90
         env:
           INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
@@ -200,7 +200,7 @@ jobs:
           dotnet test ${{ env.TEST_PROJECT }} --no-build --configuration Release
           --logger "trx;LogFileName=results.trx" --results-directory artifacts/test-results
 
-      # Tiers C and D are suspended until their providers support EF Core 11.
+      # Tier C runs in the functional suite. Tier D still needs an EF Core 11 provider.
 
       # Reports and decides nothing: EF parity for the badge, and the counters and the failing names
       # for the run summary. `always()`, because a red run still has numbers worth publishing.
@@ -308,7 +308,7 @@ jobs:
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TESTS_PASSED: ${{ steps.tiers-a-b.outcome == 'success' }}
+          TESTS_PASSED: ${{ steps.tiers-a-c.outcome == 'success' }}
         run: |
           set -euo pipefail
           . artifacts/test-results/counters.env

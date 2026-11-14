@@ -61,7 +61,7 @@ dotnet run --file eng/Measure.cs -- <label> [baseline]                   # THE S
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj   # the whole spec suite
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.InMemory"  # Tier A only
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"    # Tier B only
-# Tier C (Firebird) is suspended pending an EF Core 11 provider.
+dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Firebird"  # Tier C
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in Measure.cs
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
@@ -71,13 +71,14 @@ INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/Inf
 ### Where the tests live
 
 **The active specification suite is one project**, `test/InfoCarrier.Core.FunctionalTests`:
-`InMemory/` is Tier A and `Sqlite/` is Tier B. `eng/Measure.cs` reports one combined result.
+`InMemory/` is Tier A, `Sqlite/` is Tier B, and `Firebird/` is Tier C.
+`eng/Measure.cs` reports one combined result.
 All active projects target .NET 11 and use EF Core 11 without EF Core 10 overrides.
 
-**Tiers C and D are temporarily suspended.** Firebird sources remain excluded from compilation.
-The MongoDB project remains outside the solution and refuses direct builds. Restore either tier
-only when its provider supports EF Core 11; update dependencies, compliance exclusions, workflows,
-and measurements together. Do not introduce a mixed EF Core 10/11 graph to restore coverage.
+**Tier C runs with Firebird provider 14.0.0-rc1 on EF Core 11.** Tier D remains suspended:
+the MongoDB project is outside the solution and refuses direct builds. Restore it only when its
+provider supports EF Core 11; update dependencies, compliance exclusions, workflows, and measurements
+together. Do not introduce a mixed EF Core 10/11 graph to restore coverage.
 
 **`test/InfoCarrier.Core.TestUtilities` is the store-neutral harness**: client and server shells,
 fixtures, transport, geometry mapping, SQL capture, culture, and override auditing. Current-test
@@ -139,13 +140,12 @@ withholding it, so the opt-in bought nothing and could only be got wrong. **The 
 backing store and which spec bases it can host, and never about whether the client is relational.**
 `architecture.md` §6a carries the **D3 amendment 2026-09-03 (R135)** with the measurement.
 
-### Two provider defects this repository works around
+### Provider defects and their workarounds
 
-**`FirebirdLateralQuerySqlGenerator` corrects somebody else's bug and is deleted when they fix
-it.** The Firebird provider emits a bare function after `LATERAL`, which the store will not parse;
-it already wraps a plain *table* as `(SELECT * FROM "T") AS "t"` and never added the branch for a
-function. The correction lives on the **server** half of the harness, because the server is an
-ordinary EF application and the SQL is its provider's; nothing in `src/` knows about it.
+**The Firebird SQL-generator correction was removed on 2026-11-13.** Provider 14.0.0-rc1
+generates valid correlated procedure joins. The complete function suite and live comparison pass
+with its unmodified generator. The former correction belonged to the server test harness;
+nothing in `src/` depended on it. See the [restoration evidence](docs/plans/v11/firebird-restoration.md).
 
 **The document-store write path has two gates and needs both (#100, #102).**
 `InfoCarrierDatabase.Expand` pulls an owner's nested documents along when a root is written — the
@@ -413,9 +413,10 @@ owner had given, ten days earlier, for rejecting the same idea (ADR-014). Four r
    touches.
 
 **Never edit anything under `subrepos/`.** Those are git-ignored reference clones of `efcore`,
-`rlinq`, `aqua`, `infocarrier-v1`, and `firebird` (`FirebirdSQL/NETProvider` at `EFCore-13.0.0.0`,
-the tag matching the package Tier C runs), kept for source-level study. Each is checked out at the
-tag this repository references, and `firebird` loads in `roslyn-codelens` from
+`rlinq`, `aqua`, `infocarrier-v1`, and `firebird` (`FirebirdSQL/NETProvider` at the historical
+`EFCore-13.0.0.0` tag), kept for source-level study. The Firebird clone does not describe the
+restored 14.0.0-rc1 package; verify that package's binary or matching source instead.
+`firebird` loads in `roslyn-codelens` from
 `subrepos/firebird/src/NETProvider.slnx` with `rootProjects` naming its two EF Core projects.
 `efcore` retains the historical EF Core 10 reference. Current EF Core 11 adoption uses the pinned
 official archive under `artifacts/efcore-v11`; see the adoption checklist for preparation. Read
@@ -651,6 +652,10 @@ files left by earlier runs. A second process can mistake the first process's tem
 databases for stale files and remove them. This was reproduced during EF Core 11 timing work on
 2026-11-12. Run timing probes and the slow suite sequentially; a concurrent run requires an isolated
 working directory. Transport and engineering projects use separate output directories.
+
+This restriction also applies to Firebird after its EF Core 11 restoration. Its `.fdb` cleanup
+does not establish cross-process ownership. SQLite isolation cannot protect Firebird files.
+Preserve collection-level parallel execution inside each process.
 
 The Tier B store is **file-backed** (`<StoreName>.db` in the test output directory), as EF Core's own
 `SqliteTestStore` is. **Do not move it back to `Mode=Memory;Cache=Shared`**: that makes the

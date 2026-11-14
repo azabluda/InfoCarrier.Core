@@ -8,9 +8,9 @@ on:
       suite:
         description: Store comparisons to run
         required: true
-        default: sqlite
+        default: both
         type: choice
-        options: [sqlite]
+        options: [both, sqlite, firebird]
       ref:
         description: Optional commit or branch to test instead of the selected branch
         required: false
@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        store: [Sqlite]
+        store: ${{ fromJSON(inputs.suite == 'both' && '["Sqlite","Firebird"]' || inputs.suite == 'sqlite' && '["Sqlite"]' || '["Firebird"]') }}
     env:
       STORE: ${{ matrix.store }}
       REQUESTED_REF: ${{ inputs.ref || github.ref }}

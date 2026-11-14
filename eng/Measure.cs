@@ -4,6 +4,6 @@
 #:include shared/ScriptHost.cs
 #:include commands/Measure.cs
 
-// Run both specification projects and compare complete failure-name/reason snapshots.
+// Run active specification projects and compare complete failure-name/reason snapshots.
 // Usage: <label> [baseline-label]. Logs and snapshots live under artifacts/measure.
 return await ScriptHost.RunAsync(token => Measure.Run(args, token), "measure");

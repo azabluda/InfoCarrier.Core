@@ -3,10 +3,8 @@
 using System.Collections.Concurrent;
 using FirebirdSql.Data.FirebirdClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 
@@ -32,11 +30,10 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         it could be built at all: no installation and no container.
 ///     </para>
 ///     <para>
-///         <b>Everything else about the file's lifetime follows Tier B's store, and for Tier B's
-///         reasons.</b> Stale files are swept once at startup, nothing is deleted on disposal, and
-///         the created-guard verifies rather than trusts. Those three rules cost this repository a
-///         698-test phantom failure and a nine-test intermittent to learn; see
-///         <see cref="SqliteInfoCarrierBackendTestStore" />, which states each of them in full.
+///         Files are shared by store name within the working directory. Separate functional
+///         processes must run sequentially: startup cleanup cannot establish database ownership.
+///         SQLite's process isolation does not apply to these Firebird files. Files and
+///         initialization entries survive fixture disposal to preserve sharing within a process.
 ///     </para>
 /// </remarks>
 public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
@@ -69,7 +66,7 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new();
     private static readonly ConcurrentDictionary<string, bool> Created = new();
 
-    // Runs before the first store of this process exists, so everything it finds is stale.
+    // Separate functional processes must run sequentially in this working directory.
     private static readonly Lazy<bool> Swept = new(() =>
     {
         SweepStaleFiles();
@@ -191,7 +188,7 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
             }
             catch (IOException)
             {
-                // A file another process holds is not ours to reclaim.
+                // Best effort only. A closed database has no ownership protection here.
             }
             catch (UnauthorizedAccessException)
             {
@@ -207,21 +204,6 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
         => new FbConnection(_connectionString);
 
     /// <inheritdoc />
-    /// <remarks>
-    ///     <para>
-    ///         <b>The SQL generator is replaced here rather than on the options, and it has to
-    ///         be.</b> <c>AddProviderOptions</c> calls <c>UseInternalServiceProvider</c>, and EF
-    ///         refuses <c>ReplaceService</c> alongside one: "Entity Framework is not building its
-    ///         own internal service provider". The replacement therefore belongs in the collection
-    ///         that provider is built from, which is this one.
-    ///     </para>
-    ///     <para>
-    ///         <see cref="FirebirdLateralQuerySqlGeneratorFactory" /> says what it corrects and
-    ///         why the correction is somebody else's to make permanent. <c>RemoveAll</c> first,
-    ///         because the provider registered its own with <c>TryAdd</c> and a second
-    ///         registration would not win.
-    ///     </para>
-    /// </remarks>
     protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
     {
         ArgumentNullException.ThrowIfNull(serviceCollection);
@@ -230,21 +212,15 @@ public class FirebirdInfoCarrierBackendTestStore : InfoCarrierBackendTestStore
     }
 
     /// <summary>
-    ///     The Firebird provider with this repository's correction to its SQL generator, for the
-    ///     server context and for the plain-EF client of a slow run alike.
+    ///     The published Firebird provider, for the server and the plain-EF comparison client alike.
     /// </summary>
     /// <remarks>
-    ///     The plain-EF client of a slow run gets the correction too (#167, 2026-09-27), because it
-    ///     stands for an application on the server's configuration. Without it, plain EF fails every
-    ///     correlated table-valued function on the defect the correction exists for, and the slow
-    ///     run compares a store bug with this provider.
+    ///     Both contexts use the same unmodified provider services. The former LATERAL correction
+    ///     was removed after provider 14.0.0-rc1 passed the complete function suite without it.
     /// </remarks>
     internal static IServiceCollection AddFirebirdServices(IServiceCollection serviceCollection)
     {
         serviceCollection.AddEntityFrameworkFirebird();
-
-        serviceCollection.RemoveAll<IQuerySqlGeneratorFactory>();
-        serviceCollection.AddSingleton<IQuerySqlGeneratorFactory, FirebirdLateralQuerySqlGeneratorFactory>();
 
         return serviceCollection;
     }

@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 internal static class Measure
 {
     private static string Root() => ScriptHost.Root;
-    // Tiers C and D are suspended until their providers support EF Core 11.
+    // Tiers A, B, and C share the functional project. Tier D remains suspended.
     private static readonly string[] Projects = ["InfoCarrier.Core.FunctionalTests"];
 
     // Stream to disk, not memory: a specification run can write many megabytes. Cancel the tree,

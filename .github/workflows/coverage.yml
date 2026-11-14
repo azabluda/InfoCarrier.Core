@@ -41,6 +41,7 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
 
+      # The functional project includes restored Firebird Tier C alongside Tiers A and B.
       - name: Test with coverage
         run: >
           dotnet test ${{ env.SOLUTION }} --no-build --configuration Release

@@ -20,8 +20,9 @@ The original instructions below remain as the dated investigation brief.
   collection marking still has a purpose; it is not removed as an assumed upstream fix.
 - `StringTranslationsSqliteTest.IsNullOrEmpty` still calls `base.IsNullOrWhiteSpace` at this tag.
   No external defect report was filed.
-- The Firebird correction is retained in suspended source. It is excluded from the active build;
-  recheck it when restoring the tier with an EF Core 11 provider.
+- Firebird restoration on November 13 rechecked the published 14.0.0-rc1 binary. Its unmodified
+  generator passes the complete function suite and direct/wire comparison. The former correction
+  and its registration are removed; see [restoration evidence](firebird-restoration.md).
 - Plain complex property-bag reads now pass. The full value-buffer materializer still fails for
   complex property-bag collections, so only that narrower workaround remains. The inherited
   tracking tests and the direct/wire property-bag test pass.
@@ -88,6 +89,14 @@ decided.
 **Written 2026-09-21.** `FirebirdLateralQuerySqlGenerator` corrects it on the server half of the
 harness and is deleted when it is fixed. It was open at `EFCore-13.0.0.0`. Read the Firebird provider
 that supports EF 11 before carrying the correction forward.
+
+**Rechecked 2026-11-13:** provider 14.0.0-rc1 targets .NET 11 and depends on EF Core 11.
+Its compiled cross/outer-apply methods delegate source generation to `GenerateApplySource`.
+The complete function suite passes without the correction, including correlated procedure calls.
+The complete live comparison also passes; its sole attributed projection-read difference remains
+accurate. The package records source commit `c34a3efcb2864d970781622eb5d3483b4c450b9e`,
+which GitHub did not resolve during verification. Package behavior, rather than an unverified
+ancestry claim, establishes that the correction can be removed.
 
 ## The rest of `docs/upstream-defects.md` §1
 

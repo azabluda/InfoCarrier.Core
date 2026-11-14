@@ -815,6 +815,22 @@ Chained deployments use ordinary loggers and may retain duplicate logs rather th
       migrations. Evaluate the design before stable version 11 publication. The owner requested
       [issue #262](https://github.com/azabluda/InfoCarrier.Core/issues/262) on 2026-10-29 to track this work.
 
+## Firebird restoration on EF Core 11
+
+Owner-requested [issue #281](https://github.com/azabluda/InfoCarrier.Core/issues/281), November 13, 2026.
+Work is separate from SQLite isolation, on `restore/firebird-ef11-281` from updated `main`.
+The [restoration evidence](../v11/firebird-restoration.md) records package provenance, tests,
+coverage measurements, and remaining platform limits.
+
+- [x] **FBR1. Restore Firebird function-query coverage.** Verify the EF Core 11 package graph;
+      restore source, embedded dependencies, compliance, measurements, and workflows together.
+      Recheck retained expectations and the SQL-generator correction against complete normal and
+      live tests. Measure marginal coverage, run functional/build/documentation/hygiene checks,
+      and submit the isolated change for owner review and Linux validation.
+      Local implementation and measurement are complete. Linux checks and owner review remain
+      pending. The evidence records the unrelated full-coverage capacity-test timeout and its
+      successful isolated run without treating the failed full run as a passing gate.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

@@ -24,10 +24,10 @@ namespace InfoCarrier.Core.FunctionalTests.Firebird.Query;
 ///         <c>LATERAL</c> has been in the engine since version 4.
 ///     </para>
 ///     <para>
-///         <b>The fixture creates every routine the base names, which Firebird's own fixture does
-///         not.</b> That provider's <c>UdfDbFunctionFbTests</c> omits
+///         <b>The fixture creates every routine the adopted base names.</b> Provider 13's
+///         <c>UdfDbFunctionFbTests</c>, used when this tier was introduced, omitted
 ///         <c>GetCustomerOrderCountByYear</c> and its <c>OnlyFrom2000</c> sibling and skips nine
-///         tests as "does not have the data". Those are its choices, not the store's limits, so
+///         tests as "does not have the data". Those were fixture choices, not store limits, so
 ///         this seed follows the PostgreSQL fixture instead, which creates all four.
 ///     </para>
 ///     <para>
@@ -38,7 +38,8 @@ namespace InfoCarrier.Core.FunctionalTests.Firebird.Query;
 ///         <c>StringLength</c> are mapped to SQL Server's <c>len</c>, whose Firebird spelling is
 ///         <c>char_length</c>. And <c>IdentityString</c> is mapped to schema <c>dbo</c>: Firebird
 ///         has no schemas before version 6, so the schema is cleared rather than invented. The
-///         Firebird provider's own fixture makes all three of these changes.
+///         Firebird provider 13's fixture supplied the original reference for these changes;
+///         the restored provider 14.0.0-rc1 passes the complete suite with these mappings.
 ///     </para>
 /// </remarks>
 public class UdfDbFunctionInfoCarrierTest(UdfDbFunctionInfoCarrierTest.UdfDbFunctionInfoCarrierFixture fixture)

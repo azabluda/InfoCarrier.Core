@@ -68,13 +68,15 @@ complete suites and the owner's manual browser smoke check. Local logs and test 
 They are investigation output, not committed SQL baselines.
 
 The active solution has 13 projects targeting .NET 11. Its restored assets contain no EF Core 10
-packages. Firebird source is excluded from compilation; the MongoDB project is outside the solution
+packages. At adoption, Firebird source was excluded from compilation; the MongoDB project is outside the solution
 and explicitly refuses direct builds. Restore either tier only with an EF Core 11 provider, then
 restore its compliance coverage, measurement entry, and workflow together.
 
 The override and skip rechecks cover the active InMemory and SQLite tiers. Suspended Firebird and
 MongoDB source retains its previous expectations for restoration; it does not claim EF Core 11
 validation. Recheck those providers and their retained overrides when compatible versions exist.
+Firebird was restored on November 13 with provider 14.0.0-rc1; the
+[restoration evidence](firebird-restoration.md) records its dependency, override, comparison, and coverage checks.
 
 The override investigation temporarily removed 560 unique attributed methods and ran their inherited
 expectations. Of 954 cases, 26 passed and 928 failed. The passing methods were then compared directly
@@ -176,6 +178,19 @@ and extract its contents into `artifacts/efcore-v11`, without the enclosing arch
 Create `artifacts/efcore-v11/.source-revision` containing the full commit identifier above.
 The audit checks that revision before checking reference lines. Without local reference source,
 it reports unchecked references; it does not claim those line checks passed.
+
+## Firebird restoration, November 14, 2026
+
+- [x] Restore the EF Core 11 Firebird provider, embedded dependencies, source compilation,
+  compliance coverage, measurement inputs, and workflows together.
+- [x] Recheck retained expectations and execute complete Firebird normal and direct/wire tests.
+  Remove the obsolete SQL-generator correction after the published generator passes those queries.
+- [x] Measure Firebird's marginal product coverage using matched local inputs. The
+  [restoration evidence](firebird-restoration.md#results-november-14-2026) records the measured
+  recovery, exact denominator, and remaining limits without attributing MongoDB's gap to Firebird.
+- [ ] Confirm Linux continuous-integration results and owner review. The full local coverage run
+  exceeded an unrelated capacity-test child deadline; its isolated coverage run passed. That
+  limit remains explicit in the restoration evidence. MongoDB remains suspended.
 
 ## What #99 says that is no longer true
 
