@@ -137,9 +137,6 @@ public class RelationalInfoCarrierComplianceTest : RelationalComplianceTestBase
     /// </remarks>
     protected override ICollection<Type> IgnoredTestBases { get; } =
     [
-        // Tier C is suspended: Firebird has no EF Core 11 provider. SQLite cannot host
-        // table-valued functions or APPLY. Restore this base with the Tier C project inputs.
-        typeof(UdfDbFunctionTestBase<>),
         // Migrations run DDL against a database. The client has none. The server is an ordinary
         // EF application, and EF already tests migrations for the provider it references.
         typeof(MigrationsInfrastructureTestBase<>),

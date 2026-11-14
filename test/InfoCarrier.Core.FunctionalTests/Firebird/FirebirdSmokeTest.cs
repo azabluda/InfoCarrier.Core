@@ -115,7 +115,7 @@ public class FirebirdSmokeTest
         List<string?> titles = await client.Blogs
             .OrderBy(b => b.Id)
             .Select(b => b.Title)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(["alpha", "beta"], titles);
     }
@@ -136,7 +136,7 @@ public class FirebirdSmokeTest
         var counts = await client.Blogs
             .OrderBy(b => b.Id)
             .Select(b => new { b.Id, Count = FirebirdSmokeContext.PostCountOf(b.Id) })
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal([(1, 2), (2, 1)], counts.Select(c => (c.Id, c.Count)));
     }
@@ -185,7 +185,7 @@ public class FirebirdSmokeTest
         List<string?> headings = await client.PostsOf(1)
             .OrderBy(p => p.PostId)
             .Select(p => p.Heading)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(["first", "second"], headings);
     }
@@ -196,11 +196,9 @@ public class FirebirdSmokeTest
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>This test is the reason <see cref="FirebirdLateralQuerySqlGenerator" /> exists,
-    ///         and it fails without it.</b> The Firebird provider emits
-    ///         <c>JOIN LATERAL "PostsOf"("b"."Id") AS "p" ON TRUE</c>, and the store answers
-    ///         <c>Token unknown</c>: a bare function is not a legal source after <c>LATERAL</c>,
-    ///         though the same call wrapped in a derived table is.
+    ///         Firebird provider 14.0.0-rc1 generates the correlated procedure join itself.
+    ///         This previously required a harness SQL-generator correction, removed after
+    ///         this test and the complete function suite passed with the published generator.
     ///     </para>
     ///     <para>
     ///         It is also the shape behind fourteen of the failures Tier B cannot fix, because
@@ -216,7 +214,7 @@ public class FirebirdSmokeTest
         var rows = await (from blog in client.Blogs
                           from post in client.PostsOf(blog.Id)
                           orderby blog.Id, post.PostId
-                          select new { blog.Id, post.Heading }).ToListAsync();
+                          select new { blog.Id, post.Heading }).ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(
             [(1, "first"), (1, "second"), (2, "third")],
