@@ -4,7 +4,8 @@ using System.Diagnostics;
 
 internal static class CosmosEmulatorCommand
 {
-    internal const string Image = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:81707bcadf894a29d7dab63377685d408b5d54dca3aacfb625c19db4c6392e7c";
+    // Microsoft's classic Linux emulator, 2.14.28.0. Its evaluation period requires periodic image updates.
+    internal const string Image = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429";
     private const string Name = "infocarrier-cosmos-tests";
     private const string OwnerLabel = "io.infocarrier.cosmos-tests";
 
@@ -37,18 +38,24 @@ internal static class CosmosEmulatorCommand
             return (await Execute("rm", "--force", Name)).ExitCode;
         }
         var start = await Execute("run", "--detach", "--name", Name, "--label", OwnerLabel + "=true",
-            "--publish", "127.0.0.1:8081:8081", "--publish", "127.0.0.1:8080:8080",
-            "--env", "ENABLE_EXPLORER=false", "--env", "ENABLE_TELEMETRY=false", Image, "--protocol", "https");
+            "--publish", "127.0.0.1:8081:8081",
+            // Allocate fixture containers without limiting parallel test execution.
+            "--env", "AZURE_COSMOS_EMULATOR_PARTITION_COUNT=40",
+            "--env", "AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE=127.0.0.1",
+            "--env", "AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=false", Image);
         if (start.ExitCode != 0) return start.ExitCode;
 
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        using var client = new HttpClient(new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (request, _, _, _) => request.RequestUri?.IsLoopback == true,
+        }) { Timeout = TimeSpan.FromSeconds(3) };
         var elapsed = Stopwatch.StartNew();
-        while (elapsed.Elapsed < TimeSpan.FromMinutes(3))
+        while (elapsed.Elapsed < TimeSpan.FromMinutes(5))
         {
             token.ThrowIfCancellationRequested();
             try
             {
-                using var response = await client.GetAsync("http://localhost:8080/ready", token);
+                using var response = await client.GetAsync("https://localhost:8081/_explorer/emulator.pem", token);
                 if (response.IsSuccessStatusCode)
                 {
                     Console.WriteLine("Cosmos emulator ready: https://localhost:8081");
@@ -59,7 +66,7 @@ internal static class CosmosEmulatorCommand
             catch (TaskCanceledException) when (!token.IsCancellationRequested) { }
             await Task.Delay(TimeSpan.FromSeconds(1), token);
         }
-        Console.Error.WriteLine("Cosmos emulator did not become ready within three minutes.");
+        Console.Error.WriteLine("Cosmos emulator did not become ready within five minutes.");
         await Execute("logs", Name);
         return 1;
     }

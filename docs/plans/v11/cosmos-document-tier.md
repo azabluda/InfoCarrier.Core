@@ -3,12 +3,15 @@
 November 14, 2026. The owner authorized implementation and complete local and Linux CI validation.
 The decision to retain Cosmos permanently or temporarily remains open. MongoDB source is unchanged
 and disabled. No release or public MongoDB restoration is part of this work.
+The classic emulator in this revision is a CI candidate, not a completed validation result.
+No tested local configuration has passed the complete Linux tier with default query execution.
 
 ## Inputs and execution
 
 - Provider: Microsoft's `Microsoft.EntityFrameworkCore.Cosmos` 11.0.0, targeting .NET 11.
-- Emulator: `vnext-EN20261008`, pinned by digest
-  `sha256:81707bcadf894a29d7dab63377685d408b5d54dca3aacfb625c19db4c6392e7c`.
+- Emulator: Microsoft's classic Linux emulator 2.14.28.0, obtained from its documented `latest`
+  image and pinned by digest
+  `sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429`.
 - Reference: EF Core `v11.0.0`, commit `9e685c7a52d1a344d133a3d370e458db97417b3f`.
 - Local runtime: Podman 6.1.3 with a dedicated `infocarrier-cosmos` WSL machine.
 - CI runtime: Docker on the existing Ubuntu GitHub Actions runners.
@@ -23,7 +26,7 @@ dotnet run --file eng/CosmosEmulator.cs -- stop podman
 ```
 
 Use `docker` instead of `podman` for the same lifecycle command in CI. Startup waits for the
-emulator readiness endpoint, with a three-minute deadline. Ports bind to loopback. The command
+HTTPS certificate endpoint, with a five-minute deadline. Port 8081 binds to loopback. The command
 only removes a container carrying its own ownership label. Tests require the emulator and fail
 when it is unavailable. They do not silently skip a missing database service.
 
@@ -32,17 +35,17 @@ credential. The test client accepts the emulator's generated certificate only on
 connections. No cloud account or secret is required. Every fixture has its own database name;
 cleanup deletes only that database. Test collections retain parallel execution.
 
-The test assembly enables the Cosmos SDK's optimistic direct execution for the emulator's single
-physical partition. It also forces gateway query planning on every operating system, including
-Windows, so any planning fallback follows the Linux path. These settings affect only this test
-process, through `AZURE_COSMOS_OPTIMISTIC_DIRECT_EXECUTION_ENABLED` and
-`AZURE_COSMOS_BYPASS_QUERY_PARSING`. They do not change application defaults. The SDK still executes
-queries against stored documents; all result assertions and direct-store controls remain active.
-See [Microsoft's execution-mode documentation](https://learn.microsoft.com/azure/cosmos-db/performance-tips-query-sdk#optimize-single-partition-queries-with-optimistic-direct-execution)
-and the [pinned SDK's environment configuration](https://github.com/Azure/azure-cosmos-dotnet-v3/blob/3.63.2/Microsoft.Azure.Cosmos/src/Util/ConfigurationManager.cs).
+The client retains normal SDK query-execution defaults. Neither
+`AZURE_COSMOS_OPTIMISTIC_DIRECT_EXECUTION_ENABLED` nor `AZURE_COSMOS_BYPASS_QUERY_PARSING` is set.
+Windows can use native query planning; Linux obtains its query plans through the gateway.
+The harness selects gateway transport and accepts the loopback emulator certificate. It does
+not replace query plans, rewrite service responses, or alter result assertions. Microsoft's
+[emulator instructions](https://learn.microsoft.com/azure/cosmos-db/how-to-develop-emulator)
+document this classic image and its HTTPS certificate endpoint.
 
 The build workflow runs the Cosmos project and joins its result file and override audit with the
-functional suite. Coverage runs each project explicitly and sequentially. `eng/Measure.cs` includes
+functional suite. Coverage runs each project explicitly and sequentially, starting the emulator
+after the functional workload finishes. `eng/Measure.cs` includes
 Cosmos alongside the functional project; start the emulator before running it.
 
 ## Validation scope
@@ -142,7 +145,7 @@ The review therefore supports high confidence that the repair mechanism is provi
 providers using the normal EF Core 11 query and tracking contracts. It does not establish MongoDB
 11 runtime compatibility or guarantee every custom provider implementation.
 
-## First Linux CI result and correction
+## Initial vNext result and rejected workaround
 
 The first [spec run](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43577070719)
 and [coverage run](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43577070687)
@@ -165,6 +168,41 @@ The repository was mounted read-only so the override audit could inspect its evi
 This used xUnit's in-process runner because the Windows-built app host cannot execute on Linux.
 Logs and XML results are retained locally under `artifacts/cosmos-ci/` and `artifacts/cosmos-ci-*`.
 
-This configuration does not validate gateway query planning or cross-physical-partition aggregation.
-Updated Docker CI validation remains pending. The owner still decides whether
-Cosmos is temporary or permanent.
+That workaround narrowed validation to one execution mode and left normal Linux planning unverified.
+The owner required standard query-execution defaults instead. Both environment overrides were
+removed, and the emulator was changed rather than carrying that workaround forward.
+
+## Classic emulator with default query execution
+
+Microsoft's classic Linux emulator 2.14.28.0 passed all six direct owned-navigation query families
+on a native Linux .NET 11 test host: Passed: 102, Failed: 0, Total: 102. Both query-execution
+overrides were absent. This includes the five direct cases that failed against vNext's gateway
+plans. However, this does not qualify the image for the complete tier.
+
+The complete classic-emulator attempts on WSL kernel `6.18.58.1-microsoft-standard-WSL2` exposed
+native emulator crashes and fixture container-creation errors. An instrumented run completed with
+Passed: 226, Failed: 26, Total: 252; the failures occurred during container creation. Other runs
+aborted after the emulator exited, so they have no complete test summary. Increasing the emulator's
+partition capacity to 64 and then using 40 did not eliminate native crashes. No assertion, query,
+test collection parallelism, production code, or dependency version was changed to accept them.
+
+The official `vnext-EN20260602` general-availability image was also tested under native Linux .NET 11,
+pinned to `sha256:9a6d2a97fd28254c28cee7e8ba120ee198fe787ad0e4fd825ccaefeedc52792c`.
+Its direct controls reported Passed: 96, Failed: 6, Total: 102. It reproduces the aggregate-planning
+failures and also fails an optional-associate projection, so it was not taken to the complete tier.
+
+The next controlled comparison runs the classic image with 40 partitions on GitHub's native Linux
+Docker runner. This tests a different host from local Podman on WSL without restoring SDK query
+overrides. Local native builds, test summaries, TRX files, and emulator crash diagnostics remain
+under `artifacts/cosmos-default-*`. Native crash causes remain unresolved. A green direct-control
+run, or the earlier single-partition workaround, must not be reported as complete default-client
+validation. The draft pull request remains an investigation until its complete checks pass and
+the local emulator instability is resolved or explicitly accepted by the owner.
+
+This emulator has a built-in evaluation period. On November 14, 2026, startup reported 118 days
+remaining. Refresh the official image pin before that period expires; a permanently frozen digest
+cannot provide indefinite CI service. The emulator still does not establish complete Azure service
+parity or validate distribution across physical partitions.
+
+Complete-tier default-client validation remains unfinished. Updated Docker CI validation is the next
+comparison. The owner still decides whether Cosmos is temporary or permanent.

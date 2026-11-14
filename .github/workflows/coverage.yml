@@ -41,13 +41,16 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release -p:TreatWarningsAsErrors=true
 
+      # Keep functional processes sequential. Each project owns its own output directory.
+      - name: Test functional suite with coverage
+        run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+
+      # Provision the classic emulator after the functional workload releases its resources.
       - name: Start Cosmos emulator (Docker)
         run: dotnet run --file eng/CosmosEmulator.cs -- start docker
 
-      # Keep functional processes sequential. Each project owns its own output directory.
-      - name: Test with coverage
+      - name: Test document and transport suites with coverage
         run: |
-          dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
