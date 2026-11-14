@@ -32,6 +32,15 @@ credential. The test client accepts the emulator's generated certificate only on
 connections. No cloud account or secret is required. Every fixture has its own database name;
 cleanup deletes only that database. Test collections retain parallel execution.
 
+The test assembly enables the Cosmos SDK's optimistic direct execution for the emulator's single
+physical partition. It also forces gateway query planning on every operating system, including
+Windows, so any planning fallback follows the Linux path. These settings affect only this test
+process, through `AZURE_COSMOS_OPTIMISTIC_DIRECT_EXECUTION_ENABLED` and
+`AZURE_COSMOS_BYPASS_QUERY_PARSING`. They do not change application defaults. The SDK still executes
+queries against stored documents; all result assertions and direct-store controls remain active.
+See [Microsoft's execution-mode documentation](https://learn.microsoft.com/azure/cosmos-db/performance-tips-query-sdk#optimize-single-partition-queries-with-optimistic-direct-execution)
+and the [pinned SDK's environment configuration](https://github.com/Azure/azure-cosmos-dotnet-v3/blob/3.63.2/Microsoft.Azure.Cosmos/src/Util/ConfigurationManager.cs).
+
 The build workflow runs the Cosmos project and joins its result file and override audit with the
 functional suite. Coverage runs each project explicitly and sequentially. `eng/Measure.cs` includes
 Cosmos alongside the functional project; start the emulator before running it.
@@ -133,5 +142,29 @@ The review therefore supports high confidence that the repair mechanism is provi
 providers using the normal EF Core 11 query and tracking contracts. It does not establish MongoDB
 11 runtime compatibility or guarantee every custom provider implementation.
 
-Linux Docker validation remains pending on the review branch. Local Podman results do not stand
-in for that required check. The owner still decides whether Cosmos is temporary or permanent.
+## First Linux CI result and correction
+
+The first [spec run](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43577070719)
+and [coverage run](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43577070687)
+both reported Cosmos Passed: 242, Failed: 10, Total: 252. Emulator startup and the functional
+suite passed. Five direct-store cases and their five wire counterparts failed on nested aggregates.
+One query raised `RewrittenAggregateProjections was not an array`; others returned one result
+where seven were expected.
+
+The SDK uses native query planning on Windows x64 but gateway planning on Linux. Forcing gateway
+planning on Windows reproduced both representative failures against the same pinned image.
+The emulator's gateway plan misclassifies nested aggregates, causing the SDK to select an incorrect
+aggregation pipeline. Enabling optimistic direct execution avoids that plan for this single-partition
+test store. The two representative controls then passed, followed by the complete Windows Release
+suite: Passed: 252, Failed: 0, Total: 252, with no skips. The build treated warnings as errors.
+No production code, query, assertion, or test parallelism changed for this correction.
+
+The same assembly then ran under Linux in Microsoft's .NET SDK 11.0.100 container, using the
+emulator through Podman's host network: Passed: 252, Failed: 0, Total: 252, with no skips.
+The repository was mounted read-only so the override audit could inspect its evidence.
+This used xUnit's in-process runner because the Windows-built app host cannot execute on Linux.
+Logs and XML results are retained locally under `artifacts/cosmos-ci/` and `artifacts/cosmos-ci-*`.
+
+This configuration does not validate gateway query planning or cross-physical-partition aggregation.
+Updated Docker CI validation remains pending. The owner still decides whether
+Cosmos is temporary or permanent.
