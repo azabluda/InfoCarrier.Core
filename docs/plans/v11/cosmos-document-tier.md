@@ -553,3 +553,34 @@ The reproduction version also restores the original document fixture's Entity Fr
 SDK deletion. Diagnostics wrap the original scope creation, deletion, and provider disposal,
 so changing the cleanup path cannot silently remove the original symptom. Focused checks of
 that restored path and diagnostic behavior passed: Passed: 9, Failed: 0, Total: 9.
+
+
+## Default and generated keys batch, November 15, 2026
+
+Adopted all twelve official `DefaultKeyValuesTest` behaviors across single/composite keys and
+single/hierarchical partition keys. The fixture preserves the official warnings-as-errors setting
+on the backend. Missing-key assertions verify the exact warning text through the preserved
+server update exception and verify that the re-raised outer update exception names the client's
+entity. This accommodates the existing update-entry remapping contract rather than discarding
+or weakening the provider error.
+
+One model setting must be explicit: the integer property which is both key and partition key
+uses `ValueGeneratedNever`. The InfoCarrier client uses relational conventions, while Cosmos
+infers non-generation for this property. The direct control independently verifies the unmodified
+Cosmos convention before testing missing-key refusals and generated-GUID readback. This batch
+validates matching generation metadata; it does not establish automatic propagation of a backend's
+provider-specific conventions to the client. Application models must specify matching semantics.
+The adapter records the existing client-convention decision on the affected test. No production
+code changed.
+
+Focused new-family tests, direct control, and audit passed: Passed: 14, Failed: 0, Total: 14.
+The final direct-control and audit check passed: Passed: 2, Failed: 0, Total: 2.
+Compilation used warnings as errors.
+
+The normal Build & Test run 43659800758 for e1338382 completed successfully with retries removed
+and the original cleanup path restored. Its Cosmos worker reported 3,758 passed and 341 skipped
+out of 4,099 total cases. Allocation diagnostics identified 93 distinct databases with no conflicting
+fixture-owner records, and no cleanup failure occurred. Evidence is retained in
+`artifacts/cosmos-suite-audit/cleanup-ownership-ci-e133.json`. This does not establish the original
+cleanup failure's cause. The owner chose continued batch adoption with normal GitHub monitoring,
+rather than scheduling extra identical reproduction runs. Cleanup diagnostics remain active.
