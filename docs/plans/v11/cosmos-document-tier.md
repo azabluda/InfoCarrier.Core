@@ -694,3 +694,10 @@ Compilation used Release warnings as errors. Full normal and coverage validation
 `JsonValueReaderWriter`, `Utf8JsonWriter`, element comparers, and facets. It neither saves a
 record nor executes a database query. These provider JSON codec assertions do not test the
 InfoCarrier wire codec. This does not exclude the separate database-backed `JsonQueryCosmosTest`.
+
+
+## Inheritance queries, November 15, 2026
+
+Adopted the complete official inheritance query family with Cosmos containers, disabled generated
+keys and complex types, asynchronous behavior, and source-backed skips. No production changes.
+Focused family and audit: Passed: 85, Failed: 0, Total: 94, with nine official skips.
