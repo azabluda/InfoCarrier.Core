@@ -701,3 +701,16 @@ InfoCarrier wire codec. This does not exclude the separate database-backed `Json
 Adopted the complete official inheritance query family with Cosmos containers, disabled generated
 keys and complex types, asynchronous behavior, and source-backed skips. No production changes.
 Focused family and audit: Passed: 85, Failed: 0, Total: 94, with nine official skips.
+
+
+## Identity-resolution projections, November 15, 2026
+
+Adopted the application-level identity-resolution projection cases and all six non-shared-model
+cases. Focused tests and audit: Passed: 3, Failed: 0, Total: 9, with six official skips. No product
+change was needed. Five methods in the outer official class are excluded individually:
+`Owned_reference_without_owner_key_throws`, `Owned_collection_without_owner_key_throws`,
+`SelectMany_owned_collection_throws`, `SelectMany_owned_collection_with_owner_key_throws`, and
+`Root_entity_projection_with_owned_reference_without_owner_key_throws`. Each directly constructs
+Cosmos translation preprocessor/translator/postprocessor services and asserts their ShapedQueryExpression
+or compiler diagnostics without executing the query. They are not application execution tests.
+This exclusion does not apply to queries which actually execute through InfoCarrier.
