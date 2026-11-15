@@ -14,6 +14,7 @@ public class OverrideAuditTest(ITestOutputHelper output)
             OverrideAudit.FindRepositoryFile("docs/upstream-defects.md"),
             OverrideAudit.FindRepositoryFile("docs/decisions.md"));
         output.WriteLine(audit.Report);
+        foreach (string violation in audit.Violations) output.WriteLine(violation);
         Assert.Empty(audit.Violations);
     }
 }

@@ -495,3 +495,23 @@ This includes three concurrent rounds, each deleting eight independent databases
 that each is absent. Fault injection verifies transient recovery, retry exhaustion, non-retryable
 errors, and cancellation. These focused checks do not establish that the original GitHub cleanup
 failure was reproduced locally; complete GitHub validation remains required.
+
+
+## Custom-converter batch, November 15, 2026
+
+Adopted the pinned custom-converter family, preserving upstream fixture capabilities, mapping,
+cleanup before the custom-equality test, explicit skips, and its optional-owned undefined-row
+result difference. Pure behavior overrides that only asserted SQL remain inherited.
+
+A direct-store control confirms that composition over a converted layout collection refuses
+translation. Registering the layout CLR type explicitly in the fixture prevents a premature
+boundary that otherwise attempted synchronous database I/O. With that registration, InfoCarrier
+also refuses translation, with a tuple carrier in the diagnostic instead of the original anonymous
+projection. The override records the existing documented exception-message limitation, executes
+the same query, and asserts the refused projection and member accesses. No allowlist inference
+or production code changed. Audit failures now print their full violation strings before the
+existing assertion, so long method names cannot hide the reason behind xUnit truncation.
+
+Focused converter cases, direct control, and override audit passed: Passed: 36, Failed: 0,
+Total: 51 (15 upstream skips). Compilation used warnings as errors. Two upstream skipped theories
+enumerate inherited data rather than collapsing each theory to one discovery case.

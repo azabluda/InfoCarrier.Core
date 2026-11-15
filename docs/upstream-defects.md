@@ -509,6 +509,14 @@ limitation. The synchronous arm also executes and checks the provider refusal in
 upstream's empty body. See [the official override](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/Query/NorthwindSelectQueryCosmosTest.cs#L1977).
 No external report has been filed.
 
+### 1.21 Cosmos omits undefined optional converted-owned scalar rows
+
+The pinned EF Core 11 `CustomConvertersCosmosTest.Optional_owned_with_converter_reading_non_nullable_column`
+expects a common-specification assertion failure: "Cosmos filters out the undefined value".
+The adopted adapter retains that expectation. It is a result difference, not a supported-query
+refusal. The source reference is `test/EFCore.Cosmos.FunctionalTests/CustomConvertersCosmosTest.cs`,
+lines 122-133, at the pinned EF Core 11 commit. No external report was filed here.
+
 ## 2. Already reported
 
 ### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries
