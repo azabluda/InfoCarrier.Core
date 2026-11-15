@@ -634,3 +634,10 @@ The preceding converted-key commit d25062c9 passed both Build & Test and Coverag
 Testcontainers remains a follow-up after complete adoption. Evaluate keeping isolated databases
 until suite completion and removing their container afterward, rather than concurrent final deletion.
 This might avoid cleanup failures but does not establish the original failure's cause.
+
+
+## Value converter round trips, November 15, 2026
+
+Adopted all official value-converter end-to-end cases through InfoCarrier, preserving the four
+DateTimeOffset model exclusions from the official fixture. No production change or test override
+was needed. Focused family and audit: Passed: 28, Failed: 0, Total: 28.
