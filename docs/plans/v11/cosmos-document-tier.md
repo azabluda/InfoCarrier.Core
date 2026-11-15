@@ -607,3 +607,30 @@ No wire field, expression-node kind, or public signature changed.
 The new converted-key family plus Cosmos incomplete-document, named-policy, and audit controls
 passed: Passed: 55, Failed: 0, Total: 55. Focused transport contract and cancellation checks passed:
 Passed: 42, Failed: 0, Total: 42. Complete normal suites and trim validation run on GitHub.
+
+
+## Optimistic concurrency specification, November 15, 2026
+
+Adopted the official optimistic-concurrency family with its F1 model, ETag mappings,
+per-test reseeding, asynchronous-only reload behavior, and exact source-backed exclusions.
+The Linux-emulator and provider skips remain explicit. The upstream fake transaction is
+only a specification harness mechanism; it does not claim Cosmos transaction support.
+
+The server model uses Cosmos conventions while the client retains InfoCarrier conventions.
+The existing construction-only F1 materialization interceptor moved from the SQLite adapter
+into shared test utilities. Its behavior is unchanged: server construction supplies the model's
+required proxies, while the caller's observable name transformation executes on the client.
+No production code changed.
+
+The fixture preserves the official single metadata-probe retry after container recreation.
+It logs the complete first exception and lets a second failure propagate. This is not a database
+cleanup retry. Database deletion remains a single attempt with ownership and exception diagnostics.
+
+Focused Cosmos family and override audit: Passed: 15, Failed: 0, Total: 46, with 31 upstream skips.
+The affected SQLite family: Passed: 34, Failed: 0, Total: 46, with 12 existing skips.
+Both checks compiled in Release with warnings as errors. Full suites remain delegated to GitHub.
+The preceding converted-key commit d25062c9 passed both Build & Test and Coverage workflows.
+
+Testcontainers remains a follow-up after complete adoption. Evaluate keeping isolated databases
+until suite completion and removing their container afterward, rather than concurrent final deletion.
+This might avoid cleanup failures but does not establish the original failure's cause.

@@ -517,6 +517,14 @@ The adopted adapter retains that expectation. It is a result difference, not a s
 refusal. The source reference is `test/EFCore.Cosmos.FunctionalTests/CustomConvertersCosmosTest.cs`,
 lines 122-133, at the pinned EF Core 11 commit. No external report was filed here.
 
+### 1.22 Upstream Cosmos skips for concurrency after deletion
+
+The pinned official `OptimisticConcurrencyCosmosTest` leaves the repeated-delete and delete-then-update
+cases unexecuted. Its repeated-delete comment states "ETag concurrency doesn't work after an item was deleted".
+The adopted family retains these source-backed coverage gaps. This records upstream's decision,
+not a fresh reproduction or a new report. See `test/EFCore.Cosmos.FunctionalTests/OptimisticConcurrencyCosmosTest.cs`
+at the pinned EF Core 11 commit.
+
 ## 2. Already reported
 
 ### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries
