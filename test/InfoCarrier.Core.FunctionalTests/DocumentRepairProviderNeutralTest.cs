@@ -22,6 +22,7 @@ public class DocumentRepairProviderNeutralTest
         {
             if (sqlite) options.UseSqlite("Data Source=" + path + ";Pooling=False");
             else options.UseInMemoryDatabase(name);
+            options.ConfigureWarnings(w => w.Throw(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.RowLimitingOperationWithoutOrderByWarning));
         });
         services.AddScoped<DbContext>(provider => provider.GetRequiredService<RepairContext>());
         await using ServiceProvider provider = services.BuildServiceProvider();
@@ -31,8 +32,14 @@ public class DocumentRepairProviderNeutralTest
             {
                 RepairContext seed = scope.ServiceProvider.GetRequiredService<RepairContext>();
                 await seed.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-                seed.Add(new Root { Id = "one", Name = "Before", Tenant = "blue", Detail = new() { City = "Berlin" },
-                    Lines = [new() { Id = 1, Text = "First" }, new() { Id = 2, Text = "Second" }] });
+                seed.Add(new Root
+                {
+                    Id = "one",
+                    Name = "Before",
+                    Tenant = "blue",
+                    Detail = new() { City = "Berlin" },
+                    Lines = [new() { Id = 1, Text = "First" }, new() { Id = 2, Text = "Second" }]
+                });
                 seed.Add(new Root { Id = "hidden", Name = "Hidden", Tenant = "red", Detail = new() { City = "Paris" } });
                 await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
             }

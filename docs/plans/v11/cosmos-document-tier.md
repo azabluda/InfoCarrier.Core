@@ -584,3 +584,26 @@ fixture-owner records, and no cleanup failure occurred. Evidence is retained in
 `artifacts/cosmos-suite-audit/cleanup-ownership-ci-e133.json`. This does not establish the original
 cleanup failure's cause. The owner chose continued batch adoption with normal GitHub monitoring,
 rather than scheduling extra identical reproduction runs. Cleanup diagnostics remain active.
+
+
+## Converted-key relationships and strict repair warnings, November 15, 2026
+
+Adopted the complete 47-case `KeysWithConvertersTestBase` family with the official Cosmos fixture's
+`UseInclude = false`, root discriminator mapping, and warning configuration. No behavior tests or
+skips needed overrides.
+
+Two owned-entity updates exposed a product issue: document repair appended unordered `Take(1)`
+to its full-primary-key lookup. With the official warning policy, the provider refused that
+internal query. The same warning was reproduced on SQLite in both synchronous and asynchronous
+repair. The provider-neutral regression was strengthened to treat the warning as an error:
+before the fix, Passed: 2, Failed: 2, Total: 4; after the fix, Passed: 4, Failed: 0, Total: 4.
+
+Both repair paths now use the complete primary-key predicate without the redundant row limit.
+Primary-key uniqueness already bounds a valid lookup to one root. Context, filter, transaction,
+tracking isolation, cancellation, and merge logic remain in the existing paths. This correction
+contains no provider-specific type or branch and also applies to other document providers.
+No wire field, expression-node kind, or public signature changed.
+
+The new converted-key family plus Cosmos incomplete-document, named-policy, and audit controls
+passed: Passed: 55, Failed: 0, Total: 55. Focused transport contract and cancellation checks passed:
+Passed: 42, Failed: 0, Total: 42. Complete normal suites and trim validation run on GitHub.

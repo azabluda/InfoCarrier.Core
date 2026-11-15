@@ -975,7 +975,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         where TEntity : class
     {
         QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, default);
-        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Take(1).Expression;
+        // Full primary-key equality already bounds the lookup to one root. An extra Take
+        // introduces an unnecessary ordering warning when provider warnings are errors.
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Expression;
         Func<QueryContext, IEnumerable<TEntity>> execute = DocumentQuery<IEnumerable<TEntity>>(context, query, async: false);
         foreach (TEntity entity in execute(queryContext))
         {
@@ -1017,7 +1019,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         where TEntity : class
     {
         QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, cancellationToken);
-        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Take(1).Expression;
+        // Full primary-key equality already bounds the lookup to one root. An extra Take
+        // introduces an unnecessary ordering warning when provider warnings are errors.
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Expression;
         Func<QueryContext, IAsyncEnumerable<TEntity>> execute = DocumentQuery<IAsyncEnumerable<TEntity>>(context, query, async: true);
         await foreach (TEntity entity in execute(queryContext).WithCancellation(cancellationToken).ConfigureAwait(false))
         {
