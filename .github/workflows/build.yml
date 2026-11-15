@@ -215,6 +215,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: spec-cosmos-results
+          overwrite: true
           path: artifacts/test-results
           if-no-files-found: error
 
@@ -275,6 +276,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results
+          overwrite: true
           path: artifacts/test-results
 
       # Renders the TRX as a browsable report, so the counts and the failing tests are visible on
