@@ -532,6 +532,13 @@ expects `NullReferenceException` for its asynchronous scalar projection. The ado
 that crash expectation, rather than calling it a translation limitation. Its synchronous arm is
 unexecuted upstream. This records the existing official test, not a newly filed defect.
 
+### 1.24 Upstream Cosmos JSON result-shape skips
+
+The pinned official JsonQueryCosmosTest skips out-of-bounds member projection and missing-document
+members because results differ from the common specification. Its comments describe missing rows,
+missing arrays returned as empty, and wrong results by design. The adopted adapter preserves
+these explicit upstream gaps. No new result suppression or external report is introduced.
+
 ## 2. Already reported
 
 ### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries

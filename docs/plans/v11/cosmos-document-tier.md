@@ -743,3 +743,19 @@ The separate CosmosTriggersTest has one behavior method, conditionally excluded 
 emulator because server-side scripts are unsupported. The selected emulator scope excludes that
 entire class, following its exact official condition. This is an application coverage gap, not
 an internal-provider classification. See CosmosTriggersTest.cs at the pinned revision.
+
+
+## Database-backed JSON queries, November 15, 2026
+
+Adopted all official JsonQueryCosmosTest behavior cases through InfoCarrier, preserving the
+provider's mapping, custom result comparers, translation refusals, explicit issue skips, Linux
+projection skips, and upstream CI exclusions. The fixture constructs malformed document inputs
+through the backend SDK; application reads still execute through InfoCarrier. Primary_key_baseline
+now actually selects tracking or nontracking according to its existing theory parameter.
+The independent document JSON inspection uses the backend context, not a client Cosmos facade.
+
+Focused complete family and override audit: Passed: 405, Failed: 0, Total: 481, with 76 official
+skips on Windows/Podman. The local family took 10 minutes 36 seconds. This was the new batch only;
+full normal and coverage suites remain GitHub work. NotImplementedException cases retain the
+source issue classification and SDK query errors retain the explicit remote exception type.
+No product code, public signature, or wire format changed.
