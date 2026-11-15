@@ -714,3 +714,18 @@ change was needed. Five methods in the outer official class are excluded individ
 Cosmos translation preprocessor/translator/postprocessor services and asserts their ShapedQueryExpression
 or compiler diagnostics without executing the query. They are not application execution tests.
 This exclusion does not apply to queries which actually execute through InfoCarrier.
+
+
+## Owned queries, November 15, 2026
+
+Adopted the complete official owned-query family with its containers, indexers, seed data,
+embedded discriminator name, translation refusals, and Linux-emulator exclusions. Official empty
+synchronous arms are explicit runtime skips. Cosmos SDK failures retain their remote type and
+BadRequest status text through the existing server-exception envelope. The optional-owned scalar
+NullReferenceException remains classified as a crash, not a limitation.
+
+Focused family and audit: Passed: 172, Failed: 0, Total: 195, with 23 source-backed skips.
+One upstream override calls an unrelated sibling: Query_loads_reference_nav_automatically_in_projection
+now executes its own Fink/Barton base scenario and asserts the matching cross-document refusal.
+The focused corrected scenario and audit passed: Passed: 3, Failed: 0, Total: 3.
+No production code or wire format changed.

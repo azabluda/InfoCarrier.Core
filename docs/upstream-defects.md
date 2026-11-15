@@ -525,6 +525,13 @@ The adopted family retains these source-backed coverage gaps. This records upstr
 not a fresh reproduction or a new report. See `test/EFCore.Cosmos.FunctionalTests/OptimisticConcurrencyCosmosTest.cs`
 at the pinned EF Core 11 commit.
 
+### 1.23 Cosmos throws for a non-nullable member through an optional owned navigation
+
+The pinned official `OwnedQueryCosmosTest.Non_nullable_property_through_optional_navigation`
+expects `NullReferenceException` for its asynchronous scalar projection. The adopted adapter retains
+that crash expectation, rather than calling it a translation limitation. Its synchronous arm is
+unexecuted upstream. This records the existing official test, not a newly filed defect.
+
 ## 2. Already reported
 
 ### 2.1 Linux Cosmos emulator misprocesses aggregate subqueries
