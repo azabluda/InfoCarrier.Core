@@ -641,3 +641,56 @@ This might avoid cleanup failures but does not establish the original failure's 
 Adopted all official value-converter end-to-end cases through InfoCarrier, preserving the four
 DateTimeOffset model exclusions from the official fixture. No production change or test override
 was needed. Focused family and audit: Passed: 28, Failed: 0, Total: 28.
+
+
+## Additional applicability review, November 15, 2026
+
+These exclusions concern the exact official assertions, not general claims that the corresponding
+application capability is unsupported. The source remains pinned to the adoption-checklist revision.
+
+| Official class | Reviewed reason |
+|---|---|
+| `ConfigPatternsCosmosTest` | Direct UseCosmos region/connection-mode validation and CosmosClient identity/thread-safety. These configure the backend provider; the InfoCarrier client has no CosmosClient or region. |
+| `CosmosModelBuilderGenericTest+CosmosGenericComplexCollection` | Complex-collection model metadata and convention validation. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericComplexType` | Complex-type model metadata and convention validation. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericInheritance` | Model inheritance metadata, discriminator mappings, and convention validation. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericManyToMany` | Many-to-many model metadata and relationship conventions. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericManyToOne` | Many-to-one model metadata and relationship conventions. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericNonRelationship` | Scalar/collection model metadata and Cosmos convention validation. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericOneToMany` | One-to-many model metadata and relationship conventions. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericOneToOne` | One-to-one model metadata and relationship conventions. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `CosmosModelBuilderGenericTest+CosmosGenericOwnedTypes` | Owned-type model metadata and ownership conventions. Uses GenericTestModelBuilder with CosmosModelBuilderFixture, finalizes a model, and inspects it. There is no application query or save crossing the wire. |
+| `OverzealousInitializationCosmosTest` | The only official behavior override is explicitly skipped for EF Core issue 17246. No active Cosmos behavior case remains to execute. |
+| `QueryLoggingCosmosTest` | Asserts Cosmos query-pipeline logging positions, Cosmos QueryingEnumerable text, sensitive SQL parameter text, and provider diagnostic messages. These exact backend logs are not the InfoCarrier client query pipeline. |
+| `QueryLoggingCosmosTestSensitive` | Sensitive counterpart of the same Cosmos internal query/SQL logging assertions. This does not exclude application query or log-forwarding coverage. |
+| `ReloadTest` | The entire official behavior method unconditionally calls SkipOnLinuxEmulator for emulator issue 335. Outside the selected Linux-emulator scope. |
+| `CompiledModelCosmosTest` | Cosmos design-time compiled-model code generation, generated assembly/metadata assertions, and Cosmos-specific value-generator metadata. The backend owns its compiled model; this does not test a transported application query. |
+| `CosmosDatabaseCreatorTest` | Direct Cosmos IDatabaseCreator creation/deletion return values and seeder validation. Database administration is backend setup, not an InfoCarrier client operation. |
+
+The model-builder classes use `ModelBuilding/CosmosModelBuilderGenericTest.cs`; their shared
+fixture selects `CosmosTestHelpers` for model construction, not a remote client. Compiled-model
+assertions are in `Scaffolding/CompiledModelCosmosTest.cs`. Database-creator assertions are in
+`Storage/CosmosDatabaseCreatorTest.cs`. Configuration assertions are in `ConfigPatternsCosmosTest.cs`.
+Logging assertions are in `Query/QueryLoggingCosmosTestBase.cs`, shared by both logging classes.
+The complete Linux skip is in `ReloadTest.cs`; the eager-reference skip is in
+`OverzealousInitializationCosmosTest.cs`. Application-level concurrency, query, update, failure,
+and interception tests remain separately subject to adoption.
+
+
+## Complex-type queries and synchronous refusals, November 15, 2026
+
+Adopted both official complex-type query families, including renamed JSON properties and the two
+Cosmos-specific complex-key scenarios. Fixtures use the official model types explicitly because
+this project also defines an unrelated Customer model. Official group-by and Linux structural-equality
+skips remain source-backed. Every active assertion matches the official behavior, including exact
+translation details. No new exception-message deviation or production change was required.
+
+The batch also adopts all twenty Cosmos synchronous query refusal tests through InfoCarrier.
+Focused families and override audit: Passed: 321, Failed: 0, Total: 347, with 26 official skips.
+Compilation used Release warnings as errors. Full normal and coverage validation runs on GitHub.
+
+`JsonTypesCosmosTest` is separately excluded from remote behavior adoption. Its shared
+`JsonTypesTestBase.Can_read_and_write_JSON_value` builds model metadata and directly exercises
+`JsonValueReaderWriter`, `Utf8JsonWriter`, element comparers, and facets. It neither saves a
+record nor executes a database query. These provider JSON codec assertions do not test the
+InfoCarrier wire codec. This does not exclude the separate database-backed `JsonQueryCosmosTest`.
