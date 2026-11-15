@@ -454,3 +454,23 @@ while the client detector is held, including insert/read/delete cleanup.
 Focused tests and override audit: Passed: 23, Failed: 0, Total: 33 (10 upstream skips).
 The two explicitly skipped theories enumerate inherited data, unlike upstream's collapsed discovery.
 No production changes were needed for this batch.
+
+
+Reviewed exclusion, November 15, 2026: the entire official `NumberProjectionCosmosTest`
+requires `IsNotLinuxEmulator`. Its class-level condition in `Query/CosmosNumberProjectionTest.cs`,
+lines 6-9, cites emulator issue 335. Its 27 discovered cases are outside this Linux-emulator
+scope; this is not a translation gap hidden by a local override.
+
+
+## Materialization batch, November 15, 2026
+
+Adopted all nine behaviors from the pinned official `CosmosMaterializerTest`: shadow composite
+keys, discriminator inheritance, populated and empty owned collections, ordinal collection keys,
+converted primary keys, and three undefined-projection cases. The per-test model harness runs each
+context through InfoCarrier. The upstream class has no reusable specification base, so its test
+bodies and models are adapted directly, with test cancellation and standard assertion style.
+No SQL baselines or production changes were added.
+
+Focused materialization tests and override audit passed: Passed: 10, Failed: 0, Total: 10.
+The final compilation reported no warnings or errors. Undefined projections retain upstream's
+exact exception message, including its successful coalesced-projection control.
