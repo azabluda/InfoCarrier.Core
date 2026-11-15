@@ -440,3 +440,17 @@ They should apply to any provider exposing an equivalent registered asynchronous
 including a future MongoDB provider. That prediction is not MongoDB validation. Existing document
 repair changes remain provider-neutral; no new document-write repair was introduced in this batch.
 Full official Cosmos adoption remains incomplete.
+
+
+## Concurrency-detector batch, November 15, 2026
+
+Adopted the official enabled and disabled concurrency-detector families through InfoCarrier.
+Each uses a separate fixture and backend database. Disabled checks are configured on both client
+and backend. The enabled family retains upstream's six synchronous no-op cases as reported skips;
+both families retain its Any skip for EF Core issue 17246. Enabled SaveChanges still checks both
+execution modes, as upstream does. Disabled-mode tests execute the store's normal operations
+while the client detector is held, including insert/read/delete cleanup.
+
+Focused tests and override audit: Passed: 23, Failed: 0, Total: 33 (10 upstream skips).
+The two explicitly skipped theories enumerate inherited data, unlike upstream's collapsed discovery.
+No production changes were needed for this batch.
