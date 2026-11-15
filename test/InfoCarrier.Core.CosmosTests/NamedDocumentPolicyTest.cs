@@ -20,6 +20,7 @@ public class NamedDocumentPolicyTest
     {
         await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         string database = "icc-policy-" + Guid.NewGuid().ToString("N");
+        CosmosEmulator.ReportDatabaseOwner(database, this, $"clientsFirst={clientsFirst}");
         string memoryName = "named-policy-" + Guid.NewGuid().ToString("N");
         var probe = new MemoryReadProbe();
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -61,7 +62,9 @@ public class NamedDocumentPolicyTest
             // The independent read proves the probe observes stored owned data.
             Assert.True(probe.OwnedReads > 0);
             await using AsyncServiceScope cleanup = app.Services.CreateAsyncScope();
-            await cleanup.ServiceProvider.GetRequiredKeyedService<Context>("cosmos").Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+            await CosmosEmulator.RunDatabaseCleanupAsync(async () =>
+                await cleanup.ServiceProvider.GetRequiredKeyedService<Context>("cosmos").Database.EnsureDeletedAsync(TestContext.Current.CancellationToken),
+                database, $"{nameof(NamedDocumentPolicyTest)}[clientsFirst={clientsFirst}]", TestContext.Current.CancellationToken);
         }
 
         void AddClients()

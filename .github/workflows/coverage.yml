@@ -48,7 +48,7 @@ jobs:
       - name: Test document and transport suites with coverage
         if: matrix.suite == 'cosmos'
         run: |
-          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
+          dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-build --configuration Release --logger "console;verbosity=detailed" --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
       - name: Cosmos failure logs

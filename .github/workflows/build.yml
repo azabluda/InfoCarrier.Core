@@ -202,7 +202,7 @@ jobs:
           INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
         run: >
           dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
-          --no-build --configuration Release --logger "trx;LogFileName=cosmos.trx"
+          --no-build --configuration Release --logger "console;verbosity=detailed" --logger "trx;LogFileName=cosmos.trx"
           --results-directory artifacts/test-results
       - name: Cosmos startup and failure logs
         if: failure()

@@ -9,47 +9,40 @@ namespace InfoCarrier.Core.CosmosTests;
 public class DatabaseCleanupTest
 {
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(3)]
-    public async Task Transient_cleanup_failure_retries_only_until_success(int failures)
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Cleanup_failure_is_reported_without_retry(HttpStatusCode status)
     {
         int attempts = 0;
-        await CosmosEmulator.RetryDatabaseCleanupAsync(() =>
-        {
-            if (attempts++ < failures)
-                throw new CosmosException("catalog deadlock", HttpStatusCode.InternalServerError, 0, "test", 0);
-            return Task.CompletedTask;
-        }, TestContext.Current.CancellationToken);
-        Assert.Equal(failures + 1, attempts);
-    }
-
-    [Fact]
-    public async Task Persistent_cleanup_failure_is_reported()
-    {
-        int attempts = 0;
-        var expected = new CosmosException("persistent failure", HttpStatusCode.InternalServerError, 0, "test", 0);
-        var actual = await Assert.ThrowsAsync<CosmosException>(() => CosmosEmulator.RetryDatabaseCleanupAsync(() =>
+        var expected = new CosmosException("cleanup failure", status, 0, "activity-proof", 0);
+        var messages = new List<string>();
+        var actual = await Assert.ThrowsAsync<CosmosException>(() => CosmosEmulator.RunDatabaseCleanupAsync(() =>
         {
             attempts++;
             throw expected;
-        }, TestContext.Current.CancellationToken));
-        Assert.Same(expected, actual);
-        Assert.Equal(4, attempts);
-    }
-
-    [Fact]
-    public async Task Other_failures_are_not_retried()
-    {
-        int attempts = 0;
-        var expected = new CosmosException("forbidden", HttpStatusCode.Forbidden, 0, "test", 0);
-        var actual = await Assert.ThrowsAsync<CosmosException>(() => CosmosEmulator.RetryDatabaseCleanupAsync(() =>
-        {
-            attempts++;
-            throw expected;
-        }, TestContext.Current.CancellationToken));
+        }, "database-proof", "fixture-proof", TestContext.Current.CancellationToken, messages.Add));
         Assert.Same(expected, actual);
         Assert.Equal(1, attempts);
+        string diagnostic = Assert.Single(messages, m => m.Contains("FAILED", StringComparison.Ordinal));
+        Assert.Contains("database-proof", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("fixture-proof", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("cleanup failure", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("activity-proof", diagnostic, StringComparison.Ordinal);
+        Assert.Contains(nameof(CosmosException), diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Cleanup_diagnostic_includes_inner_exception_and_preserves_exception_identity()
+    {
+        var expected = new InvalidOperationException("outer cleanup failure", new IOException("inner cleanup failure"));
+        var messages = new List<string>();
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => CosmosEmulator.RunDatabaseCleanupAsync(
+            () => throw expected, "database-proof", "fixture-proof", TestContext.Current.CancellationToken, messages.Add));
+        Assert.Same(expected, actual);
+        string diagnostic = Assert.Single(messages, m => m.Contains("FAILED", StringComparison.Ordinal));
+        Assert.Contains("System.InvalidOperationException: outer cleanup failure", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("System.IO.IOException: inner cleanup failure", diagnostic, StringComparison.Ordinal);
+        Assert.Contains(nameof(Cleanup_diagnostic_includes_inner_exception_and_preserves_exception_identity), diagnostic, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -58,11 +51,11 @@ public class DatabaseCleanupTest
         int attempts = 0;
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CosmosEmulator.RetryDatabaseCleanupAsync(() =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CosmosEmulator.RunDatabaseCleanupAsync(() =>
         {
             attempts++;
             return Task.CompletedTask;
-        }, cancellation.Token));
+        }, "cancelled-database", "cancelled-fixture", cancellation.Token, _ => { }));
         Assert.Equal(0, attempts);
     }
 
@@ -83,7 +76,7 @@ public class DatabaseCleanupTest
                 DatabaseResponse database = await client.CreateDatabaseAsync(name, cancellationToken: cancellationToken);
                 await database.Database.CreateContainerAsync("Documents", "/id", cancellationToken: cancellationToken);
             }
-            await Task.WhenAll(names.Select(name => CosmosEmulator.DeleteDatabaseAsync(client, name, cancellationToken)));
+            await Task.WhenAll(names.Select(name => CosmosEmulator.DeleteDatabaseAsync(client, name, cancellationToken, nameof(DatabaseCleanupTest))));
             foreach (string name in names)
             {
                 var error = await Assert.ThrowsAsync<CosmosException>(() =>
@@ -94,7 +87,7 @@ public class DatabaseCleanupTest
         finally
         {
             foreach (string name in names)
-                await CosmosEmulator.DeleteDatabaseAsync(client, name, cancellationToken);
+                await CosmosEmulator.DeleteDatabaseAsync(client, name, cancellationToken, nameof(DatabaseCleanupTest));
         }
     }
 }

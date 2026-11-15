@@ -515,3 +515,34 @@ existing assertion, so long method names cannot hide the reason behind xUnit tru
 Focused converter cases, direct control, and override audit passed: Passed: 36, Failed: 0,
 Total: 51 (15 upstream skips). Compilation used warnings as errors. Two upstream skipped theories
 enumerate inherited data rather than collapsing each theory to one discovery case.
+
+
+## Cleanup ownership review and retry removal, November 15, 2026
+
+The owner requested ownership evidence before accepting the administrative retry. The earlier
+cross-class sharing explanation was incorrect. Each standalone document-fixture instance gets
+its own GUID database name. Each specification backend also gets a GUID database name and its
+own server service provider/store index. Matching logical store names, including Northwind,
+do not identify the same physical database. Nonshared-model tests create fresh backend stores;
+named-policy cases generate independent names. Tests and contexts within one class fixture
+intentionally use that fixture's database. No Cosmos collection or assembly fixtures share it
+between classes.
+
+The HTTP 500 retry introduced in 091b3bfc is removed. Each cleanup makes one attempt; the final
+exception remains the original exception. Not-found is still idempotent success. The earlier
+catalog-deadlock observation is correlation, not a confirmed explanation of the fixture exception.
+
+Allocation and cleanup diagnostics include the physical database name, fixture/backend identity,
+test class, process, and UTC time. Failures print the complete exception chain and stack. Normal
+and coverage Cosmos jobs use detailed console logging, so the next fixture failure should not
+be reduced to its outer pipeline exception. No production code or test parallelism changed.
+
+Focused cleanup, ownership, incomplete-document, and named-policy checks passed: Passed: 16,
+Failed: 0, Total: 16. Ownership checks inspect actual provider database identifiers for separate
+fixture instances and backend stores with equal logical names. Failure injection verifies one
+attempt for HTTP 500 and HTTP 403, exception identity, inner diagnostic details, and cancellation.
+Three concurrent deletion rounds remain active without retries.
+
+Reproduction should use repeated Cosmos jobs at the same commit, emulator image, and configuration.
+Passing attempts only mean the timing-dependent failure was not observed; they do not establish
+its cause or a fix. Complete normal/slow suites remain delegated to GitHub.

@@ -65,35 +65,39 @@ internal static class CosmosEmulator
         HttpClientFactory = HttpClient,
     });
 
-    internal static async Task DeleteDatabaseAsync(CosmosClient client, string database, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await RetryDatabaseCleanupAsync(async () =>
-                await client.GetDatabase(database).DeleteAsync(cancellationToken: cancellationToken), cancellationToken);
-        }
-        catch (CosmosException error) when (error.StatusCode == System.Net.HttpStatusCode.NotFound) { }
-    }
+    internal static void ReportDatabaseOwner(string database, object owner, string logicalName)
+        => Console.Error.WriteLine($"{DateTimeOffset.UtcNow:O} Cosmos database owner: database={database}; "
+            + $"owner={owner.GetType().FullName}/{logicalName}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(owner):x}; "
+            + $"class={Xunit.TestContext.Current.TestClass?.TestClassName ?? "unknown"}; process={Environment.ProcessId}");
 
-    // The Linux emulator can return HTTP 500 from PostgreSQL catalog deadlocks while independent
-    // fixtures delete databases concurrently. Retry only this idempotent administrative operation.
-    // Queries, writes, and their assertions never pass through this helper.
-    internal static async Task RetryDatabaseCleanupAsync(Func<Task> delete, CancellationToken cancellationToken)
-    {
-        for (int attempt = 0; ; attempt++)
+    internal static Task DeleteDatabaseAsync(CosmosClient client, string database, CancellationToken cancellationToken,
+        string owner)
+        => RunDatabaseCleanupAsync(async () =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await delete();
-                return;
+                await client.GetDatabase(database).DeleteAsync(cancellationToken: cancellationToken);
             }
-            catch (CosmosException error) when (error.StatusCode == System.Net.HttpStatusCode.InternalServerError
-                && attempt < 3 && !cancellationToken.IsCancellationRequested)
-            {
-                Console.Error.WriteLine($"Cosmos database cleanup retry {attempt + 1}: {error}");
-                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)), cancellationToken);
-            }
+            catch (CosmosException error) when (error.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+        }, database, owner, cancellationToken);
+
+    internal static async Task RunDatabaseCleanupAsync(Func<Task> delete, string database, string owner,
+        CancellationToken cancellationToken, Action<string>? report = null)
+    {
+        report ??= Console.Error.WriteLine;
+        string identity = $"database={database}; owner={owner}; class={Xunit.TestContext.Current.TestClass?.TestClassName ?? "unknown"}; process={Environment.ProcessId}";
+        report($"{DateTimeOffset.UtcNow:O} Cosmos database cleanup: {identity}");
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await delete();
+            report($"{DateTimeOffset.UtcNow:O} Cosmos database cleanup completed: {identity}");
+        }
+        catch (Exception error)
+        {
+            // Include the complete exception chain even when the runner truncates fixture failures.
+            report($"{DateTimeOffset.UtcNow:O} Cosmos database cleanup FAILED: {identity}\n{error}");
+            throw;
         }
     }
 }

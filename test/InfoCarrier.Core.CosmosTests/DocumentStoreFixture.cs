@@ -19,6 +19,7 @@ public class DocumentStoreFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
+        CosmosEmulator.ReportDatabaseOwner(DatabaseName, this, GetType().Name);
         await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         var services = new ServiceCollection();
         services.AddDbContext<ShopServerContext>(options => CosmosEmulator.Configure(options, DatabaseName));
@@ -59,7 +60,8 @@ public class DocumentStoreFixture : IAsyncLifetime
         try
         {
             using var client = CosmosEmulator.Client();
-            await CosmosEmulator.DeleteDatabaseAsync(client, DatabaseName, TestContext.Current.CancellationToken);
+            await CosmosEmulator.DeleteDatabaseAsync(client, DatabaseName, TestContext.Current.CancellationToken,
+                $"{GetType().FullName}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this):x}");
         }
         finally { await _serverProvider.DisposeAsync(); }
     }

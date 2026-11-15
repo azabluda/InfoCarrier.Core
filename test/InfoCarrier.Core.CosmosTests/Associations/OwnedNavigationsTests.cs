@@ -124,12 +124,14 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
     {
         await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         _emulatorAvailable = true;
+        CosmosEmulator.ReportDatabaseOwner(_database, this, Name);
         return await base.InitializeAsync(serviceProvider, createContext, seed, clean);
     }
     public override async Task CleanAsync(DbContext context, bool createTables = true)
     {
-        await CosmosEmulator.RetryDatabaseCleanupAsync(
+        await CosmosEmulator.RunDatabaseCleanupAsync(
             async () => await context.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken),
+            _database, $"{GetType().FullName}/{Name}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this):x}",
             TestContext.Current.CancellationToken);
         if (createTables) await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
     }
@@ -138,7 +140,8 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
         if (_emulatorAvailable)
         {
             using Microsoft.Azure.Cosmos.CosmosClient client = CosmosEmulator.Client();
-            await CosmosEmulator.DeleteDatabaseAsync(client, _database, TestContext.Current.CancellationToken);
+            await CosmosEmulator.DeleteDatabaseAsync(client, _database, TestContext.Current.CancellationToken,
+                $"{GetType().FullName}/{Name}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this):x}");
         }
         await base.DisposeAsync();
     }
