@@ -64,4 +64,36 @@ internal static class CosmosEmulator
         ConnectionMode = ConnectionMode.Gateway,
         HttpClientFactory = HttpClient,
     });
+
+    internal static async Task DeleteDatabaseAsync(CosmosClient client, string database, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RetryDatabaseCleanupAsync(async () =>
+                await client.GetDatabase(database).DeleteAsync(cancellationToken: cancellationToken), cancellationToken);
+        }
+        catch (CosmosException error) when (error.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+    }
+
+    // The Linux emulator can return HTTP 500 from PostgreSQL catalog deadlocks while independent
+    // fixtures delete databases concurrently. Retry only this idempotent administrative operation.
+    // Queries, writes, and their assertions never pass through this helper.
+    internal static async Task RetryDatabaseCleanupAsync(Func<Task> delete, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await delete();
+                return;
+            }
+            catch (CosmosException error) when (error.StatusCode == System.Net.HttpStatusCode.InternalServerError
+                && attempt < 3 && !cancellationToken.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Cosmos database cleanup retry {attempt + 1}: {error}");
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)), cancellationToken);
+            }
+        }
+    }
 }

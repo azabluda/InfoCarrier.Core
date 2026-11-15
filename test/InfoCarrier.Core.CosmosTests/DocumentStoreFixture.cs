@@ -58,8 +58,8 @@ public class DocumentStoreFixture : IAsyncLifetime
         if (_serverProvider is null) return;
         try
         {
-            using IServiceScope scope = _serverProvider.CreateScope();
-            await scope.ServiceProvider.GetRequiredService<ShopServerContext>().Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+            using var client = CosmosEmulator.Client();
+            await CosmosEmulator.DeleteDatabaseAsync(client, DatabaseName, TestContext.Current.CancellationToken);
         }
         finally { await _serverProvider.DisposeAsync(); }
     }

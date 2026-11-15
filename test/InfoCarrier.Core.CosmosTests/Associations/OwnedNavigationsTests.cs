@@ -71,7 +71,8 @@ internal sealed class CosmosDirectFactory(Action<ModelBuilder, DbContext> onMode
 {
     private SharedTestStoreProperties Properties() => new()
     {
-        ContextType = typeof(PoolableDbContext), OnModelCreating = onModelCreating,
+        ContextType = typeof(PoolableDbContext),
+        OnModelCreating = onModelCreating,
     };
     public TestStore Create(string name) => new CosmosBackendStore(name, false, Properties());
     public TestStore GetOrCreate(string name) => new CosmosBackendStore(name, true, Properties());
@@ -127,7 +128,9 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
     }
     public override async Task CleanAsync(DbContext context, bool createTables = true)
     {
-        await context.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+        await CosmosEmulator.RetryDatabaseCleanupAsync(
+            async () => await context.Database.EnsureDeletedAsync(TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
         if (createTables) await context.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
     }
     public override async ValueTask DisposeAsync()
@@ -135,11 +138,7 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
         if (_emulatorAvailable)
         {
             using Microsoft.Azure.Cosmos.CosmosClient client = CosmosEmulator.Client();
-            try
-            {
-                await client.GetDatabase(_database).DeleteAsync();
-            }
-            catch (Microsoft.Azure.Cosmos.CosmosException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+            await CosmosEmulator.DeleteDatabaseAsync(client, _database, TestContext.Current.CancellationToken);
         }
         await base.DisposeAsync();
     }

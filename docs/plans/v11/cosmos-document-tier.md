@@ -474,3 +474,24 @@ No SQL baselines or production changes were added.
 Focused materialization tests and override audit passed: Passed: 10, Failed: 0, Total: 10.
 The final compilation reported no warnings or errors. Undefined projections retain upstream's
 exact exception message, including its successful coalesced-projection control.
+
+
+## Concurrent database cleanup, November 15, 2026
+
+GitHub run 43656286661 reported Passed: 3705, Failed: 0, Total: 4031, but the Cosmos worker
+correctly failed on an `IncompleteDocumentTest` class-cleanup error. The uploaded report records
+a `TestPipelineException`; the emulator log records a PostgreSQL catalog deadlock (`E40P01`)
+while deleting that fixture's database at the same time. The adapter did not include the inner
+cleanup exception in its report, so the HTTP response details remain unavailable.
+
+Database deletion now retries HTTP 500 at most three times, with bounded delays and diagnostics.
+A final failure still propagates. Not-found remains idempotent success; other failures and
+cancellation are not retried. The helper covers the standalone document fixture and association
+backend cleanup, including database reset before seeding. Query and write operations never use
+this administrative retry helper. Collection parallelism remains enabled.
+
+Focused deletion-policy and incomplete-document checks passed: Passed: 14, Failed: 0, Total: 14.
+This includes three concurrent rounds, each deleting eight independent databases and checking
+that each is absent. Fault injection verifies transient recovery, retry exhaustion, non-retryable
+errors, and cancellation. These focused checks do not establish that the original GitHub cleanup
+failure was reproduced locally; complete GitHub validation remains required.
