@@ -729,3 +729,17 @@ One upstream override calls an unrelated sibling: Query_loads_reference_nav_auto
 now executes its own Fink/Barton base scenario and asserts the matching cross-document refusal.
 The focused corrected scenario and audit passed: Passed: 3, Failed: 0, Total: 3.
 No production code or wire format changed.
+
+
+## Partition-key application round trips, November 15, 2026
+
+Adopted all three single-level and all three hierarchical partition-key scenarios. They cover
+insert, implicit and explicit partition queries, ordered reads, updates, key immutability, and
+deletions. The fixture grants CosmosQueryableExtensions on both wire halves; database creation
+remains backend fixture setup. No production change or query-execution bypass was needed.
+Focused families and audit: Passed: 7, Failed: 0, Total: 7.
+
+The separate CosmosTriggersTest has one behavior method, conditionally excluded for the Linux
+emulator because server-side scripts are unsupported. The selected emulator scope excludes that
+entire class, following its exact official condition. This is an application coverage gap, not
+an internal-provider classification. See CosmosTriggersTest.cs at the pinned revision.
