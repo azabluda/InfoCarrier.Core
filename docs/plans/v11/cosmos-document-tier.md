@@ -546,3 +546,10 @@ Three concurrent deletion rounds remain active without retries.
 Reproduction should use repeated Cosmos jobs at the same commit, emulator image, and configuration.
 Passing attempts only mean the timing-dependent failure was not observed; they do not establish
 its cause or a fix. Complete normal/slow suites remain delegated to GitHub.
+
+
+The reproduction version also restores the original document fixture's Entity Framework
+`EnsureDeletedAsync` operation; the earlier retry mitigation had changed that fixture to direct
+SDK deletion. Diagnostics wrap the original scope creation, deletion, and provider disposal,
+so changing the cleanup path cannot silently remove the original symptom. Focused checks of
+that restored path and diagnostic behavior passed: Passed: 9, Failed: 0, Total: 9.

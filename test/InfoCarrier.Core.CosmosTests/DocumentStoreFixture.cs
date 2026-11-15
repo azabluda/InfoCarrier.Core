@@ -57,13 +57,17 @@ public class DocumentStoreFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         if (_serverProvider is null) return;
-        try
+        await CosmosEmulator.RunDatabaseCleanupAsync(async () =>
         {
-            using var client = CosmosEmulator.Client();
-            await CosmosEmulator.DeleteDatabaseAsync(client, DatabaseName, TestContext.Current.CancellationToken,
-                $"{GetType().FullName}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this):x}");
-        }
-        finally { await _serverProvider.DisposeAsync(); }
+            try
+            {
+                using IServiceScope scope = _serverProvider.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<ShopServerContext>().Database.EnsureDeletedAsync(TestContext.Current.CancellationToken);
+            }
+            finally { await _serverProvider.DisposeAsync(); }
+        }, DatabaseName, $"{GetType().FullName}@{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this):x}",
+            // Always enter the action so service-provider disposal also runs after cancellation.
+            CancellationToken.None);
     }
 
     public ShopClientContext CreateClient() => new(ClientOptions);
