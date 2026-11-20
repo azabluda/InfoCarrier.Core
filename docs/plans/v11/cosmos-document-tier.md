@@ -917,3 +917,12 @@ remain GitHub work. MongoDB remains disabled and was not exercised by this corre
 
 The end-to-end fixture also preserves the source's context-pooling option. Focused pooled
 insert/read/update/delete and audit checks passed: Passed: 3, Failed: 0, Total: 3.
+
+## Bulk end-to-end variants, November 20, 2026
+
+Adopted CosmosBulkEndToEndTest and CosmosBulkEndToEndTestNoBatching through the same application
+scenarios. Bulk execution is applied to actual backend contexts. The first variant retains the
+source's bulk/transaction warning policy. The second uses Never on both sides and retains its
+exact true-arm exclusion. Context pooling follows the source option; test parallelism is unchanged.
+Focused complete batch and audit: Passed: 63, Failed: 0, Total: 81, with 18 official skips.
+No additional production change was needed.
