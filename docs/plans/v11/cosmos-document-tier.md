@@ -872,3 +872,17 @@ are omitted. No production changes were required.
 After removing the seed retry and managed per-fixture probes, the former failing concurrency
 case, fixture-isolation regression, and availability controls passed: Passed: 8, Failed: 0,
 Total: 8. Full validation remains on GitHub.
+
+## Read-item and partition-key query families, November 20, 2026
+
+Adopted all four official variants: no discriminator in IDs, concrete discriminator in IDs,
+root discriminator in IDs, and the non-inheritance model. Shared application bases, complete
+models, expected data, sorters, and result comparers are retained. SQL-only overrides and the four
+SQL-override-completeness guards are omitted. Twenty-one exact Linux-emulator issue-329 cases
+remain explicit source-backed skips; no application assertion is replaced with a baseline check.
+
+Focused complete batch and override audit: Passed: 307, Failed: 0, Total: 328, with 21 official
+skips. It exercises composite/hierarchical and single partition keys, special characters,
+conflicting predicates, inheritance discriminator variants, tracking modes, and missing items.
+The client allows Cosmos query extensions explicitly on both wire halves. No production changes
+or extra emulator environment settings were required.
