@@ -17,6 +17,15 @@ internal static class CosmosEmulatorCommand
             return 2;
         }
         string runtime = args[1];
+        var runtimeInfo = await ScriptHost.Execute(runtime, ["info"], ScriptHost.Root, true, token);
+        if (runtimeInfo.ExitCode != 0)
+        {
+            Console.Error.WriteLine(runtime == "podman"
+                ? "Cannot contact Podman. Start its machine with 'podman machine start', then run this command again."
+                : "Cannot contact Docker. Start Docker with Linux containers, then run this command again.");
+            if (runtimeInfo.Error.Length > 0) Console.Error.Write(runtimeInfo.Error);
+            return runtimeInfo.ExitCode;
+        }
         async Task<ScriptHost.ProcessResult> Execute(params string[] command)
         {
             var result = await ScriptHost.Execute(runtime, command, ScriptHost.Root, true, token);

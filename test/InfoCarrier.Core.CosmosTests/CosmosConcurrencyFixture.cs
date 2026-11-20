@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.TestModels.ConcurrencyModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace InfoCarrier.Core.CosmosTests;
@@ -16,6 +18,21 @@ namespace InfoCarrier.Core.CosmosTests;
 public class CosmosConcurrencyFixture : F1FixtureBase<byte[]>
 {
     private ITestStoreFactory? _factory;
+    private ListLoggerFactory? _loggerFactory;
+
+    protected override IServiceCollection AddServices(IServiceCollection services)
+        => base.AddServices(services).Replace(ServiceDescriptor.Singleton<ILoggerFactory>(
+            _loggerFactory ??= new ListLoggerFactory(ShouldLogCategory)));
+
+    public override async Task ReseedAsync()
+    {
+        // The spec base needs an initialized fixture in its constructor. Keep that fixture and
+        // its logger, but replace its store/provider/client before each case instead of deleting
+        // and recreating containers through a client which still caches their old metadata.
+        // The externally supplied logger instance is not disposed by either service provider.
+        await base.DisposeAsync();
+        await base.InitializeAsync();
+    }
 
     protected override bool UsePooling => false;
     public override TestHelpers TestHelpers => InfoCarrierTestHelpers.Instance;
@@ -42,13 +59,6 @@ public class CosmosConcurrencyFixture : F1FixtureBase<byte[]>
                     await context.SaveChangesAsync(token);
                 }
             });
-
-    public override async Task ReseedAsync()
-    {
-        var backend = ((IInfoCarrierClientTestStore)TestStore).Backend;
-        using var context = backend.CreateDbContext();
-        await backend.CleanAsync(context);
-    }
 
     // Preserve upstream F1CosmosFixture's single cached-container-metadata probe retry.
     protected override async Task<bool> ShouldSeedAsync(F1Context context)

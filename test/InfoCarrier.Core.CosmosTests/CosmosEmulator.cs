@@ -34,6 +34,7 @@ internal static class CosmosEmulator
             throw new InvalidOperationException(
                 $"Cannot reach the Cosmos emulator at {endpoint}.\n"
                 + "Cosmos test fixtures do not start containers.\n"
+                + "For Podman, start its machine first: podman machine start\n"
                 + "Start your container runtime with Linux containers, then run from the repository root:\n"
                 + "  dotnet run --file eng/CosmosEmulator.cs -- start podman\n"
                 + "or:\n"

@@ -759,3 +759,25 @@ skips on Windows/Podman. The local family took 10 minutes 36 seconds. This was t
 full normal and coverage suites remain GitHub work. NotImplementedException cases retain the
 source issue classification and SDK query errors retain the explicit remote exception type.
 No product code, public signature, or wire format changed.
+
+## Emulator diagnostics and concurrency isolation, November 20, 2026
+
+The stopped-machine check confirmed that test failures identify the emulator endpoint and launcher
+commands. The message now also names `podman machine start`. The launcher checks runtime access
+before container operations and gives a direct machine-start instruction when Podman is unavailable.
+A deliberately unreachable Podman endpoint confirmed the launcher message without stopping the machine.
+
+Run [43697841012](https://github.com/azabluda/InfoCarrier.Core/actions/runs/43697841012) failed during
+F1 fixture reseeding: the second seed probe received BadRequest with a missing PostgreSQL relation.
+The failure occurred before the concurrency test body. Its exact cause remains unconfirmed; later
+green runs do not explain it. No evidence established cross-class database sharing.
+
+Each concurrency case now receives a new database, service provider, and SDK client. The existing
+fixture and externally owned logger remain stable for the upstream constructor. This removes the
+repeated delete/recreate cycle with a reused client. No cleanup retry or parallelism reduction was
+added. An integration regression checks distinct database names, survival after another fixture's
+disposal, and fresh seeded data after reseeding.
+
+Focused concurrency, isolation, availability, and override checks: Passed: 22, Failed: 0, Total: 53,
+with 31 existing source-backed skips. Full-suite validation remains GitHub work. Production code and
+wire format are unchanged. The missing-table cause is not claimed as proven.
