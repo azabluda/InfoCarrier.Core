@@ -368,6 +368,16 @@ public class InfoCarrierDatabase(
         var mapper = _expressionSerializer.ValueMapper;
         mapper.ResetReferenceScope();
         List<IUpdateEntry> sent = [.. Expand(entries)];
+        // Expanded owners can receive generated values when only an embedded member changed.
+        // EF accepts only entries in its original save list. Include those unchanged owners so
+        // their generated-value sidecars reach the entity and its next concurrency snapshot.
+        foreach (IUpdateEntry entry in sent)
+        {
+            if (entry.EntityState == EntityState.Unchanged && !entries.Contains(entry))
+            {
+                entries.Add(entry);
+            }
+        }
         var request = new Common.SaveChangesRequest
         {
             Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
@@ -850,6 +860,12 @@ public class InfoCarrierDatabase(
                     }
                     else
                     {
+                        // An implicit document write can generate values on an unchanged owner.
+                        // Keep it in the changed set until acceptance, including SaveChanges(false).
+                        if (entry.EntityState == EntityState.Unchanged && entry is InternalEntityEntry owner)
+                        {
+                            owner.SetEntityState(EntityState.Modified, modifyProperties: false);
+                        }
                         entry.SetStoreGeneratedValue(property, clientValue);
                     }
                 }

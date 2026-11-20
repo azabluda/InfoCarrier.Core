@@ -790,3 +790,42 @@ matching the existing SQLite harness. Embedded settings ownership is explicit be
 uses relational conventions. Official issue exclusions and synchronous-I/O refusals are retained.
 Focused batch: Passed: 16, Failed: 0, Total: 24, with eight source-backed skips.
 No production code or wire behavior changed.
+
+## Generated document-owner values, November 20, 2026
+
+The official CosmosConcurrencyTest exposed a general acceptance defect: when only an owned member
+changed, InfoCarrier sent the unchanged owner and returned its generated revision, but EF's save
+list omitted that owner. Its generated-value sidecar therefore did not reach the entity or the
+next original-value snapshot. Direct Cosmos controls passed while all six remoted nested-update
+cases failed before correction.
+
+The client now includes expanded unchanged entries in EF's acceptance list. An unchanged entry
+which receives a generated value also remains in the changed set until acceptance, covering
+SaveChanges(false) followed by ChangeTracker.AcceptAllChanges(). The serialized request retains
+its original states. No Cosmos provider names, annotations, or entity-tag special cases occur in
+this change. Existing correlation identifiers and generated-value response fields are unchanged.
+
+A provider-neutral InMemory regression uses generated owner revisions and independent store reads.
+All four synchronous/asynchronous and immediate/deferred acceptance combinations fail on the old
+production code. With the correction, those four cases and the four existing provider-neutral
+repair cases pass: Passed: 8, Failed: 0, Total: 8. This establishes behavior beyond Cosmos; it does
+not establish compatibility with the disabled MongoDB provider. Full active suites remain CI work.
+
+
+## Additional applicability review, November 20, 2026
+
+At the pinned EF revision, AdHocFullTextSearchCosmosTest's composite-index, non-string-property,
+and enable/disable cases assert model validation errors. Its collection-navigation case asserts
+schema-creation rejection. The remaining four language-configuration cases require
+IsNotLinuxEmulator and cite emulator issue 162. None executes an application query or write.
+AdHocVectorSearchCosmosTest similarly contains only composite-index model validation and
+collection-navigation schema-creation rejection. These ten cases are reviewed exclusions, with
+the four Linux exclusions distinguished from the six provider model/schema checks.
+Sources: AddHocFullTextSearchCosmosTest.cs and AdHocVectorSearchCosmosTest.cs in the pinned
+EFCore.Cosmos.FunctionalTests tree. Runtime query/write families remain subject to adoption.
+
+Final focused Cosmos concurrency batch and override audit: Passed: 22, Failed: 0, Total: 22.
+This includes nine official cases, six matching direct-store controls, six deferred-acceptance
+controls, and the override audit. Token comparisons against independent reads retain the official
+quote normalization. Focused protocol compatibility and protocol-3 execution: Passed: 22,
+Failed: 0, Total: 22. Existing sample trimming diagnostics appeared during that build.
