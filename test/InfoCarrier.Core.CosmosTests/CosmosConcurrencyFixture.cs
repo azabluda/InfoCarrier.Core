@@ -60,17 +60,6 @@ public class CosmosConcurrencyFixture : F1FixtureBase<byte[]>
                 }
             });
 
-    // Preserve upstream F1CosmosFixture's single cached-container-metadata probe retry.
-    protected override async Task<bool> ShouldSeedAsync(F1Context context)
-    {
-        try { await base.ShouldSeedAsync(context); }
-        catch (Exception error)
-        {
-            Console.Error.WriteLine($"Upstream F1 Cosmos metadata-probe retry: {error}");
-        }
-        return await base.ShouldSeedAsync(context);
-    }
-
     protected override void BuildModelExternal(ModelBuilder modelBuilder)
     {
         base.BuildModelExternal(modelBuilder);

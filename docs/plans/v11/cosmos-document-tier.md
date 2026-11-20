@@ -473,9 +473,9 @@ a `TestPipelineException`; the emulator log records a PostgreSQL catalog deadloc
 while deleting that fixture's database at the same time. The adapter did not include the inner
 cleanup exception in its report, so the HTTP response details remain unavailable.
 
-Database deletion now retries HTTP 500 at most three times, with bounded delays and diagnostics.
+The subsequently reverted implementation retried HTTP 500 at most three times, with bounded delays and diagnostics.
 A final failure still propagates. Not-found remains idempotent success; other failures and
-cancellation are not retried. The helper covers the standalone document fixture and association
+cancellation are not retried. That helper covered the standalone document fixture and association
 backend cleanup, including database reset before seeding. Query and write operations never use
 this administrative retry helper. Collection parallelism remains enabled.
 
@@ -849,3 +849,26 @@ runtime; no false unavailable-runtime result is claimed from that successful dis
 An intentional one-test failure also removed the managed emulator and preserved its logs. That
 temporary probe was removed immediately afterward and is not part of the suite. The expected
 negative controls are recorded separately from green behavior-batch counts.
+
+## Setup simplification after Testcontainers, November 20, 2026
+
+The administrative HTTP-500 cleanup retry was already removed before the migration. The remaining
+upstream F1 metadata-probe retry is now removed too: that workaround addressed database recreation
+through a reused client, whereas this fixture now uses a fresh database and client per case.
+Managed runs also omit per-fixture reachability probes because the assembly fixture already awaits
+container readiness. Explicit external endpoints retain the actionable diagnostic check.
+
+Per-case database isolation and ownership/error logs remain intentional. Explicit database cleanup
+still makes one attempt and propagates failures. No cleanup serialization, backoff, query-parser
+bypass, fixture-wide parallelism reduction, or suppressed store errors was introduced. The manual
+launcher remains only for the explicit external-endpoint mode.
+
+The next official ad-hoc query family passed through InfoCarrier: Passed: 20, Failed: 0, Total: 20,
+including the override audit. It covers missing scalar fields, enum partition keys/discriminators,
+nullable aggregates, null-converting conditions, and quoted scalar/key/partition values. Malformed
+JSON creation is backend-only setup; subsequent application reads cross InfoCarrier. SQL baselines
+are omitted. No production changes were required.
+
+After removing the seed retry and managed per-fixture probes, the former failing concurrency
+case, fixture-isolation regression, and availability controls passed: Passed: 8, Failed: 0,
+Total: 8. Full validation remains on GitHub.

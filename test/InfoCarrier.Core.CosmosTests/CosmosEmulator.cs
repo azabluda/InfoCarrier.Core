@@ -16,6 +16,10 @@ internal static class CosmosEmulator
 
     internal static async Task EnsureAvailableAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        // The assembly fixture already awaited the managed container's readiness once.
+        // Explicit external endpoints still need the diagnostic reachability check.
+        if (ManagedEndpoint is not null) return;
         using HttpClient client = HttpClient();
         client.Timeout = TimeSpan.FromSeconds(5);
         await EnsureAvailableAsync(client, new Uri(Endpoint), cancellationToken);
