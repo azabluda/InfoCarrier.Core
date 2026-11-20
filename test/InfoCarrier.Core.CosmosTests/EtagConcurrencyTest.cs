@@ -34,7 +34,7 @@ public class EtagConcurrencyTest : IAsyncLifetime
                     builder.UseCosmos(options => options.ContentResponseOnWriteEnabled(enabled));
 #pragma warning restore CS0618
                 }
-                return builder;
+                return ConfigureServerOptions(builder);
             }).Create(DatabaseName);
         _options = _store.AddProviderOptions(new DbContextOptionsBuilder()).Options;
         await _store.InitializeAsync(null, () => new ConcurrencyContext(_options));
@@ -249,6 +249,8 @@ public class EtagConcurrencyTest : IAsyncLifetime
         var entry = updateException.Entries.Single();
         Assert.IsAssignableFrom<Customer>(entry.Entity);
     }
+
+    protected virtual DbContextOptionsBuilder ConfigureServerOptions(DbContextOptionsBuilder builder) => builder;
 
     protected virtual ConcurrencyContext CreateContext()
         => CreateContext(_options!);

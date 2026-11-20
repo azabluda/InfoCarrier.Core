@@ -22,7 +22,8 @@ public class EmulatorAvailabilityTest
 
         Assert.Same(cause, error.InnerException);
         Assert.Contains(Endpoint.ToString(), error.Message);
-        Assert.Contains("fixtures do not start containers", error.Message);
+        Assert.Contains("Testcontainers starts and stops", error.Message);
+        Assert.Contains("INFOCARRIER_COSMOS_ENDPOINT", error.Message);
         Assert.Contains("podman machine start", error.Message);
         Assert.Contains("dotnet run --file eng/CosmosEmulator.cs -- start podman", error.Message);
         Assert.Contains("dotnet run --file eng/CosmosEmulator.cs -- start docker", error.Message);

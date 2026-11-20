@@ -195,8 +195,6 @@ jobs:
         run: dotnet restore test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
       - name: Build
         run: dotnet build test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-restore --configuration Release -p:TreatWarningsAsErrors=true
-      - name: Start Cosmos emulator (Docker)
-        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
       - name: Test (Cosmos document tier and direct controls)
         env:
           INFOCARRIER_OVERRIDE_REASONS: ${{ github.workspace }}/artifacts/test-results
@@ -204,12 +202,13 @@ jobs:
           dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
           --no-build --configuration Release --logger "console;verbosity=detailed" --logger "trx;LogFileName=cosmos.trx"
           --results-directory artifacts/test-results
-      - name: Cosmos startup and failure logs
-        if: failure()
-        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
-      - name: Stop Cosmos emulator
+      - name: Upload Cosmos emulator logs
         if: always()
-        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
+        uses: actions/upload-artifact@v7
+        with:
+          name: spec-cosmos-emulator
+          path: artifacts/cosmos-emulator
+          if-no-files-found: warn
       - name: Upload Cosmos results
         if: always()
         uses: actions/upload-artifact@v7

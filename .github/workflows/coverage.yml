@@ -42,21 +42,19 @@ jobs:
         if: matrix.suite == 'functional'
         run: dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
 
-      - name: Start Cosmos emulator (Docker)
-        if: matrix.suite == 'cosmos'
-        run: dotnet run --file eng/CosmosEmulator.cs -- start docker
       - name: Test document and transport suites with coverage
         if: matrix.suite == 'cosmos'
         run: |
           dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --no-build --configuration Release --logger "console;verbosity=detailed" --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
           dotnet test test/InfoCarrier.EngineeringTests/InfoCarrier.EngineeringTests.csproj --no-build --configuration Release --collect:"XPlat Code Coverage" --settings eng/coverage.runsettings --results-directory artifacts/coverage/raw
-      - name: Cosmos failure logs
-        if: failure() && matrix.suite == 'cosmos'
-        run: dotnet run --file eng/CosmosEmulator.cs -- logs docker
-      - name: Stop Cosmos emulator
+      - name: Upload Cosmos emulator logs
         if: always() && matrix.suite == 'cosmos'
-        run: dotnet run --file eng/CosmosEmulator.cs -- stop docker
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-cosmos-emulator
+          path: artifacts/cosmos-emulator
+          if-no-files-found: warn
       - name: Upload raw coverage
         if: always()
         uses: actions/upload-artifact@v7

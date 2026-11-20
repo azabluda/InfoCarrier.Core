@@ -19,8 +19,9 @@ prefers Podman over installing a native Windows Cosmos emulator.
 | Linux | Linux test process connecting to the same image; Docker in GitHub Actions |
 
 This follows EF Core's Linux-emulator test path, including its known emulator skips, on both hosts.
-It does not reproduce their separate native Windows emulator path. Their Testcontainers startup
-is replaced by this repository's existing explicit C# lifecycle command, supporting Podman and Docker.
+It does not reproduce their separate native Windows emulator path. Testcontainers 4.17.0 starts
+one fresh container for each test assembly execution and removes it after all fixtures finish.
+The assembly fixture preserves class parallelism. The image remains pinned to the same digest.
 See the pinned [upstream environment](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/TestUtilities/CosmosTestEnvironment.cs)
 and [test jobs](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/eng/helix.proj).
 
@@ -28,41 +29,29 @@ On this Windows machine:
 
 ```powershell
 podman machine start infocarrier-cosmos
-dotnet run --file eng/CosmosEmulator.cs -- start podman
 dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj --configuration Release
-dotnet run --file eng/CosmosEmulator.cs -- stop podman
 ```
 
-Use `docker` instead of `podman` in the lifecycle command on Linux CI, or locally with Docker
-Desktop running Linux containers. The runtime argument selects the executable; the operating
-system resolves it through its normal executable search, including `PATH`. PowerShell aliases
-are not used. Docker selects its engine through its
-[active context and connection settings](https://docs.docker.com/engine/manage-resources/contexts/).
-Inspect these with `docker context ls` and `docker info`. Windows tests against Docker Desktop
-have not been validated on this machine; Windows/Podman and Linux/Docker have been validated.
+Docker Desktop with Linux containers uses the same test command. Testcontainers discovers the
+container API; it does not invoke a hardcoded docker or podman executable. Windows/Podman has
+been exercised without additional environment settings. Windows/Docker Desktop has not been
+validated on this machine. Linux/Docker validation runs on GitHub.
 
-Startup waits up to three
-minutes for `/ready`. Ports 8081 and 8080 bind to loopback. Cleanup removes only the task-owned
-container. Each fixture owns a separate generated database. Test collections remain parallel.
-An unavailable emulator fails the tests instead of silently skipping them.
+The container uses dynamically assigned loopback ports and waits up to three minutes for `/ready`.
+The assembly fixture records container identity and captures emulator output under
+`artifacts/cosmos-emulator/<process>/`, including startup-failure diagnostics. Both GitHub workflows
+upload those logs. Testcontainers' resource reaper remains enabled; no cleanup suppression or
+extra runtime settings were introduced for Podman.
 
-Fixtures do not start or stop containers. Before database setup, custom fixtures, inherited/direct
-test stores, and standalone named-store tests check endpoint reachability with a five-second timeout.
-If the endpoint cannot be reached, the error names it and gives both `start podman` and `start docker`
-launcher commands. Database cleanup is not attempted after a failed startup check. A received HTTP
-response leaves authentication and service validation to the provider; ordinary provider failures
-are not rewritten as missing-container errors. Test cancellation keeps its cancellation exception.
-Failed checks are not cached, so starting the emulator and rerunning tests in the same host works.
+An explicit `INFOCARRIER_COSMOS_ENDPOINT` opts into an external emulator. That mode retains the
+manual `eng/CosmosEmulator.cs -- start|stop podman|docker` command and loopback HTTPS restriction.
+The fixture never removes an externally supplied container. Missing-container errors distinguish
+automatic startup from this external mode and name `podman machine start`. A received HTTP
+response leaves authentication and service validation to the provider. Cancellation stays cancellation.
 
-The stopped-container check intentionally failed five cases across all startup paths, each with
-the endpoint and both launch commands. After explicit startup, the focused run reported Passed: 11,
-Failed: 0, Total: 11, including six standalone diagnostic controls. Logs are under
-`artifacts/cosmos-suite-audit/emulator-*`. These negative startup checks are not part of the normal
-suite's failure count, and the diagnostic controls do not require an emulator.
-The complete normal check then reported Cosmos Passed: 447, Failed: 0, Total: 489, with the same
-42 upstream skips; functional Passed: 30350, Failed: 0, Total: 30583. The combined measurement was
-FAILING: 0, TOTAL: 31072, with no broken tests and unchanged failure reasons. Evidence is under
-`artifacts/measure/cosmos-emulator-diagnostics*`.
+Each fixture still owns a generated database. Explicit cleaning and database deletion remain
+observable operations; Testcontainers does not prove that the earlier missing-table or PostgreSQL
+file errors are resolved. Stability review is deferred until automatic lifecycle validation.
 
 The client uses gateway transport and accepts the emulator certificate only on loopback HTTPS.
 The embedded key is Microsoft's public emulator key, not an Azure credential. Neither
@@ -829,3 +818,34 @@ This includes nine official cases, six matching direct-store controls, six defer
 controls, and the override audit. Token comparisons against independent reads retain the official
 quote normalization. Focused protocol compatibility and protocol-3 execution: Passed: 22,
 Failed: 0, Total: 22. Existing sample trimming diagnostics appeared during that build.
+
+## Automatic container lifecycle and bulk concurrency, November 20, 2026
+
+Testcontainers 4.17.0 now owns one fresh pinned Linux emulator per assembly execution. Random
+loopback ports avoid collisions with manually running emulators. Readiness is bounded, normal
+teardown captures logs before removal, and startup failures preserve the underlying exception.
+The resource reaper remains enabled. Local Windows/Podman required no Docker executable or
+additional environment settings. The initial availability controls passed: Passed: 6, Failed: 0,
+Total: 6. The managed emulator and resource-reaper containers were absent after process exit.
+
+The bulk-concurrency adapter inherits all nine official entity-tag cases, plus the direct-store
+and deferred-acceptance controls. Bulk execution is configured on the actual backend. Transaction
+mode Never is configured explicitly on both sides; this is fixture configuration, not a claim
+that client transaction mode crosses the wire. Focused batch and override audit on a fresh
+automatic container: Passed: 22, Failed: 0, Total: 22.
+
+The previous bulk attempt against the long-running manual container failed 21 cases with emulator
+PostgreSQL E58P01 errors. That failure is retained as infrastructure evidence, not classified as
+an InfoCarrier failure or silently excluded. The fresh-container result does not establish that
+all emulator cleanup races are solved. Per the owner's direction, revisit stability after the
+lifecycle migration rather than repeatedly running identical suites.
+
+The unavailable-runtime probe forced an unreachable named-pipe endpoint and produced the intended
+startup failure: "Cannot start the Cosmos test container. Start Docker with Linux containers, or
+run 'podman machine start'." The original connection exception is retained. Setting DOCKER_HOST
+alone was insufficient to force failure because Testcontainers discovered the available default
+runtime; no false unavailable-runtime result is claimed from that successful discovery check.
+
+An intentional one-test failure also removed the managed emulator and preserved its logs. That
+temporary probe was removed immediately afterward and is not part of the suite. The expected
+negative controls are recorded separately from green behavior-batch counts.
