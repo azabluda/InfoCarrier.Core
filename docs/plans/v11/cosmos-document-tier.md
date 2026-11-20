@@ -189,8 +189,8 @@ official suite. The dated results below identify their tested scope.
 
 ## CI parallelization and remaining follow-up
 
-The owner subsequently moved CI parallelization ahead of the next adoption batch. Testcontainers
-remains a follow-up after completing the applicable suite.
+The owner moved CI parallelization ahead of the next adoption batch. The earlier plan placed
+Testcontainers after adoption; on November 20 its implementation moved earlier to give batches fresh containers.
 
 1. Split functional and Cosmos validation into parallel GitHub Actions jobs on separate runners,
    with a separate job combining results. Coverage collection uses independent functional and
@@ -208,7 +208,7 @@ remains a follow-up after completing the applicable suite.
    explicit launcher. Keep the pinned image, upstream emulator behavior, and test parallelism.
 
 The parallel workflow validation and timing comparison completed before the next batch was pushed.
-The Testcontainers option is not implemented by this change.
+The parallelism-only change did not implement Testcontainers. The November 20 lifecycle change does.
 
 Both parallel workflows passed for `202e3b0f`. The successful sequential baseline is `be7e11a7`.
 The specification and product code are identical across this timing comparison; the parallelism
@@ -611,8 +611,8 @@ into shared test utilities. Its behavior is unchanged: server construction suppl
 required proxies, while the caller's observable name transformation executes on the client.
 No production code changed.
 
-The fixture preserves the official single metadata-probe retry after container recreation.
-It logs the complete first exception and lets a second failure propagate. This is not a database
+At initial adoption, the fixture preserved the official metadata-probe retry after container recreation.
+That retry logged the first exception and propagated a second failure. It was removed on November 20. This is not a database
 cleanup retry. Database deletion remains a single attempt with ownership and exception diagnostics.
 
 Focused Cosmos family and override audit: Passed: 15, Failed: 0, Total: 46, with 31 upstream skips.
@@ -620,9 +620,9 @@ The affected SQLite family: Passed: 34, Failed: 0, Total: 46, with 12 existing s
 Both checks compiled in Release with warnings as errors. Full suites remain delegated to GitHub.
 The preceding converted-key commit d25062c9 passed both Build & Test and Coverage workflows.
 
-Testcontainers remains a follow-up after complete adoption. Evaluate keeping isolated databases
-until suite completion and removing their container afterward, rather than concurrent final deletion.
-This might avoid cleanup failures but does not establish the original failure's cause.
+The earlier plan proposed Testcontainers after adoption and considered deferring database deletion.
+The November 20 migration instead keeps explicit deletion visible and removes the whole container
+after each assembly run. It does not claim that the original cleanup cause is established.
 
 
 ## Value converter round trips, November 15, 2026
@@ -886,3 +886,34 @@ skips. It exercises composite/hierarchical and single partition keys, special ch
 conflicting predicates, inheritance discriminator variants, tracking modes, and missing items.
 The client allows Cosmos query extensions explicitly on both wire halves. No production changes
 or extra emulator environment settings were required.
+
+
+## End-to-end application scenarios and dictionary interfaces, November 20, 2026
+
+Adopted the complete official EndToEndCosmosTest family, retaining its two issue-33402 skips.
+Provider-specific shadow-ID assertions receive the exact backend model explicitly on the client.
+All application reads and writes still cross InfoCarrier. TransactionalBatch settings are explicit
+backend fixture configuration; logger assertions inspect the actual backend logger rather than
+claiming Cosmos logs originate on the client. Redundant EnsureCreated setup remains in the backend
+harness. The pinned custom JSON-ID factory and definition are retained for its key-generator case.
+
+The first complete family and audit reported Passed: 33, Failed: 6, Total: 41, with two official
+skips. Two failures were missing CosmosQueryableExtensions registrations in this new fixture;
+the partition hint was consequently evaluated on the client. That fixture now explicitly grants
+the extension type on both halves. Four failures exposed dictionary-interface reconstruction:
+a list of KeyValuePair values did not implement IDictionary or IReadOnlyDictionary.
+
+The general value mapper now reconstructs a compatible Dictionary for those interfaces. This
+contains no Cosmos-specific type, annotation, or branch. Four provider-neutral round-trip cases
+fail on the old implementation and pass with the correction, including nullable values, nested
+dictionaries, and shared references. They use the production serializer. Together with existing
+expression round trips: Passed: 13, Failed: 0, Total: 13. Focused protocol compatibility/execution:
+Passed: 22, Failed: 0, Total: 22. No wire fields or public signatures changed.
+
+Only the six failed application cases and audit were rerun locally after correction:
+Passed: 7, Failed: 0, Total: 7. The earlier 33 passing cases are left to full GitHub validation;
+this is not presented as a second complete local-family run. Normal, slow, and coverage gates
+remain GitHub work. MongoDB remains disabled and was not exercised by this correction.
+
+The end-to-end fixture also preserves the source's context-pooling option. Focused pooled
+insert/read/update/delete and audit checks passed: Passed: 3, Failed: 0, Total: 3.
