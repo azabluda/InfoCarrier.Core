@@ -781,3 +781,12 @@ disposal, and fresh seeded data after reseeding.
 Focused concurrency, isolation, availability, and override checks: Passed: 22, Failed: 0, Total: 53,
 with 31 existing source-backed skips. Full-suite validation remains GitHub work. Production code and
 wire format are unchanged. The missing-table cause is not claimed as proven.
+
+## Interception families, November 20, 2026
+
+Adopted the official diagnostic query-expression interception and materialization interception
+families. Model configuration reaches both halves; application interceptors remain client-side,
+matching the existing SQLite harness. Embedded settings ownership is explicit because the client
+uses relational conventions. Official issue exclusions and synchronous-I/O refusals are retained.
+Focused batch: Passed: 16, Failed: 0, Total: 24, with eight source-backed skips.
+No production code or wire behavior changed.
