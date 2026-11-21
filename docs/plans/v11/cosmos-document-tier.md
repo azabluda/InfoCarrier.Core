@@ -1181,7 +1181,7 @@ telemetry, and startup-log readiness check. The package exclusion, custom HTTPS 
 port, loopback binding override, and immutable image selection are removed. Explicit external
 mode retains its separate HTTPS restriction and manual helper; it is not the managed test path.
 
-Remaining lifecycle differences are recorded on InitializeAsync with InfoCarrierDesign and Other:
+Remaining lifecycle differences are documented here and in fixture comments:
 one fresh assembly-owned container, explicit external opt-in instead of automatic localhost reuse,
 diagnostic capture, and a three-minute overall startup deadline. These do not alter query execution.
 Gateway mode matches official provider configuration. The separate official test retry strategy
@@ -1407,7 +1407,7 @@ The remaining conflict failure matches confirmed
 Its vnext-latest hotfix returns HTTP 500 instead of the required 409 on duplicate creation.
 The maintainer confirms that the official vnext-EN20261117pre image avoids this defect and plans
 a correction to the default image. The test fixture temporarily selects that dated preview on
-both hosts, with the deviation recorded on InitializeAsync. CosmosDbBuilder, protocol, readiness,
+both hosts, with the reason recorded here and in fixture comments. CosmosDbBuilder, protocol, readiness,
 session storage, parallelism, and all conflict assertions stay unchanged. No packages are changed
 inside the image. Return to upstream's vnext-latest after verifying its correction.
 

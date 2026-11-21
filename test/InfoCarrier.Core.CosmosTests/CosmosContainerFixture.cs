@@ -1,7 +1,6 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Testcontainers.CosmosDb;
-using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(InfoCarrier.Core.CosmosTests.CosmosContainerFixture))]
@@ -14,9 +13,8 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
     private CosmosQueryCapture? _queries;
     private readonly string _logs = Path.Combine(RepositoryRoot(), "artifacts", "cosmos-emulator", Environment.ProcessId.ToString());
 
-    [InfoCarrierDesign(9, Deviation = DeviationKind.Other,
-        Justification = "The document tier owns its Linux emulator lifecycle and retains diagnostics across both host operating systems.",
-        DeviationNote = "Own one fresh assembly container rather than automatically reusing localhost. External endpoints require explicit opt-in. Keep diagnostics and a three-minute startup deadline. Temporarily use the official EN20261117pre image: emulator issue 391 confirms vnext-latest breaks duplicate insertion and this preview avoids the defect. Keep CosmosDbBuilder defaults without package changes.")]
+    // This fixture owns a fresh assembly container, explicit external-endpoint opt-in,
+    // diagnostic capture, and a three-minute startup deadline. See the document-tier validation record.
     public async ValueTask InitializeAsync()
     {
         if (InfoCarrier.Core.FunctionalTests.TestUtilities.LiveComparison.IsEnabled)
