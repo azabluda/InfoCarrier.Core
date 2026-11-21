@@ -1298,3 +1298,20 @@ The complete functional GitHub job on 340a307b reported Passed: 30365, Failed: 0
 with 237 skipped, confirming the inherited-generator correction beyond its focused controls.
 Its Cosmos job still failed conflict-token checks and the one-item paging assertion. The local
 passing paging control therefore does not establish stable Linux behavior.
+
+## Small query-shape differences, November 21, 2026
+
+The next reviewed methods retain their inherited assertions and now explain four measured
+differences: positional enum-projection members and a parameterized one-row Take bound; a renamed
+bound collection variable; removal of a null entity candidate before key membership; and earlier
+cancellation before a backend query-attempt event. The cancellation reference is the wire protocol's
+cancellation-before-dispatch section. These reasons do not cover unrelated shapes or outcomes.
+The six independent terminal-projection controls also verify that unrelated rows do not cross the
+wire. Focused comparison, bounded-payload, and audit checks reported Passed: 13, Failed: 0, Total: 13.
+
+The complete comparison after the exception-assertion correction, before projection triage,
+reported Passed: 4223, Failed: 44, Total: 4648, with 381 skipped in
+[run 44908402798](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44908402798).
+Remaining direct association assertion errors are being separated from actual provider behavior.
+Refreshing vnext-latest from the registry retained the same local image ID, so the independently
+reproduced duplicate-insert failure was not explained by a stale locally cached tag.

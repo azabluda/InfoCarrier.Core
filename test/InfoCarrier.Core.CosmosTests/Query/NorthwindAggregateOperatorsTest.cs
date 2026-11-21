@@ -884,6 +884,9 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1946, 1974,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Query reconstruction can rename the bound collection range variable.",
+        DeviationNote = "The two EXISTS queries use v instead of p for the same collection binding; predicates, parameters, and statement count match.")]
     public override Task Contains_with_local_enumerable_inline_closure_mix(bool async) => Fixture.NoSyncTest(async, base.Contains_with_local_enumerable_inline_closure_mix);
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1976, 1998,

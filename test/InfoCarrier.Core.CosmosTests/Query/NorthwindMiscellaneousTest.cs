@@ -17,6 +17,11 @@ namespace InfoCarrier.Core.CosmosTests.Query;
 public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fixture)
     : NorthwindMiscellaneousQueryTestBase<NorthwindFixture<NoopModelCustomizer>>(fixture)
 {
+    [InfoCarrierDesign("docs/wire-protocol.md", "cancellation-before-dispatch", Deviation = DeviationKind.SqlDiffers,
+        Justification = "An already-canceled transport operation stops before constructing a backend query.",
+        DeviationNote = "Direct EF emits one query-attempt diagnostic before SDK cancellation; InfoCarrier emits none. Both retain the inherited OperationCanceledException and QueryCanceled assertions.")]
+    public override Task ToListAsync_with_canceled_token() => base.ToListAsync_with_canceled_token();
+
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/NorthwindMiscellaneousQueryCosmosTest.cs";
 
     private static NorthwindCustomer ProcessCustomer(NorthwindCustomer c, ManualResetEventSlim e, SemaphoreSlim s)
@@ -2611,6 +2616,9 @@ public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fi
             });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 3738, 3749, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Entity membership reconstruction filters null entity candidates before comparing their keys.",
+        DeviationNote = "The direct id IN (null, ALFKI) predicate becomes id = ALFKI; persisted entity identifiers cannot be null and the inherited result assertions remain unchanged.")]
     public override Task Entity_equality_contains_with_list_of_null(bool async)
         => Fixture.NoSyncTest(
             async, async a =>

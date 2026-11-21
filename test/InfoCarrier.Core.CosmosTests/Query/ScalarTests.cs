@@ -15,6 +15,12 @@ public class GuidTest(BasicTypesFixture fixture) : GuidTranslationsTestBase<Basi
 
 public class EnumTest(BasicTypesFixture fixture) : EnumTranslationsTestBase<BasicTypesFixture>(fixture)
 {
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "A reconstructed terminal projection uses a positional carrier and a server-side Take bound.",
+        DeviationNote = "Item1/Item2/Item3 replace the projected field names; LIMIT uses a parameter for the same one-row bound instead of the direct First literal.")]
+    public override Task Bitwise_projects_values_in_select()
+        => base.Bitwise_projects_values_in_select();
+
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Translations/EnumTranslationsCosmosTest.cs";
 
     [StoreIssue(IssueTracker.EfCore, 35317, UpstreamRepository.EfCore, Source, 243, 245,
