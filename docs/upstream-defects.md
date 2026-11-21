@@ -600,8 +600,11 @@ This is an upstream coverage gap, not a fresh reproduction or a report filed her
 The pinned EF Core 11 miscellaneous Northwind suite excludes its variable-size paging tests
 on the Linux emulator. Its source cites [emulator issue #285](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/285),
 "MaxItemCount not respected". The adopted tier retains only those conditional exclusions.
-The exact-size, point-filter, and subquery-refusal paging tests remain active. This records
-upstream's decision, not a fresh reproduction or a claim about the issue's current status.
+The exact-size, point-filter, and subquery-refusal paging tests remain active. The additional
+three-document ordered paging control adopts the same exclusion, since it exercises the same
+bounded-page contract. A standalone SDK reproduction on November 21, 2026 also returned all three
+documents for MaxItemCount=1 without a continuation token. This does not extend the exclusion
+to other paging scenarios.
 
 Nothing here needs writing. The list exists so that an entry in §1 is not filed twice, and so that a
 reader meeting one of these numbers in a comment can see what it covers.

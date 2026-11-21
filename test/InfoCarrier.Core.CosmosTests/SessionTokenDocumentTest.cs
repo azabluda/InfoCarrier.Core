@@ -34,7 +34,11 @@ public class SessionTokenDocumentTest : IAsyncLifetime
     public ValueTask DisposeAsync() => _store.DisposeAsync();
     protected Task<CosmosSessionTokenContext> CreateContext() => Task.FromResult(_store.CreateContext());
 
-    [Theory, InlineData(false), InlineData(true)]
+    // Same ordered, bounded-page scenario as upstream ToPageAsync; both hosts use the Linux emulator.
+    [StoreDefect("2.7", UpstreamRepository.EfCore,
+        "test/EFCore.Cosmos.FunctionalTests/Query/NorthwindMiscellaneousQueryCosmosTest.cs", 4848, 4904,
+        Skip = true, Justification = "MaxItemCount not respected")]
+    [Theory(Skip = "MaxItemCount not respected"), InlineData(false), InlineData(true)]
     public async Task Paging_returns_values_and_continuation_like_the_direct_store(bool directFirst)
     {
         using var client = await CreateContext();

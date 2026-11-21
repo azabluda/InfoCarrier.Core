@@ -1361,3 +1361,41 @@ and identifies the failing path in a page-size assertion. It retains pageSize=1,
 completion, all three expected identifiers, and no-tracking assertions. Both local cases passed:
 Passed: 2, Failed: 0, Total: 2. This adds diagnostics for the earlier Linux failure; it does not
 declare that intermittent behavior resolved or change the official paging contract.
+
+## Official paging exclusion and conflict investigation, November 21, 2026
+
+The additional ordered, one-document-page control missed the official Linux exclusion already
+adopted by NorthwindMiscellaneousTest.ToPageAsync. It now carries the same StoreDefect reference
+to pinned EF Core 11 NorthwindMiscellaneousQueryCosmosTest.cs lines 4848-4904 and the same
+"MaxItemCount not respected" skip reason. Its body remains for a future emulator correction.
+Both local host operating systems use the Linux emulator, so both receive this exclusion.
+The supported exact-size paging control remains active. Focused paging and override-audit checks
+reported Passed: 2, Failed: 0, Total: 3, with one skipped theory.
+
+The conflict assertion remains unchanged. A standalone reproduction uses the official EF Core
+11.0.0 package, its real session storage, the upstream customer model, two ordinary contexts,
+SemiAutomatic session management, and both upstream transaction settings. It has no InfoCarrier
+references or replacement storage service. Against the default CosmosDbBuilder vnext-latest image,
+both settings reproduce a null conflict token after a successful first insert. The underlying
+duplicate insert returns HTTP 500 with "cannot drop portal ... while it is being set up".
+The official 20-minute request timeout does not change this result. SDK-only reproductions on
+Windows and in a Linux client container also fail without Entity Framework Core.
+
+Independent upstream evidence now confirms that the assertion is not reliably green there.
+Microsoft's [Linux Cosmos job](https://github.com/dotnet/efcore/actions/runs/44859366342/job/136708933780)
+fails Add_conflict_updates_session_token for both Always and Never with expected nonnull tokens
+and actual null. Its Windows Cosmos job succeeds. This upstream run is on the current development
+branch targeting .NET 12, not the pinned EF Core 11 release. The standalone EF Core 11 reproduction
+separately establishes the version-11 result. The upstream log does not expose the underlying
+HTTP error, so matching token failures alone do not prove an identical internal cause.
+
+The evidence identifies an emulator failure independent of InfoCarrier, rather than an extra
+InfoCarrier requirement. There is still no official skip for the conflict cases. No production
+workaround, token fabrication, retry, or changed conflict expectation was introduced. Diagnostic
+sources and logs remain under artifacts/CosmosOfficialConflictRepro.cs,
+artifacts/cosmos-official-conflict-repro.log, and artifacts/official-cosmos-linux-44859366342.log.
+
+All three slow comparison jobs on 3f99e065 completed successfully in
+[run 44911082036](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44911082036).
+Normal and coverage Cosmos validation on that commit retained six failures before this paging
+exclusion. The four conflict cases remain unresolved; a green complete Cosmos suite is not claimed.
