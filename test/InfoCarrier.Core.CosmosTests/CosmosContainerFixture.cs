@@ -25,6 +25,21 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         {
             _container = new ContainerBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:81707bcadf894a29d7dab63377685d408b5d54dca3aacfb625c19db4c6392e7c")
                 .WithLabel("io.infocarrier.cosmos-tests", "true")
+                // Preserve the pinned image's PostgreSQL binaries. Its background distro-sync
+                // replaces plpgsql.so with an ABI-incompatible library while the server runs.
+                // All original package-manager settings and other package updates are retained.
+                .WithResourceMapping(System.Text.Encoding.UTF8.GetBytes("""
+                    [main]
+                    gpgcheck=1
+                    installonly_limit=3
+                    installonlypkgs=kernel kernel-mshv kernel-uvm kernel-uki kernel-64k kernel-hwe
+                    clean_requirements_on_remove=0
+                    repodir=/etc/yum.repos.d
+                    cachedir=/var/cache/tdnf
+                    plugins=1
+                    excludepkgs=postgresql*
+
+                    """), FilePath.Of("/etc/tdnf/tdnf.conf"))
                 .WithEnvironment("ENABLE_EXPLORER", "false")
                 .WithEnvironment("ENABLE_TELEMETRY", "false")
                 .WithCommand("--protocol", "https")
@@ -69,12 +84,14 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         try
         {
             Directory.CreateDirectory(_logs);
-            foreach (string name in new[] { "pglog.log", "package-updates.log", "start_postgres_server.log" })
+            foreach (string name in new[] { "pglog.log", "package-updates.log", "start_postgres_server.log", "postgresql-packages.log" })
             {
                 try
                 {
                     using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    var result = await container.ExecAsync(["cat", "/logs/" + name], deadline.Token);
+                    string[] command = name == "postgresql-packages.log"
+                        ? ["rpm", "-q", "postgresql", "postgresql-libs"] : ["cat", "/logs/" + name];
+                    var result = await container.ExecAsync(command, deadline.Token);
                     await File.WriteAllTextAsync(Path.Combine(_logs, name),
                         result.Stdout + result.Stderr + $"\nCapture exit code: {result.ExitCode}\n");
                 }

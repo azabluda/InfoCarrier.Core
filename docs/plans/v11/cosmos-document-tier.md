@@ -1128,3 +1128,44 @@ not a promise that every document provider exposes identical conventions or capa
 All classes in the pinned discovered Cosmos inventory now have an adoption or applicability
 decision. Final full normal, coverage, and SQLite/Firebird slow validation remain outstanding.
 The newly captured emulator failures prevent declaring the expanded milestone validated.
+
+
+## CI regression corrections, November 21, 2026
+
+Final-commit validation exposed two separate failures. The normal and coverage functional runs
+both reported Passed: 29589, Failed: 776, Total: 30602. Their graph-update failures originated
+in the new temporary-key preparation, not in Cosmos. Keys already marked temporary were needlessly
+regenerated; inherited-type generator caches could start at a value already tracked by another
+entry. The prepass now leaves existing temporary values alone and still prepares exchanges of
+explicit existing keys. The unchanged failing alternate-key family first reported Passed: 0,
+Failed: 98, Total: 98. With the correction and generated-document controls it reported
+Passed: 108, Failed: 0, Total: 108. The additional failing slow-comparison graph case passed:
+Passed: 1, Failed: 0, Total: 1. Focused protocol controls: Passed: 22, Failed: 0, Total: 22.
+
+The newly captured Cosmos PostgreSQL log identifies the E58P01 cause precisely:
+`could not load library "/usr/lib/postgresql/plpgsql.so"` with
+`undefined symbol: heap_datum_update_type`. The package-update artifact records background
+replacement of postgresql and postgresql-libs 16.15 with 16.16 while the image's original custom
+server is running. Thus the pinned container digest did not keep its database libraries pinned.
+The normal Cosmos job reported 212 failures and its coverage counterpart 263; fixture failures
+account for many dependent test failures. These are distinct from the relational key regression.
+
+Managed Testcontainers runs now supply the original /etc/tdnf/tdnf.conf settings plus
+`excludepkgs=postgresql*`. This keeps the image's original database packages while retaining
+other system-package updates. The actual package-manager noninstalling transaction preview
+excludes PostgreSQL from the upgrade plan. A first comma-separated draft did not exclude either
+package and was corrected before commit; its green focused run is not evidence for the final pin.
+The documented package exclusion mechanism is described in the
+[tdnf configuration reference](https://vmware.github.io/photon/docs-v5/administration-guide/managing-packages-with-tdnf/configuration_options/).
+
+This is an explicit test-container package pin, not a query-parser setting, suppressed failure,
+cleanup retry, or reduced parallelism. It applies to managed containers; explicit external
+emulators remain the caller's responsibility. Teardown also records installed PostgreSQL package
+versions. The earlier missing-relation errors are not declared resolved by this separate library
+mismatch diagnosis. Full normal, coverage, and final-commit slow comparisons must be reviewed again.
+
+
+Final wildcard-pin, document key-exchange, availability, and audit checks reported Passed: 10,
+Failed: 0, Total: 10. The captured installed-package record shows postgresql and postgresql-libs
+still at 16.15-1.azl3. The transaction preview aborts without installing, as intended; its upgrade
+plan omits both PostgreSQL packages. Those focused checks do not replace a complete GitHub run.

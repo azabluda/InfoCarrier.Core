@@ -867,6 +867,8 @@ public class InfoCarrierDatabase(
         // A response can exchange generated key values between tracked entries. Move changing
         // keys to fresh temporary values before applying any final values, so response order
         // cannot cause a transient identity-map collision. Foreign keys follow normal fixup.
+        // Existing temporary keys already occupy safe slots. Regenerating them can restart a
+        // derived-type generator at a value held by another tracked entry.
         var generators = _currentContext.Context.GetService<Microsoft.EntityFrameworkCore.ValueGeneration.IValueGeneratorSelector>();
         foreach (Common.GeneratedValues generated in result.GeneratedValues)
         {
@@ -876,7 +878,7 @@ public class InfoCarrierDatabase(
             foreach (Expressions.DynamicPropertyValue value in ChangeEntryMapper.ReadValues(generated.SerializedValues))
             {
                 if (entry.EntityType.FindProperty(value.Name) is not { } property
-                    || !property.IsKey() || property.IsForeignKey()
+                    || !property.IsKey() || property.IsForeignKey() || entry.HasTemporaryValue(property)
                     || Microsoft.EntityFrameworkCore.Metadata.Internal.PropertyBaseExtensions.GetStoreGeneratedIndex(property) == -1)
                     continue;
                 object? finalValue = Expressions.PrimitiveCoercion.FromWireValue(
