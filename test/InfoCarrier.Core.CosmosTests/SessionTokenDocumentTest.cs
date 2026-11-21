@@ -34,21 +34,32 @@ public class SessionTokenDocumentTest : IAsyncLifetime
     public ValueTask DisposeAsync() => _store.DisposeAsync();
     protected Task<CosmosSessionTokenContext> CreateContext() => Task.FromResult(_store.CreateContext());
 
-    [Fact]
-    public async Task Paging_returns_values_and_continuation_like_the_direct_store()
+    [Theory, InlineData(false), InlineData(true)]
+    public async Task Paging_returns_values_and_continuation_like_the_direct_store(bool directFirst)
     {
         using var client = await CreateContext();
-        client.Customers.AddRange(Enumerable.Range(1, 3).Select(i => new Customer { Id = i.ToString(), PartitionKey = "1" }));
-        await client.SaveChangesAsync(TestContext.Current.CancellationToken);
-        client.ChangeTracker.Clear();
-        var remoteIds = await ReadPages(client.Customers.AsNoTracking());
         using var direct = _store.CreateBackendContext();
-        var directIds = await ReadPages(direct.Customers.AsNoTracking());
+        var seed = directFirst ? direct : client;
+        seed.Customers.AddRange(Enumerable.Range(1, 3).Select(i => new Customer { Id = i.ToString(), PartitionKey = "1" }));
+        await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        seed.ChangeTracker.Clear();
+        List<string?> directIds;
+        List<string?> remoteIds;
+        if (directFirst)
+        {
+            directIds = await ReadPages(direct.Customers.AsNoTracking(), "direct provider");
+            remoteIds = await ReadPages(client.Customers.AsNoTracking(), "InfoCarrier");
+        }
+        else
+        {
+            remoteIds = await ReadPages(client.Customers.AsNoTracking(), "InfoCarrier");
+            directIds = await ReadPages(direct.Customers.AsNoTracking(), "direct provider");
+        }
         Assert.Equal(new[] { "1", "2", "3" }, remoteIds);
         Assert.Equal(directIds, remoteIds);
         Assert.Empty(client.ChangeTracker.Entries());
 
-        static async Task<List<string?>> ReadPages(IQueryable<Customer> source)
+        static async Task<List<string?>> ReadPages(IQueryable<Customer> source, string path)
         {
             List<string?> ids = [];
             string? continuation = null;
@@ -56,7 +67,8 @@ public class SessionTokenDocumentTest : IAsyncLifetime
             {
                 var page = await source.OrderBy(c => c.Id).ToPageAsync(1, continuation,
                     cancellationToken: TestContext.Current.CancellationToken);
-                Assert.InRange(page.Values.Count, 0, 1);
+                Assert.True(page.Values.Count <= 1,
+                    $"The {path} returned {page.Values.Count} values for pageSize=1 on page {i}; continuation={continuation ?? "<null>"}.");
                 ids.AddRange(page.Values.Select(c => c.Id));
                 continuation = page.ContinuationToken;
                 if (string.IsNullOrEmpty(continuation)) return ids;

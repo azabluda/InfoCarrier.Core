@@ -711,7 +711,11 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
         Assert.Equal(NotImplementedBindPropertyMessage, message);
     }
 
-    [StoreLimit(UpstreamRepository.EfCore, Source, 716, 723, Skip = true, Justification = Upstream.GaveNoReason, Deviation = DeviationKind.StoreExceptionAsData, DeviationNote = "The wire preserves the Cosmos SDK exception as InfoCarrierServerException.")]
+    [StoreLimit(UpstreamRepository.EfCore, Source, 716, 723, Case = "async: False", Skip = true, Justification = "Always throws for sync.")]
+    [StoreLimit(UpstreamRepository.EfCore, Source, 716, 723, Case = "async: True", Justification = Upstream.GaveNoReason, Deviation = DeviationKind.StoreExceptionAsData)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the key and entity through positional carrier members.",
+        DeviationNote = "Item1/Item2 replace Id/x; the indexed predicate and expected Cosmos refusal are unchanged.")]
     public override async Task Json_collection_index_in_predicate_using_column(bool async)
     {
         // Always throws for sync.
@@ -722,7 +726,11 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
         }
     }
 
-    [StoreLimit(UpstreamRepository.EfCore, Source, 725, 733, Skip = true, Justification = Upstream.GaveNoReason, Deviation = DeviationKind.StoreExceptionAsData, DeviationNote = "The wire preserves the Cosmos SDK exception as InfoCarrierServerException.")]
+    [StoreLimit(UpstreamRepository.EfCore, Source, 725, 733, Case = "async: False", Skip = true, Justification = "Always throws for sync.")]
+    [StoreLimit(UpstreamRepository.EfCore, Source, 725, 733, Case = "async: True", Justification = Upstream.GaveNoReason, Deviation = DeviationKind.StoreExceptionAsData)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the key and entity through positional carrier members.",
+        DeviationNote = "Item1/Item2 replace Id/x; the conditional indexed predicate and expected Cosmos refusal are unchanged.")]
     public override async Task Json_collection_index_in_predicate_using_complex_expression1(bool async)
     {
         // Always throws for sync.

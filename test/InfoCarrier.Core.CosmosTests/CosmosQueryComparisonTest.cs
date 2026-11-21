@@ -9,6 +9,38 @@ namespace InfoCarrier.Core.CosmosTests;
 public class CosmosQueryComparisonTest(DocumentStoreFixture fixture) : IClassFixture<DocumentStoreFixture>
 {
     [Theory]
+    [InlineData("alice", "Alice")]
+    [InlineData("bob", "Bob")]
+    public async Task Point_reads_use_the_requested_key_among_multiple_documents(string id, string name)
+    {
+        var owner = Assert.IsType<CurrentTest>(CurrentTest.Value);
+        var reads = new List<(string Id, string Container, string Partition)>();
+        using var observer = new CosmosQueryCapture(item =>
+        {
+            if (ReferenceEquals(CurrentTest.Value, owner))
+                reads.Add((item.ResourceId, item.ContainerId, item.PartitionKeyValue.ToString()));
+        });
+        using var direct = fixture.CreateBackend();
+        Assert.Equal(3, await direct.Customers.CountAsync(TestContext.Current.CancellationToken));
+        var expected = await direct.Customers.AsNoTracking().SingleAsync(c => c.Id == id, TestContext.Current.CancellationToken);
+        AssertRead(expected);
+        reads.Clear();
+        using var client = fixture.CreateNonRelationalClient();
+        var actual = await client.Customers.AsNoTracking().SingleAsync(c => c.Id == id, TestContext.Current.CancellationToken);
+        AssertRead(actual);
+
+        void AssertRead(Customer customer)
+        {
+            Assert.Equal(id, customer.Id);
+            Assert.Equal(name, customer.Name);
+            var read = Assert.Single(reads);
+            Assert.Equal(id, read.Id);
+            Assert.Equal("customers", read.Container);
+            Assert.Equal(new Microsoft.Azure.Cosmos.PartitionKey(id).ToString(), read.Partition);
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Filter_projection_order_and_limit_match_the_direct_store(bool nested)

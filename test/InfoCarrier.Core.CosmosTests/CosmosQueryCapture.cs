@@ -12,8 +12,14 @@ internal sealed class CosmosQueryCapture : IObserver<DiagnosticListener>, IObser
 {
     private readonly List<IDisposable> _subscriptions = [];
     private readonly IDisposable _listeners;
+    private readonly Action<CosmosReadItemEventData>? _pointRead;
 
-    public CosmosQueryCapture() => _listeners = DiagnosticListener.AllListeners.Subscribe(this);
+    // Observer mode inspects input identifiers without adding comparison records in concurrent tests.
+    public CosmosQueryCapture(Action<CosmosReadItemEventData>? pointRead = null)
+    {
+        _pointRead = pointRead;
+        _listeners = DiagnosticListener.AllListeners.Subscribe(this);
+    }
 
     public void OnNext(DiagnosticListener listener)
     {
@@ -24,6 +30,11 @@ internal sealed class CosmosQueryCapture : IObserver<DiagnosticListener>, IObser
 
     public void OnNext(KeyValuePair<string, object?> value)
     {
+        if (_pointRead is { } observe)
+        {
+            if (value.Value is CosmosReadItemEventData item) observe(item);
+            return;
+        }
         if (CurrentTest.Value is not { } test) return;
         switch (value.Value)
         {

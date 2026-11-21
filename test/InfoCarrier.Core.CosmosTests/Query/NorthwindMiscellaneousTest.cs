@@ -1271,6 +1271,9 @@ public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fi
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1721, 1740, Case = "async: False", Skip = true, Justification = "Always throws for sync.")]
     [StoreIssue(IssueTracker.EfCore, 17246, UpstreamRepository.EfCore, Source, 1721, 1740, Case = "async: True", Justification = "Cosmos client evaluation. Issue #17246.", Deviation = DeviationKind.StoreExceptionAsData)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the coalesced values through positional carrier members.",
+        DeviationNote = "Item1/Item2/Item3 replace CustomerID/CompanyName/Region; coalescing, ordering, and the expected Cosmos refusal are unchanged.")]
     public override async Task Select_null_coalesce_operator(bool async)
     {
         // Always throws for sync.
@@ -1334,6 +1337,9 @@ public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fi
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1833, 1856, Case = "async: False", Skip = true, Justification = "Always throws for sync.")]
     [StoreIssue(IssueTracker.EfCore, 17246, UpstreamRepository.EfCore, Source, 1833, 1856, Case = "async: True", Justification = "Subquery pushdown. Issue #16156.", Deviation = DeviationKind.StoreExceptionAsData)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the coalesced values through positional carrier members.",
+        DeviationNote = "Item1/Item2/Item3 replace CustomerID/CompanyName/Region; coalescing, ordering, the parameterized limit, and the expected Cosmos refusal are unchanged.")]
     public override async Task Select_take_null_coalesce_operator(bool async)
     {
         // Always throws for sync.

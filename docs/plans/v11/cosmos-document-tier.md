@@ -1332,3 +1332,32 @@ The focused replay, dedicated direct controls, and override audit reported Passe
 Total: 17. The Release build passed with warnings treated as errors. The complete comparison on
 55bd2841 reported Passed: 4253, Failed: 14, Total: 4648, with 381 official skips, before this
 association correction and the small query-shape annotations.
+
+## Final captured differences and stronger read controls, November 21, 2026
+
+Re-read the official indexed-JSON and coalescing Cosmos overrides before classifying the four
+remaining projection differences. They preserve the same predicates, ordering, limits, and native
+Cosmos refusal; positional carrier member names differ. Their custom attributes now explain that
+specific difference. The two indexed-JSON skip records now describe only the synchronous arms,
+matching the upstream condition; their asynchronous error assertions were already active and remain.
+
+The compiled raw-query case is different: the official compiled Cosmos query inlines its constant
+CONSH argument. The compiled InfoCarrier client ships the raw expression and values for ordinary
+backend translation, as ADR-006 specifies; that backend execution keeps the argument parameterized.
+An ADR-006 SqlDiffers reason records this distinction. Both executions now also assert CustomerID
+equals CONSH, beyond the unchanged single-row assertion. This is not claimed to produce identical
+query plans. No compile-mode wire field or provider-specific production branch was added.
+Focused comparison and override-audit checks reported Passed: 7, Failed: 0, Total: 11, with four
+existing official synchronous skips. The strict Release build passed.
+
+Point-read comparison excludes varying generated identifiers, while a separate always-on control
+now validates exact SDK diagnostic item and partition keys against three stored customers. It
+requests two different keys through both native Cosmos and InfoCarrier and checks the corresponding
+names. Its scoped observer does not add duplicate comparison records in other parallel tests.
+Point-key, existing query comparison, and audit controls reported Passed: 6, Failed: 0, Total: 6.
+
+The independent paging control now runs in both orders, with native or wire insertion respectively,
+and identifies the failing path in a page-size assertion. It retains pageSize=1, continuation
+completion, all three expected identifiers, and no-tracking assertions. Both local cases passed:
+Passed: 2, Failed: 0, Total: 2. This adds diagnostics for the earlier Linux failure; it does not
+declare that intermittent behavior resolved or change the official paging contract.

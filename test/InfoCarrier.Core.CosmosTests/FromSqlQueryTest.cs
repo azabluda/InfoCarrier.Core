@@ -192,6 +192,9 @@ SELECT * FROM root c WHERE c["$type"] = "Customer"
             });
 
     [Theory, MemberData(nameof(IsAsyncData))]
+    [InfoCarrierDesign(6, Deviation = DeviationKind.SqlDiffers | DeviationKind.Other,
+        Justification = "A compiled client query ships a raw tree and values for ordinary backend query translation.",
+        DeviationNote = "The raw CONSH argument remains a bound parameter on the server instead of the direct compiled query's literal. Also assert the returned CustomerID, beyond upstream's single-row count.")]
     public virtual Task FromSqlRaw_queryable_composed_compiled_with_parameter(bool async)
         => Fixture.NoSyncTest(
             async, async a =>
@@ -207,6 +210,7 @@ SELECT * FROM root c WHERE c["$type"] = "Customer"
                         var actual = await query(context).ToListAsync();
 
                         Assert.Single(actual);
+                        Assert.Equal("CONSH", actual[0].CustomerID);
                     }
                 }
                 else
@@ -220,6 +224,7 @@ SELECT * FROM root c WHERE c["$type"] = "Customer"
                         var actual = query(context).ToArray();
 
                         Assert.Single(actual);
+                        Assert.Equal("CONSH", actual[0].CustomerID);
                     }
                 }
 
