@@ -1497,3 +1497,36 @@ The remaining recorded differences stay. Projection rewriting, parameter transpo
 and incomplete-document repair are shared InfoCarrier mechanisms. Their exact generated query
 forms depend on the backend provider. Cosmos session-token behavior and emulator cross-database
 token interference are Cosmos-specific observations; no equivalent MongoDB behavior is claimed.
+
+## Rejecting temporary keys unsupported by the backend, November 21, 2026
+
+The unconfigured-key regression confirmed an actual persisted placeholder: the missing-key insert
+succeeded and an independent backend query returned Id=-2147482647. Before the correction, the
+new rejection regression reported Passed: 0, Failed: 1, Total: 1. It checks the stored row count
+and keys, not only the client model or SaveChanges return value.
+
+ServerSaveChangesExecutor now rejects an Added entry's temporary key when the backend marks it
+ValueGenerated.Never and it is not a borrowed foreign key. The existing TemporaryProperties field
+distinguishes placeholders from explicit values. A configuration error identifies the property and
+requires matching generation rules before any database write. The positive control saves an
+explicit negative key and independently reads it back. This is a provider-neutral safety fix;
+it neither infers Cosmos conventions nor adds wire fields or a protocol version.
+
+The original explicitly aligned official key test remains, together with its convention controls.
+Rejecting an inconsistent request is not full convention parity: the guard reports a configuration
+error, rather than reproducing Cosmos's provider-specific missing-key warning. Permanent generated
+values remain outside this temporary-value protection. The architecture now documents the
+configuration requirement and this protection.
+
+The affected key class and audit reported Passed: 14, Failed: 0, Total: 14. Focused document writes,
+nested values, repair, and end-to-end cases reported Passed: 101, Failed: 0, Total: 105, with four
+existing official skips. Logs are under artifacts/cosmos-temporary-key-before/,
+artifacts/cosmos-temporary-key-after/, and artifacts/cosmos-temporary-key-documents/.
+Shared generated-value and foreign-key controls on InMemory and SQLite reported Passed: 12,
+Failed: 0, Total: 12. Historical payload and protocol controls reported Passed: 33, Failed: 0,
+Total: 33. The production Release rebuild passed with source warnings treated as errors; its
+existing NU1900 vulnerability-service connectivity warning was excluded from that local error policy.
+
+Historical scope was checked against v10.3.0: LiveComparison selected only the SQLite and Firebird
+namespaces. MongoDB retained separate direct controls rather than this full query-comparison path.
+Current evidence does not date every deviation or show that MongoDB had identical manifestations.

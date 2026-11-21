@@ -302,6 +302,35 @@ public class DefaultKeyValuesTest(DefaultKeyValuesTest.CosmosDefaultKeyValuesTes
     }
 
     [Fact]
+    public async Task Client_temporary_keys_are_rejected_when_the_backend_never_generates_them()
+    {
+        var store = (InfoCarrierTestStore)Fixture.TestStore;
+        using var direct = store.Backend.CreateDbContext();
+        int before = await direct.Set<SingleSameKeyAndPartitionKey>().CountAsync(TestContext.Current.CancellationToken);
+        using var client = new ConventionOnlyKeyContext(store.AddProviderOptions(new DbContextOptionsBuilder()).Options);
+        var entry = client.Add(new SingleSameKeyAndPartitionKey());
+        Assert.True(entry.Property(e => e.Id).IsTemporary);
+
+        var failure = await Record.ExceptionAsync(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
+        var keys = await direct.Set<SingleSameKeyAndPartitionKey>().Select(e => e.Id)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.True(failure is InvalidOperationException,
+            $"Expected temporary-key rejection; actual={failure?.GetType().FullName ?? "success"}; "
+            + $"stored count before={before}, after={keys.Count}; keys=[{string.Join(",", keys)}].");
+        Assert.Contains("temporary", failure!.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(SingleSameKeyAndPartitionKey.Id), failure.Message, StringComparison.Ordinal);
+        Assert.Equal(before, keys.Count);
+
+        // An explicitly supplied negative key is a real key, not a temporary-value heuristic.
+        using var explicitClient = new ConventionOnlyKeyContext(store.AddProviderOptions(new DbContextOptionsBuilder()).Options);
+        var explicitEntry = explicitClient.Add(new SingleSameKeyAndPartitionKey { Id = -12345 });
+        Assert.False(explicitEntry.Property(e => e.Id).IsTemporary);
+        await explicitClient.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(-12345, await direct.Set<SingleSameKeyAndPartitionKey>().Where(e => e.Id == -12345)
+            .Select(e => e.Id).SingleAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Composite_same_key_and_partition_key_must_have_key_set()
     {
         using var context = CreateContext();

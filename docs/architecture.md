@@ -1017,6 +1017,34 @@ with only the owner able to end it.
 
 **Closed by plan J3 (2026-08-17).** Nothing was built for it.
 
+#### Client and server key-generation conventions, November 21, 2026
+
+The client and backend run different provider conventions, even when they share OnModelCreating.
+Configure key-generation intent explicitly where those conventions differ. For application-assigned
+integer keys, use the same configuration on both models:
+
+```csharp
+modelBuilder.Entity<Item>().Property(e => e.Id).ValueGeneratedNever();
+```
+
+The Cosmos default-key control demonstrates why this matters: the client convention marks a
+single integer key OnAdd, while native Cosmos marks it Never. Previously, the client allocated
+a temporary negative key and the server stored that placeholder as a real key. The save could
+succeed where the official missing-key scenario rejects the insert.
+
+Server replay now rejects an Added entry's temporary, independently generated key when the
+backend model declares ValueGenerated.Never. It uses the transmitted temporary-value flag and
+backend metadata, not a negative-number heuristic or a provider name. An explicitly supplied
+negative key remains valid. Foreign keys that borrow a principal's placeholder still use normal
+graph resolution. The error identifies the property and asks for matching key-generation rules;
+the request is rejected before SaveChanges writes any rows.
+
+This is protection against persisting a placeholder, not automatic synchronization of provider
+conventions. Permanent client-generated values are not distinguishable from explicit values by
+this flag. Explicit model configuration remains necessary where defaults differ. MongoDB's exact
+defaults have not been verified by this Cosmos investigation. The existing wire fields and format
+are unchanged; updated servers reject the invalid temporary-key requests previously accepted.
+
 ### D4 — chained InfoCarrier: a server whose own `DbContext` is an InfoCarrier client
 
 **Raised and measured 2026-08-16, during the D3 audit. Two defects recorded, neither scheduled.**

@@ -232,6 +232,20 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 object? clrValue = PrimitiveCoercion.FromWireValue(
                     property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
 
+                // A client placeholder is not an application-supplied key. When the backend
+                // never generates this key, replaying that placeholder as a real value can make
+                // an unset-key insert succeed. Reject the convention mismatch before any write.
+                // Foreign keys can borrow a principal's placeholder and resolve later below.
+                if (isAdded && temporaryNames.Contains(property.Name)
+                    && property.IsKey() && !property.IsForeignKey()
+                    && property.ValueGenerated == ValueGenerated.Never)
+                {
+                    throw new InvalidOperationException(
+                        $"The client supplied a temporary key for '{entityType.Name}.{property.Name}', "
+                        + "but the server model does not generate this key. "
+                        + "Configure matching key-generation rules on the client and server models before saving.");
+                }
+
                 // "A key this store issues" is `ValueGenerated`, not "is not a foreign key".
                 // The two agree for every ordinary model, which is why the FK test stood in for
                 // it — but they part company on a **key cycle**, and there the FK test gives the
