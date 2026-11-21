@@ -71,7 +71,9 @@ internal sealed class QueryExecutor<TElement>
         _expressionSerializer = expressionSerializer;
         try
         {
-            _relationalRoots = Relational.InfoCarrierRelationalQueryRoots.Instance;
+            _relationalRoots = queryContext.Context.GetInfrastructure()
+                .GetService<Metadata.IInfoCarrierRelationalQueryRoots>()
+                ?? Relational.InfoCarrierRelationalQueryRoots.Instance;
 
             // Before the substitution below, because after it a closure-captured value is a constant
             // too, and EF lets that one pass (#113). See `CapturedConstantValidator`.

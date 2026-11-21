@@ -926,3 +926,34 @@ source's bulk/transaction warning policy. The second uses Never on both sides an
 exact true-arm exclusion. Context pooling follows the source option; test parallelism is unchanged.
 Focused complete batch and audit: Passed: 63, Failed: 0, Total: 81, with 18 official skips.
 No additional production change was needed.
+
+
+## Raw Cosmos queries and registered root adapters, November 21, 2026
+
+The complete official FromSqlQueryCosmosTest family now crosses InfoCarrier, including its
+SQL inputs and parameter cases. Golden SQL baselines remain omitted. The two Linux-emulator
+issue-335 projection exclusions retain exact upstream references. The fixture registers an
+adapter for the official Cosmos query-root type through the existing public service seam,
+and explicitly grants arbitrary SQL execution on the backend.
+
+QueryExecutor previously ignored a registered root adapter and always selected the default
+relational adapter. It now resolves that existing service, retaining the default fallback.
+Two provider-neutral InMemory regressions fail before this change and pass afterward, covering
+synchronous and asynchronous execution through the production serializer. No Cosmos type or
+wire field was added to production code. MongoDB remains disabled and was not tested.
+
+Focused raw-query family and audit: Passed: 49, Failed: 0, Total: 51, with two official skips.
+Final registered-service regressions: Passed: 2, Failed: 0, Total: 2. Focused transport service
+replacement and protocol controls: Passed: 52, Failed: 0, Total: 52.
+
+## GitHub validation review, November 21, 2026
+
+Commit 86383505 passed every job in both [Build & Test](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44819904048)
+and [Coverage](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44819904027).
+The preceding [Build & Test run](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44818602181)
+at 27d752f1 failed two ComplexTypesTrackingTest cases during SaveChanges: changing a deleted
+complex-field-record collection to Modified, and tracking complex readonly structs as Added.
+The emulator reported missing PostgreSQL document relations. These failures happened after
+Testcontainers adoption. The later successful run does not establish their cause or resolution.
+Keep the lifecycle and database-owner diagnostics; continue adoption while monitoring subsequent
+runs, as directed by the owner, rather than repeatedly launching identical suites.
