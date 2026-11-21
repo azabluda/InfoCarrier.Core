@@ -248,7 +248,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Inline_collection_index_Column()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Inline_collection_index_Column);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Inline_collection_index_Column);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -270,7 +270,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Inline_collection_value_index_Column()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Inline_collection_value_index_Column);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Inline_collection_value_index_Column);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -283,7 +283,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Inline_collection_List_value_index_Column()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Inline_collection_List_value_index_Column);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Inline_collection_List_value_index_Column);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -296,7 +296,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Parameter_collection_index_Column_equal_Column()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Parameter_collection_index_Column_equal_Column);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Parameter_collection_index_Column_equal_Column);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -309,7 +309,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Parameter_collection_index_Column_equal_constant()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Parameter_collection_index_Column_equal_constant);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Parameter_collection_index_Column_equal_constant);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -322,7 +322,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Column_collection_OrderByDescending_ElementAt()
     {
         // 'ORDER BY' is not supported in subqueries.
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Column_collection_OrderByDescending_ElementAt);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Column_collection_OrderByDescending_ElementAt);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -372,7 +372,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Parameter_collection_with_type_inference_for_JsonScalarExpression()
     {
         // Member indexer (c.Array[c.SomeMember]) isn't supported by Cosmos
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(
+        var exception = await CosmosExceptionAssert.ThrowsAsync(
             base.Parameter_collection_with_type_inference_for_JsonScalarExpression);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
@@ -452,7 +452,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Project_collection_of_ints_ordered()
     {
         // 'ORDER BY' is not supported in subqueries.
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Project_collection_of_ints_ordered);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Project_collection_of_ints_ordered);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -465,7 +465,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
     public override async Task Project_collection_of_nullable_ints_with_paging2()
     {
         // 'ORDER BY' is not supported in subqueries.
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Project_collection_of_nullable_ints_with_paging2);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Project_collection_of_nullable_ints_with_paging2);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);
@@ -477,7 +477,7 @@ public class PrimitiveCollectionsTest(PrimitiveCollectionsTest.CosmosFixture fix
         DeviationNote = "Assert the remote CosmosException type and its BadRequest status text.")]
     public override async Task Project_multiple_collections()
     {
-        var exception = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Project_multiple_collections);
+        var exception = await CosmosExceptionAssert.ThrowsAsync(base.Project_multiple_collections);
 
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, exception.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("BadRequest (400)", exception.Message, StringComparison.Ordinal);

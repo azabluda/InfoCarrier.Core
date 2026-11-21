@@ -33,7 +33,7 @@ public class NorthwindFunctionsTest(NorthwindFixture<NoopModelCustomizer> fixtur
                 await base.Order_by_length_twice(false);
                 return;
             }
-            InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.Order_by_length_twice(a));
+            InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(() => base.Order_by_length_twice(a));
             Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
             Assert.Contains("Unsupported ORDER BY clause.", error.Message, StringComparison.Ordinal);
         });

@@ -1230,3 +1230,44 @@ passed with warnings treated as errors. Reference:
 [ValueGenerationManager](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/src/EFCore/ChangeTracking/Internal/ValueGenerationManager.cs#L188-L222).
 Focused protocol compatibility and protocol 3 execution checks reported Passed: 22, Failed: 0,
 Total: 22. No payload format or field meaning changed.
+
+## Current official-image conflict failure and first full comparison, November 21, 2026
+
+The current vnext-latest image identifies itself as EN20261019. Its original PostgreSQL and
+library packages are both 16.16-1.azl3, before running its startup script. Consequently the
+previous image's 16.15-to-16.16 update diagnosis does not explain this new observation, and no
+package exclusion is restored. Local image inspection recorded image ID
+fb41c9f127ccd798bf5c0e14d9d2ba8b457b71fa8c2a32d3bbcc88f1384273a5.
+
+The previously failing paging scenario passed against the official module. The conflict-token
+scenario still failed in both transaction modes. An independent direct-provider execution using
+the same model, storage setup, and operations reproduced both failures without InfoCarrier:
+Passed: 0, Failed: 4, Total: 4 across the direct and wire controls. Duplicate insertion returns
+500 InternalServerError, not the intended conflict, with PostgreSQL reporting
+`cannot drop portal "<unnamed portal ...>" while it is being set up`. No session token arrives.
+The PostgreSQL log independently records the error while executing cosmos_api.create_document.
+The upstream token-equality requirement stays unchanged and failing. Diagnostic assertions now
+include the underlying exception, rather than hiding the 500 behind a token mismatch. No retry,
+skip, package mutation, or weaker token assertion is introduced. This local failure is not proof
+of the cause of the earlier Linux token difference.
+
+The first complete optional Cosmos comparison on c760e842 reported Passed: 4184, Failed: 83,
+Total: 4648, with 381 skipped, in
+[run 44907219437](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44907219437).
+The failures include projection carrier names, literal-versus-parameter query limits, and
+direct/wire outcome differences. They are an investigation queue, not 83 established production
+defects and not 83 accepted deviations. The comparison remains red until each difference is
+explained or corrected. The exact-commit normal, coverage, and all-store slow runs on 340a307b
+were still running when these findings were recorded.
+
+Initial triage found that some outcome differences were assertion-harness errors: copied wire
+assertions expected InfoCarrierServerException even during a direct-provider replay, which
+correctly threw CosmosException. CosmosExceptionAssert now requires the exact native exception
+on the direct path and the exact transmitted wrapper on the wire path. Only after asserting that
+type does it expose a common type-name/message view for existing assertions. It does not wrap the
+executed query, change provider behavior, accept arbitrary exceptions, or change expected results.
+Existing StoreExceptionAsData metadata continues to describe this mechanical wire difference.
+Focused failing-replay cases and the complete override audit then reported Passed: 4, Failed: 0,
+Total: 5, with one existing official synchronous-operation skip. The conflict-token controls
+remain red by design of this investigation: they still require the upstream successful behavior,
+and do not accept the observed emulator error as a passing result.

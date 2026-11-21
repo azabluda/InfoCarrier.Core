@@ -49,7 +49,7 @@ public class CollectionTest(ComplexFixture fixture) : ComplexPropertiesCollectio
         DeviationNote = "The wire represents CosmosException as InfoCarrierServerException.")]
     public override async Task OrderBy_ElementAt()
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(base.OrderBy_ElementAt);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(base.OrderBy_ElementAt);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("'ORDER BY' is not supported in subqueries.", error.Message, StringComparison.Ordinal);
     }
@@ -59,7 +59,7 @@ public class CollectionTest(ComplexFixture fixture) : ComplexPropertiesCollectio
         DeviationNote = "The wire represents CosmosException as InfoCarrierServerException.")]
     public override async Task Index_column()
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Index_column);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(base.Index_column);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("'member indexer'", error.Message, StringComparison.Ordinal);
     }

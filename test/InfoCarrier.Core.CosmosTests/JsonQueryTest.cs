@@ -80,7 +80,7 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     }
     private static async Task<InfoCarrierServerException> AssertCosmosExceptionAsync(Func<Task> action)
     {
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(action);
+        var error = await CosmosExceptionAssert.ThrowsAsync(action);
         Assert.Equal("Microsoft.Azure.Cosmos.CosmosException", error.ServerExceptionTypeName);
         return error;
     }

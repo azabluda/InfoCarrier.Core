@@ -301,7 +301,7 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
     public override async Task MaxBy_no_data_nullable_source(bool async)
     {
         if (!async) throw SkipException.ForSkip("Always throws for sync.");
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.MaxBy_no_data_nullable_source(async));
+        var error = await CosmosExceptionAssert.ThrowsAsync(() => base.MaxBy_no_data_nullable_source(async));
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 
@@ -352,7 +352,7 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
     public override async Task MaxBy_with_coalesce(bool async)
     {
         if (!async) throw SkipException.ForSkip("Always throws for sync.");
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.MaxBy_with_coalesce(async));
+        var error = await CosmosExceptionAssert.ThrowsAsync(() => base.MaxBy_with_coalesce(async));
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 
@@ -411,7 +411,7 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
     public override async Task MinBy_no_data_nullable_source(bool async)
     {
         if (!async) throw SkipException.ForSkip("Always throws for sync.");
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.MinBy_no_data_nullable_source(async));
+        var error = await CosmosExceptionAssert.ThrowsAsync(() => base.MinBy_no_data_nullable_source(async));
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 
@@ -458,7 +458,7 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
     public override async Task MinBy_with_coalesce(bool async)
     {
         if (!async) throw SkipException.ForSkip("Always throws for sync.");
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.MinBy_with_coalesce(async));
+        var error = await CosmosExceptionAssert.ThrowsAsync(() => base.MinBy_with_coalesce(async));
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 
@@ -691,7 +691,7 @@ public class NorthwindAggregateOperatorsTest(NorthwindFixture<NoopModelCustomize
     public override async Task OrderBy_client_Take(bool async)
     {
         if (!async) throw SkipException.ForSkip("Always throws for sync.");
-        var error = await Assert.ThrowsAsync<InfoCarrierServerException>(async () => await base.OrderBy_client_Take(async));
+        var error = await CosmosExceptionAssert.ThrowsAsync(async () => await base.OrderBy_client_Take(async));
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 

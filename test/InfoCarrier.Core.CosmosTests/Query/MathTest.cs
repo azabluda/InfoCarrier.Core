@@ -44,7 +44,7 @@ public class MathTest(BasicTypesFixture fixture) : MathTranslationsTestBase<Basi
         DeviationNote = "Assert the remote CosmosException type and message through InfoCarrierServerException.")]
     public override async Task Truncate_project_and_order_by_it_twice()
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Truncate_project_and_order_by_it_twice);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(base.Truncate_project_and_order_by_it_twice);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("Unsupported ORDER BY clause. ORDER BY item expression could not be mapped to a document path.", error.Message, StringComparison.Ordinal);
     }
@@ -55,7 +55,7 @@ public class MathTest(BasicTypesFixture fixture) : MathTranslationsTestBase<Basi
         DeviationNote = "Assert the remote CosmosException type and message through InfoCarrierServerException.")]
     public override async Task Truncate_project_and_order_by_it_twice2()
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Truncate_project_and_order_by_it_twice2);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(base.Truncate_project_and_order_by_it_twice2);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("Unsupported ORDER BY clause. ORDER BY item expression could not be mapped to a document path.", error.Message, StringComparison.Ordinal);
     }
@@ -66,7 +66,7 @@ public class MathTest(BasicTypesFixture fixture) : MathTranslationsTestBase<Basi
         DeviationNote = "Assert the remote CosmosException type and message through InfoCarrierServerException.")]
     public override async Task Truncate_project_and_order_by_it_twice3()
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(base.Truncate_project_and_order_by_it_twice3);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(base.Truncate_project_and_order_by_it_twice3);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
         Assert.Contains("Unsupported ORDER BY clause. ORDER BY item expression could not be mapped to a document path.", error.Message, StringComparison.Ordinal);
     }

@@ -171,10 +171,19 @@ public class SessionTokenFailureDocumentTest : IAsyncLifetime
     }
 
     [Theory, InlineData(AutoTransactionBehavior.Never), InlineData(AutoTransactionBehavior.Always)]
+    [InfoCarrierDesign(9, Deviation = DeviationKind.Other,
+        Justification = "Session storage is configured and observed on the actual backend for each logical client context.",
+        DeviationNote = "Preserve upstream's token equality requirement. Run the same scenario directly as a control and include the underlying store failure when token equality fails.")]
     public virtual async Task Add_conflict_updates_session_token(AutoTransactionBehavior autoTransactionBehavior)
-    {
+        => await AssertConflictSessionToken(autoTransactionBehavior, direct: false);
 
-        using var context = CreateContext(autoTransactionBehavior); // Actual backend mode for this logical context only.
+    [Theory, InlineData(AutoTransactionBehavior.Never), InlineData(AutoTransactionBehavior.Always)]
+    public async Task Direct_store_add_conflict_updates_session_token(AutoTransactionBehavior autoTransactionBehavior)
+        => await AssertConflictSessionToken(autoTransactionBehavior, direct: true);
+
+    private async Task AssertConflictSessionToken(AutoTransactionBehavior autoTransactionBehavior, bool direct)
+    {
+        using var context = direct ? _store.CreateBackendContext() : CreateContext(autoTransactionBehavior);
         context.Database.AutoTransactionBehavior = autoTransactionBehavior;
         var customer = new Customer { Id = "1", PartitionKey = "1" };
         context.Customers.Add(customer);
@@ -182,12 +191,14 @@ public class SessionTokenFailureDocumentTest : IAsyncLifetime
 
         var createdSessionToken = BackendStorage(context).GetDefaultContainerTrackedToken();
 
-        using var context2 = CreateContext();
+        using var context2 = direct ? _store.CreateBackendContext() : CreateContext();
         context2.Add(customer);
-        await Assert.ThrowsAsync<DbUpdateException>(() => context2.SaveChangesAsync(TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => context2.SaveChangesAsync(TestContext.Current.CancellationToken));
         var afterExceptionSessionToken = BackendStorage(context2).GetDefaultContainerTrackedToken();
 
-        Assert.Equal(createdSessionToken, afterExceptionSessionToken);
+        Assert.True(createdSessionToken == afterExceptionSessionToken,
+            $"Expected session token '{createdSessionToken}', actual '{afterExceptionSessionToken ?? "<null>"}'. "
+            + $"Direct store: {direct}. Conflict failure: {error}");
     }
 
     [Fact]

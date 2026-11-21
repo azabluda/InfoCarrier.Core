@@ -105,7 +105,7 @@ public class NorthwindSelectTest(NorthwindFixture<NoopModelCustomizer> fixture)
                 await base.Select_bool_closure_with_order_parameter_with_cast_to_nullable(false);
                 return;
             }
-            var error = await Assert.ThrowsAsync<InfoCarrierServerException>(() => base.Select_bool_closure_with_order_parameter_with_cast_to_nullable(a));
+            var error = await CosmosExceptionAssert.ThrowsAsync(() => base.Select_bool_closure_with_order_parameter_with_cast_to_nullable(a));
             Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
             Assert.Contains("BadRequest (400)", error.Message, StringComparison.Ordinal);
         });

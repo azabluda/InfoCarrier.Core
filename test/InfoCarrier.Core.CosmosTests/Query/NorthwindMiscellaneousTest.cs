@@ -29,7 +29,7 @@ public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fi
 
     private static async Task AssertStoreException(Func<Task> action)
     {
-        InfoCarrierServerException error = await Assert.ThrowsAsync<InfoCarrierServerException>(action);
+        InfoCarrierServerException error = await CosmosExceptionAssert.ThrowsAsync(action);
         Assert.Equal(typeof(Microsoft.Azure.Cosmos.CosmosException).FullName, error.ServerExceptionTypeName.Split(',')[0]);
     }
 
