@@ -7,6 +7,7 @@ using InfoCarrier.Core.CosmosTests.Associations;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
@@ -278,10 +279,19 @@ public class DefaultKeyValuesTest(DefaultKeyValuesTest.CosmosDefaultKeyValuesTes
     [InfoCarrierDesign(Decisions.Architecture, Decisions.ClientServices,
         Justification = "Match Cosmos key-generation semantics explicitly because the client uses relational conventions.",
         Deviation = DeviationKind.Other,
-        DeviationNote = "The model explicitly marks the integer key as ValueGeneratedNever; Cosmos infers this by convention.")]
+        DeviationNote = "Assert the convention-only client OnAdd and native Cosmos Never metadata. Explicit ValueGeneratedNever then gives both models the same missing-key contract.")]
     [Fact]
     public async Task Single_same_key_and_partition_key_must_have_key_set()
     {
+        using var conventionClient = new ConventionOnlyKeyContext(
+            ((InfoCarrierTestStore)Fixture.TestStore).AddProviderOptions(new DbContextOptionsBuilder()).Options);
+        using var conventionDirect = new ConventionOnlyKeyContext(
+            CosmosEmulator.Configure(new DbContextOptionsBuilder(), nameof(ConventionOnlyKeyContext)).Options);
+        Assert.Equal(ValueGenerated.OnAdd, conventionClient.Model.FindEntityType(typeof(SingleSameKeyAndPartitionKey))!
+            .FindProperty(nameof(SingleSameKeyAndPartitionKey.Id))!.ValueGenerated);
+        Assert.Equal(ValueGenerated.Never, conventionDirect.Model.FindEntityType(typeof(SingleSameKeyAndPartitionKey))!
+            .FindProperty(nameof(SingleSameKeyAndPartitionKey.Id))!.ValueGenerated);
+
         using var context = CreateContext();
 
         context.Add(new SingleSameKeyAndPartitionKey());
@@ -649,6 +659,16 @@ public class DefaultKeyValuesTest(DefaultKeyValuesTest.CosmosDefaultKeyValuesTes
 
     protected DefaultKeyValuesTestContext CreateContext()
         => Fixture.CreateContext();
+
+    private sealed class ConventionOnlyKeyContext(DbContextOptions options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+            => modelBuilder.Entity<SingleSameKeyAndPartitionKey>(b =>
+            {
+                b.HasKey(e => e.Id);
+                b.HasPartitionKey(e => e.Id);
+            });
+    }
 
     public class CosmosDefaultKeyValuesTestFixture : SharedStoreFixtureBase<DefaultKeyValuesTestContext>
     {

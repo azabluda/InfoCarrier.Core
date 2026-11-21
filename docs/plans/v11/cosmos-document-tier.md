@@ -1472,3 +1472,28 @@ original interference instead of relying on scheduler timing. The final focused 
 interference-regression, and audit run reported Passed: 7, Failed: 0, Total: 7. Logs are under
 artifacts/cosmos-isolated-sessions/, artifacts/cosmos-isolation-shared-control/, and
 artifacts/cosmos-isolation-final/. Complete normal and coverage verification remains in GitHub.
+
+## Default key conventions and annotation scope, November 21, 2026
+
+The explicit ValueGeneratedNever setting in the same-key-and-partition-key integer test compensates
+for a real model-convention difference. Removing it makes the official missing-key scenario fail:
+the InfoCarrier save succeeds instead of raising the expected update exception. That diagnostic
+run reported Passed: 0, Failed: 1, Total: 1, under artifacts/cosmos-implicit-key/.
+
+The retained test now also builds convention-only client and native Cosmos models without the
+compensating setting. It asserts client ValueGenerated.OnAdd and native ValueGenerated.Never,
+then retains the original explicitly aligned missing-key and supplied-key checks. The explicit
+setting and its InfoCarrierDesign reason remain. This establishes configured behavior, not
+automatic parity between provider conventions. It does not change production conventions or
+apply Cosmos defaults to every nonrelational backend. Other document providers can have different
+key-generation rules and require their own verification; MongoDB remains disabled.
+
+The Add_conflict_updates_session_token InfoCarrierDesign record described backend observation,
+not a changed token expectation. Its explanation is now a comment. Both direct and wire token
+assertions remain. Focused convention, conflict, and override-audit validation reported Passed: 6,
+Failed: 0, Total: 6, under artifacts/cosmos-key-conventions/.
+
+The remaining recorded differences stay. Projection rewriting, parameter transport, cancellation,
+and incomplete-document repair are shared InfoCarrier mechanisms. Their exact generated query
+forms depend on the backend provider. Cosmos session-token behavior and emulator cross-database
+token interference are Cosmos-specific observations; no equivalent MongoDB behavior is claimed.

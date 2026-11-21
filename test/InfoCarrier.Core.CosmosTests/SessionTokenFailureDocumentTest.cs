@@ -184,9 +184,8 @@ public class SessionTokenFailureDocumentTest(SessionTokenFailureDocumentTest.Iso
     }
 
     [Theory, InlineData(AutoTransactionBehavior.Never), InlineData(AutoTransactionBehavior.Always)]
-    [InfoCarrierDesign(9, Deviation = DeviationKind.Other,
-        Justification = "Session storage is configured and observed on the actual backend for each logical client context.",
-        DeviationNote = "Preserve upstream's token equality requirement. Run the same scenario directly as a control and include the underlying store failure when token equality fails.")]
+    // Observe each logical context's backend storage. The original token equality is unchanged;
+    // the direct control and failure details distinguish backend behavior from transport behavior.
     public virtual async Task Add_conflict_updates_session_token(AutoTransactionBehavior autoTransactionBehavior)
         => await AssertConflictSessionToken(autoTransactionBehavior, direct: false);
 
