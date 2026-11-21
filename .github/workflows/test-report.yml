@@ -2,8 +2,8 @@ name: Test report
 
 # The spec-suite check run for a pull request FROM A FORK, and for nothing else.
 #
-# build.yml creates that check run itself, in the `spec-tests` job, right where the TRX is
-# produced. It cannot do so for a fork: a workflow triggered by a fork's pull request runs with a
+# build.yml creates that check run in `spec-tests`, after combining both workers' TRX artifacts.
+# It cannot do so for a fork: a workflow triggered by a fork's pull request runs with a
 # read-only token, and `checks.create` returns 403. This is the test reporter's own documented way
 # around that -- the build uploads the TRX as an artifact, and a second workflow, running in this
 # repository's context with a writable token, reads the artifact and creates the check.

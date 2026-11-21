@@ -29,6 +29,28 @@ public class ExpressionRoundTripTest
         => new ExpressionToNodeTranslator(new TypeNodeMapper(), new DynamicValueMapper(null, new TypeNodeMapper(), new TypeNodeResolver()))
             .Translate(expression);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Non_cancellable_token_round_trips_without_runtime_handles(bool boxed)
+    {
+        Type declared = boxed ? typeof(object) : typeof(CancellationToken);
+        ExpressionNode node = RoundTripNode(ToNode(Expression.Constant(CancellationToken.None, declared)));
+        var denied = new TypeNodeResolver();
+        var resolver = new TypeNodeResolver(allowlist: TypeAllowlist.ForModel(null).With([typeof(CancellationToken)]));
+        var reverse = new NodeToExpressionTranslator(
+            resolver,
+            new DynamicValueMapper(null, new TypeNodeMapper(), resolver),
+            (stub, type) => throw new NotSupportedException("No query roots here."));
+        Assert.Throws<InvalidOperationException>(() => denied.Resolve(new TypeNodeMapper().ToTypeNode(typeof(CancellationToken))));
+        Expression rebuilt = reverse.Translate(node);
+        Assert.Equal(declared, rebuilt.Type);
+        CancellationToken token = Expression.Lambda<Func<CancellationToken>>(
+            Expression.Convert(rebuilt, typeof(CancellationToken))).Compile()();
+        Assert.Equal(CancellationToken.None, token);
+        Assert.False(token.CanBeCanceled);
+    }
+
     [Fact]
     public void Constant_primitive_round_trips()
     {

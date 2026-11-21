@@ -491,7 +491,9 @@ public class ServerQueryExecutor(
         if (request.ReturnsSingleResult)
         {
             return (Task<object?>)ExecuteSingleMethod
-                .MakeGenericMethod(query.Type)
+                .MakeGenericMethod(query.Type.IsGenericType && query.Type.GetGenericTypeDefinition() == typeof(Task<>)
+                    ? query.Type.GetGenericArguments()[0]
+                    : query.Type)
                 .Invoke(null, [QueryProvider, query, cancellationToken])!;
         }
 

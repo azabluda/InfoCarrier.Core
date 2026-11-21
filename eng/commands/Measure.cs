@@ -9,8 +9,8 @@ using System.Text.RegularExpressions;
 internal static class Measure
 {
     private static string Root() => ScriptHost.Root;
-    // Tiers A, B, and C share the functional project. Tier D remains suspended.
-    private static readonly string[] Projects = ["InfoCarrier.Core.FunctionalTests"];
+    // The Cosmos document tier is separate. The retained MongoDB project remains disabled.
+    private static readonly string[] Projects = ["InfoCarrier.Core.FunctionalTests", "InfoCarrier.Core.CosmosTests"];
 
     // Stream to disk, not memory: a specification run can write many megabytes. Cancel the tree,
     // await both output pumps, and retain the partial log for diagnosis.

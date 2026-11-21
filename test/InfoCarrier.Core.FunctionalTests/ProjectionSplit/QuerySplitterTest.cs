@@ -896,5 +896,25 @@ public class QuerySplitterTest : IDisposable
         Assert.Contains("Hidden", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Registered_async_terminal_keeps_its_result_on_the_server()
+    {
+        var allowlist = InfoCarrier.Core.Expressions.TypeAllowlist.ForModel(_context.Model)
+            .With([typeof(QuerySplitterTest), typeof(Task<int>)]);
+        var splitter = new QuerySplitter(_context.Model, allowlist);
+        Expression call = Expression.Call(
+            typeof(QuerySplitterTest), nameof(CountRowsAsync), [], _context.Authors.AsQueryable().Expression);
+
+        SplitQuery split = splitter.Split(call);
+        ServerQuery server = Assert.Single(split.ServerQueries);
+        Assert.True(split.IsPassThrough);
+        Assert.True(server.ReturnsSingleResult);
+        Assert.Equal(typeof(int), server.ElementType);
+        var task = Assert.IsType<Task<int>>(RunOnServer(server));
+        Assert.Equal(2, split.Apply([await task]));
+    }
+
+    public static Task<int> CountRowsAsync(IQueryable<Author> source) => Task.FromResult(source.Count());
+
     private static bool Threshold(int count) => count > 0;
 }

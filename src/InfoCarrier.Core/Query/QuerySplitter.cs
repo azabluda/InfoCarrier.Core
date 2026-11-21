@@ -91,7 +91,8 @@ public sealed class QuerySplitter
 
     /// <summary>
     ///     <see cref="EF.Constant{T}(T)" />, so the row limit reaches SQL as <c>LIMIT 1</c> and not as
-    ///     a parameter.
+    ///     a parameter on relational stores. Nonrelational stores receive an ordinary count,
+    ///     because their provider need not support forced constantization.
     /// </summary>
     /// <remarks>
     ///     EF's own client writes the limit of a <c>First()</c> as a literal and parameterizes a
@@ -304,7 +305,7 @@ public sealed class QuerySplitter
         {
             // Nothing to do on the client. Keep the residual an identity so callers have one
             // shape to handle, and flag it so they can skip the work entirely.
-            ParameterExpression only = Expression.Parameter(query.Type, "server");
+            ParameterExpression only = Expression.Parameter(UnwrapTask(query.Type), "server");
             return new SplitQuery(
                 [ToServerQuery(query)],
                 Expression.Lambda(only, only),
@@ -546,7 +547,7 @@ public sealed class QuerySplitter
     ///         of the rows can go.
     ///     </para>
     /// </remarks>
-    private static (Expression Residual, IReadOnlyList<Expression> Augmented) WithRowLimitForTerminalOperator(
+    private (Expression Residual, IReadOnlyList<Expression> Augmented) WithRowLimitForTerminalOperator(
         Expression residual,
         IReadOnlyList<ParameterExpression> parameters,
         IReadOnlyList<Expression> augmented)
@@ -640,10 +641,16 @@ public sealed class QuerySplitter
                 }
 
                 var limited = new List<Expression>(augmented);
+                Expression count = Expression.Constant(rows);
+                if (ServerStoreIsRelational)
+                {
+                    count = Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), count);
+                }
+
                 limited[i] = Expression.Call(
                     TakeMethod.MakeGenericMethod(element),
                     shipped,
-                    Expression.Call(ConstantMethod.MakeGenericMethod(typeof(int)), Expression.Constant(rows)));
+                    count);
 
                 return (new UnpagingVisitor(paging).Visit(residual)!, limited);
             }
@@ -684,10 +691,15 @@ public sealed class QuerySplitter
         }
     }
 
+    private static Type UnwrapTask(Type type)
+        => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>)
+            ? type.GetGenericArguments()[0]
+            : type;
+
     private static ServerQuery ToServerQuery(Expression query)
     {
         bool sequence = typeof(IQueryable).IsAssignableFrom(query.Type);
-        return new ServerQuery(query, sequence ? ElementTypeOf(query.Type) : query.Type, !sequence);
+        return new ServerQuery(query, sequence ? ElementTypeOf(query.Type) : UnwrapTask(query.Type), !sequence);
     }
 
     private static Type ElementTypeOf(Type queryableType)

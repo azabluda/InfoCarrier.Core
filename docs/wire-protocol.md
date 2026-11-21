@@ -87,6 +87,15 @@ number, frame shape, operation, encoding, or existing default changes. A future 
 interpretation still requires a new integer under the procedure below; the structural check alone
 does not establish this semantic conclusion.
 
+**Document generated-value review, November 21, 2026.** Existing GeneratedValues records now
+include generated keys that actually changed while saving existing embedded elements. Their
+meaning remains the store's final value for the correlated entry. Client application uses temporary
+keys before applying exchanges. Document request entries retain application navigation order;
+principal/dependent replay already preserves relative order subject to dependency requirements.
+No field, discriminator, encoding, operation, or default changes. Existing released scenarios do
+not depend on the formerly broken key-exchange behavior. Historical protocol execution and the
+structural guard remain separate checks; MongoDB source is disabled and was not executed.
+
 Preserve existing field names, types, and meanings. Add fields with defaults that preserve older
 behavior, and give new expression node kinds new discriminator numbers. A field or interpretation
 that carries a new promise requires a contract version change, even if the schema is unchanged.

@@ -57,10 +57,12 @@ declared so that the audit counts it.
 | Self-hosted | the store's suite has no such test | a test in this repository that shows what the store does |
 | InfoCarrier defect | the failure is ours | a fix; if no fix is possible now, a GitHub issue in this repository |
 
-**The commit is the release tag of the package version we run, never a branch.** This tier runs
-`MongoDB.EntityFrameworkCore` 10.0.3, tagged `v10.0.3` at `de93261da6d989bd12db8815a3a672dcf28bafb1`.
-Their `main` carries an unreleased rebuild of the query provider (`EF-322`), so it describes a
-different product.
+**The commit is the release tag of the package version we run, never a branch.** The retained,
+disabled MongoDB tests cite `MongoDB.EntityFrameworkCore` 10.0.3, tagged `v10.0.3` at
+`de93261da6d989bd12db8815a3a672dcf28bafb1`. Their `main` carries a different query provider
+(`EF-322`), so it cannot describe that package. The provisional Cosmos tier uses Microsoft's
+11.0.0 provider and cites the same official EF Core 11 source pin as the other active tiers;
+see [its validation record](plans/v11/cosmos-document-tier.md).
 
 **A GitHub issue is filed only when the owner asks.** Tier D has no InfoCarrier defect, so it needs
 none.
