@@ -51,7 +51,8 @@ response leaves authentication and service validation to the provider. Cancellat
 
 Each fixture still owns a generated database. Explicit cleaning and database deletion remain
 observable operations; Testcontainers does not prove that the earlier missing-table or PostgreSQL
-file errors are resolved. Stability review is deferred until automatic lifecycle validation.
+file errors are resolved. Stability review remains open; the November 21 evidence below records
+failures after lifecycle migration.
 
 The client uses gateway transport and accepts the emulator certificate only on loopback HTTPS.
 The embedded key is Microsoft's public emulator key, not an Azure credential. Neither
@@ -176,11 +177,11 @@ They do not exclude the separate ad hoc search classes, which need their own rev
 
 Remaining work is explicitly open:
 
-- [ ] Review every remaining official class and record a specific applicability decision.
-- [ ] Adopt applicable Northwind, association, complex/JSON, primitive-collection, and other query tests.
-- [ ] Adopt remaining scalar translations, full-text/vector behavior, and application-level extension tests.
-- [ ] Adopt applicable tracking, keys, conversions, concurrency, updates, and failure tests.
-- [ ] Review direct Cosmos service, model-building, design-time, logging, session, and transaction tests
+- [x] Review every remaining official class and record a specific applicability decision.
+- [x] Adopt applicable Northwind, association, complex/JSON, primitive-collection, and other query tests.
+- [x] Adopt remaining scalar translations, full-text/vector behavior, and application-level extension tests.
+- [x] Adopt applicable tracking, keys, conversions, concurrency, updates, and failure tests.
+- [x] Review direct Cosmos service, model-building, design-time, logging, session, and transaction tests
   individually. Provider-internal assertions may be excluded; ordinary application failures may not.
 - [ ] Validate the complete expanded suite on Windows/Podman and Linux/Docker, including coverage.
 
@@ -1031,3 +1032,99 @@ The earlier passing cases cover same-partition atomicity, partial progress acros
 nontransactional writes, 100/101-operation behavior, cross-partition Always refusals, trigger
 atomicity refusal, execution-strategy propagation, suppressed concurrency, successful large batches,
 and create/update/delete backend logging. No production correction was needed for this batch.
+
+
+## Session-token application coverage, November 21, 2026
+
+Adopted the applicable application cases from CosmosSessionTokensTest and its nonshared class.
+Reads, shaped queries, read-item queries, paging, writes, conflict handling, and not-found behavior
+cross InfoCarrier. The fixtures configure the actual backend token-storage interface. Each test
+owns its database and recording storage; each logical context in the nonshared scenarios has
+separate real provider token storage. There is no shared static recording field. This explicit
+backend setup does not add a Cosmos session facade or token-management protocol to the client.
+
+The first outer family and audit reported Passed: 30, Failed: 6, Total: 36. Successful paging
+needed explicit grants for the page, task, and cancellation-token types on both halves. The
+existing generic asynchronous-terminal path then executed it on Cosmos. An independent populated
+three-document paging test compares client and direct-store results, one-item page limits,
+continuation completion, and no-tracking behavior: Passed: 2, Failed: 0, Total: 2, including audit.
+
+The other outer failures exposed the expected incomplete-document repair read before a default
+container update. Those cases now explicitly assert the additional read's nonempty token and
+retain every write-token assertion. An invalid token refuses that repair read before reaching
+the write pipeline, so that exact default-container case asserts the transmitted Cosmos type and
+message with an ADR-009 RefusedEarlier reason. Other-container updates retain the original
+DbUpdateException path. Repair-read tokens are not assumed equal to preceding write tokens.
+
+The nonshared family, successful paging, and audit initially reported Passed: 9, Failed: 1,
+Total: 11, with one official issue-331 theory skip. Its conflict failure was a fixture mistake:
+transaction mode Always had also reached a second context that upstream leaves WhenNeeded.
+Explicit per-logical-context backend configuration fixes this without changing the expectation.
+The combined correction subset reported Passed: 10, Failed: 2, Total: 12, with only the unsupported
+repair-token equality assumptions remaining. Their focused correction and audit then reported
+Passed: 4, Failed: 0, Total: 4. Negative paging, availability diagnostics, and audit finally passed:
+Passed: 8, Failed: 0, Total: 8. No production change was needed for session-token adoption.
+
+Individually reviewed exclusions from the same pinned source:
+
+| Method | Why it is outside application-through-InfoCarrier scope |
+|---|---|
+| AppendSessionToken_uses_AppendDefaultContainerSessionToken | Asserts direct Cosmos DatabaseFacade forwarding to a recording service; no query or write. |
+| AppendSessionTokens_uses_AppendSessionTokens | Asserts direct Cosmos facade dictionary forwarding; no query or write. |
+| UseSessionToken_uses_SetDefaultContainerSessionToken | Asserts direct Cosmos facade forwarding; no query or write. |
+| UseSessionTokens_uses_SetSessionTokens | Asserts direct Cosmos facade forwarding; no query or write. |
+| GetSessionTokens_uses_GetTrackedSessionTokens | Asserts the Cosmos facade returns the provider service dictionary; no query or write. |
+| Different_contexts_do_not_share_DefaultContainer_name | Compares provider context configuration and resolved default-container service metadata. |
+| New_context_does_not_use_same_SessionTokenStorage | Asserts identity of directly resolved CosmosDatabaseWrapper services. |
+| Pooled_context_uses_same_SessionTokenStorage | Asserts reuse of the same Cosmos context and provider service instance. |
+| Pooled_context_clears_SessionTokenStorage | Asserts a direct provider pool reset calls its recording storage service. |
+
+These exclusions do not exclude application reads, writes, or failures. Their source is
+[CosmosSessionTokensTest.cs](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/CosmosSessionTokensTest.cs).
+The official non-Linux concurrency-token theory remains a referenced Linux exclusion, not a new
+InfoCarrier skip. New application code has no ignored errors or reduced collection parallelism.
+
+## Emulator failure evidence and internal logs, November 21, 2026
+
+The [transaction-batch build](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44885262305)
+failed 302 Cosmos cases. Its earliest reported failure was database deletion returning PostgreSQL
+E58P01. The same error then affected unrelated databases and classes. The captured gateway log
+confirms those service errors; the health probe continued reporting PostgreSQL and Gateway OK.
+This is not evidence that the generated-key correction caused the failure, nor proof that every
+reported case has only an infrastructure cause. The original job and result artifact remain the
+authoritative failure record.
+
+The pinned image runs background system-package updates during startup. Its update-completion
+message precedes the first observed service error by seconds, but timing alone does not establish
+causality. The existing console artifact lacks PostgreSQL's internal error detail. Teardown now
+also captures /logs/pglog.log, package-updates.log, and start_postgres_server.log before removing
+the container. The focused local run verified all three files were saved. No emulator setting,
+cleanup retry, query bypass, or concurrency reduction was added. Stability remains unresolved.
+
+Startup diagnostics now include podman machine list and podman machine start <name>, because this
+machine has a named VM and no default VM. The focused availability controls verify both commands.
+
+
+## Final production neutrality review, November 21, 2026
+
+The production changes are general provider/transport corrections. None references a Cosmos
+package, provider name, JSON field spelling, Cosmos session interface, or emulator behavior.
+The Cosmos SQL-root adapter, session setup, transaction configuration, and provider-specific
+models remain in the test project. MongoDB source and project configuration remain disabled.
+
+| Production area | General rule and evidence | Remaining limit |
+|---|---|---|
+| Incomplete-document repair | Merge omitted owned values using model keys, ownership, and existing context services. InMemory/SQLite regressions and the earlier official MongoDB 10 portability experiment support it. | That historical MongoDB experiment does not validate later changes or an EF Core 11 MongoDB provider. |
+| Nonrelational projected terminal limits | Leave count representation to a nonrelational provider instead of forcing the relational EF.Constant marker. Direct Cosmos controls verify bounded results. | Other document providers must still translate the resulting query. |
+| Generated owner acceptance | Include implicitly written owners in EF's acceptance set, including deferred acceptance. InMemory and direct Cosmos controls cover it. | A provider must return its generated values through EF update entries. |
+| Dictionary interfaces | Rebuild a compatible Dictionary for dictionary interfaces. Serializer-backed independent regressions cover nullable, nested, and shared values. | This is value reconstruction, not evidence for arbitrary provider mappings. |
+| Registered query roots | Resolve the registered public adapter rather than selecting the relational default unconditionally. InMemory regressions prove service replacement. | Cosmos-specific root recognition remains an explicitly registered test adapter. |
+| Document order and generated key exchanges | Preserve owned-navigation order, wait on real foreign keys, return actually changed generated keys, and prepare exchanges with temporary generators. InMemory reconstruction/key controls and independent Cosmos document reads cover it. | The temporary prepass applies where the registered generator produces temporary values. Arbitrary generated key types and MongoDB 11 remain unverified. |
+
+Confidence is high that the implementation boundaries are provider-neutral. Runtime confidence
+outside the exercised providers remains limited by those explicit gaps. Source independence is
+not a promise that every document provider exposes identical conventions or capabilities.
+
+All classes in the pinned discovered Cosmos inventory now have an adoption or applicability
+decision. Final full normal, coverage, and SQLite/Firebird slow validation remain outstanding.
+The newly captured emulator failures prevent declaring the expanded milestone validated.

@@ -24,7 +24,8 @@ public class EmulatorAvailabilityTest
         Assert.Contains(Endpoint.ToString(), error.Message);
         Assert.Contains("Testcontainers starts and stops", error.Message);
         Assert.Contains("INFOCARRIER_COSMOS_ENDPOINT", error.Message);
-        Assert.Contains("podman machine start", error.Message);
+        Assert.Contains("podman machine start <name>", error.Message);
+        Assert.Contains("podman machine list", error.Message);
         Assert.Contains("dotnet run --file eng/CosmosEmulator.cs -- start podman", error.Message);
         Assert.Contains("dotnet run --file eng/CosmosEmulator.cs -- start docker", error.Message);
     }

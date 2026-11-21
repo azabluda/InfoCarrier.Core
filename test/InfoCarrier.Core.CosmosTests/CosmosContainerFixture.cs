@@ -54,7 +54,8 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
             try { await DisposeAsync(); }
             catch (Exception cleanup) { Console.Error.WriteLine($"Cosmos startup cleanup failed: {cleanup}"); }
             throw new InvalidOperationException(
-                "Cannot start the Cosmos test container. Start Docker with Linux containers, or run 'podman machine start'. "
+                "Cannot start the Cosmos test container. Start Docker with Linux containers, or run 'podman machine start <name>'. "
+                + "Use 'podman machine list' to find the machine name. "
                 + "Testcontainers connects through the container API; the docker command is not required. "
                 + "Check DOCKER_HOST or your active Docker context when using a non-default endpoint.", error);
         }
@@ -68,6 +69,20 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         try
         {
             Directory.CreateDirectory(_logs);
+            foreach (string name in new[] { "pglog.log", "package-updates.log", "start_postgres_server.log" })
+            {
+                try
+                {
+                    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var result = await container.ExecAsync(["cat", "/logs/" + name], deadline.Token);
+                    await File.WriteAllTextAsync(Path.Combine(_logs, name),
+                        result.Stdout + result.Stderr + $"\nCapture exit code: {result.ExitCode}\n");
+                }
+                catch (Exception error)
+                {
+                    Console.Error.WriteLine($"Cannot capture Cosmos internal log {name}: {error.Message}");
+                }
+            }
             var (stdout, stderr) = await container.GetLogsAsync();
             await File.WriteAllTextAsync(Path.Combine(_logs, "stdout.log"), stdout);
             await File.WriteAllTextAsync(Path.Combine(_logs, "stderr.log"), stderr);

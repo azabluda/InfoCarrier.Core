@@ -41,7 +41,7 @@ internal static class CosmosEmulator
                 $"Cannot reach the Cosmos emulator at {endpoint}.\n"
                 + "Testcontainers starts and stops the Cosmos emulator for each test run.\n"
                 + "If INFOCARRIER_COSMOS_ENDPOINT selects an external emulator, start that emulator yourself.\n"
-                + "For Podman, start its machine first: podman machine start\n"
+                + "For Podman, list machines with 'podman machine list', then run 'podman machine start <name>'.\n"
                 + "Start your container runtime with Linux containers, then run from the repository root:\n"
                 + "  dotnet run --file eng/CosmosEmulator.cs -- start podman\n"
                 + "or:\n"

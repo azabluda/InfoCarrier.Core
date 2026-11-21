@@ -65,10 +65,9 @@ dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTe
 dotnet test  test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~NorthwindWhere"
 dotnet test  test/InfoCarrier.Core.TransportTests/InfoCarrier.Core.TransportTests.csproj     # separate project, NOT in Measure.cs
 INFOCARRIER_LIVE_COMPARE=1 dotnet test test/InfoCarrier.Core.FunctionalTests/InfoCarrier.Core.FunctionalTests.csproj --filter "FullyQualifiedName~InfoCarrier.Core.FunctionalTests.Sqlite"  # the slow run (#167): Tier B twice, red = differs from plain EF
-# Document tier: start the emulator, then test Cosmos. MongoDB stays disabled.
-dotnet run --file eng/CosmosEmulator.cs -- start podman # use docker on Linux CI
+# Document tier: Testcontainers starts/stops the emulator. The container runtime must be running.
+# MongoDB stays disabled. Podman on this machine: podman machine start infocarrier-cosmos
 dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
-dotnet run --file eng/CosmosEmulator.cs -- stop podman
 ```
 
 ### Where the tests live
@@ -238,7 +237,8 @@ claimed one. `Other` counts since the amendment of 2026-09-28.
 
 **Point test runs at each `.csproj`, never at the `.slnx`**, and prefer `dotnet run --file eng/Measure.cs --`, which runs
 every project in its own `projects` list and adds the figures. **That list currently holds the active
-spec project and the provisional Cosmos project. Start its emulator before measuring.
+spec project and the provisional Cosmos project. Start the container runtime before measuring;
+Testcontainers manages the Cosmos emulator.
 The retained MongoDB project remains disabled.** `InfoCarrier.Core.TransportTests` is
 deliberately absent: it is this repository's own HTTP-transport suite, not a spec project, and the
 spec-suite badge counts spec tests. **So a `src/` change needs the transport line above as well as

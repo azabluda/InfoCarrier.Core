@@ -35,13 +35,18 @@ internal sealed class DocumentApplicationStore<TContext>(Func<DbContextOptions, 
         await backend.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
     }
 
-    public TContext CreateContext(Action<DbContextOptionsBuilder>? configureBackend = null)
+    public TContext CreateBackendContext() => create(_options!);
+
+    public TContext CreateContext(Action<DbContextOptionsBuilder>? configureBackend = null,
+        Func<DbContextOptions, TContext>? createContext = null,
+        Func<AutoTransactionBehavior>? transactionMode = null)
     {
+        var factory = createContext ?? create;
         var builder = new DbContextOptionsBuilder(_options!);
         configureBackend?.Invoke(builder);
-        builder.AddInterceptors(new BackendMode(() => TransactionMode));
+        builder.AddInterceptors(new BackendMode(transactionMode ?? (() => TransactionMode)));
         var options = builder.Options;
-        var services = new ServiceCollection().AddScoped<DbContext>(_ => create(options));
+        var services = new ServiceCollection().AddScoped<DbContext>(_ => factory(options));
         var provider = services.BuildServiceProvider();
         _providers.Add(provider);
         var serverOptions = new InfoCarrierServerOptions().WithStoresOwnedDataInsideOwner(true);
@@ -52,14 +57,14 @@ internal sealed class DocumentApplicationStore<TContext>(Func<DbContextOptions, 
         var envelope = new InfoCarrierEnvelopeServer(server, serializer);
         var transport = new InfoCarrier.Core.FunctionalTests.TestUtilities.InProcessInfoCarrierTransport(
             envelope.Dispatch, envelope.DispatchAsync, serializer);
-        using var backend = create(options);
+        using var backend = factory(options);
         var clientOptions = new DbContextOptionsBuilder().UseInfoCarrier(
             new TransportInfoCarrierClient(transport, serializer), o =>
             {
                 o.ServerUsesRelationalQueryRules = false;
                 o.AddAllowedTypes([typeof(CosmosQueryableExtensions), .. AllowedTypes]);
             }).UseModel(backend.Model).Options;
-        return create(clientOptions);
+        return factory(clientOptions);
     }
 
     public async ValueTask DisposeAsync()
