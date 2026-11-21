@@ -995,3 +995,19 @@ A stopped Podman machine produced the explicit startup diagnostic before any beh
 The local machine is named infocarrier-cosmos, so starting it required that name; the command
 without a name looked for a nonexistent default machine. This is startup evidence, separate from
 application failure counts, and identifies a remaining diagnostic refinement.
+
+
+## Official bulk-execution behavior, November 21, 2026
+
+Adopted all six CosmosBulkExecutionTest cases through InfoCarrier. Bulk execution, transaction
+mode, session-token setup, and trigger mappings are actual backend fixture configuration. The
+mixed-partition case checks the backend's two single writes and two transactional batches.
+The remaining cases preserve successful 100-item insertion and the exact bulk/transaction,
+bulk/session, and bulk/trigger refusals.
+
+The initial complete family and audit reported Passed: 5, Failed: 2, Total: 7. Both failures
+were direct-store inner-exception assertions encountering the client-entry exception wrapper.
+The assertions now inspect the reconstructed server DbUpdateException and its exact original
+InvalidOperationException cause, with source-backed mechanical deviations. No failure is skipped
+and no production code changed. Focused failed cases and audit: Passed: 3, Failed: 0, Total: 3.
+The earlier passing cases are left to GitHub's full suite.
