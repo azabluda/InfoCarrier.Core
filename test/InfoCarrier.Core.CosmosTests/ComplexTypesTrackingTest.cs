@@ -132,8 +132,8 @@ public class ComplexTypesTrackingTest(ComplexTypesTrackingTest.CosmosFixture fix
             ? base.Can_save_null_third_level_complex_property_with_all_optional_properties(async)
             : throw SkipException.ForSkip("Cosmos does not support synchronous operations.");
 
-    [StoreLimit(UpstreamRepository.EfCore, Source, 125, 128,
-        Skip = true, Justification = "Cosmos does not support synchronous operations.")]
+    // Pinned CosmosComplexTypesTrackingTest.cs, lines 125-128, applies this synchronous
+    // exclusion in the shared helper. This is not a test method and carries no test-reason attribute.
     protected override Task TrackAndSaveTest<TEntity>(EntityState state, bool async, Func<DbContext, TEntity> createPub)
         => async
             ? base.TrackAndSaveTest(state, async, createPub)

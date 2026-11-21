@@ -1417,3 +1417,34 @@ The four original direct/wire conflict cases, supported exact-size paging, and o
 reported Passed: 6, Failed: 0, Total: 6 locally. Logs and the tested image identity remain under
 artifacts/cosmos-nov17-conflict/ and artifacts/cosmos-nov17-image.txt. Complete normal, coverage,
 and query-comparison validation of this image remains delegated to GitHub Actions.
+
+## Focused token interference and attribute audit, November 21, 2026
+
+The complete run on d12a3d33 fixes the missing-token HTTP 500 failure, but exposes a different
+failure: a valid 409 response sometimes carries a newer token than the first insert. The normal
+Cosmos summary is Passed: 5394, Failed: 3, Total: 6037; coverage is Passed: 5395, Failed: 2,
+Total: 6037. The full optional Cosmos query comparison succeeds. The four conflict cases alone
+then pass locally: Passed: 4, Failed: 0, Total: 4. Focused success does not establish full-suite
+stability.
+
+A controlled reproduction preserves the pinned official EF Core 11 conflict scenario, ordinary
+contexts, real session storage, both transaction settings, and the corrected preview image.
+There are no InfoCarrier references. With no intervening activity, each conflict returns the
+first insert's token. After that insert, a background task writes one document to an independent
+database and container before the second context attempts the duplicate insertion. For Never,
+the original token is 0:0#4, the independent write returns 0:0#5, and the conflict returns 0:0#5.
+Always similarly changes from 0:0#7 to 0:0#8. Both duplicates correctly return 409. The independent
+database is created before the scenario and deleted afterward; no other test shares its documents.
+
+This establishes that unrelated database writes within the same emulator can invalidate the
+official equality assertion. Separate databases do not isolate these token values. The controlled
+interleaving explains why the complete parallel suite can fail while the focused case passes;
+it does not establish the behavior of a real Azure account. The script and output remain at
+artifacts/CosmosOfficialConflictRepro.cs and artifacts/cosmos-conflict-independent-write.log.
+No assertion relaxation, token fabrication, global serialization, or production fix was added.
+
+The semantic attribute audit found one further misplaced reason: StoreLimit on the protected
+TrackAndSaveTest helper in ComplexTypesTrackingTest. Its upstream synchronous exclusion stays;
+the helper's source reference is now a comment. Together with the removed InitializeAsync
+InfoCarrierDesign, these are two misplaced attributes found during this review. No additional
+InfoCarrierDesign misuse was found. Fixture explanations stay in comments and this document.
