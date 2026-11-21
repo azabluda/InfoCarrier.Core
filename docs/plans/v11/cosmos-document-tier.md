@@ -1011,3 +1011,23 @@ The assertions now inspect the reconstructed server DbUpdateException and its ex
 InvalidOperationException cause, with source-backed mechanical deviations. No failure is skipped
 and no production code changed. Focused failed cases and audit: Passed: 3, Failed: 0, Total: 3.
 The earlier passing cases are left to GitHub's full suite.
+
+
+## Transactional batches, November 21, 2026
+
+Adopted the complete CosmosTransactionalBatchTest family through InfoCarrier. Tests own separate
+databases and use actual backend transaction modes, execution strategies, concurrency suppression,
+trigger mappings, and command logs. The five official Linux exclusions retain their exact source
+references and reasons. Their disabled trigger-admin setup is not presented as an application test.
+
+The complete batch and audit reported Passed: 15, Failed: 1, Total: 21, with five official skips.
+The single failure was the oversized-document input exceeding the default 64 MiB transport request
+limit after envelope encoding. That one test now explicitly permits 128 MiB so the unchanged
+50-million-character source input reaches Cosmos. Production defaults and other tests retain their
+limits. The provider refusal and independent read verify that the smaller preceding document was
+saved. Focused oversized-input case and audit: Passed: 2, Failed: 0, Total: 2.
+
+The earlier passing cases cover same-partition atomicity, partial progress across partitions and
+nontransactional writes, 100/101-operation behavior, cross-partition Always refusals, trigger
+atomicity refusal, execution-strategy propagation, suppressed concurrency, successful large batches,
+and create/update/delete backend logging. No production correction was needed for this batch.
