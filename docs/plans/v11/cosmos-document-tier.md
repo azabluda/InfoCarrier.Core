@@ -1399,3 +1399,21 @@ All three slow comparison jobs on 3f99e065 completed successfully in
 [run 44911082036](https://github.com/azabluda/InfoCarrier.Core/actions/runs/44911082036).
 Normal and coverage Cosmos validation on that commit retained six failures before this paging
 exclusion. The four conflict cases remain unresolved; a green complete Cosmos suite is not claimed.
+
+## Official emulator correction, November 21, 2026
+
+The remaining conflict failure matches confirmed
+[emulator issue 391](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/391).
+Its vnext-latest hotfix returns HTTP 500 instead of the required 409 on duplicate creation.
+The maintainer confirms that the official vnext-EN20261117pre image avoids this defect and plans
+a correction to the default image. The test fixture temporarily selects that dated preview on
+both hosts, with the deviation recorded on InitializeAsync. CosmosDbBuilder, protocol, readiness,
+session storage, parallelism, and all conflict assertions stay unchanged. No packages are changed
+inside the image. Return to upstream's vnext-latest after verifying its correction.
+
+The standalone official EF Core 11 reproduction passes both transaction settings against the
+preview: duplicate insertion returns 409 and the conflict token equals the first insert token.
+The four original direct/wire conflict cases, supported exact-size paging, and override audit
+reported Passed: 6, Failed: 0, Total: 6 locally. Logs and the tested image identity remain under
+artifacts/cosmos-nov17-conflict/ and artifacts/cosmos-nov17-image.txt. Complete normal, coverage,
+and query-comparison validation of this image remains delegated to GitHub Actions.

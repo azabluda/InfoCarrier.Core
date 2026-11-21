@@ -16,7 +16,7 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
 
     [InfoCarrierDesign(9, Deviation = DeviationKind.Other,
         Justification = "The document tier owns its Linux emulator lifecycle and retains diagnostics across both host operating systems.",
-        DeviationNote = "Own one fresh assembly container rather than automatically reusing localhost. External endpoints require explicit opt-in. Keep diagnostic capture and a three-minute startup deadline; use the official CosmosDbBuilder defaults without package changes.")]
+        DeviationNote = "Own one fresh assembly container rather than automatically reusing localhost. External endpoints require explicit opt-in. Keep diagnostics and a three-minute startup deadline. Temporarily use the official EN20261117pre image: emulator issue 391 confirms vnext-latest breaks duplicate insertion and this preview avoids the defect. Keep CosmosDbBuilder defaults without package changes.")]
     public async ValueTask InitializeAsync()
     {
         if (InfoCarrier.Core.FunctionalTests.TestUtilities.LiveComparison.IsEnabled)
@@ -29,7 +29,9 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         }
         try
         {
-            _container = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest")
+            // https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/391
+            // Return to upstream's vnext-latest after its duplicate-insert correction is verified.
+            _container = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261117pre")
                 .WithLabel("io.infocarrier.cosmos-tests", "true")
                 .Build();
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
