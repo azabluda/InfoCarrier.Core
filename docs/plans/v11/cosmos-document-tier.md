@@ -957,3 +957,41 @@ The emulator reported missing PostgreSQL document relations. These failures happ
 Testcontainers adoption. The later successful run does not establish their cause or resolution.
 Keep the lifecycle and database-owner diagnostics; continue adoption while monitoring subsequent
 runs, as directed by the owner, rather than repeatedly launching identical suites.
+
+
+## Embedded documents and generated collection keys, November 21, 2026
+
+Adopted the complete EmbeddedDocumentsTest family with its two official skips. Each test owns
+one database. Mapping variants within Old_still_works intentionally share that test's documents;
+other tests and classes cannot delete its database. Application operations use the production
+serializer and InfoCarrier transport. Explicit backend models retain the official ownership mappings.
+
+The first complete family and audit reported Passed: 15, Failed: 2, Total: 19, with two official
+skips. Both collection-manipulation variants exposed a client identity-map conflict after a
+successful store write. Diagnosis found three related losses: generated existing keys were
+suppressed, returned key exchanges were applied without temporary values, and reconstructed
+collections did not retain application order. The server also deferred new entries on their
+own generated keys, rather than only on actual foreign-key dependencies.
+
+The client now sends document members in current navigation order and prepares changed generated
+keys with the registered framework temporary-value generator. The server waits on foreign keys
+and returns existing generated keys only when their values actually changed during the save.
+These changes use ownership metadata, key comparers, and framework generators; they contain no
+Cosmos types, annotations, property names, or provider-name checks. Relational request ordering
+is unchanged. MongoDB remains disabled; applicability to MongoDB is architectural inference,
+not execution evidence. The existing blanket key-suppression workaround is removed.
+
+Four serializer-backed InMemory key-exchange regressions fail with the original client application
+logic and pass with the correction, covering both execution modes and deferred acceptance.
+Two additional cases inspect actual backend collection reconstruction after client tracking order
+differs from navigation order. InMemory does not persist an ordinal, so those cases do not claim
+persistent collection ordering. Independent Cosmos reads retain the official order assertions.
+Focused generated-owner, key, order, and repair controls: Passed: 14, Failed: 0, Total: 14.
+The failed collection variants, their matching existing control, and audit then passed:
+Passed: 4, Failed: 0, Total: 4. Earlier passing family cases are left to full GitHub validation.
+Focused protocol, historical execution, and wire-guard controls: Passed: 52, Failed: 0, Total: 52.
+
+A stopped Podman machine produced the explicit startup diagnostic before any behavior case ran.
+The local machine is named infocarrier-cosmos, so starting it required that name; the command
+without a name looked for a nonexistent default machine. This is startup evidence, separate from
+application failure counts, and identifies a remaining diagnostic refinement.

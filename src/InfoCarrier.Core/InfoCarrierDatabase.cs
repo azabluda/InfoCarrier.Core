@@ -26,7 +26,7 @@ namespace InfoCarrier.Core;
 ///     The InfoCarrier client provider's <see cref="IDatabase" />: the raw-capture query entry
 ///     point (ADR-006). <see cref="CompileQuery{TResult}" /> intercepts the LINQ tree before
 ///     EF's translation pipeline, substitutes compiled-query parameters as plain constants
-///     (research-findings §6), serializes the tree, and ships it to the server. SaveChanges
+///     (research-findings Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’§6), serializes the tree, and ships it to the server. SaveChanges
 ///     lands in Step 10.
 /// </summary>
 /// <remarks>
@@ -368,6 +368,34 @@ public class InfoCarrierDatabase(
         var mapper = _expressionSerializer.ValueMapper;
         mapper.ResetReferenceScope();
         List<IUpdateEntry> sent = [.. Expand(entries)];
+        if (!_serverStoreIsRelational)
+        {
+            // Fixup rebuilds document collections in replay order. Keep the application's
+            // current collection order, including inserted and moved elements, on the wire.
+            var order = new Dictionary<IUpdateEntry, int>();
+            foreach (IUpdateEntry entry in sent)
+                if (!entry.EntityType.IsOwned() && entry is InternalEntityEntry root) Visit(root);
+            sent = [.. sent.OrderBy(e => order.GetValueOrDefault(e, int.MaxValue))];
+
+            void Visit(InternalEntityEntry entry)
+            {
+                if (!order.TryAdd(entry, order.Count)) return;
+                foreach (var navigation in entry.EntityType.GetNavigations())
+                {
+                    if (!navigation.ForeignKey.IsOwnership || navigation.IsOnDependent) continue;
+                    object? value = entry[navigation];
+                    if (navigation.IsCollection && value is System.Collections.IEnumerable collection)
+                    {
+                        foreach (object child in collection) VisitChild(child);
+                    }
+                    else if (value is not null) VisitChild(value);
+                    void VisitChild(object child)
+                    {
+                        if (entry.StateManager.TryGetEntry(child, navigation.TargetEntityType) is { } nested) Visit(nested);
+                    }
+                }
+            }
+        }
         // Expanded owners can receive generated values when only an embedded member changed.
         // EF accepts only entries in its original save list. Include those unchanged owners so
         // their generated-value sidecars reach the entity and its next concurrency snapshot.
@@ -809,7 +837,7 @@ public class InfoCarrierDatabase(
     /// <remarks>
     ///     <para>
     ///         Keyed by correlation id rather than by key value, because the whole point is that the
-    ///         client's key was temporary and the server's is not (research-findings §9). Setting the
+    ///         client's key was temporary and the server's is not (research-findings Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’§9). Setting the
     ///         current value is what lets EF's own <c>AcceptAllChanges</c> replace the temporary key
     ///         and fix up everything that referenced it.
     ///     </para>
@@ -831,11 +859,35 @@ public class InfoCarrierDatabase(
     ///         property the client believes is never generated has no such conflict to resolve.
     ///     </para>
     /// </remarks>
-    private static void ApplyGeneratedValues(
+    private void ApplyGeneratedValues(
         List<IUpdateEntry> entries,
         Common.SaveChangesResult result,
         Expressions.IDynamicValueMapper mapper)
     {
+        // A response can exchange generated key values between tracked entries. Move changing
+        // keys to fresh temporary values before applying any final values, so response order
+        // cannot cause a transient identity-map collision. Foreign keys follow normal fixup.
+        var generators = _currentContext.Context.GetService<Microsoft.EntityFrameworkCore.ValueGeneration.IValueGeneratorSelector>();
+        foreach (Common.GeneratedValues generated in result.GeneratedValues)
+        {
+            if (generated.CorrelationId < 0 || generated.CorrelationId >= entries.Count
+                || entries[generated.CorrelationId] is not InternalEntityEntry entry)
+                continue;
+            foreach (Expressions.DynamicPropertyValue value in ChangeEntryMapper.ReadValues(generated.SerializedValues))
+            {
+                if (entry.EntityType.FindProperty(value.Name) is not { } property
+                    || !property.IsKey() || property.IsForeignKey()
+                    || Microsoft.EntityFrameworkCore.Metadata.Internal.PropertyBaseExtensions.GetStoreGeneratedIndex(property) == -1)
+                    continue;
+                object? finalValue = Expressions.PrimitiveCoercion.FromWireValue(
+                    property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property)));
+                if (!property.GetKeyValueComparer().Equals(entry.GetCurrentValue(property), finalValue)
+                    && generators.TrySelect(property, entry.EntityType, out var generator)
+                    && generator is { GeneratesTemporaryValues: true })
+                    entry.SetTemporaryValue(property, generator.Next(entry.ToEntityEntry()), setModified: false);
+            }
+        }
+
         foreach (Common.GeneratedValues generated in result.GeneratedValues)
         {
             if (generated.CorrelationId < 0 || generated.CorrelationId >= entries.Count)

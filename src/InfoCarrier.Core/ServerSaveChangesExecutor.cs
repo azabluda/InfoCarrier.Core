@@ -94,6 +94,10 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             CompleteDocuments();
         }
 
+        var originalKeys = tracked.ToDictionary(t => t.CorrelationId,
+            t => (IReadOnlyDictionary<IProperty, object?>)t.EntityType.GetProperties()
+                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
+                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue)));
         int count;
         try
         {
@@ -105,7 +109,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw;
         }
 
-        return Result(count, tracked);
+        return Result(count, tracked, originalKeys);
     }
 
     /// <summary>
@@ -124,6 +128,10 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        var originalKeys = tracked.ToDictionary(t => t.CorrelationId,
+            t => (IReadOnlyDictionary<IProperty, object?>)t.EntityType.GetProperties()
+                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
+                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue)));
         int count;
         try
         {
@@ -145,7 +153,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw;
         }
 
-        return Result(count, tracked);
+        return Result(count, tracked, originalKeys);
     }
 
     private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(SaveChangesRequest request)
@@ -372,7 +380,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             for (int i = 0; i < waiting.Count; i++)
             {
                 Replay replay = waiting[i];
-                if (replay.References.Any(r => expected.Contains(r.ClientValue)
+                if (replay.References.Any(r => r.Property.IsForeignKey()
+                        && expected.Contains(r.ClientValue)
                         && !placeholders.ContainsKey(r.ClientValue)))
                 {
                     continue;
@@ -749,12 +758,13 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
     private SaveChangesResult Result(
         int count,
-        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked)
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<IProperty, object?>> originalKeys)
         => new()
         {
             Count = count,
             GeneratedValues = [.. tracked
-                .Select(t => ReadGenerated(t.CorrelationId, t.Entry, t.EntityType, t.State))
+                .Select(t => ReadGenerated(t.CorrelationId, t.Entry, t.EntityType, t.State, originalKeys[t.CorrelationId]))
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
@@ -1674,7 +1684,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         int correlationId,
         EntityEntry entry,
         IEntityType entityType,
-        EntityState state)
+        EntityState state,
+        IReadOnlyDictionary<IProperty, object?> originalKeys)
     {
         if (state == EntityState.Deleted)
         {
@@ -1689,30 +1700,13 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 ? property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate
                 : property.ValueGenerated is ValueGenerated.OnUpdate or ValueGenerated.OnAddOrUpdate;
 
-            // A KEY NEVER COMES BACK FOR A ROW THAT ALREADY EXISTS, WHATEVER THE SERVER'S MODEL
-            // SAYS ABOUT IT (#107). The client's key is what the server used to FIND the row, so
-            // the two cannot disagree about it and a value returned for it can only overwrite a
-            // correct answer with another one.
-            //
-            // **The two halves disagree about `ValueGenerated` here, and that is the defect rather
-            // than a quirk of one store.** The doc comment on `InfoCarrierDatabase.ApplyGeneratedValues`
-            // already states the asymmetry in the other direction: `ValueGenerated` is inferred by
-            // a convention, the server's provider runs conventions this one does not, so the two
-            // models answer differently for the same property. MongoDB's owned-collection ordinal
-            // is `OnAddOrUpdate` on the server and `OnAdd` on the client, which put it through the
-            // `else` branch above on every modified element.
-            //
-            // What that costs is not a wrong number, it is a thrown save: applying the server's
-            // ordinal to one tracked element gives it the key of its sibling, and EF refuses with
-            // "another instance with the same key value is already being tracked". A nested array
-            // of two, with one element changed in place, is the whole repro.
-            //
-            // **Added is the case this must not touch**, and the block below is why it exists: a
-            // row being inserted has no key yet worth keeping, the store decides it, and the
-            // client held a placeholder.
-            if (generated && state != EntityState.Added && property.IsKey())
+            // Existing generated keys can change when a store renumbers embedded elements.
+            // Return only an actual change, rather than suppressing every existing key or
+            // relying on provider conventions agreeing about OnAdd versus OnAddOrUpdate.
+            if (state != EntityState.Added && property.IsKey())
             {
-                continue;
+                generated = originalKeys.TryGetValue(property, out object? original)
+                    && !property.GetKeyValueComparer().Equals(original, entry.Property(property.Name).CurrentValue);
             }
 
             // A store decides a value indirectly as well as directly. A foreign key onto a
