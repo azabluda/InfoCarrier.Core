@@ -33,7 +33,7 @@ internal sealed class CosmosQueryCapture : IObserver<DiagnosticListener>, IObser
                 break;
             case CosmosReadItemEventData item:
                 test.RecordProviderRead($"-- container: {item.ContainerId}\n-- partition: {item.PartitionKeyValue}\n"
-                    + $"ReadItem({item.ResourceId})");
+                    + "ReadItem()");
                 break;
         }
     }

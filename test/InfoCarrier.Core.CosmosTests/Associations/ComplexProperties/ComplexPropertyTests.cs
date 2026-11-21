@@ -217,6 +217,18 @@ public class StructuralEqualityTest(ComplexFixture fixture) : ComplexPropertiesS
 
 public class ProjectionTest(ComplexFixture fixture) : ComplexPropertiesProjectionTestBase<ComplexFixture>(fixture)
 {
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports both complex values through a positional carrier.",
+        DeviationNote = "Item1/Item2 replace First/Second; selected complex fields and query source are unchanged.")]
+    public override Task Select_required_associate_and_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => base.Select_required_associate_and_optional_associate(queryTrackingBehavior);
+
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the key and complex value through a positional carrier.",
+        DeviationNote = "SELECT VALUE wraps the same Id and RequiredAssociate fields as Item1/Item2.")]
+    public override Task Select_associate_and_target_to_index_based_binding_via_closure(QueryTrackingBehavior queryTrackingBehavior)
+        => base.Select_associate_and_target_to_index_based_binding_via_closure(queryTrackingBehavior);
+
     [StoreLimit(UpstreamRepository.EfCore, "test/EFCore.Cosmos.FunctionalTests/Query/Associations/ComplexProperties/ComplexPropertiesProjectionCosmosTest.cs", 39, 53,
         Justification = "When OptionalAssociate is null, the property access on it evaluates to undefined in Cosmos, causing the result to be filtered out entirely.")]
     public override async Task Select_property_on_optional_associate(QueryTrackingBehavior queryTrackingBehavior)

@@ -27,6 +27,12 @@ namespace InfoCarrier.Core.CosmosTests.Specifications;
 #pragma warning disable EF1001 // Preserve pinned Cosmos diagnostic resources and malformed-document setup.
 public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
 {
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports both primitive arrays through a positional carrier.",
+        DeviationNote = "SELECT VALUE uses Item1/Item2 for IntArray/ListOfString; array expressions and row ordering match the direct provider.")]
+    public override Task Project_json_array_of_primitives_on_reference()
+        => base.Project_json_array_of_primitives_on_reference();
+
     private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/JsonQueryCosmosTest.cs";
     public JsonQueryTest(JsonQueryFixture fixture) : base(fixture) { }
 
@@ -156,6 +162,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
             });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 104, 126, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Basic_json_projection_owned_reference_branch_NoTrackingWithIdentityResolution(bool async)
         => Fixture.NoSyncTest(
             async, async asyncQuery =>
@@ -211,6 +220,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     }
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 173, 211, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Basic_json_projection_owned_reference_duplicated_NoTrackingWithIdentityResolution(bool async)
         => Fixture.NoSyncTest(
             async, async asyncQuery =>
@@ -251,6 +263,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
             });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 227, 248, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Basic_json_projection_owned_reference_root_NoTrackingWithIdentityResolution(bool async)
         => Fixture.NoSyncTest(
             async, async asyncQuery =>
@@ -630,6 +645,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
             });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 637, 653, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Json_collection_ElementAt_and_pushdown(bool async)
         => Fixture.NoSyncTest(
             async, async a =>
@@ -1811,6 +1829,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     }
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1932, 1944, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Json_projection_nothing_interesting_AsNoTrackingWithIdentityResolution(bool async)
         => Fixture.NoSyncTest(
             async, async a =>
@@ -2202,6 +2223,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     }
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 2325, 2336, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Project_top_level_entity_with_null_value_required_scalars(bool async)
     => Fixture.NoSyncTest(async, async async =>
     {
@@ -2287,6 +2311,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 2425, 2442, Skip = true, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override async Task Project_missing_required_scalar(bool async)
     {
         // Throws sync not supported exception for sync
@@ -2303,6 +2330,9 @@ public class JsonQueryTest : JsonQueryTestBase<JsonQueryFixture>
     }
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 2444, 2455, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Project_null_required_scalar(bool async)
     => Fixture.NoSyncTest(async, async async =>
     {

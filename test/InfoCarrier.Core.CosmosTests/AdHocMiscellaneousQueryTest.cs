@@ -400,6 +400,9 @@ public class AdHocMiscellaneousQueryTest(NonSharedFixture fixture) : NonSharedMo
     #region 37653
 
     [Fact]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public virtual async Task Coalesce_in_conditional_with_value_conversion()
     {
         var contextFactory = await InitializeNonSharedTest<Context37653>();

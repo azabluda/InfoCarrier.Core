@@ -1271,3 +1271,30 @@ Focused failing-replay cases and the complete override audit then reported Passe
 Total: 5, with one existing official synchronous-operation skip. The conflict-token controls
 remain red by design of this investigation: they still require the upstream successful behavior,
 and do not accept the observed emulator error as a passing result.
+
+## Projection comparison triage, November 21, 2026
+
+Reviewed each pure projection-envelope difference in the first full comparison. The selected
+field expressions, predicates, row ordering, and limits match; InfoCarrier reconstructs the
+application projection from positional carrier members instead of the direct provider's JSON
+envelope/member names. Those methods now carry InfoCarrierDesign(10) with SqlDiffers and an
+explanation. Their original result assertions and tracking modes remain unchanged. Association
+overrides delegate to the inherited scenario, including optional values and primitive collections.
+The comparison continues to preserve these JSON names and validate the declared difference.
+
+Four point-read differences were generated identifiers in independently seeded databases, not
+different query operations. Point-read capture now compares operation, container, and partition,
+without the item identifier value. Query literals remain significant. This follows the existing
+comparison policy of excluding varying input values; application assertions still validate the
+returned entities. It does not normalize query projection names, SQL structure, or query literals.
+
+Focused direct/wire projection, generated-identifier, and audit validation reported Passed: 54,
+Failed: 0, Total: 59, with five existing official skips. The strict Release build passed.
+Literal-versus-parameter limits, compiled raw-query parameterization, null-entity membership,
+alias naming, cancellation request counts, and any remaining outcome differences are separate
+triage items. This batch does not declare those differences harmless or add blanket reasons.
+
+The complete functional GitHub job on 340a307b reported Passed: 30365, Failed: 0, Total: 30602,
+with 237 skipped, confirming the inherited-generator correction beyond its focused controls.
+Its Cosmos job still failed conflict-token checks and the one-item paging assertion. The local
+passing paging control therefore does not establish stable Linux behavior.

@@ -27,6 +27,9 @@ public class NorthwindSelectTest(NorthwindFixture<NoopModelCustomizer> fixture)
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 44, 60,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Projection_when_arithmetic_expression_precedence(bool async) => Fixture.NoSyncTest(async, base.Projection_when_arithmetic_expression_precedence);
 
     [StoreDefect("2.3", UpstreamRepository.EfCore, Source, 62, 88,
@@ -128,14 +131,23 @@ public class NorthwindSelectTest(NorthwindFixture<NoopModelCustomizer> fixture)
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 272, 287,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Select_anonymous_bool_constant_true(bool async) => Fixture.NoSyncTest(async, base.Select_anonymous_bool_constant_true);
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 289, 303,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Select_anonymous_constant_in_expression(bool async) => Fixture.NoSyncTest(async, base.Select_anonymous_constant_in_expression);
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 305, 321,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Select_anonymous_conditional_expression(bool async) => Fixture.NoSyncTest(async, base.Select_anonymous_conditional_expression);
 
     [StoreDefect("2.3", UpstreamRepository.EfCore, Source, 323, 339,
@@ -276,6 +288,9 @@ public class NorthwindSelectTest(NorthwindFixture<NoopModelCustomizer> fixture)
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 651, 669,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Select_non_matching_value_types_from_anonymous_type_introduces_explicit_cast(bool async) => Fixture.NoSyncTest(async, base.Select_non_matching_value_types_from_anonymous_type_introduces_explicit_cast);
 
     [StoreIssue(IssueTracker.EfCore, 17246, UpstreamRepository.EfCore, Source, 671, 679,
@@ -1177,6 +1192,9 @@ public class NorthwindSelectTest(NorthwindFixture<NoopModelCustomizer> fixture)
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1949, 1961,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Projection_with_parameterized_constructor_with_member_assignment(bool async) => Fixture.NoSyncTest(async, base.Projection_with_parameterized_constructor_with_member_assignment);
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1963, 1975,

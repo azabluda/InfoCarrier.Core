@@ -14,7 +14,26 @@ namespace InfoCarrier.Core.CosmosTests.Associations;
 public class CollectionTest(CollectionFixture fixture) : CollectionTests<CollectionFixture>(fixture);
 public class MiscellaneousTest(MiscellaneousFixture fixture) : OwnedNavigationsMiscellaneousTestBase<MiscellaneousFixture>(fixture);
 public class PrimitiveCollectionTest(PrimitiveCollectionFixture fixture) : PrimitiveCollectionTests<PrimitiveCollectionFixture>(fixture);
-public class ProjectionTest(ProjectionFixture fixture) : ProjectionTests<ProjectionFixture>(fixture);
+public class ProjectionTest(ProjectionFixture fixture) : ProjectionTests<ProjectionFixture>(fixture)
+{
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports both associations through a positional carrier.",
+        DeviationNote = "Item1/Item2 replace First/Second; the selected associations and query source are unchanged.")]
+    public override Task Select_required_associate_and_optional_associate(QueryTrackingBehavior queryTrackingBehavior)
+        => base.Select_required_associate_and_optional_associate(queryTrackingBehavior);
+
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the optional association and primitive collection through a positional carrier.",
+        DeviationNote = "Item1/Item2 replace First/Ints; the association, primitive collection, and query source are unchanged.")]
+    public override Task Select_optional_associate_and_ints(QueryTrackingBehavior queryTrackingBehavior)
+        => base.Select_optional_associate_and_ints(queryTrackingBehavior);
+
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the key and association through a positional carrier.",
+        DeviationNote = "SELECT VALUE wraps the same Id and RequiredAssociate fields as Item1/Item2.")]
+    public override Task Select_associate_and_target_to_index_based_binding_via_closure(QueryTrackingBehavior queryTrackingBehavior)
+        => base.Select_associate_and_target_to_index_based_binding_via_closure(queryTrackingBehavior);
+}
 public class SetOperationsTest(SetOperationsFixture fixture) : SetOperationsTests<SetOperationsFixture>(fixture);
 public class StructuralEqualityTest(StructuralEqualityFixture fixture) : StructuralEqualityTests<StructuralEqualityFixture>(fixture);
 public class DirectCollectionTest(DirectCollectionFixture fixture) : CollectionTests<DirectCollectionFixture>(fixture);

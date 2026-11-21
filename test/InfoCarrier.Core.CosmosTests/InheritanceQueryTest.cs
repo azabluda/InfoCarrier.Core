@@ -297,6 +297,9 @@ public class InheritanceQueryTest(InheritanceQueryTest.CosmosFixture fixture)
             });
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 414, 430, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override Task Discriminator_used_when_projection_over_derived_type2(bool async)
         => Fixture.NoSyncTest(
             async, async a =>

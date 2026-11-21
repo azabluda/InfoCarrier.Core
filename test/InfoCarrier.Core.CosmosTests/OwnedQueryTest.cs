@@ -897,6 +897,9 @@ public class OwnedQueryTest(OwnedQueryTest.CosmosFixture fixture)
     }
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 1063, 1092, Skip = true, Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the same fields through a positional carrier.",
+        DeviationNote = "JSON projection envelope or member names differ; field expressions, predicates, row ordering, and limits match the direct provider.")]
     public override async Task Owned_entity_without_owner_does_not_throw_for_identity_resolution(bool async, bool useAsTracking)
     {
         if (!async) throw SkipException.ForSkip("Upstream does not execute this synchronous arm.");
