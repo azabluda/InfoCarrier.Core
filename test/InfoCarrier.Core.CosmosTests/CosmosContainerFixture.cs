@@ -1,6 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
 using Testcontainers.CosmosDb;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(InfoCarrier.Core.CosmosTests.CosmosContainerFixture))]
@@ -9,18 +10,37 @@ namespace InfoCarrier.Core.CosmosTests;
 
 public sealed class CosmosContainerFixture : IAsyncLifetime
 {
+    private readonly bool _publishEndpoint;
     private CosmosDbContainer? _container;
     private CosmosQueryCapture? _queries;
-    private readonly string _logs = Path.Combine(RepositoryRoot(), "artifacts", "cosmos-emulator", Environment.ProcessId.ToString());
+    private readonly string _logs;
 
-    // This fixture owns a fresh assembly container, explicit external-endpoint opt-in,
-    // diagnostic capture, and a three-minute startup deadline. See the document-tier validation record.
+    public CosmosContainerFixture() : this(publishEndpoint: true) { }
+
+    internal CosmosContainerFixture(bool publishEndpoint)
+    {
+        _publishEndpoint = publishEndpoint;
+        _logs = Path.Combine(RepositoryRoot(), "artifacts", "cosmos-emulator", Environment.ProcessId.ToString(),
+            publishEndpoint ? "shared" : "sessions");
+    }
+
+    internal DbContextOptionsBuilder Configure(DbContextOptionsBuilder builder, string database)
+        => builder.UseCosmos(Endpoint, CosmosEmulator.Key, database, options => options
+            .ConnectionMode(Microsoft.Azure.Cosmos.ConnectionMode.Gateway)
+            .HttpClientFactory(() => new HttpClient(_container!.HttpMessageHandler, disposeHandler: false)));
+
+    private string Endpoint => _container is { } container
+        ? new UriBuilder(Uri.UriSchemeHttp, container.Hostname, container.GetMappedPublicPort(CosmosDbBuilder.CosmosDbPort)).ToString()
+        : throw new InvalidOperationException("The Cosmos container has not initialized.");
+
+    // The assembly uses the shared endpoint; token-sensitive tests own a separate instance.
+    // Both retain diagnostic capture and a three-minute startup deadline. See the validation record.
     public async ValueTask InitializeAsync()
     {
-        if (InfoCarrier.Core.FunctionalTests.TestUtilities.LiveComparison.IsEnabled)
+        if (_publishEndpoint && InfoCarrier.Core.FunctionalTests.TestUtilities.LiveComparison.IsEnabled)
             _queries = new CosmosQueryCapture();
         // An explicit endpoint is an opt-in to an externally managed emulator.
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOCARRIER_COSMOS_ENDPOINT")))
+        if (_publishEndpoint && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOCARRIER_COSMOS_ENDPOINT")))
         {
             await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
             return;
@@ -35,13 +55,15 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             deadline.CancelAfter(TimeSpan.FromMinutes(3));
             await _container.StartAsync(deadline.Token);
-            CosmosEmulator.ManagedEndpoint = new UriBuilder(Uri.UriSchemeHttp,
-                _container.Hostname, _container.GetMappedPublicPort(CosmosDbBuilder.CosmosDbPort)).ToString();
-            CosmosEmulator.ManagedHttpMessageHandler = _container.HttpMessageHandler;
+            if (_publishEndpoint)
+            {
+                CosmosEmulator.ManagedEndpoint = Endpoint;
+                CosmosEmulator.ManagedHttpMessageHandler = _container.HttpMessageHandler;
+            }
             Directory.CreateDirectory(_logs);
             await File.WriteAllTextAsync(Path.Combine(_logs, "container.txt"),
-                $"id={_container.Id}\nendpoint={CosmosEmulator.Endpoint}\n", TestContext.Current.CancellationToken);
-            Console.Error.WriteLine($"Cosmos Testcontainers emulator ready: {CosmosEmulator.Endpoint}");
+                $"id={_container.Id}\nendpoint={Endpoint}\n", TestContext.Current.CancellationToken);
+            Console.Error.WriteLine($"Cosmos Testcontainers emulator ready: {Endpoint}; shared={_publishEndpoint}");
         }
         catch (Exception error)
         {
@@ -94,8 +116,11 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         finally
         {
             await container.DisposeAsync();
-            CosmosEmulator.ManagedEndpoint = null;
-            CosmosEmulator.ManagedHttpMessageHandler = null;
+            if (_publishEndpoint)
+            {
+                CosmosEmulator.ManagedEndpoint = null;
+                CosmosEmulator.ManagedHttpMessageHandler = null;
+            }
         }
     }
 

@@ -1448,3 +1448,27 @@ TrackAndSaveTest helper in ComplexTypesTrackingTest. Its upstream synchronous ex
 the helper's source reference is now a comment. Together with the removed InitializeAsync
 InfoCarrierDesign, these are two misplaced attributes found during this review. No additional
 InfoCarrierDesign misuse was found. Fixture explanations stay in comments and this document.
+
+## Token-sensitive container isolation, November 21, 2026
+
+SessionTokenFailureDocumentTest now owns one class-scoped emulator container. Other tests retain
+the assembly-scoped shared container and their parallel scheduling. Both containers use the same
+official CosmosDbBuilder, image, protocol, readiness, and diagnostic capture. The isolated fixture
+does not publish or clear the shared endpoint. DocumentApplicationStore accepts an explicit
+connection configuration, keeping its default shared connection for every other application class.
+The token-sensitive class always uses its own managed container, even when an external shared
+endpoint is configured. Testcontainers disposes it after the class. No production code changes.
+
+The pinned official scenario and exact equality assertions remain. This is container-level
+isolation beyond the official suite's database isolation, justified by the independently reproduced
+cross-database token interference. All original token-failure application cases and the audit
+reported Passed: 13, Failed: 0, Total: 14 locally, with one existing official skip.
+
+An additional direct/wire regression deliberately writes and verifies a document in the shared
+emulator between insertion and duplicate insertion in the isolated emulator. Temporarily restoring
+the session store's shared connection makes both regression arms fail with a newer conflict token:
+Passed: 0, Failed: 2, Total: 2. The isolated connection was then restored. This check detects the
+original interference instead of relying on scheduler timing. The final focused original-conflict,
+interference-regression, and audit run reported Passed: 7, Failed: 0, Total: 7. Logs are under
+artifacts/cosmos-isolated-sessions/, artifacts/cosmos-isolation-shared-control/, and
+artifacts/cosmos-isolation-final/. Complete normal and coverage verification remains in GitHub.

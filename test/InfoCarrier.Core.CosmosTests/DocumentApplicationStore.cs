@@ -21,12 +21,14 @@ internal sealed class DocumentApplicationStore<TContext>(Func<DbContextOptions, 
     public IReadOnlyList<Type> AllowedTypes { get; init; } = [];
     public AutoTransactionBehavior TransactionMode { get; set; } = AutoTransactionBehavior.WhenNeeded;
     public Action<DbContextOptionsBuilder>? ConfigureBackend { get; init; }
+    public Func<DbContextOptionsBuilder, string, DbContextOptionsBuilder> ConfigureConnection { get; init; }
+        = CosmosEmulator.Configure;
 
     public async ValueTask InitializeAsync()
     {
         await CosmosEmulator.EnsureAvailableAsync(TestContext.Current.CancellationToken);
         CosmosEmulator.ReportDatabaseOwner(_database, this, typeof(TContext).FullName!);
-        var builder = CosmosEmulator.Configure(new DbContextOptionsBuilder(), _database)
+        var builder = ConfigureConnection(new DbContextOptionsBuilder(), _database)
             .UseLoggerFactory(Logger)
             .ConfigureWarnings(w => w.Ignore(CosmosEventId.NoPartitionKeyDefined));
         ConfigureBackend?.Invoke(builder);

@@ -16,11 +16,24 @@ using OtherContainerCustomer = SessionTokenDocumentTest.OtherContainerCustomer;
 
 #pragma warning disable EF1001 // Preserve the official session-token storage behavior on the backend.
 
-public class SessionTokenFailureDocumentTest : IAsyncLifetime
+public class SessionTokenFailureDocumentTest(SessionTokenFailureDocumentTest.IsolatedEmulator emulator)
+    : IAsyncLifetime, IClassFixture<SessionTokenFailureDocumentTest.IsolatedEmulator>
 {
+    // The official equality assertions require no intervening writes. This emulator advances
+    // tokens even for writes in unrelated databases, so this class owns a separate container.
+    public sealed class IsolatedEmulator : IAsyncLifetime
+    {
+        private readonly CosmosContainerFixture _container = new(publishEndpoint: false);
+        public ValueTask InitializeAsync() => _container.InitializeAsync();
+        public ValueTask DisposeAsync() => _container.DisposeAsync();
+        internal DbContextOptionsBuilder Configure(DbContextOptionsBuilder builder, string database)
+            => _container.Configure(builder, database);
+    }
+
     private const string OtherContainerName = "Other";
     private readonly DocumentApplicationStore<CosmosSessionTokenContext> _store = new(o => new(o) { Storage = NewStorage() })
     {
+        ConfigureConnection = emulator.Configure,
         ConfigureBackend = b => b.UseCosmos(c => c.SessionTokenManagementMode(SessionTokenManagementMode.SemiAutomatic))
             .ReplaceService<ISessionTokenStorageFactory, SessionTokenDocumentTest.TestSessionTokenStorageFactory>()
     };
@@ -181,7 +194,25 @@ public class SessionTokenFailureDocumentTest : IAsyncLifetime
     public async Task Direct_store_add_conflict_updates_session_token(AutoTransactionBehavior autoTransactionBehavior)
         => await AssertConflictSessionToken(autoTransactionBehavior, direct: true);
 
-    private async Task AssertConflictSessionToken(AutoTransactionBehavior autoTransactionBehavior, bool direct)
+    [Theory, InlineData(false), InlineData(true)]
+    public async Task Conflict_token_is_unchanged_while_shared_emulator_writes(bool direct)
+    {
+        await using var independentStore = new DocumentApplicationStore<CosmosSessionTokenContext>(o => new(o));
+        await independentStore.InitializeAsync();
+        await AssertConflictSessionToken(AutoTransactionBehavior.Never, direct, async () =>
+        {
+            await Task.Run(async () =>
+            {
+                using var independent = independentStore.CreateBackendContext();
+                independent.Customers.Add(new Customer { Id = "independent", PartitionKey = "other" });
+                await independent.SaveChangesAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(1, await independent.Customers.CountAsync(TestContext.Current.CancellationToken));
+            });
+        });
+    }
+
+    private async Task AssertConflictSessionToken(AutoTransactionBehavior autoTransactionBehavior, bool direct,
+        Func<Task>? interveningWrite = null)
     {
         using var context = direct ? _store.CreateBackendContext() : CreateContext(autoTransactionBehavior);
         context.Database.AutoTransactionBehavior = autoTransactionBehavior;
@@ -190,6 +221,7 @@ public class SessionTokenFailureDocumentTest : IAsyncLifetime
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var createdSessionToken = BackendStorage(context).GetDefaultContainerTrackedToken();
+        if (interveningWrite is not null) await interveningWrite();
 
         using var context2 = direct ? _store.CreateBackendContext() : CreateContext();
         context2.Add(customer);
