@@ -99,6 +99,9 @@ public abstract class DocumentAssociationFixture : OwnedNavigationsFixtureBase
 
 internal sealed class CosmosTier : InfoCarrierTier
 {
+    public override IServiceCollection AddDirectClientServices(IServiceCollection services)
+        => services.AddEntityFrameworkCosmos().AddSingleton<TestStoreIndex>();
+
     public override InfoCarrierBackendTestStore CreateBackend(string name, bool shared, SharedTestStoreProperties properties)
         => new CosmosBackendStore(name, shared, properties with
         {
@@ -118,6 +121,9 @@ internal sealed class CosmosBackendStore(string name, bool shared, SharedTestSto
         => provider?.GetService<TestStoreIndex>() ?? base.GetTestStoreIndex(provider);
     public override DbContextOptionsBuilder AddProviderOptions(DbContextOptionsBuilder builder)
         => CosmosEmulator.Configure(base.AddProviderOptions(builder), _database)
+            .ConfigureWarnings(warnings => warnings.Ignore(CosmosEventId.NoPartitionKeyDefined));
+    public override DbContextOptionsBuilder AddDirectClientOptions(DbContextOptionsBuilder builder)
+        => CosmosEmulator.Configure(builder.EnableSensitiveDataLogging(), _database)
             .ConfigureWarnings(warnings => warnings.Ignore(CosmosEventId.NoPartitionKeyDefined));
     public override async Task<TestStore> InitializeAsync(IServiceProvider? serviceProvider, Func<DbContext>? createContext,
         Func<DbContext, Task>? seed = null, Func<DbContext, Task>? clean = null)

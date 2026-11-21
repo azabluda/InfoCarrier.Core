@@ -11,6 +11,7 @@ internal static class CosmosEmulator
     // https://learn.microsoft.com/en-us/azure/cosmos-db/emulator#authentication
     internal const string Key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
     internal static string? ManagedEndpoint { get; set; }
+    internal static HttpMessageHandler? ManagedHttpMessageHandler { get; set; }
     internal static string Endpoint => Environment.GetEnvironmentVariable("INFOCARRIER_COSMOS_ENDPOINT")
         ?? ManagedEndpoint ?? throw new InvalidOperationException("The Cosmos assembly container fixture has not initialized.");
 
@@ -52,6 +53,8 @@ internal static class CosmosEmulator
 
     internal static HttpClient HttpClient()
     {
+        if (ManagedHttpMessageHandler is { } handler)
+            return new HttpClient(handler, disposeHandler: false);
         var endpoint = new Uri(Endpoint);
         if (!endpoint.IsLoopback || endpoint.Scheme != "https")
             throw new InvalidOperationException("Cosmos tests require a loopback HTTPS emulator endpoint.");

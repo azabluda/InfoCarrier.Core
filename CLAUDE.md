@@ -78,7 +78,7 @@ dotnet test test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.cspro
 All active projects target .NET 11 and use EF Core 11 without EF Core 10 overrides.
 
 **Tier C runs with Firebird provider 14.0.0-rc1 on EF Core 11.** The provisional document tier is
-`test/InfoCarrier.Core.CosmosTests`, using Microsoft's Cosmos 11.0.0 provider and a pinned Linux
+`test/InfoCarrier.Core.CosmosTests`, using Microsoft's Cosmos 11.0.0 provider and the official Linux
 emulator image. Podman runs it locally; Docker runs it in CI. The owner has not decided whether
 Cosmos is temporary or permanent. See [the validation record](docs/plans/v11/cosmos-document-tier.md).
 Cosmos always runs in a Linux vNext container. Windows tests run directly on Windows against

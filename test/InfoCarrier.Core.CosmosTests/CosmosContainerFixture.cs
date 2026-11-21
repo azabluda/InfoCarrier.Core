@@ -1,7 +1,7 @@
 // Licensed under the MIT license. See license.txt file in the project root for license information.
 
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
+using Testcontainers.CosmosDb;
+using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(InfoCarrier.Core.CosmosTests.CosmosContainerFixture))]
@@ -10,11 +10,17 @@ namespace InfoCarrier.Core.CosmosTests;
 
 public sealed class CosmosContainerFixture : IAsyncLifetime
 {
-    private IContainer? _container;
+    private CosmosDbContainer? _container;
+    private CosmosQueryCapture? _queries;
     private readonly string _logs = Path.Combine(RepositoryRoot(), "artifacts", "cosmos-emulator", Environment.ProcessId.ToString());
 
+    [InfoCarrierDesign(9, Deviation = DeviationKind.Other,
+        Justification = "The document tier owns its Linux emulator lifecycle and retains diagnostics across both host operating systems.",
+        DeviationNote = "Own one fresh assembly container rather than automatically reusing localhost. External endpoints require explicit opt-in. Keep diagnostic capture and a three-minute startup deadline; use the official CosmosDbBuilder defaults without package changes.")]
     public async ValueTask InitializeAsync()
     {
+        if (InfoCarrier.Core.FunctionalTests.TestUtilities.LiveComparison.IsEnabled)
+            _queries = new CosmosQueryCapture();
         // An explicit endpoint is an opt-in to an externally managed emulator.
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOCARRIER_COSMOS_ENDPOINT")))
         {
@@ -23,40 +29,15 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         }
         try
         {
-            _container = new ContainerBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:81707bcadf894a29d7dab63377685d408b5d54dca3aacfb625c19db4c6392e7c")
+            _container = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest")
                 .WithLabel("io.infocarrier.cosmos-tests", "true")
-                // Preserve the pinned image's PostgreSQL binaries. Its background distro-sync
-                // replaces plpgsql.so with an ABI-incompatible library while the server runs.
-                // All original package-manager settings and other package updates are retained.
-                .WithResourceMapping(System.Text.Encoding.UTF8.GetBytes("""
-                    [main]
-                    gpgcheck=1
-                    installonly_limit=3
-                    installonlypkgs=kernel kernel-mshv kernel-uvm kernel-uki kernel-64k kernel-hwe
-                    clean_requirements_on_remove=0
-                    repodir=/etc/yum.repos.d
-                    cachedir=/var/cache/tdnf
-                    plugins=1
-                    excludepkgs=postgresql*
-
-                    """), FilePath.Of("/etc/tdnf/tdnf.conf"))
-                .WithEnvironment("ENABLE_EXPLORER", "false")
-                .WithEnvironment("ENABLE_TELEMETRY", "false")
-                .WithCommand("--protocol", "https")
-                .WithPortBinding(8081, true)
-                .WithPortBinding(8080, true)
-                .WithCreateParameterModifier(parameters =>
-                {
-                    foreach (var bindings in parameters.HostConfig!.PortBindings!.Values)
-                        foreach (var binding in bindings) binding.HostIP = "127.0.0.1";
-                })
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(request => request.ForPort(8080).ForPath("/ready")))
                 .Build();
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             deadline.CancelAfter(TimeSpan.FromMinutes(3));
             await _container.StartAsync(deadline.Token);
-            CosmosEmulator.ManagedEndpoint = $"https://localhost:{_container.GetMappedPublicPort(8081)}";
+            CosmosEmulator.ManagedEndpoint = new UriBuilder(Uri.UriSchemeHttp,
+                _container.Hostname, _container.GetMappedPublicPort(CosmosDbBuilder.CosmosDbPort)).ToString();
+            CosmosEmulator.ManagedHttpMessageHandler = _container.HttpMessageHandler;
             Directory.CreateDirectory(_logs);
             await File.WriteAllTextAsync(Path.Combine(_logs, "container.txt"),
                 $"id={_container.Id}\nendpoint={CosmosEmulator.Endpoint}\n", TestContext.Current.CancellationToken);
@@ -78,6 +59,8 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        _queries?.Dispose();
+        _queries = null;
         if (_container is null) return;
         var container = _container;
         _container = null;
@@ -112,6 +95,7 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         {
             await container.DisposeAsync();
             CosmosEmulator.ManagedEndpoint = null;
+            CosmosEmulator.ManagedHttpMessageHandler = null;
         }
     }
 

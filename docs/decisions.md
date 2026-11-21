@@ -1552,3 +1552,19 @@ methods differed in ways none of the three describes; such a difference is now s
 reason's `DeviationNote`, which the audit requires with `Other`. The reverse half does not read
 `Other`, because `Other` also describes a body that differs from upstream's while running nothing
 different.
+
+### Amendment 2026-11-21 — Cosmos query comparison
+
+The owner approved comparing actual Cosmos reads directly and through InfoCarrier, using the
+same optional live-comparison mechanism. The reasons for rejecting committed baselines still
+apply: the queries belong to upstream, regenerating expected strings can conceal a regression,
+and captured output must not become a second maintained artifact. This extension keeps all three
+protections. A normal run does not replay the inherited suite.
+
+Cosmos query, association, read-item, JSON, owned, inheritance, ad-hoc, and raw-query fixtures use
+separate generated databases for the two executions. Diagnostic events capture executed query
+text, container identity, partition selection, and point reads. Parameter names are canonicalized;
+JSON property names and literals remain significant. This does not provide relational reader
+counts, Cosmos request charges, or write-command comparison. Test assertions still check results.
+Changed behavior requires the existing typed deviation attributes, with an explained reason.
+The optional GitHub workflow can select Cosmos separately or run all three store comparisons.

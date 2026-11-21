@@ -222,6 +222,11 @@ six-family validation above does not complete this larger scope.
 - [x] Complete the remaining class-by-class applicability review and test adoption listed in the
   [expanded scope](cosmos-document-tier.md#expanded-official-test-scope).
 - [ ] Validate the fully expanded suite on Windows/Podman and Linux/Docker, including coverage.
+- [x] Replace custom managed-container configuration with the official CosmosDbBuilder module,
+  image tag, protocol, and readiness defaults; remove the PostgreSQL package exclusion.
+- [x] Add optional direct/wire Cosmos query comparison and explain measured deviations with
+  existing custom attributes, rather than normalizing them away.
+- [ ] Review the complete Cosmos query comparison on GitHub and resolve unexplained differences.
 
 ## What #99 says that is no longer true
 

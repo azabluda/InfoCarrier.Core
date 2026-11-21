@@ -1033,6 +1033,9 @@ public class NorthwindWhereTest(NorthwindFixture<NoopModelCustomizer> fixture)
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 2486, 2502,
         Justification = Upstream.GaveNoReason)]
+    [InfoCarrierDesign(10, Deviation = DeviationKind.SqlDiffers,
+        Justification = "Projection reassembly transports the server fields through positional carrier members.",
+        DeviationNote = "Projection reconstruction uses Item1/Item2 JSON field names instead of e/Title; the live comparison preserves and reports these names. The same entity, scalar, and filter reach Cosmos.")]
     public override Task Where_simple_shadow_projection_mixed(bool async) => Fixture.NoSyncTest(async, base.Where_simple_shadow_projection_mixed);
 
     [StoreLimit(UpstreamRepository.EfCore, Source, 2504, 2507,

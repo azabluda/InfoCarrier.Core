@@ -12,8 +12,8 @@ prefers Podman over installing a native Windows Cosmos emulator.
 | Component | Configuration |
 |---|---|
 | Provider | Microsoft's `Microsoft.EntityFrameworkCore.Cosmos` 11.0.0 |
-| Emulator | Official Linux vNext `vnext-EN20261008` |
-| Immutable image | `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator@sha256:81707bcadf894a29d7dab63377685d408b5d54dca3aacfb625c19db4c6392e7c` |
+| Emulator | Official Linux vNext `vnext-latest`, selected as in EF Core's test environment |
+| Container module | `Testcontainers.CosmosDb` 4.17.0, using `CosmosDbBuilder` defaults |
 | Framework reference | EF Core 11.0.0, commit `9e685c7a52d1a344d133a3d370e458db97417b3f` |
 | Local Windows | Windows `dotnet test` process connecting to Podman 6.1.3 |
 | Linux | Linux test process connecting to the same image; Docker in GitHub Actions |
@@ -21,7 +21,7 @@ prefers Podman over installing a native Windows Cosmos emulator.
 This follows EF Core's Linux-emulator test path, including its known emulator skips, on both hosts.
 It does not reproduce their separate native Windows emulator path. Testcontainers 4.17.0 starts
 one fresh container for each test assembly execution and removes it after all fixtures finish.
-The assembly fixture preserves class parallelism. The image remains pinned to the same digest.
+The assembly fixture preserves class parallelism. The image tag can change between runs.
 See the pinned [upstream environment](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/TestUtilities/CosmosTestEnvironment.cs)
 and [test jobs](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/eng/helix.proj).
 
@@ -37,11 +37,13 @@ container API; it does not invoke a hardcoded docker or podman executable. Windo
 been exercised without additional environment settings. Windows/Docker Desktop has not been
 validated on this machine. Linux/Docker validation runs on GitHub.
 
-The container uses dynamically assigned loopback ports and waits up to three minutes for `/ready`.
+The module assigns a dynamic port and uses its standard startup-log readiness check. The managed
+endpoint uses HTTP, as in the official EF setup. A three-minute overall startup deadline remains.
 The assembly fixture records container identity and captures emulator output under
 `artifacts/cosmos-emulator/<process>/`, including startup-failure diagnostics. Both GitHub workflows
 upload those logs. Testcontainers' resource reaper remains enabled; no cleanup suppression or
-extra runtime settings were introduced for Podman.
+extra runtime settings are introduced for Podman. The earlier PostgreSQL package exclusion has
+been removed; the managed container receives no custom package configuration.
 
 An explicit `INFOCARRIER_COSMOS_ENDPOINT` opts into an external emulator. That mode retains the
 manual `eng/CosmosEmulator.cs -- start|stop podman|docker` command and loopback HTTPS restriction.
@@ -1169,3 +1171,45 @@ Final wildcard-pin, document key-exchange, availability, and audit checks report
 Failed: 0, Total: 10. The captured installed-package record shows postgresql and postgresql-libs
 still at 16.15-1.azl3. The transaction preview aborts without installing, as intended; its upgrade
 plan omits both PostgreSQL packages. Those focused checks do not replace a complete GitHub run.
+
+## Official container module and live query comparison, November 21, 2026
+
+The owner approved removing unnecessary setup differences. The managed fixture now uses
+Testcontainers.CosmosDb 4.17.0 and CosmosDbBuilder with vnext-latest, like the pinned official
+CosmosTestEnvironment. Module defaults select the protocol, port mapping, disabled explorer and
+telemetry, and startup-log readiness check. The package exclusion, custom HTTPS command, health
+port, loopback binding override, and immutable image selection are removed. Explicit external
+mode retains its separate HTTPS restriction and manual helper; it is not the managed test path.
+
+Remaining lifecycle differences are recorded on InitializeAsync with InfoCarrierDesign and Other:
+one fresh assembly-owned container, explicit external opt-in instead of automatic localhost reuse,
+diagnostic capture, and a three-minute overall startup deadline. These do not alter query execution.
+Gateway mode matches official provider configuration. The separate official test retry strategy
+and twenty-minute request timeout have not been adopted by this container-only change.
+
+The existing optional INFOCARRIER_LIVE_COMPARE mode now covers Cosmos query and association
+families, read-item families, and the JSON, owned, inheritance, ad-hoc, and raw-query classes.
+Direct controls are not replayed as wire tests. Each side owns a separate database. An EF
+DiagnosticListener captures the actual executing queries and point reads without replacing
+fixture logging. Query text, containers, partitions, operation order, and test outcomes are
+compared. Parameter names are canonicalized outside quoted text; JSON keys and literals remain
+significant. Parameter values, result-row read counts, request charges, and Cosmos writes are not
+captured by this mechanism. Application assertions validate results independently.
+
+The first focused comparison reported Passed: 25, Failed: 1, Total: 26. It detected positional
+projection carrier fields Item1/Item2 replacing e/Title in Where_simple_shadow_projection_mixed.
+The projected entity, scalar, and predicate remain identical. The override now records that
+specific difference with InfoCarrierDesign(10), SqlDiffers, and an explanation; the normalizer
+does not erase it. Two always-on direct/wire controls compare filtering, scalar and nested
+projection, ordering, and limits, and require nonempty captured queries on both paths.
+
+The optional Slow comparison workflow accepts cosmos or all. Its Cosmos job uses a Linux runner
+and starts the emulator through the same assembly fixture. Captured differences stay in failure
+messages and workflow artifacts; no generated query baseline is committed. Full validation remains
+open. The prior commit's normal jobs had two functional failures and two Cosmos session failures;
+switching container modules is not a claim that those unrelated assertions are fixed.
+
+Focused final comparison, partition-key, inheritance, raw-query, and override-audit validation
+reported Passed: 35, Failed: 0, Total: 35. The Release build passed with warnings treated as errors.
+This is focused Windows/Podman evidence with the official module and unmodified current image,
+not a complete-suite result or a Linux/Docker claim.

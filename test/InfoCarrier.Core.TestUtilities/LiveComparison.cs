@@ -35,6 +35,8 @@ namespace InfoCarrier.Core.FunctionalTests.TestUtilities;
 ///         generator. <b>Tier A is outside because it cannot be mined</b> (the owner, the same day):
 ///         EF's InMemory provider runs no statement, so there is nothing to capture and only an
 ///         outcome could differ.
+///         Cosmos query families were added on 2026-11-21. Their provider diagnostic events
+///         capture queries and point reads; Cosmos write commands and reader counts are not compared.
 ///     </para>
 ///     <para>
 ///         <b>When a test is red</b>, by the same amendment. A row whose statements differ needs a
@@ -70,9 +72,21 @@ public static class LiveComparison
     [
         "InfoCarrier.Core.FunctionalTests.Sqlite",
         "InfoCarrier.Core.FunctionalTests.Firebird",
+        "InfoCarrier.Core.CosmosTests.Query",
+        "InfoCarrier.Core.CosmosTests.Associations",
+        "InfoCarrier.Core.CosmosTests.Specifications.ReadItems",
     ];
 
     private const DeviationKind OutcomeReasons = DeviationKind.AnswerNotRefusal | DeviationKind.RefusedEarlier;
+
+    private static readonly HashSet<string> ComparedClasses =
+    [
+        "InfoCarrier.Core.CosmosTests.Specifications.JsonQueryTest",
+        "InfoCarrier.Core.CosmosTests.Specifications.OwnedQueryTest",
+        "InfoCarrier.Core.CosmosTests.Specifications.InheritanceQueryTest",
+        "InfoCarrier.Core.CosmosTests.Specifications.AdHocMiscellaneousQueryTest",
+        "InfoCarrier.Core.CosmosTests.Specifications.CosmosSql.FromSqlQueryTest",
+    ];
 
     private static readonly ConcurrentDictionary<Type, DirectFixtures> Fixtures = new();
     private static readonly ConcurrentDictionary<Type, bool> Covered = new();
@@ -82,7 +96,7 @@ public static class LiveComparison
     /// <summary>Whether this run is a slow one.</summary>
     public static bool IsEnabled { get; } = Environment.GetEnvironmentVariable(Variable) == "1";
 
-    /// <summary>Whether the class runs twice in a slow run: a Tier B or Tier C class that runs an EF specification base.</summary>
+    /// <summary>Whether the class runs twice: a selected relational or Cosmos query class with an EF specification base.</summary>
     public static bool Covers(Type testClass)
     {
         ArgumentNullException.ThrowIfNull(testClass);
@@ -90,7 +104,10 @@ public static class LiveComparison
         return Covered.GetOrAdd(
             testClass,
             type => type.Namespace is { } space
-                && ComparedNamespaces.Any(tier => space == tier || space.StartsWith(tier + ".", StringComparison.Ordinal))
+                && (ComparedClasses.Contains(type.FullName!)
+                    || ComparedNamespaces.Any(tier => space == tier || space.StartsWith(tier + ".", StringComparison.Ordinal)))
+                && !(space.StartsWith("InfoCarrier.Core.CosmosTests", StringComparison.Ordinal)
+                    && type.Name.StartsWith("Direct", StringComparison.Ordinal))
                 && RunsSpecificationBase(type));
     }
 
@@ -502,10 +519,12 @@ public static class LiveComparison
 /// <param name="Failed">The command threw.</param>
 public sealed record ComparedCommand(string Text, string Outcome, bool Failed)
 {
-    /// <summary>Whether it reads: its first line that is not a comment starts <c>SELECT</c> or <c>WITH</c>.</summary>
+    /// <summary>Whether it reads: a query statement or a captured Cosmos point read.</summary>
     public bool IsRead
         => Text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0 && !l.StartsWith("--", StringComparison.Ordinal)) is { } first
-            && (first.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) || first.StartsWith("WITH", StringComparison.OrdinalIgnoreCase));
+            && (first.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
+                || first.StartsWith("WITH", StringComparison.OrdinalIgnoreCase)
+                || first.StartsWith("ReadItem(", StringComparison.Ordinal));
 
     /// <summary>The command as a slow run compares it.</summary>
     public static ComparedCommand From(CapturedCommand command)
@@ -513,12 +532,13 @@ public sealed record ComparedCommand(string Text, string Outcome, bool Failed)
         ArgumentNullException.ThrowIfNull(command);
 
         return new(
-            SqlNormalizer.Normalize(command.Text),
+            command.Kind == CapturedCommandKind.ProviderRead ? command.Text : SqlNormalizer.Normalize(command.Text),
             command.Failed ? "failed"
             : command.Kind switch
             {
                 CapturedCommandKind.Reader => command.Count is { } reads ? $"reads {reads}" : "reads ?",
                 CapturedCommandKind.NonQuery => $"rows {command.Count}",
+                CapturedCommandKind.ProviderRead => "provider read",
                 _ => "scalar",
             },
             command.Failed);

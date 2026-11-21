@@ -8,7 +8,7 @@
     <ProjectReference Include="../../src/InfoCarrier.Core.AspNetCore/InfoCarrier.Core.AspNetCore.csproj" />
     <ProjectReference Include="../InfoCarrier.Core.TestUtilities/InfoCarrier.Core.TestUtilities.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Cosmos" />
-    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.CosmosDb" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

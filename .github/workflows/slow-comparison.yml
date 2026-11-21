@@ -10,7 +10,7 @@ on:
         required: true
         default: both
         type: choice
-        options: [both, sqlite, firebird]
+        options: [both, sqlite, firebird, cosmos, all]
       ref:
         description: Optional commit or branch to test instead of the selected branch
         required: false
@@ -27,6 +27,7 @@ env:
 
 jobs:
   compare:
+    if: inputs.suite != 'cosmos'
     name: Slow ${{ matrix.store }} comparison
     runs-on: windows-latest
     timeout-minutes: 180
@@ -36,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        store: ${{ fromJSON(inputs.suite == 'both' && '["Sqlite","Firebird"]' || inputs.suite == 'sqlite' && '["Sqlite"]' || '["Firebird"]') }}
+        store: ${{ fromJSON((inputs.suite == 'both' || inputs.suite == 'all') && '["Sqlite","Firebird"]' || inputs.suite == 'sqlite' && '["Sqlite"]' || '["Firebird"]') }}
     env:
       STORE: ${{ matrix.store }}
       REQUESTED_REF: ${{ inputs.ref || github.ref }}
@@ -129,5 +130,43 @@ jobs:
         with:
           name: slow-${{ matrix.store }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.RESULTS }}/
+          retention-days: 14
+          if-no-files-found: warn
+
+  cosmos:
+    name: Slow Cosmos query comparison
+    if: inputs.suite == 'cosmos' || inputs.suite == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TEST_PROJECT: test/InfoCarrier.Core.CosmosTests/InfoCarrier.Core.CosmosTests.csproj
+      INFOCARRIER_LIVE_COMPARE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Record tested revision
+        run: git rev-parse HEAD
+      - name: Build
+        run: dotnet build $TEST_PROJECT --configuration Release -p:TreatWarningsAsErrors=true
+      - name: Compare Cosmos queries directly and through InfoCarrier
+        run: >-
+          dotnet test $TEST_PROJECT --no-build --no-restore --configuration Release
+          --filter "FullyQualifiedName~InfoCarrier.Core.CosmosTests.Query|FullyQualifiedName~InfoCarrier.Core.CosmosTests.Associations|FullyQualifiedName~CosmosQueryComparisonTest|FullyQualifiedName~JsonQueryTest|FullyQualifiedName~OwnedQueryTest|FullyQualifiedName~InheritanceQueryTest|FullyQualifiedName~AdHocMiscellaneousQueryTest|FullyQualifiedName~FromSqlQueryTest|FullyQualifiedName~Specifications.ReadItems"
+          --logger "trx;LogFileName=results.trx" --logger "console;verbosity=normal"
+          --results-directory artifacts/slow-comparison/Cosmos
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: slow-Cosmos-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/slow-comparison/Cosmos/
+            artifacts/cosmos-emulator/
           retention-days: 14
           if-no-files-found: warn
