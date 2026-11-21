@@ -1213,3 +1213,20 @@ Focused final comparison, partition-key, inheritance, raw-query, and override-au
 reported Passed: 35, Failed: 0, Total: 35. The Release build passed with warnings treated as errors.
 This is focused Windows/Podman evidence with the official module and unmodified current image,
 not a complete-suite result or a Linux/Docker claim.
+
+## Inherited key-generator correction, November 21, 2026
+
+The two remaining functional failures reproduced in isolation: Passed: 0, Failed: 2, Total: 2.
+Ignore_before_save_property_is_still_generated_graph supplies explicit keys across a mapped
+inheritance hierarchy. The generated-key exchange prepass selected a temporary generator using
+the entry's concrete type, creating separate generators for one inherited key and colliding
+temporary values. Official ValueGenerationManager.TryFindValueGenerator selects using
+property.DeclaringType. The prepass now makes that same call. This is an EF metadata correction,
+with no document-provider condition or Cosmos-specific value handling.
+
+The unchanged failing graph cases, their scalar siblings, and generated-document owner/key
+exchange controls then reported Passed: 14, Failed: 0, Total: 14. A nonincremental Release build
+passed with warnings treated as errors. Reference:
+[ValueGenerationManager](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/src/EFCore/ChangeTracking/Internal/ValueGenerationManager.cs#L188-L222).
+Focused protocol compatibility and protocol 3 execution checks reported Passed: 22, Failed: 0,
+Total: 22. No payload format or field meaning changed.

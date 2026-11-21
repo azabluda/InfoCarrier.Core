@@ -884,7 +884,8 @@ public class InfoCarrierDatabase(
                 object? finalValue = Expressions.PrimitiveCoercion.FromWireValue(
                     property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property)));
                 if (!property.GetKeyValueComparer().Equals(entry.GetCurrentValue(property), finalValue)
-                    && generators.TrySelect(property, entry.EntityType, out var generator)
+                    // Match EF's ValueGenerationManager: inherited properties share the declaring type's generator.
+                    && generators.TrySelect(property, property.DeclaringType, out var generator)
                     && generator is { GeneratesTemporaryValues: true })
                     entry.SetTemporaryValue(property, generator.Next(entry.ToEntityEntry()), setModified: false);
             }
