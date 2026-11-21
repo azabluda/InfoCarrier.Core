@@ -1530,3 +1530,28 @@ existing NU1900 vulnerability-service connectivity warning was excluded from tha
 Historical scope was checked against v10.3.0: LiveComparison selected only the SQLite and Firebird
 namespaces. MongoDB retained separate direct controls rather than this full query-comparison path.
 Current evidence does not date every deviation or show that MongoDB had identical manifestations.
+
+## Correcting the temporary-key guard, November 21, 2026
+
+Complete normal and coverage validation of 282ee821 each reported Passed: 30363, Failed: 2,
+Total: 30602. Both failures were SQLite table-per-concrete-type inheritance cases. The guard
+incorrectly equated a non-generated backend key with an invalid default key. The official SQLite
+write scenario legitimately saves a zero key. Both failures reproduced locally before correction:
+Passed: 0, Failed: 2, Total: 2.
+
+Replay now restores the backend sentinel instead of rejecting the request itself. Native Cosmos
+can raise its own missing-key warning, while SQLite can accept zero. Accepted keys are returned
+to the client through the existing correlated response. The placeholder map redirects foreign
+keys to the restored value. Explicit negative keys are untouched. This replaces the blanket
+rejection described above; there is no provider-name test or relational bypass.
+
+Both inherited SQLite cases and existing generated-key controls reported Passed: 14, Failed: 0,
+Total: 14. An independent SQLite control first confirms that native storage accepts zero, then
+checks the remoted principal, the client key, and a dependent foreign key after SaveChanges and
+through a separate backend read: Passed: 1, Failed: 0, Total: 1. The Cosmos control now requires
+the native missing-key DbUpdateException and exact warning, rather than the guard's custom
+configuration error. Logs are under artifacts/tpc-guard-before/, artifacts/tpc-guard-after/,
+artifacts/default-key-fixup/, and artifacts/restored-key-cosmos/.
+The corrected Cosmos key class and audit reported Passed: 14, Failed: 0, Total: 14. Historical
+payload and protocol checks reported Passed: 33, Failed: 0, Total: 33. The production Release
+rebuild passed with source warnings treated as errors, retaining the local NU1900 exception noted above.

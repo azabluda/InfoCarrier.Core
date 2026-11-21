@@ -88,16 +88,13 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     public virtual SaveChangesResult Execute(SaveChangesRequest request)
     {
         List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked
-            = Prepare(request);
+            = Prepare(request, out var restoredKeys);
         if (_documentStore)
         {
             CompleteDocuments();
         }
 
-        var originalKeys = tracked.ToDictionary(t => t.CorrelationId,
-            t => (IReadOnlyDictionary<IProperty, object?>)t.EntityType.GetProperties()
-                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
-                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue)));
+        var originalKeys = SnapshotKeys(tracked, restoredKeys);
         int count;
         try
         {
@@ -119,7 +116,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         SaveChangesRequest request,
         CancellationToken cancellationToken = default)
     {
-        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked = Prepare(request);
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked
+            = Prepare(request, out var restoredKeys);
 
         // Everything the client sent is now tracked. On a store with no partial write, that is not
         // yet everything the write needs (#102).
@@ -128,10 +126,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var originalKeys = tracked.ToDictionary(t => t.CorrelationId,
-            t => (IReadOnlyDictionary<IProperty, object?>)t.EntityType.GetProperties()
-                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
-                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue)));
+        var originalKeys = SnapshotKeys(tracked, restoredKeys);
         int count;
         try
         {
@@ -156,9 +151,25 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         return Result(count, tracked, originalKeys);
     }
 
-    private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(SaveChangesRequest request)
+    private static Dictionary<int, IReadOnlyDictionary<IProperty, object?>> SnapshotKeys(
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked,
+        Dictionary<int, Dictionary<IProperty, object?>> restoredKeys)
+        => tracked.ToDictionary(t => t.CorrelationId, t =>
+        {
+            var values = t.EntityType.GetProperties()
+                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
+                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue));
+            if (restoredKeys.TryGetValue(t.CorrelationId, out var restored))
+                foreach (var (property, original) in restored)
+                    values[property] = property.GetKeyValueComparer().Snapshot(original);
+            return (IReadOnlyDictionary<IProperty, object?>)values;
+        });
+
+    private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(
+        SaveChangesRequest request, out Dictionary<int, Dictionary<IProperty, object?>> restoredKeys)
     {
         ArgumentNullException.ThrowIfNull(request);
+        restoredKeys = [];
 
         var tracked = new List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)>();
         var pending = new List<Replay>();
@@ -204,6 +215,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             // than as describing one.
             var shadow = new List<(IProperty Property, object? Value)>();
             var generatedKeys = new List<(IProperty Property, object ClientValue, bool IssuedAtSave)>();
+            var resetKeys = new List<(IProperty Property, object ClientValue)>();
             var references = new List<(IProperty Property, object ClientValue)>();
             var values = new List<(IProperty Property, object? Value)>();
 
@@ -232,18 +244,16 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 object? clrValue = PrimitiveCoercion.FromWireValue(
                     property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
 
-                // A client placeholder is not an application-supplied key. When the backend
-                // never generates this key, replaying that placeholder as a real value can make
-                // an unset-key insert succeed. Reject the convention mismatch before any write.
+                // A placeholder is not an explicit value. Restore the backend's unset value
+                // when it does not generate this key, and let its ordinary save pipeline decide
+                // whether that value is valid. Preserve the mapping for fixup and the response.
                 // Foreign keys can borrow a principal's placeholder and resolve later below.
-                if (isAdded && temporaryNames.Contains(property.Name)
+                if (isAdded && clrValue is not null && temporaryNames.Contains(property.Name)
                     && property.IsKey() && !property.IsForeignKey()
                     && property.ValueGenerated == ValueGenerated.Never)
                 {
-                    throw new InvalidOperationException(
-                        $"The client supplied a temporary key for '{entityType.Name}.{property.Name}', "
-                        + "but the server model does not generate this key. "
-                        + "Configure matching key-generation rules on the client and server models before saving.");
+                    resetKeys.Add((property, clrValue));
+                    clrValue = property.Sentinel;
                 }
 
                 // "A key this store issues" is `ValueGenerated`, not "is not a foreign key".
@@ -310,10 +320,14 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
             pending.Add(new Replay(change, entity, entityType, shadow, generatedKeys, references, isAdded));
             pending[^1].Values.AddRange(values);
+            pending[^1].RestoredKeys.AddRange(resetKeys);
+            if (resetKeys.Count > 0)
+                restoredKeys[change.CorrelationId] = resetKeys.ToDictionary(k => k.Property, k => (object?)k.ClientValue);
         }
 
         // Every placeholder this request expects to resolve, and the types they are.
-        var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys).Select(g => g.ClientValue));
+        var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys.Select(g => g.ClientValue)
+            .Concat(p.RestoredKeys.Select(k => k.ClientValue))));
         var expectedTypes = new HashSet<Type>(expected.Select(v => v.GetType()));
 
         // A borrowed placeholder is recognised by its **value**, not by the client's temporary
@@ -719,9 +733,16 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 qualifiedPlaceholders[(property, clientValue)] = (generated.CurrentValue, generated.IsTemporary);
             }
 
-            // A reference is a placeholder exactly as long as what it points at is one. An
-            // unresolved reference keeps the client's flagging, which is what it had before any
-            // of this existed.
+            // An unset, non-generated key can be valid for this backend (for example zero).
+            // References must follow that actual value instead of the client's placeholder.
+            foreach ((IProperty property, object clientValue) in replay.RestoredKeys)
+            {
+                PropertyEntry restored = entry.Property(property.Name);
+                placeholders[clientValue] = (restored.CurrentValue, restored.IsTemporary);
+                qualifiedPlaceholders[(property, clientValue)] = (restored.CurrentValue, restored.IsTemporary);
+            }
+
+            // A reference is a placeholder exactly as long as what it points at is one.
             foreach ((IProperty property, object clientValue) in replay.References)
             {
                 // Through the same `Resolve`, so both halves of a redirection read the same
@@ -1401,6 +1422,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         ///     and each can be classified as a borrowed one or an ordinary value.
         /// </summary>
         public List<(IProperty Property, object? Value)> Values { get; } = [];
+
+        /// <summary>Client placeholders restored to non-generated backend keys.</summary>
+        public List<(IProperty Property, object ClientValue)> RestoredKeys { get; } = [];
     }
 
     /// <summary>
@@ -1713,6 +1737,12 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             bool generated = state == EntityState.Added
                 ? property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate
                 : property.ValueGenerated is ValueGenerated.OnUpdate or ValueGenerated.OnAddOrUpdate;
+
+            // A non-generated key restored from a client placeholder must reach the client too.
+            if (state == EntityState.Added && property.IsKey()
+                && originalKeys.TryGetValue(property, out object? supplied)
+                && !property.GetKeyValueComparer().Equals(supplied, entry.Property(property.Name).CurrentValue))
+                generated = true;
 
             // Existing generated keys can change when a store renumbers embedded elements.
             // Return only an actual change, rather than suppressing every existing key or

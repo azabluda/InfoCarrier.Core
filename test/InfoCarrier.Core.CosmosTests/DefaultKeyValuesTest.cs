@@ -302,7 +302,7 @@ public class DefaultKeyValuesTest(DefaultKeyValuesTest.CosmosDefaultKeyValuesTes
     }
 
     [Fact]
-    public async Task Client_temporary_keys_are_rejected_when_the_backend_never_generates_them()
+    public async Task Client_placeholders_preserve_the_native_missing_key_failure()
     {
         var store = (InfoCarrierTestStore)Fixture.TestStore;
         using var direct = store.Backend.CreateDbContext();
@@ -314,11 +314,12 @@ public class DefaultKeyValuesTest(DefaultKeyValuesTest.CosmosDefaultKeyValuesTes
         var failure = await Record.ExceptionAsync(() => client.SaveChangesAsync(TestContext.Current.CancellationToken));
         var keys = await direct.Set<SingleSameKeyAndPartitionKey>().Select(e => e.Id)
             .ToListAsync(TestContext.Current.CancellationToken);
-        Assert.True(failure is InvalidOperationException,
+        Assert.True(failure is DbUpdateException,
             $"Expected temporary-key rejection; actual={failure?.GetType().FullName ?? "success"}; "
             + $"stored count before={before}, after={keys.Count}; keys=[{string.Join(",", keys)}].");
-        Assert.Contains("temporary", failure!.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(SingleSameKeyAndPartitionKey.Id), failure.Message, StringComparison.Ordinal);
+        var updateFailure = Assert.IsType<DbUpdateException>(failure);
+        Assert.Equal(ExpectedMissingKeyWarning(nameof(SingleSameKeyAndPartitionKey), nameof(SingleSameKeyAndPartitionKey.Id)),
+            updateFailure.GetBaseException().Message);
         Assert.Equal(before, keys.Count);
 
         // An explicitly supplied negative key is a real key, not a temporary-value heuristic.
