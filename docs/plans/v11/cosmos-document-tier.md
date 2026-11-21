@@ -1315,3 +1315,20 @@ reported Passed: 4223, Failed: 44, Total: 4648, with 381 skipped in
 Remaining direct association assertion errors are being separated from actual provider behavior.
 Refreshing vnext-latest from the registry retained the same local image ID, so the independently
 reproduced duplicate-insert failure was not explained by a stale locally cached tag.
+
+## Association direct-replay assertions, November 21, 2026
+
+The remaining association replay failures were assertion setup errors. Two collection cases
+selected the native exception type only for dedicated DirectAssociationFixture instances, not
+for the direct replay of a wire fixture. They now recognize both direct paths and retain the
+same error-message assertions. Three subquery cases inherit a common tracked-owned assertion
+whose expected message differs from Cosmos's earlier translation refusal. The official Cosmos
+overrides omit that tracked arm. Our existing direct controls already exercise the written query
+and assert native translation refusal in both tracking modes. That implementation is now shared
+with direct replay instead of copied in a second class. The wire's existing tracked-owned
+refusal and all nontracking checks remain. Updated metadata explains the extra tracked coverage.
+
+The focused replay, dedicated direct controls, and override audit reported Passed: 17, Failed: 0,
+Total: 17. The Release build passed with warnings treated as errors. The complete comparison on
+55bd2841 reported Passed: 4253, Failed: 14, Total: 4648, with 381 official skips, before this
+association correction and the small query-shape annotations.

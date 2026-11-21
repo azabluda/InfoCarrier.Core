@@ -39,29 +39,7 @@ public class StructuralEqualityTest(StructuralEqualityFixture fixture) : Structu
 public class DirectCollectionTest(DirectCollectionFixture fixture) : CollectionTests<DirectCollectionFixture>(fixture);
 public class DirectMiscellaneousTest(DirectMiscellaneousFixture fixture) : OwnedNavigationsMiscellaneousTestBase<DirectMiscellaneousFixture>(fixture);
 public class DirectPrimitiveCollectionTest(DirectPrimitiveCollectionFixture fixture) : PrimitiveCollectionTests<DirectPrimitiveCollectionFixture>(fixture);
-public class DirectProjectionTest(DirectProjectionFixture fixture) : ProjectionTests<DirectProjectionFixture>(fixture)
-{
-    private const string Source = "test/EFCore.Cosmos.FunctionalTests/Query/Associations/OwnedNavigations/OwnedNavigationsProjectionCosmosTest.cs";
-    [StoreLimit(UpstreamRepository.EfCore, Source, 441, 447, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.QueryWrittenOut, DeviationNote = "Exercise both tracking modes; upstream omits the tracked arm. Avoid the common base's assertion of a different tracking error.")]
-    public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().Select(x => ss.Set<RootEntity>()
-            .OrderBy(e => e.Id).Select(e => e.RequiredAssociate).FirstOrDefault()!.RequiredNestedAssociate),
-            queryTrackingBehavior: queryTrackingBehavior));
-    [StoreLimit(UpstreamRepository.EfCore, Source, 449, 455, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.QueryWrittenOut, DeviationNote = "Exercise both tracking modes; upstream omits the tracked arm. Avoid the common base's assertion of a different tracking error.")]
-    public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().Select(x => ss.Set<RootEntity>()
-            .OrderBy(e => e.Id).Select(e => e.OptionalAssociate).FirstOrDefault()!.RequiredNestedAssociate),
-            queryTrackingBehavior: queryTrackingBehavior));
-    [StoreLimit(UpstreamRepository.EfCore, Source, 429, 439, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.QueryWrittenOut, DeviationNote = "Exercise both tracking modes; upstream omits the tracked arm. Avoid the common base's assertion of a different tracking error.")]
-    public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
-        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().OrderBy(x => x.Id).Select(x => ss.Set<RootEntity>()
-            .OrderBy(e => e.Id).FirstOrDefault()!.AssociateCollection),
-            assertOrder: true, elementAsserter: (e, a) => AssertCollection(e, a, elementSorter: r => r.Id),
-            queryTrackingBehavior: queryTrackingBehavior));
-}
+public class DirectProjectionTest(DirectProjectionFixture fixture) : ProjectionTests<DirectProjectionFixture>(fixture);
 public class DirectSetOperationsTest(DirectSetOperationsFixture fixture) : SetOperationsTests<DirectSetOperationsFixture>(fixture);
 public class DirectStructuralEqualityTest(DirectStructuralEqualityFixture fixture) : StructuralEqualityTests<DirectStructuralEqualityFixture>(fixture);
 

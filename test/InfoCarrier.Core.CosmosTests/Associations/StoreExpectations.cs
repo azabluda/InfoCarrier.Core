@@ -28,7 +28,7 @@ public abstract class CollectionTests<TFixture>(TFixture fixture) : OwnedNavigat
     public override async Task OrderBy_ElementAt()
     {
         Exception error = await Assert.ThrowsAnyAsync<Exception>(base.OrderBy_ElementAt);
-        Assert.Equal(Fixture is DirectAssociationFixture ? typeof(Microsoft.Azure.Cosmos.CosmosException) : typeof(InfoCarrierServerException), error.GetType());
+        Assert.Equal(Fixture is DirectAssociationFixture || DirectClient.IsEnabled ? typeof(Microsoft.Azure.Cosmos.CosmosException) : typeof(InfoCarrierServerException), error.GetType());
         Assert.Contains("'ORDER BY' is not supported in subqueries.", error.Message, StringComparison.Ordinal);
     }
     [StoreLimit(UpstreamRepository.EfCore, Source, 134, 145, Justification = "The specified query includes 'member indexer' which is currently not supported",
@@ -36,7 +36,7 @@ public abstract class CollectionTests<TFixture>(TFixture fixture) : OwnedNavigat
     public override async Task Index_column()
     {
         Exception error = await Assert.ThrowsAnyAsync<Exception>(base.Index_column);
-        Assert.Equal(Fixture is DirectAssociationFixture ? typeof(Microsoft.Azure.Cosmos.CosmosException) : typeof(InfoCarrierServerException), error.GetType());
+        Assert.Equal(Fixture is DirectAssociationFixture || DirectClient.IsEnabled ? typeof(Microsoft.Azure.Cosmos.CosmosException) : typeof(InfoCarrierServerException), error.GetType());
         Assert.Contains("'member indexer'", error.Message, StringComparison.Ordinal);
     }
     [StoreLimit(UpstreamRepository.EfCore, Source, 76, 79, Justification = Upstream.GaveNoReason)]
@@ -140,21 +140,43 @@ public abstract class ProjectionTests<TFixture>(TFixture fixture) : OwnedNavigat
                 assertOrder: true, elementAsserter: (e, a) => AssertCollection(e, a, elementSorter: r => r.Id),
                 queryTrackingBehavior: queryTrackingBehavior);
     [StoreLimit(UpstreamRepository.EfCore, Source, 441, 447, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.Other, DeviationNote = "Run the common base's tracked owned-entity refusal; upstream omits that arm. Keep its non-tracking translation refusal.")]
+        Deviation = DeviationKind.Other | DeviationKind.QueryWrittenOut, DeviationNote = "Upstream omits the tracked arm. The wire keeps its tracked-owned refusal; direct execution writes the same query explicitly to assert native translation refusal without the common base's different tracking-error assertion.")]
     public override Task Select_subquery_required_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior == QueryTrackingBehavior.TrackAll
+        => Fixture is DirectAssociationFixture || DirectClient.IsEnabled
+            ? AssertRequiredSubqueryTranslationFailed(queryTrackingBehavior)
+            : queryTrackingBehavior == QueryTrackingBehavior.TrackAll
             ? base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior)
             : AssertTranslationFailed(() => base.Select_subquery_required_related_FirstOrDefault(queryTrackingBehavior));
     [StoreLimit(UpstreamRepository.EfCore, Source, 449, 455, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.Other, DeviationNote = "Run the common base's tracked owned-entity refusal; upstream omits that arm. Keep its non-tracking translation refusal.")]
+        Deviation = DeviationKind.Other | DeviationKind.QueryWrittenOut, DeviationNote = "Upstream omits the tracked arm. The wire keeps its tracked-owned refusal; direct execution writes the same query explicitly to assert native translation refusal without the common base's different tracking-error assertion.")]
     public override Task Select_subquery_optional_related_FirstOrDefault(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior == QueryTrackingBehavior.TrackAll
+        => Fixture is DirectAssociationFixture || DirectClient.IsEnabled
+            ? AssertOptionalSubqueryTranslationFailed(queryTrackingBehavior)
+            : queryTrackingBehavior == QueryTrackingBehavior.TrackAll
             ? base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior)
             : AssertTranslationFailed(() => base.Select_subquery_optional_related_FirstOrDefault(queryTrackingBehavior));
     [StoreLimit(UpstreamRepository.EfCore, Source, 429, 439, Justification = Upstream.GaveNoReason,
-        Deviation = DeviationKind.Other, DeviationNote = "Run the common base's tracked owned-entity refusal; upstream omits that arm. Keep its non-tracking translation refusal.")]
+        Deviation = DeviationKind.Other | DeviationKind.QueryWrittenOut, DeviationNote = "Upstream omits the tracked arm. The wire keeps its tracked-owned refusal; direct execution writes the same query explicitly to assert native translation refusal without the common base's different tracking-error assertion.")]
     public override Task Select_subquery_FirstOrDefault_complex_collection(QueryTrackingBehavior queryTrackingBehavior)
-        => queryTrackingBehavior == QueryTrackingBehavior.TrackAll
+        => Fixture is DirectAssociationFixture || DirectClient.IsEnabled
+            ? AssertCollectionSubqueryTranslationFailed(queryTrackingBehavior)
+            : queryTrackingBehavior == QueryTrackingBehavior.TrackAll
             ? base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior)
             : AssertTranslationFailed(() => base.Select_subquery_FirstOrDefault_complex_collection(queryTrackingBehavior));
+
+    private Task AssertRequiredSubqueryTranslationFailed(QueryTrackingBehavior queryTrackingBehavior)
+        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().Select(x => ss.Set<RootEntity>()
+            .OrderBy(e => e.Id).Select(e => e.RequiredAssociate).FirstOrDefault()!.RequiredNestedAssociate),
+            queryTrackingBehavior: queryTrackingBehavior));
+
+    private Task AssertOptionalSubqueryTranslationFailed(QueryTrackingBehavior queryTrackingBehavior)
+        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().Select(x => ss.Set<RootEntity>()
+            .OrderBy(e => e.Id).Select(e => e.OptionalAssociate).FirstOrDefault()!.RequiredNestedAssociate),
+            queryTrackingBehavior: queryTrackingBehavior));
+
+    private Task AssertCollectionSubqueryTranslationFailed(QueryTrackingBehavior queryTrackingBehavior)
+        => AssertTranslationFailed(() => AssertQuery(ss => ss.Set<RootEntity>().OrderBy(x => x.Id).Select(x => ss.Set<RootEntity>()
+            .OrderBy(e => e.Id).FirstOrDefault()!.AssociateCollection),
+            assertOrder: true, elementAsserter: (e, a) => AssertCollection(e, a, elementSorter: r => r.Id),
+            queryTrackingBehavior: queryTrackingBehavior));
 }
