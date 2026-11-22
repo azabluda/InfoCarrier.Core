@@ -831,6 +831,40 @@ coverage measurements, and remaining platform limits.
       pending. The evidence records the unrelated full-coverage capacity-test timeout and its
       successful isolated run without treating the failed full run as a passing gate.
 
+## Version 11 product coverage audit
+
+Owner-selected [issue #288](https://github.com/azabluda/InfoCarrier.Core/issues/288), November 22, 2026.
+The [dated audit](../v11/coverage-audit.md) records the exact complete source measurement,
+raw/merged report checks, file decisions, earlier decision rechecks and bounded follow-up work.
+
+- [x] **CVA1. Audit product coverage and close confirmed gaps.** Inspect the successful complete coverage run
+      for the selected revision, verify assembly/generated-source filters, compare raw line
+      outcomes with the merged report, and distinguish branch-report limitations. Record file decisions.
+      Remove the unused
+      historical descriptor cache helper; test buffered-only server replacements and facade
+      transaction completion/reset. Keep unresolved reachability and adapter scenarios explicit.
+- [x] **CVA2. Remove the obsolete mapping-source host.** Verify registrations and all source
+      consumers; move unchanged scalar rules into the active relational service. Record the public
+      major-version removal and replacement for custom subclasses. Run existing model/query controls.
+- [x] **CVA3. Fix progressive concatenation of client projections.** Reproduce buffered execution
+      with a gated application test, stream independently projected result slots, and preserve
+      buffering for residuals that need shared inputs. Explain why the original regression and
+      inherited result assertions did not establish this timing contract.
+- [x] **CVA4. Resolve remaining coverage candidates.** Remove unreachable predicate/distinct
+      streaming steps and the buffered decoder called only by a test. Retain paging after proving
+      its indexed-projection caller. Add adapter, diagnostic, stored-model, direct-conflict and
+      historical/admission controls. Record retained defensive boundaries and bounded future work.
+- [ ] **CVA5. Complete final hosted validation and owner review.** Reconcile the final complete
+      coverage report and review normal/slow checks. Record results in the pull request. Merging,
+      issue closure and version 11 publication remain separate owner decisions.
+- [x] **CVA6. Preserve buffered range paging.** Review reproduced `Take(Range)` failing during
+      projected concat plan selection. Require integer streaming counts and cover standalone and
+      concatenated indexed projections. Both regressions failed first; all 428 transport tests pass.
+- [x] **CVA7. Remove cancellation-test ordering dependence.** Coverage exposed TestHost wrapping
+      cancellation in `IOException` before a new read. Accept only its specific cancellation wrapper
+      or direct cancellation, while retaining server-observation and query-count assertions.
+      Verify three identical focused coverage runs and replacement/streaming controls.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these

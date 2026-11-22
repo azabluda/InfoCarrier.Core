@@ -81,6 +81,10 @@ Create schema and check connectivity through the server's database provider.
 - Review query-split event handlers: `UnregisteredKeyTypes` was removed.
   Use current event data and handle refused queries.
 - Removed obsolete query translation/shaped-query factories need no replacement in ordinary application setup.
+- `InfoCarrierTypeMappingSource` was removed. Custom mapping-source subclasses should derive from
+  `InfoCarrier.Core.Relational.InfoCarrierRelationalTypeMappingSource` and accept both core and
+  relational mapping dependencies. Update `FindMapping` overrides to use `RelationalTypeMappingInfo`
+  and return `RelationalTypeMapping`. Ordinary provider registration already uses this service.
 
 For direct constructors and serializer/value-mapper implementations, compare the current signatures
 with your code. A new optional parameter can preserve a source call while changing the compiled signature.

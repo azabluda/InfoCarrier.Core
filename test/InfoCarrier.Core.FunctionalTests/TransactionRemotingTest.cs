@@ -3,6 +3,7 @@
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.FunctionalTests.TestUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace InfoCarrier.Core.FunctionalTests;
@@ -170,6 +171,60 @@ public class TransactionRemotingTest
                 "release:server-token-1:sp1"
             ],
             client.Savepoints);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task Ending_through_the_database_facade_requires_and_clears_its_current_token(
+        bool async, bool commit, bool open)
+    {
+        var client = new RecordingClient();
+        await using var context = new SmokeContext(Options(client));
+        if (open)
+        {
+            if (async) { await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken); }
+            else { context.Database.BeginTransaction(); }
+        }
+
+        if (open) { await End(); }
+        else { await Assert.ThrowsAsync<InvalidOperationException>(End); }
+
+        Assert.Null(context.Database.CurrentTransaction);
+        Assert.Equal(open ? [commit ? "commit:server-token-1" : "rollback:server-token-1"] : [], client.Ends);
+
+        async Task End()
+        {
+            if (async)
+            {
+                if (commit) { await context.Database.CommitTransactionAsync(TestContext.Current.CancellationToken); }
+                else { await context.Database.RollbackTransactionAsync(TestContext.Current.CancellationToken); }
+            }
+            else
+            {
+                if (commit) { context.Database.CommitTransaction(); }
+                else { context.Database.RollbackTransaction(); }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Resetting_the_transaction_manager_rolls_back_its_open_server_token()
+    {
+        var client = new RecordingClient();
+        await using var context = new SmokeContext(Options(client));
+        await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await context.GetService<IDbContextTransactionManager>().ResetStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["rollback:server-token-1"], client.Ends);
+        Assert.Null(context.Database.CurrentTransaction);
     }
 
     private static DbContextOptions<SmokeContext> Options(IInfoCarrierClient client)
