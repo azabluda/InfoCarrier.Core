@@ -625,4 +625,3 @@ public class IdentityResolutionTest
             });
     }
 }
-

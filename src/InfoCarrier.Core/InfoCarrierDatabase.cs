@@ -26,7 +26,7 @@ namespace InfoCarrier.Core;
 ///     The InfoCarrier client provider's <see cref="IDatabase" />: the raw-capture query entry
 ///     point (ADR-006). <see cref="CompileQuery{TResult}" /> intercepts the LINQ tree before
 ///     EF's translation pipeline, substitutes compiled-query parameters as plain constants
-///     (research-findings Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’§6), serializes the tree, and ships it to the server. SaveChanges
+///     (research-findings §6), serializes the tree, and ships it to the server. SaveChanges
 ///     lands in Step 10.
 /// </summary>
 /// <remarks>
@@ -837,7 +837,7 @@ public class InfoCarrierDatabase(
     /// <remarks>
     ///     <para>
     ///         Keyed by correlation id rather than by key value, because the whole point is that the
-    ///         client's key was temporary and the server's is not (research-findings Р В Р’В Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РЎС›Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’§9). Setting the
+    ///         client's key was temporary and the server's is not (research-findings §9). Setting the
     ///         current value is what lets EF's own <c>AcceptAllChanges</c> replace the temporary key
     ///         and fix up everything that referenced it.
     ///     </para>

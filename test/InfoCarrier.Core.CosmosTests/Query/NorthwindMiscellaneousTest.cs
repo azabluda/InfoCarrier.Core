@@ -3454,4 +3454,3 @@ public class NorthwindMiscellaneousTest(NorthwindFixture<NoopModelCustomizer> fi
     }
 }
 #pragma warning restore EF9102
-

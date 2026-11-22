@@ -557,4 +557,3 @@ public class InheritanceQueryTest(InheritanceQueryTest.CosmosFixture fixture)
         }
     }
 }
-

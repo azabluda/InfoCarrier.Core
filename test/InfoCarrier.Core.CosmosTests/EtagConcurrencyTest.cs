@@ -346,4 +346,3 @@ public class EtagConcurrencyTest : IAsyncLifetime
         public string LoyaltyLevel { get; set; } = null!;
     }
 }
-

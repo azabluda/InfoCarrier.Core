@@ -1509,4 +1509,3 @@ public class OwnedQueryTest(OwnedQueryTest.CosmosFixture fixture)
                 builder.ConfigureWarnings(w => w.Ignore(CosmosEventId.NoPartitionKeyDefined)));
     }
 }
-

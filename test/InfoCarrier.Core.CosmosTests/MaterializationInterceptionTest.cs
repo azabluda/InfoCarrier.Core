@@ -114,4 +114,3 @@ public class MaterializationInterceptionTest(NonSharedFixture fixture) :
     }
 
 }
-

@@ -186,4 +186,3 @@ public class CustomConvertersTest(CustomConvertersTest.CosmosFixture fixture)
         }
     }
 }
-

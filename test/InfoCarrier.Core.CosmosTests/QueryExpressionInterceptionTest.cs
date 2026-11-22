@@ -60,4 +60,3 @@ public class QueryExpressionInterceptionTest(QueryExpressionInterceptionTest.Cos
         protected override bool ShouldSubscribeToDiagnosticListener => true;
     }
 }
-

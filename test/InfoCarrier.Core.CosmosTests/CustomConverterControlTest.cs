@@ -29,4 +29,3 @@ public class CustomConverterControlTest(CustomConvertersTest.CosmosFixture fixtu
             error.Message.Replace("\r", "").Replace("\n", ""));
     }
 }
-

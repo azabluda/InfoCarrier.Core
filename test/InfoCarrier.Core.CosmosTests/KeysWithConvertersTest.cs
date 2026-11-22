@@ -34,4 +34,3 @@ public class KeysWithConvertersTest(KeysWithConvertersTest.CosmosFixture fixture
                 CoreEventId.CollectionWithoutComparer)));
     }
 }
-

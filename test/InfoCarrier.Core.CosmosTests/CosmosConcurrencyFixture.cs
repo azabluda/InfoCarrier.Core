@@ -108,4 +108,3 @@ public class CosmosConcurrencyFixture : F1FixtureBase<byte[]>
         }
     }
 }
-

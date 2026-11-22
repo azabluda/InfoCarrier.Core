@@ -264,4 +264,3 @@ public class HierarchicalPartitionKeyTest : IClassFixture<HierarchicalPartitionK
         public bool PartitionKey3 { get; set; }
     }
 }
-

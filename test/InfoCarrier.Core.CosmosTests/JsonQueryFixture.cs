@@ -616,4 +616,3 @@ public class JsonQueryFixture : JsonQueryFixtureBase
         Assert.Equal(expected.StringYNConvertedToBool, actual.StringYNConvertedToBool);
     }
 }
-
