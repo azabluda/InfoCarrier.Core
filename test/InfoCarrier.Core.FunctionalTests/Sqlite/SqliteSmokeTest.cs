@@ -35,7 +35,8 @@ public class SqliteSmokeTest
     /// </remarks>
     private static SqliteInfoCarrierBackendTestStore CreateStore(
         Action<InfoCarrierServerOptions>? configureServer = null,
-        ParameterTranslationMode? collectionMode = null)
+        ParameterTranslationMode? collectionMode = null,
+        Action<ModelBuilder, DbContext>? onModelCreating = null)
         => new(
             Guid.NewGuid().ToString(),
             shared: false,
@@ -44,8 +45,8 @@ public class SqliteSmokeTest
                 ContextType = typeof(SqliteSmokeContext),
 
                 // The base store hands this straight to TestModelSource, which does not accept
-                // null; SmokeContext needs no customization beyond its own OnModelCreating.
-                OnModelCreating = (_, _) => { },
+                // null; most cases need no customization beyond the context's OnModelCreating.
+                OnModelCreating = onModelCreating ?? ((_, _) => { }),
                 ConfigureServer = configureServer,
                 OnAddOptions = builder =>
                 {
@@ -639,6 +640,43 @@ public class SqliteSmokeTest
         Assert.Equal(
             "alpha",
             (await client.Blogs.SingleAsync(b => b.Id == first.Id, cancellationToken: TestContext.Current.CancellationToken)).Title);
+    }
+
+    [Fact]
+    public async Task A_backend_default_key_replaces_the_client_placeholder_and_its_foreign_keys()
+    {
+        await using SqliteInfoCarrierBackendTestStore store = CreateStore(
+            onModelCreating: (model, _) => model.Entity<Blog>().Property(e => e.Id).ValueGeneratedNever());
+        await store.InitializeAsync(store.ServiceProvider, store.CreateDbContext);
+        using (var native = store.CreateDbContext())
+        {
+            var baseline = new Blog { Title = "native" };
+            native.Add(baseline);
+            await native.SaveChangesAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(0, baseline.Id);
+            native.Remove(baseline);
+            await native.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (SqliteSmokeContext client = CreateClient(store))
+        {
+            var blog = new Blog { Title = "remote" };
+            client.Add(blog);
+            var key = client.Entry(blog).Property(e => e.Id);
+            Assert.True(key.IsTemporary);
+            var post = new Post { Heading = "dependent", BlogId = key.CurrentValue };
+            client.Add(post);
+            Assert.Equal(2, await client.SaveChangesAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(0, blog.Id);
+            Assert.Equal(blog.Id, post.BlogId);
+            Assert.False(key.IsTemporary);
+        }
+
+        using var direct = store.CreateDbContext();
+        var stored = await direct.Set<Blog>().Include(e => e.Posts).SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, stored.Id);
+        Assert.Equal("remote", stored.Title);
+        Assert.Equal(stored.Id, Assert.Single(stored.Posts).BlogId);
     }
 
     [Fact]

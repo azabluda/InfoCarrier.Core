@@ -1017,6 +1017,35 @@ with only the owner able to end it.
 
 **Closed by plan J3 (2026-08-17).** Nothing was built for it.
 
+#### Client and server key-generation conventions, November 21, 2026
+
+The client and backend run different provider conventions, even when they share OnModelCreating.
+Configure key-generation intent explicitly where those conventions differ. For application-assigned
+integer keys, use the same configuration on both models:
+
+```csharp
+modelBuilder.Entity<Item>().Property(e => e.Id).ValueGeneratedNever();
+```
+
+The Cosmos default-key control demonstrates why this matters: the client convention marks a
+single integer key OnAdd, while native Cosmos marks it Never. Previously, the client allocated
+a temporary negative key and the server stored that placeholder as a real key. The save could
+succeed where the official missing-key scenario rejects the insert.
+
+The initial November 21 guard rejected those temporary keys whenever the backend declared
+ValueGenerated.Never. Full validation found that too broad: SQLite legitimately accepts zero for
+a non-generated key, including the official inheritance write scenario. Replay now restores the
+backend's sentinel for an Added entry's independently generated temporary key and lets the native
+save pipeline accept or reject it. Cosmos retains its native missing-key failure; SQLite can save
+zero. The resulting real key is returned by correlation id, and dependent foreign keys follow
+the placeholder mapping. An explicitly supplied negative key remains unchanged.
+
+This restores unset-key semantics without automatically synchronizing provider conventions.
+The existing temporary-value flag distinguishes a placeholder from an explicit key; it cannot
+distinguish permanent client-generated values from explicit values. Explicit model configuration
+therefore remains necessary where defaults differ. MongoDB's exact defaults have not been verified
+by this Cosmos investigation. The existing wire fields and format are unchanged.
+
 ### D4 — chained InfoCarrier: a server whose own `DbContext` is an InfoCarrier client
 
 **Raised and measured 2026-08-16, during the D3 audit. Two defects recorded, neither scheduled.**

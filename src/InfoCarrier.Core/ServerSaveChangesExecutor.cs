@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
 
@@ -57,11 +58,11 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///     <see cref="LoadDocumentAsync{TEntity}" />, whose type argument only the model knows.
     /// </summary>
     private static readonly MethodInfo LoadDocumentMethod =
-        ((Func<DbContext, LambdaExpression, CancellationToken, Task>)LoadDocumentAsync<object>)
+        ((Func<DbContext, LambdaExpression, object?[], CancellationToken, Task>)LoadDocumentAsync<object>)
             .Method.GetGenericMethodDefinition();
 
     private static readonly MethodInfo LoadDocumentSyncMethod =
-        ((Action<DbContext, LambdaExpression>)LoadDocument<object>)
+        ((Action<DbContext, LambdaExpression, object?[]>)LoadDocument<object>)
             .Method.GetGenericMethodDefinition();
 
     private readonly DbContext _context = context;
@@ -87,12 +88,13 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     public virtual SaveChangesResult Execute(SaveChangesRequest request)
     {
         List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked
-            = Prepare(request);
+            = Prepare(request, out var restoredKeys);
         if (_documentStore)
         {
             CompleteDocuments();
         }
 
+        var originalKeys = SnapshotKeys(tracked, restoredKeys);
         int count;
         try
         {
@@ -104,7 +106,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw;
         }
 
-        return Result(count, tracked);
+        return Result(count, tracked, originalKeys);
     }
 
     /// <summary>
@@ -114,7 +116,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         SaveChangesRequest request,
         CancellationToken cancellationToken = default)
     {
-        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked = Prepare(request);
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked
+            = Prepare(request, out var restoredKeys);
 
         // Everything the client sent is now tracked. On a store with no partial write, that is not
         // yet everything the write needs (#102).
@@ -123,6 +126,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             await CompleteDocumentsAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        var originalKeys = SnapshotKeys(tracked, restoredKeys);
         int count;
         try
         {
@@ -144,12 +148,28 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw;
         }
 
-        return Result(count, tracked);
+        return Result(count, tracked, originalKeys);
     }
 
-    private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(SaveChangesRequest request)
+    private static Dictionary<int, IReadOnlyDictionary<IProperty, object?>> SnapshotKeys(
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked,
+        Dictionary<int, Dictionary<IProperty, object?>> restoredKeys)
+        => tracked.ToDictionary(t => t.CorrelationId, t =>
+        {
+            var values = t.EntityType.GetProperties()
+                .Where(p => p.IsKey() && p.ValueGenerated != ValueGenerated.Never)
+                .ToDictionary(p => p, p => p.GetKeyValueComparer().Snapshot(t.Entry.Property(p.Name).CurrentValue));
+            if (restoredKeys.TryGetValue(t.CorrelationId, out var restored))
+                foreach (var (property, original) in restored)
+                    values[property] = property.GetKeyValueComparer().Snapshot(original);
+            return (IReadOnlyDictionary<IProperty, object?>)values;
+        });
+
+    private List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> Prepare(
+        SaveChangesRequest request, out Dictionary<int, Dictionary<IProperty, object?>> restoredKeys)
     {
         ArgumentNullException.ThrowIfNull(request);
+        restoredKeys = [];
 
         var tracked = new List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)>();
         var pending = new List<Replay>();
@@ -195,6 +215,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             // than as describing one.
             var shadow = new List<(IProperty Property, object? Value)>();
             var generatedKeys = new List<(IProperty Property, object ClientValue, bool IssuedAtSave)>();
+            var resetKeys = new List<(IProperty Property, object ClientValue)>();
             var references = new List<(IProperty Property, object ClientValue)>();
             var values = new List<(IProperty Property, object? Value)>();
 
@@ -222,6 +243,18 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
                 object? clrValue = PrimitiveCoercion.FromWireValue(
                     property, _mapper.FromPropertyValue(value, PrimitiveCoercion.WireType(property)));
+
+                // A placeholder is not an explicit value. Restore the backend's unset value
+                // when it does not generate this key, and let its ordinary save pipeline decide
+                // whether that value is valid. Preserve the mapping for fixup and the response.
+                // Foreign keys can borrow a principal's placeholder and resolve later below.
+                if (isAdded && clrValue is not null && temporaryNames.Contains(property.Name)
+                    && property.IsKey() && !property.IsForeignKey()
+                    && property.ValueGenerated == ValueGenerated.Never)
+                {
+                    resetKeys.Add((property, clrValue));
+                    clrValue = property.Sentinel;
+                }
 
                 // "A key this store issues" is `ValueGenerated`, not "is not a foreign key".
                 // The two agree for every ordinary model, which is why the FK test stood in for
@@ -287,10 +320,14 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
             pending.Add(new Replay(change, entity, entityType, shadow, generatedKeys, references, isAdded));
             pending[^1].Values.AddRange(values);
+            pending[^1].RestoredKeys.AddRange(resetKeys);
+            if (resetKeys.Count > 0)
+                restoredKeys[change.CorrelationId] = resetKeys.ToDictionary(k => k.Property, k => (object?)k.ClientValue);
         }
 
         // Every placeholder this request expects to resolve, and the types they are.
-        var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys).Select(g => g.ClientValue));
+        var expected = new HashSet<object>(pending.SelectMany(p => p.GeneratedKeys.Select(g => g.ClientValue)
+            .Concat(p.RestoredKeys.Select(k => k.ClientValue))));
         var expectedTypes = new HashSet<Type>(expected.Select(v => v.GetType()));
 
         // A borrowed placeholder is recognised by its **value**, not by the client's temporary
@@ -371,7 +408,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             for (int i = 0; i < waiting.Count; i++)
             {
                 Replay replay = waiting[i];
-                if (replay.References.Any(r => expected.Contains(r.ClientValue)
+                if (replay.References.Any(r => r.Property.IsForeignKey()
+                        && expected.Contains(r.ClientValue)
                         && !placeholders.ContainsKey(r.ClientValue)))
                 {
                     continue;
@@ -695,9 +733,16 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 qualifiedPlaceholders[(property, clientValue)] = (generated.CurrentValue, generated.IsTemporary);
             }
 
-            // A reference is a placeholder exactly as long as what it points at is one. An
-            // unresolved reference keeps the client's flagging, which is what it had before any
-            // of this existed.
+            // An unset, non-generated key can be valid for this backend (for example zero).
+            // References must follow that actual value instead of the client's placeholder.
+            foreach ((IProperty property, object clientValue) in replay.RestoredKeys)
+            {
+                PropertyEntry restored = entry.Property(property.Name);
+                placeholders[clientValue] = (restored.CurrentValue, restored.IsTemporary);
+                qualifiedPlaceholders[(property, clientValue)] = (restored.CurrentValue, restored.IsTemporary);
+            }
+
+            // A reference is a placeholder exactly as long as what it points at is one.
             foreach ((IProperty property, object clientValue) in replay.References)
             {
                 // Through the same `Resolve`, so both halves of a redirection read the same
@@ -748,12 +793,13 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
 
     private SaveChangesResult Result(
         int count,
-        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked)
+        List<(int CorrelationId, EntityEntry Entry, IEntityType EntityType, EntityState State)> tracked,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<IProperty, object?>> originalKeys)
         => new()
         {
             Count = count,
             GeneratedValues = [.. tracked
-                .Select(t => ReadGenerated(t.CorrelationId, t.Entry, t.EntityType, t.State))
+                .Select(t => ReadGenerated(t.CorrelationId, t.Entry, t.EntityType, t.State, originalKeys[t.CorrelationId]))
                 .Where(g => g is not null)
                 .Select(g => g!)],
         };
@@ -779,11 +825,12 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         looking the same, and both are repaired the same way.
     ///     </para>
     ///     <para>
-    ///         <b>The repair is a query, and EF's own identity resolution is what makes it a
-    ///         repair rather than a clobber.</b> A tracked entity is never overwritten by a query,
-    ///         so the client's values win wherever the client sent any, and the store fills in
-    ///         only what nobody is holding. A removed element stays removed: its <c>Deleted</c>
-    ///         entry is already in the identity map under the key the query returns.
+    ///         The query uses a separate identity map with the original context and transaction.
+    ///         The merge preserves modified properties, keys, concurrency values, and deleted entries;
+    ///         it supplies absent owned entries and unchanged scalar values from storage.
+    ///         Until November 14, 2026 this relied on the query's ordinary identity resolution.
+    ///         Cosmos skips an owned graph when the root is already tracked, so that query alone
+    ///         left incomplete documents incomplete.
     ///     </para>
     ///     <para>
     ///         <b>It reads only where something could actually be missing.</b> A root whose change
@@ -882,11 +929,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         on the tracked root, and a document store serializes the object.
     ///     </para>
     ///     <para>
-    ///         <b>The key travels as an array element rather than as a constant</b>, so that the
-    ///         tree has one shape per entity type instead of one per key value. EF parameterizes an
-    ///         evaluatable subtree and leaves a bare <c>ConstantExpression</c> alone, and a
-    ///         constant key would put an entry in the compiled-query cache for every row a server
-    ///         ever writes.
+    ///         Keys are explicit query parameters, so EF caches one query shape per model and
+    ///         entity type rather than a compiled query for every document key. The provider's own
+    ///         cache-key generator also preserves provider options and execution-mode differences.
     ///     </para>
     /// </remarks>
     private Task LoadDocumentAsync(IEntityType entityType, object?[] keyValues, CancellationToken cancellationToken)
@@ -910,31 +955,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 + "document from the client instead, with UseNonRelationalServerStore().");
         }
 
-        IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
-        ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
-        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
-        Expression? body = null;
-
-        for (int i = 0; i < keyProperties.Count; i++)
-        {
-            Expression member = keyProperties[i].PropertyInfo is { } clrProperty
-                ? Expression.Property(parameter, clrProperty)
-                : Expression.Call(
-                    EfPropertyMethod.MakeGenericMethod(keyProperties[i].ClrType),
-                    parameter,
-                    Expression.Constant(keyProperties[i].Name));
-
-            Expression comparison = Expression.Equal(
-                member,
-                Expression.Convert(
-                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
-
-            body = body is null ? comparison : Expression.AndAlso(body, comparison);
-        }
-
         return (Task)LoadDocumentMethod
             .MakeGenericMethod(entityType.ClrType)
-            .Invoke(null, [_context, Expression.Lambda(body!, parameter), cancellationToken])!;
+            .Invoke(null, [_context, DocumentPredicate(entityType), keyValues, cancellationToken])!;
     }
 
     private void LoadDocument(IEntityType entityType, object?[] keyValues)
@@ -944,9 +967,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             throw CannotCompleteDocument(entityType);
         }
 
-        LambdaExpression predicate = DocumentPredicate(entityType, keyValues);
+        LambdaExpression predicate = DocumentPredicate(entityType);
         LoadDocumentSyncMethod.MakeGenericMethod(entityType.ClrType)
-            .Invoke(null, [_context, predicate]);
+            .Invoke(null, [_context, predicate, keyValues]);
     }
 
     private static InvalidOperationException CannotCompleteDocument(IEntityType entityType)
@@ -960,11 +983,10 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             + " Writing it would lose the parts the change set did not name. Send the whole "
             + "document from the client instead, with UseNonRelationalServerStore().");
 
-    private static LambdaExpression DocumentPredicate(IEntityType entityType, object?[] keyValues)
+    private static LambdaExpression DocumentPredicate(IEntityType entityType)
     {
         IReadOnlyList<IProperty> keyProperties = entityType.FindPrimaryKey()!.Properties;
         ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "e");
-        ConstantExpression keys = Expression.Constant(keyValues, typeof(object?[]));
         Expression? body = null;
         for (int i = 0; i < keyProperties.Count; i++)
         {
@@ -976,8 +998,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                     Expression.Constant(keyProperties[i].Name));
             Expression comparison = Expression.Equal(
                 member,
-                Expression.Convert(
-                    Expression.ArrayIndex(keys, Expression.Constant(i)), keyProperties[i].ClrType));
+                new QueryParameterExpression(DocumentKeyParameter(i), keyProperties[i].ClrType));
             body = body is null ? comparison : Expression.AndAlso(body, comparison);
         }
 
@@ -994,11 +1015,20 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicFields
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
         DbContext context,
-        LambdaExpression predicate)
+        LambdaExpression predicate,
+        object?[] keyValues)
         where TEntity : class
-        => _ = context.Set<TEntity>()
-            .Where((Expression<Func<TEntity, bool>>)predicate)
-            .FirstOrDefault();
+    {
+        QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, default);
+        // Full primary-key equality already bounds the lookup to one root. An extra Take
+        // introduces an unnecessary ordering warning when provider warnings are errors.
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Expression;
+        Func<QueryContext, IEnumerable<TEntity>> execute = DocumentQuery<IEnumerable<TEntity>>(context, query, async: false);
+        foreach (TEntity entity in execute(queryContext))
+        {
+            MergeDocumentEntries(context, queryContext.TryGetEntry(entity)!.StateManager);
+        }
+    }
 
     /// <remarks>
     ///     <para>
@@ -1018,7 +1048,7 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
     ///         <c>eng/trim-baseline.txt</c> has described that premise since it was written.
     ///     </para>
     /// </remarks>
-    private static Task LoadDocumentAsync<
+    private static async Task LoadDocumentAsync<
         [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
             System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.NonPublicConstructors
@@ -1029,11 +1059,81 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
             | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] TEntity>(
         DbContext context,
         LambdaExpression predicate,
+        object?[] keyValues,
         CancellationToken cancellationToken)
         where TEntity : class
-        => context.Set<TEntity>()
-            .Where((Expression<Func<TEntity, bool>>)predicate)
-            .FirstOrDefaultAsync(cancellationToken);
+    {
+        QueryContext queryContext = CreateDocumentQueryContext(context, keyValues, cancellationToken);
+        // Full primary-key equality already bounds the lookup to one root. An extra Take
+        // introduces an unnecessary ordering warning when provider warnings are errors.
+        Expression query = context.Set<TEntity>().AsTracking().Where((Expression<Func<TEntity, bool>>)predicate).Expression;
+        Func<QueryContext, IAsyncEnumerable<TEntity>> execute = DocumentQuery<IAsyncEnumerable<TEntity>>(context, query, async: true);
+        await foreach (TEntity entity in execute(queryContext).WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            MergeDocumentEntries(context, queryContext.TryGetEntry(entity)!.StateManager);
+        }
+    }
+
+    private static string DocumentKeyParameter(int index) => "__infocarrier_documentKey" + index;
+
+    private static QueryContext CreateDocumentQueryContext(DbContext context, object?[] keyValues, CancellationToken cancellationToken)
+    {
+        QueryContext queryContext = context.GetService<IQueryContextFactory>().Create();
+        // Use the original context, provider services, filters, connection and transaction. Only
+        // identity resolution is isolated, so an already tracked root cannot suppress its owned graph.
+        queryContext.InitializeStateManager(standAlone: true);
+        queryContext.CancellationToken = cancellationToken;
+        for (int i = 0; i < keyValues.Length; i++)
+        {
+            queryContext.Parameters.Add(DocumentKeyParameter(i), keyValues[i]);
+        }
+        return queryContext;
+    }
+
+    private static Func<QueryContext, TResult> DocumentQuery<TResult>(DbContext context, Expression query, bool async)
+        => context.GetService<ICompiledQueryCache>().GetOrAddQuery(
+            (typeof(ServerSaveChangesExecutor), context.GetService<ICompiledQueryCacheKeyGenerator>().GenerateCacheKey(query, async)),
+            () => async
+                ? context.GetService<IQueryCompiler>().CreateCompiledAsyncQuery<TResult>(query)
+                : context.GetService<IQueryCompiler>().CreateCompiledQuery<TResult>(query));
+
+    private static void MergeDocumentEntries(DbContext context, IStateManager reader)
+    {
+        IStateManager target = context.GetService<IStateManager>();
+        // Cosmos can skip the entire owned graph when its root is already tracked. Read into a
+        // separate tracker, retaining shadow keys, then let fixup connect only absent entries.
+        // Existing modified and deleted entries win, including their original concurrency values.
+        try
+        {
+            foreach (InternalEntityEntry source in reader.Entries.ToList())
+            {
+                IKey key = source.EntityType.FindPrimaryKey()!;
+                object?[] values = [.. key.Properties.Select(source.GetCurrentValue)];
+                if (target.TryGetEntry(key, values) is { } existing)
+                {
+                    if (existing.EntityState is EntityState.Modified or EntityState.Unchanged)
+                    {
+                        foreach (IProperty property in source.EntityType.GetProperties())
+                        {
+                            if (!property.IsKey() && !property.IsConcurrencyToken && !existing.IsModified(property))
+                            {
+                                existing.SetProperty(property, source[property], isMaterialization: false, setModified: false);
+                                existing.SetOriginalValue(property, source[property], skipChangeDetection: true);
+                            }
+                        }
+                    }
+                    continue;
+                }
+                InternalEntityEntry entry = target.GetOrCreateEntry(source.Entity, source.EntityType);
+                foreach (IProperty property in source.EntityType.GetProperties())
+                {
+                    entry[property] = source[property];
+                }
+                entry.SetEntityState(EntityState.Unchanged);
+            }
+        }
+        finally { reader.Clear(resetting: false); }
+    }
 
     /// <summary>
     ///     The document root this entry belongs to, and the key values the store knows it by.
@@ -1322,6 +1422,9 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         ///     and each can be classified as a borrowed one or an ordinary value.
         /// </summary>
         public List<(IProperty Property, object? Value)> Values { get; } = [];
+
+        /// <summary>Client placeholders restored to non-generated backend keys.</summary>
+        public List<(IProperty Property, object ClientValue)> RestoredKeys { get; } = [];
     }
 
     /// <summary>
@@ -1619,7 +1722,8 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
         int correlationId,
         EntityEntry entry,
         IEntityType entityType,
-        EntityState state)
+        EntityState state,
+        IReadOnlyDictionary<IProperty, object?> originalKeys)
     {
         if (state == EntityState.Deleted)
         {
@@ -1634,30 +1738,19 @@ public class ServerSaveChangesExecutor(DbContext context, IDynamicValueMapper ma
                 ? property.ValueGenerated is ValueGenerated.OnAdd or ValueGenerated.OnAddOrUpdate
                 : property.ValueGenerated is ValueGenerated.OnUpdate or ValueGenerated.OnAddOrUpdate;
 
-            // A KEY NEVER COMES BACK FOR A ROW THAT ALREADY EXISTS, WHATEVER THE SERVER'S MODEL
-            // SAYS ABOUT IT (#107). The client's key is what the server used to FIND the row, so
-            // the two cannot disagree about it and a value returned for it can only overwrite a
-            // correct answer with another one.
-            //
-            // **The two halves disagree about `ValueGenerated` here, and that is the defect rather
-            // than a quirk of one store.** The doc comment on `InfoCarrierDatabase.ApplyGeneratedValues`
-            // already states the asymmetry in the other direction: `ValueGenerated` is inferred by
-            // a convention, the server's provider runs conventions this one does not, so the two
-            // models answer differently for the same property. MongoDB's owned-collection ordinal
-            // is `OnAddOrUpdate` on the server and `OnAdd` on the client, which put it through the
-            // `else` branch above on every modified element.
-            //
-            // What that costs is not a wrong number, it is a thrown save: applying the server's
-            // ordinal to one tracked element gives it the key of its sibling, and EF refuses with
-            // "another instance with the same key value is already being tracked". A nested array
-            // of two, with one element changed in place, is the whole repro.
-            //
-            // **Added is the case this must not touch**, and the block below is why it exists: a
-            // row being inserted has no key yet worth keeping, the store decides it, and the
-            // client held a placeholder.
-            if (generated && state != EntityState.Added && property.IsKey())
+            // A non-generated key restored from a client placeholder must reach the client too.
+            if (state == EntityState.Added && property.IsKey()
+                && originalKeys.TryGetValue(property, out object? supplied)
+                && !property.GetKeyValueComparer().Equals(supplied, entry.Property(property.Name).CurrentValue))
+                generated = true;
+
+            // Existing generated keys can change when a store renumbers embedded elements.
+            // Return only an actual change, rather than suppressing every existing key or
+            // relying on provider conventions agreeing about OnAdd versus OnAddOrUpdate.
+            if (state != EntityState.Added && property.IsKey())
             {
-                continue;
+                generated = originalKeys.TryGetValue(property, out object? original)
+                    && !property.GetKeyValueComparer().Equals(original, entry.Property(property.Name).CurrentValue);
             }
 
             // A store decides a value indirectly as well as directly. A foreign key onto a

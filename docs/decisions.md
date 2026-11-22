@@ -878,6 +878,53 @@ as a `Deviation`.
 **`eng/tier-d-control.py`, `test/tier-d-overrides.txt` and `test/tier-d-control-pending.txt` are
 deleted.** Tier D stays in the ratchet at zero failures until the other tiers are converted.
 
+### Amendment 2026-11-14: provisional Cosmos document tier, MongoDB retained
+
+The owner authorized Cosmos implementation and full local and Linux CI validation using Podman
+locally and Docker in CI. The choice of a permanent or temporary document provider remains open.
+`test/InfoCarrier.Core.DocumentStoreTests` retains its MongoDB source, remains outside the solution,
+and continues to reject direct builds. No unofficial MongoDB package is restored or executed.
+
+The new `InfoCarrier.Core.CosmosTests` project uses Microsoft's official Cosmos 11.0.0 provider.
+It runs the six owned-navigation specification families and direct Cosmos controls, plus document
+writes, incomplete-document repair, named policy isolation, projections, generated keys, and failures.
+Provider overrides cite the matching EF Core 11 Cosmos source. They do not reuse MongoDB outcomes.
+The [validation record](plans/v11/cosmos-document-tier.md) describes scope and remaining limits.
+
+The earlier MongoDB process-isolation findings remain scoped to that provider and its harness.
+Cosmos uses a single externally managed emulator with a distinct generated database per fixture.
+Database creation, mutation, and cleanup remain fixture-local; test collections remain parallel.
+This introduces an explicit container-runtime prerequisite, accepted by the owner's authorization.
+The same immutable emulator image is used with both runtimes.
+
+The owner's later clarification on the same date keeps Cosmos in a Linux container on both test
+hosts. Windows tests run directly on Windows and connect to Podman; Linux CI tests connect to
+Docker. The tier uses the vNext emulator and adopts EF Core 11's same Linux-emulator aggregate
+skips, with exact upstream references. The test host's operating system does not change the
+database's limitations. No native Windows emulator is installed and no SDK query-execution
+override is enabled. The earlier classic-image and query-mode experiments are superseded.
+
+Document repair now reads into an isolated EF query tracker while retaining the application's
+original context, provider services, connection, query filters, and transaction. The merge keeps
+modified values, deleted entries, keys, and original concurrency values, and fills absent owned
+entries and unchanged scalar values from storage. The previous assumption that an ordinary
+tracking query would always materialize missing owned entries failed on Cosmos when the root was
+already tracked. The earlier client and server document-policy switches remain required.
+
+### Amendment 2026-11-14: all applicable official Cosmos tests through InfoCarrier
+
+The owner explicitly expanded the provisional Cosmos tier beyond the six owned-navigation families:
+"All applicable official tests through InfoCarrier." This supersedes the narrow document-tier scope
+and the one-base-one-tier rule for this Cosmos work. It does not change the allocation of Tiers A-C
+or restore MongoDB. Application behavior remains applicable even when Cosmos refuses a query.
+
+The earlier reasons for avoiding duplication still apply to general specification coverage. They
+do not satisfy this new goal: testing the application's behavior against the actual document provider.
+Inherit shared specification tests where possible, reproduce meaningful Cosmos expectations with
+exact references, retain official Linux-emulator skips, and explain each provider-internal exclusion.
+Do not copy SQL baselines or replace behavioral assertions with successful no-op overrides.
+An initial inventory or a passing subset does not establish completion of this expanded scope.
+
 ## ADR-010 — Projection split: boundary computed on the client — LOCKED (2026-08-01)
 
 **Context.** Requirements §3: the server holds only the shared entity assembly, so it cannot
@@ -1505,3 +1552,19 @@ methods differed in ways none of the three describes; such a difference is now s
 reason's `DeviationNote`, which the audit requires with `Other`. The reverse half does not read
 `Other`, because `Other` also describes a body that differs from upstream's while running nothing
 different.
+
+### Amendment 2026-11-21 — Cosmos query comparison
+
+The owner approved comparing actual Cosmos reads directly and through InfoCarrier, using the
+same optional live-comparison mechanism. The reasons for rejecting committed baselines still
+apply: the queries belong to upstream, regenerating expected strings can conceal a regression,
+and captured output must not become a second maintained artifact. This extension keeps all three
+protections. A normal run does not replay the inherited suite.
+
+Cosmos query, association, read-item, JSON, owned, inheritance, ad-hoc, and raw-query fixtures use
+separate generated databases for the two executions. Diagnostic events capture executed query
+text, container identity, partition selection, and point reads. Parameter names are canonicalized;
+JSON property names and literals remain significant. This does not provide relational reader
+counts, Cosmos request charges, or write-command comparison. Test assertions still check results.
+Changed behavior requires the existing typed deviation attributes, with an explained reason.
+The optional GitHub workflow can select Cosmos separately or run all three store comparisons.

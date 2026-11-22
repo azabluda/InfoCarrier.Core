@@ -1130,6 +1130,18 @@ public class DynamicValueMapper(
             }
         }
 
+        // Dictionary interfaces enumerate key/value pairs, but a list of those pairs does
+        // not implement either dictionary contract. Rebuild a dictionary before the caller
+        // applies the declared property type, including nested dictionaries and nullable values.
+        if (elementType.IsGenericType && elementType.GetGenericTypeDefinition() == typeof(KeyValuePair<,>))
+        {
+            Type dictionary = typeof(Dictionary<,>).MakeGenericType(elementType.GetGenericArguments());
+            if (type.IsAssignableFrom(dictionary))
+            {
+                return Activator.CreateInstance(dictionary, items);
+            }
+        }
+
         // A set interface — `ISet<T>`, `IReadOnlySet<T>` — is satisfied by a HashSet, without
         // hunting for a factory. (The sequence interfaces never reach here: a list already
         // satisfies them. `IOrderedEnumerable<T>` is the exception, and it is the next clause.)

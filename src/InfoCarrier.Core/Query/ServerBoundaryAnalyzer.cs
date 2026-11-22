@@ -292,7 +292,13 @@ public sealed class ServerBoundaryAnalyzer(
                     && call.Method.DeclaringType is { } declaring
                     && (declaring == typeof(Queryable)
                         || declaring == typeof(Enumerable)
-                        || declaring == typeof(EntityFrameworkQueryableExtensions))));
+                        || declaring == typeof(EntityFrameworkQueryableExtensions)
+                        // Explicitly allowed provider extensions can terminate a query too.
+                        || (call.Method.IsStatic
+                            && call.Type.IsGenericType
+                            && call.Type.GetGenericTypeDefinition() == typeof(Task<>)
+                            && call.Arguments.Count > 0
+                            && typeof(IQueryable).IsAssignableFrom(call.Arguments[0].Type)))));
 
     /// <summary>
     ///     Operators that <em>materialize</em> rather than query.

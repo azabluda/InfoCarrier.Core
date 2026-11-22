@@ -368,6 +368,44 @@ public class InfoCarrierDatabase(
         var mapper = _expressionSerializer.ValueMapper;
         mapper.ResetReferenceScope();
         List<IUpdateEntry> sent = [.. Expand(entries)];
+        if (!_serverStoreIsRelational)
+        {
+            // Fixup rebuilds document collections in replay order. Keep the application's
+            // current collection order, including inserted and moved elements, on the wire.
+            var order = new Dictionary<IUpdateEntry, int>();
+            foreach (IUpdateEntry entry in sent)
+                if (!entry.EntityType.IsOwned() && entry is InternalEntityEntry root) Visit(root);
+            sent = [.. sent.OrderBy(e => order.GetValueOrDefault(e, int.MaxValue))];
+
+            void Visit(InternalEntityEntry entry)
+            {
+                if (!order.TryAdd(entry, order.Count)) return;
+                foreach (var navigation in entry.EntityType.GetNavigations())
+                {
+                    if (!navigation.ForeignKey.IsOwnership || navigation.IsOnDependent) continue;
+                    object? value = entry[navigation];
+                    if (navigation.IsCollection && value is System.Collections.IEnumerable collection)
+                    {
+                        foreach (object child in collection) VisitChild(child);
+                    }
+                    else if (value is not null) VisitChild(value);
+                    void VisitChild(object child)
+                    {
+                        if (entry.StateManager.TryGetEntry(child, navigation.TargetEntityType) is { } nested) Visit(nested);
+                    }
+                }
+            }
+        }
+        // Expanded owners can receive generated values when only an embedded member changed.
+        // EF accepts only entries in its original save list. Include those unchanged owners so
+        // their generated-value sidecars reach the entity and its next concurrency snapshot.
+        foreach (IUpdateEntry entry in sent)
+        {
+            if (entry.EntityState == EntityState.Unchanged && !entries.Contains(entry))
+            {
+                entries.Add(entry);
+            }
+        }
         var request = new Common.SaveChangesRequest
         {
             Entries = [.. sent.Select((e, i) => ChangeEntryMapper.ToChangeEntry(e, i, mapper))],
@@ -821,11 +859,38 @@ public class InfoCarrierDatabase(
     ///         property the client believes is never generated has no such conflict to resolve.
     ///     </para>
     /// </remarks>
-    private static void ApplyGeneratedValues(
+    private void ApplyGeneratedValues(
         List<IUpdateEntry> entries,
         Common.SaveChangesResult result,
         Expressions.IDynamicValueMapper mapper)
     {
+        // A response can exchange generated key values between tracked entries. Move changing
+        // keys to fresh temporary values before applying any final values, so response order
+        // cannot cause a transient identity-map collision. Foreign keys follow normal fixup.
+        // Existing temporary keys already occupy safe slots. Regenerating them can restart a
+        // derived-type generator at a value held by another tracked entry.
+        var generators = _currentContext.Context.GetService<Microsoft.EntityFrameworkCore.ValueGeneration.IValueGeneratorSelector>();
+        foreach (Common.GeneratedValues generated in result.GeneratedValues)
+        {
+            if (generated.CorrelationId < 0 || generated.CorrelationId >= entries.Count
+                || entries[generated.CorrelationId] is not InternalEntityEntry entry)
+                continue;
+            foreach (Expressions.DynamicPropertyValue value in ChangeEntryMapper.ReadValues(generated.SerializedValues))
+            {
+                if (entry.EntityType.FindProperty(value.Name) is not { } property
+                    || !property.IsKey() || property.IsForeignKey() || entry.HasTemporaryValue(property)
+                    || Microsoft.EntityFrameworkCore.Metadata.Internal.PropertyBaseExtensions.GetStoreGeneratedIndex(property) == -1)
+                    continue;
+                object? finalValue = Expressions.PrimitiveCoercion.FromWireValue(
+                    property, mapper.FromPropertyValue(value, Expressions.PrimitiveCoercion.WireType(property)));
+                if (!property.GetKeyValueComparer().Equals(entry.GetCurrentValue(property), finalValue)
+                    // Match EF's ValueGenerationManager: inherited properties share the declaring type's generator.
+                    && generators.TrySelect(property, property.DeclaringType, out var generator)
+                    && generator is { GeneratesTemporaryValues: true })
+                    entry.SetTemporaryValue(property, generator.Next(entry.ToEntityEntry()), setModified: false);
+            }
+        }
+
         foreach (Common.GeneratedValues generated in result.GeneratedValues)
         {
             if (generated.CorrelationId < 0 || generated.CorrelationId >= entries.Count)
@@ -850,6 +915,12 @@ public class InfoCarrierDatabase(
                     }
                     else
                     {
+                        // An implicit document write can generate values on an unchanged owner.
+                        // Keep it in the changed set until acceptance, including SaveChanges(false).
+                        if (entry.EntityState == EntityState.Unchanged && entry is InternalEntityEntry owner)
+                        {
+                            owner.SetEntityState(EntityState.Modified, modifyProperties: false);
+                        }
                         entry.SetStoreGeneratedValue(property, clientValue);
                     }
                 }

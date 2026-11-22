@@ -105,6 +105,10 @@ public sealed class CurrentTest
         }
     }
 
+    /// <summary>Records a nonrelational read whose provider supplies its own canonical text.</summary>
+    public void RecordProviderRead(string text)
+        => Add(new CapturedCommand(text, CapturedCommandKind.ProviderRead, null, false));
+
     internal void SetReadCount(Guid commandId, int readCount)
     {
         lock (_gate)
@@ -129,6 +133,8 @@ public sealed class CurrentTest
 /// <summary>Which of <c>DbCommand</c>'s three execute methods the server called.</summary>
 public enum CapturedCommandKind
 {
+    /// <summary>A nonrelational provider read; relational normalization and row counts do not apply.</summary>
+    ProviderRead,
     /// <summary><c>ExecuteReader</c>: a query, and a write that reads back what the store generated.</summary>
     Reader,
 
