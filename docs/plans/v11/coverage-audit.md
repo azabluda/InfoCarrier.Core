@@ -382,6 +382,21 @@ separate process and is a bounded future admission stress test, not evidence of 
 reason to loosen the limit. Ambiguous catalog bindings and malformed plugin output likewise stay
 guarded; their absence from normal model tests is expected.
 
+### Review correction: range paging must retain buffered execution
+
+The pull-request review found an overload boundary missed by the integer-paging regression.
+`Take(1..3)` takes a `Range`, but the residual planner matched only the method name and argument
+count before compiling its argument as an integer. Projected concat now reaches that planner,
+so this previously buffered composition threw `ArgumentException` during plan selection.
+
+The new application regression covers both an indexed client projection alone and the same
+projection inside concat. Both cases failed before the correction: **Passed: 0, Failed: 2,
+Total: 2**. Streaming paging now requires an integer argument; other overloads decline the plan
+and retain buffered execution. The full transport suite, including integer first-row timing and
+both range-result cases, passed afterward: **Passed: 428, Failed: 0, Total: 428**.
+The correction changes no public or wire signature. Final hosted evidence is recorded below
+through the pull request's source-specific validation entry.
+
 ## Completion and bounded further work
 
 The file table records the starting counts and review candidates; the dated follow-up sections
@@ -393,13 +408,14 @@ run links there identify the actual measured result; focused percentages do not 
 The remaining candidates are retained defensive or public compatibility boundaries, with no
 confirmed defect or justified removal. Further useful work, in order:
 
-1. Isolated admission stress tests for exchange and process generation budgets, without exhausting
-   global state in the shared suite. Keep all current bounds in the meantime.
-2. Additional supported document/sentinel metadata combinations if an application requires them.
+1. Additional supported document/sentinel metadata combinations if an application requires them.
    Keep current refusal and repair behavior; validate stored data before narrowing either.
-3. Broader covered-code necessity review using production references, framework callbacks and
+2. Broader covered-code necessity review using production references, framework callbacks and
    generated entry points. The test-only decoder demonstrates why a high file percentage is
    insufficient, but this audit is not a whole-program proof.
+
+The owner declined isolated resource-limit stress tests on 2026-11-22. They are not scheduled;
+all existing bounds remain in place.
 
 These are bounded extensions, not new issues or release blockers established by this audit.
 The audit does not authorize publication, merging its pull request, or closing its issue.

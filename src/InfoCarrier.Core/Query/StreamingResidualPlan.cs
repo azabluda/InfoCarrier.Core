@@ -69,9 +69,9 @@ internal sealed class StreamingResidualPlan
         {
             nameof(Queryable.Select) when call.Arguments.Count == 2
                 => new SelectorStep(CompileLambda(call.Arguments[1])),
-            nameof(Queryable.Skip) when call.Arguments.Count == 2
+            nameof(Queryable.Skip) when call.Arguments.Count == 2 && call.Arguments[1].Type == typeof(int)
                 => new SkipStep(EvaluateCount(call.Arguments[1])),
-            nameof(Queryable.Take) when call.Arguments.Count == 2
+            nameof(Queryable.Take) when call.Arguments.Count == 2 && call.Arguments[1].Type == typeof(int)
                 => new TakeStep(EvaluateCount(call.Arguments[1])),
             _ => null,
         };

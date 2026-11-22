@@ -857,6 +857,9 @@ raw/merged report checks, file decisions, earlier decision rechecks and bounded 
 - [ ] **CVA5. Complete final hosted validation and owner review.** Reconcile the final complete
       coverage report and review normal/slow checks. Record results in the pull request. Merging,
       issue closure and version 11 publication remain separate owner decisions.
+- [x] **CVA6. Preserve buffered range paging.** Review reproduced `Take(Range)` failing during
+      projected concat plan selection. Require integer streaming counts and cover standalone and
+      concatenated indexed projections. Both regressions failed first; all 428 transport tests pass.
 
 ## Branches that outlive their pull request
 

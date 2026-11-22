@@ -121,6 +121,31 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
         Assert.Empty(context.ChangeTracker.Entries());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Range_paging_after_an_indexed_client_projection_keeps_results(bool concatenate)
+    {
+        using NorthwindContext context = CreateContext(CreateInnerClient());
+        IQueryable<IndexedCustomerCard> query = context.Customers.AsNoTracking().OrderBy(customer => customer.Id)
+            .Select(customer => new CustomerCard(customer.Id))
+            .Select((card, index) => new IndexedCustomerCard(card.Id, index))
+            .Take(1..3);
+        if (concatenate)
+        {
+            query = query.Concat(context.Customers.AsNoTracking().Where(customer => customer.Id == "BLAUS")
+                .Select(customer => new IndexedCustomerCard(customer.Id, 0)));
+        }
+
+        List<IndexedCustomerCard> rows = await query.ToListAsync(TestContext.Current.CancellationToken);
+
+        string[] expectedIds = concatenate ? ["ANATR", "AROUT", "BLAUS"] : ["ANATR", "AROUT"];
+        int[] expectedIndexes = concatenate ? [1, 2, 0] : [1, 2];
+        Assert.Equal(expectedIds, rows.Select(card => card.Id));
+        Assert.Equal(expectedIndexes, rows.Select(card => card.Index));
+        Assert.Empty(context.ChangeTracker.Entries());
+    }
+
     [Fact]
     public async Task Tracked_query_waits_for_buffered_materialization()
     {
