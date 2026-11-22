@@ -831,6 +831,22 @@ coverage measurements, and remaining platform limits.
       pending. The evidence records the unrelated full-coverage capacity-test timeout and its
       successful isolated run without treating the failed full run as a passing gate.
 
+## Version 11 product coverage audit
+
+Owner-selected [issue #288](https://github.com/azabluda/InfoCarrier.Core/issues/288), November 22, 2026.
+The [dated audit](../v11/coverage-audit.md) records the exact complete source measurement,
+raw/merged report checks, file decisions, earlier decision rechecks and bounded follow-up work.
+
+- [x] **CVA1. Audit product coverage and close confirmed gaps.** Inspect the successful complete coverage run
+      for the selected revision, verify assembly/generated-source filters, compare raw line
+      outcomes with the merged report, and distinguish branch-report limitations. Record file decisions.
+      Remove the unused
+      historical descriptor cache helper; test buffered-only server replacements and facade
+      transaction completion/reset. Keep unresolved reachability and adapter scenarios explicit.
+- [ ] **CVA2. Review hosted validation and remaining decisions.** Verify the changed revision,
+      then review the audit's ranked streaming, adapter, save/model and historical/admission work
+      with the owner. This audit does not authorize version 11 publication.
+
 ## Branches that outlive their pull request
 
 **A branch that survives a merge is a branch nobody records, and until 2026-09-20 none of these
