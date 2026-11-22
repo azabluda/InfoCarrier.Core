@@ -12,7 +12,7 @@ prefers Podman over installing a native Windows Cosmos emulator.
 | Component | Configuration |
 |---|---|
 | Provider | Microsoft's `Microsoft.EntityFrameworkCore.Cosmos` 11.0.0 |
-| Emulator | Official Linux vNext `vnext-latest`, selected as in EF Core's test environment |
+| Emulator | Official Linux vNext `vnext-EN20261117pre`, an explicitly selected dated prerelease |
 | Container module | `Testcontainers.CosmosDb` 4.17.0, using `CosmosDbBuilder` defaults |
 | Framework reference | EF Core 11.0.0, commit `9e685c7a52d1a344d133a3d370e458db97417b3f` |
 | Local Windows | Windows `dotnet test` process connecting to Podman 6.1.3 |
@@ -20,10 +20,26 @@ prefers Podman over installing a native Windows Cosmos emulator.
 
 This follows EF Core's Linux-emulator test path, including its known emulator skips, on both hosts.
 It does not reproduce their separate native Windows emulator path. Testcontainers 4.17.0 starts
-one fresh container for each test assembly execution and removes it after all fixtures finish.
-The assembly fixture preserves class parallelism. The image tag can change between runs.
+one fresh shared assembly container. SessionTokenFailureDocumentTest owns an additional class
+container because unrelated database writes in the same emulator can advance its session tokens.
+Both are removed after their fixtures finish. Other classes retain parallel execution.
 See the pinned [upstream environment](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/test/EFCore.Cosmos.FunctionalTests/TestUtilities/CosmosTestEnvironment.cs)
 and [test jobs](https://github.com/dotnet/efcore/blob/9e685c7a52d1a344d133a3d370e458db97417b3f/eng/helix.proj).
+
+### Emulator version policy
+
+Owner decision, November 22, 2026. Use a specific dated image tag rather than the movable
+vnext-latest alias. The selected vnext-EN20261117pre image has passed the adopted suite and avoids
+the confirmed duplicate-insert regression in [emulator issue 391](https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/391).
+Its [official prerelease notes](https://github.com/Azure/azure-cosmos-db-emulator-docker/releases/tag/EN20261117pre)
+identify the published image and digest. Changes to the selected release require a deliberate
+commit and validation, rather than an automatic return to latest after an upstream fix.
+
+A dated release tag is the chosen practical version boundary, not a promise of immutable bytes.
+Microsoft has not documented an immutability guarantee for these tags. Record the resolved image
+identity when investigating a regression and compare it with the release digest if the same commit
+changes behavior. The test reference remains a readable dated tag; digest pinning is not required.
+This policy supersedes the planned return to vnext-latest in the dated investigation below.
 
 On this Windows machine:
 

@@ -48,7 +48,8 @@ public sealed class CosmosContainerFixture : IAsyncLifetime
         try
         {
             // https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/391
-            // Return to upstream's vnext-latest after its duplicate-insert correction is verified.
+            // Keep a dated release instead of a movable latest alias; upgrades require validation.
+            // See the emulator version policy in docs/plans/v11/cosmos-document-tier.md.
             _container = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261117pre")
                 .WithLabel("io.infocarrier.cosmos-tests", "true")
                 .Build();
