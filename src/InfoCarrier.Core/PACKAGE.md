@@ -6,7 +6,7 @@ a local database driver.
 
 ## Usage
 
-For version 11 development code, configure a client and a context factory:
+Configure a client and a context factory:
 
 ```csharp
 using InfoCarrier.Core;
@@ -19,19 +19,19 @@ builder.Services.AddDbContextFactory<ShopContext>(o => o.UseInfoCarrier());
 
 The server uses its own database provider and the `InfoCarrier.Core.AspNetCore` HTTP endpoint.
 Both sides need matching model definitions and compatible InfoCarrier versions.
-This development build uses Entity Framework Core 11.
+Version 11.0.0 requires .NET 11 and Entity Framework Core 11.
 
 ## Getting started
 
-Follow the [version 11 tutorial](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/first-app.md)
+Follow the [tutorial](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/)
 for a complete model, database setup, and client/server example.
-Use [installation](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/installation.md)
-for the distinction between development builds and published packages.
+See [installation](https://azabluda.github.io/InfoCarrier.Core/getting-started/installation/)
+for package and framework requirements.
 
 ## Additional documentation
 
-Read the [development guides](https://github.com/azabluda/InfoCarrier.Core/tree/main/website/docs).
-The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
+Read the [documentation](https://azabluda.github.io/InfoCarrier.Core/) and
+the [11.0 release notes](https://azabluda.github.io/InfoCarrier.Core/release-notes/11.0/).
 
 ## Feedback
 

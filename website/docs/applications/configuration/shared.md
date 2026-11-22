@@ -85,6 +85,11 @@ An unknown structure used by server execution is refused.
 Supported final result construction can still take place on the client.
 Registering a structure does not grant permission to custom types inside it.
 
+Version 11 does not download rows to work around a missing type or shape registration in grouping,
+joins, filtering, ordering, set operations, or equality. Register the required types and structures,
+then check the backend's translation. Use `AsEnumerable` before an operator to choose local work explicitly.
+This does not require registering every anonymous `Select`; supported final client projections remain available.
+
 Different anonymous types with the same registered structure cannot share one exchange.
 They are refused to avoid changing equality behavior or restoring the wrong client type.
 Keep prototypes in trusted startup code. See [reference limits](../../reference/options.md#anonymous-structures).

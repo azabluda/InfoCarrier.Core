@@ -93,7 +93,7 @@
                             <span class="kv-key">product @line.ProductId &nbsp;&middot;&nbsp; @line.UnitPrice.ToString("0.00")</span>
                             <FluentNumberInput Value="@line.Quantity" Min="0" Style="width: 6.5rem;"
                                                ValueChanged="@(value => SetQuantity(line, value))"
-                                               TValue="int" Immediate="true" />
+                                               TValue="int" />
                         </div>
                     }
 

@@ -3,9 +3,10 @@
 Use NuGet to add InfoCarrier to your application.
 Install the .NET 11 SDK to follow the [first tutorial](first-app.md).
 
-This is the draft installation guide for version 11, whose packages are not published yet.
-The commands below describe installation for that release.
-For available version 10.3 packages, use the [published guide](https://azabluda.github.io/InfoCarrier.Core/getting-started/installation/).
+These instructions install InfoCarrier.Core 11.0.0.
+For an existing 10.3 application, follow the [upgrade guide](../upgrades/from-10-to-11.md).
+Version 11 is a breaking upgrade. Changing package references alone does not update configuration,
+query registrations, custom components, or deployed clients and servers.
 
 ## Client
 
@@ -31,8 +32,8 @@ Add the Entity Framework Core provider for the server's database too.
 The tutorial uses SQLite.
 
 Use matching InfoCarrier versions on client and server.
-Version 11 requires .NET 11 and Entity Framework Core 11. Adoption checks are recorded
-in the [11.0 notes](../release-notes/11.0.md).
+Version 11.0.0 requires .NET 11 and Entity Framework Core 11.
+See the [11.0 release notes](../release-notes/11.0.md) for changes and compatibility requirements.
 
 ## Shared model
 
