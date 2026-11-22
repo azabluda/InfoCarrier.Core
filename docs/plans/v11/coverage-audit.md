@@ -397,6 +397,25 @@ both range-result cases, passed afterward: **Passed: 428, Failed: 0, Total: 428*
 The correction changes no public or wire signature. Final hosted evidence is recorded below
 through the pull request's source-specific validation entry.
 
+### Coverage correction: cancellation has two valid TestHost outcomes
+
+Coverage run 45031073560 exposed an ordering-dependent assertion in the new buffered-replacement
+cancellation test. Normal transport tests passed, while coverage reported **Passed: 427,
+Failed: 1, Total: 428**. The client received `IOException` with an inner `TaskCanceledException`,
+and the server had already observed cancellation. The range-paging regressions passed.
+
+The runtime stack identifies TestHost's `ResponseBodyReaderStream.CheckAborted`. Its
+[source](https://github.com/dotnet/aspnetcore/blob/main/src/Hosting/TestHost/src/ResponseBodyReaderStream.cs)
+checks an existing abort before starting the next read and wraps the stored exception in
+`IOException`; a canceled pending read instead throws `OperationCanceledException`. Requiring
+only the latter made the test depend on which read/abort ordering occurred.
+
+The assertion now accepts only direct cancellation or an `IOException` whose immediate inner
+exception is cancellation. It still requires the replacement to observe server-side cancellation
+and exactly one query. Unrelated I/O failures and successful completion still fail. No production
+exception behavior changed. Three consecutive focused coverage runs each reported
+**Passed: 1, Failed: 0, Total: 1**. Replacement and streaming controls also passed.
+
 ## Completion and bounded further work
 
 The file table records the starting counts and review candidates; the dated follow-up sections

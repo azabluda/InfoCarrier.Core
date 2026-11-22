@@ -860,6 +860,10 @@ raw/merged report checks, file decisions, earlier decision rechecks and bounded 
 - [x] **CVA6. Preserve buffered range paging.** Review reproduced `Take(Range)` failing during
       projected concat plan selection. Require integer streaming counts and cover standalone and
       concatenated indexed projections. Both regressions failed first; all 428 transport tests pass.
+- [x] **CVA7. Remove cancellation-test ordering dependence.** Coverage exposed TestHost wrapping
+      cancellation in `IOException` before a new read. Accept only its specific cancellation wrapper
+      or direct cancellation, while retaining server-observation and query-count assertions.
+      Verify three identical focused coverage runs and replacement/streaming controls.
 
 ## Branches that outlive their pull request
 

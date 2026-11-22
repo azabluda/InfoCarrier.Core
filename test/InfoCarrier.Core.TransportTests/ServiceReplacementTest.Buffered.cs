@@ -84,8 +84,13 @@ public partial class ServiceReplacementTest
         await observation.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Exception? failure = await Record.ExceptionAsync(() => pending);
         await observation.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        // TestHost's ResponseBodyReaderStream.CheckAborted wraps the stored cancellation in
+        // IOException if abort wins before the next read. Both forms mean this request canceled.
+        // https://github.com/dotnet/aspnetcore/blob/main/src/Hosting/TestHost/src/ResponseBodyReaderStream.cs
+        Assert.True(failure is OperationCanceledException or IOException { InnerException: OperationCanceledException },
+            $"Expected cancellation or TestHost's cancellation wrapper, got {failure}");
         Assert.Equal(1, observation.Queries);
     }
 
