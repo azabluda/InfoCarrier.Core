@@ -19,7 +19,13 @@ resources. An open transaction keeps its context until that transaction ends.
 only after enumeration finishes.
 
 The client can reconstruct projections incrementally after a query split. A concatenated query
-also preserves progressive delivery. Operations that need the complete input remain buffered.
+can also preserve progressive delivery when each part can be processed independently, including
+parts that construct results on the client. Rows keep the concatenation's input order and duplicates.
+
+`Skip(n)` and `Take(n)` can remain incremental after a client projection. Other overloads,
+such as `Take(1..3)`, can require buffered execution after that projection. Operations that need
+the complete input remain buffered. Matching final rows does not establish that a query streams;
+check when its first row reaches your application if that timing matters.
 
 Tracked queries are buffered before client materialization. Entity identity and navigation fix-up
 can depend on later rows, so the client preserves the complete result graph before yielding it.

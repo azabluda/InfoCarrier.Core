@@ -6,7 +6,7 @@ Reference it from shared application code that both client and server can use.
 
 ## Usage
 
-For version 11 development code:
+Put shared settings in an application-owned method:
 
 ```csharp
 using InfoCarrier.Core;
@@ -24,15 +24,15 @@ Shared source does not verify that separately deployed applications use matching
 
 ## Getting started
 
-See [shared configuration](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/applications/configuration/shared.md).
+See [shared configuration](https://azabluda.github.io/InfoCarrier.Core/applications/configuration/shared/).
 Core already depends on this package. Add a direct reference when a shared project needs only
 the configuration builder and value-mapper interface.
 
 ## Additional documentation
 
-Use the [package installation guide](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/installation.md)
+Use the [package installation guide](https://azabluda.github.io/InfoCarrier.Core/getting-started/installation/)
 for matching package versions.
-The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
+Read the [documentation](https://azabluda.github.io/InfoCarrier.Core/).
 
 ## Feedback
 

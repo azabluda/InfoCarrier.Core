@@ -4,7 +4,7 @@ This tutorial creates a console client, an ASP.NET Core server, and a shared mod
 The server creates a SQLite database and seeds one customer. The client reads that customer,
 updates it, and reads it again through a fresh context.
 
-These are the version 11 draft APIs; see [package availability](installation.md).
+The example uses InfoCarrier.Core 11.0.0; see [package requirements](installation.md).
 The example runs locally. Follow the [security guide](../operations/security.md) before exposing it to other users.
 
 ## Before you start
@@ -39,7 +39,7 @@ dotnet add Shop.Server package InfoCarrier.Core.AspNetCore
 dotnet add Shop.Server package Microsoft.EntityFrameworkCore.Sqlite --version 11.*
 ```
 
-The Entity Framework Core commands select the latest version 11 packages, matching the current draft.
+The Entity Framework Core commands select the latest version 11 packages.
 Keep InfoCarrier package versions matched on both sides.
 Delete `Shop.Shared/Class1.cs`. Keep this terminal in `ShopTutorial`.
 

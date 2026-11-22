@@ -9,6 +9,10 @@ is the seam for those.
 Most application values already work: numbers, strings, dates, enums, GUIDs, and byte arrays.
 Built-in mappers handle `IPAddress` and `Uri`.
 
+Dictionary values declared as `IDictionary<TKey, TValue>` or `IReadOnlyDictionary<TKey, TValue>`
+are reconstructed as compatible dictionaries, including nested dictionaries and nullable values.
+You do not need a custom mapper merely because the declaration uses one of these interfaces.
+
 If a value has a model conversion, use that on both sides.
 For example, add this Money type to the shared project:
 

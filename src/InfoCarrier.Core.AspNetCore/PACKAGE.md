@@ -6,7 +6,7 @@ Client applications reference Core without this server package.
 
 ## Usage
 
-For version 11 development code, register the server context and map its endpoint:
+Register the server context and map its endpoint:
 
 ```csharp
 using InfoCarrier.Core;
@@ -23,18 +23,17 @@ app.MapInfoCarrier().RequireAuthorization("DataAccess");
 Configure the named authorization policy and the database provider in the application.
 The endpoint permits queries and writes; enforce access rules on the server.
 The shared model and imports are shown in the complete tutorial.
-This development build uses Entity Framework Core 11.
+Version 11.0.0 requires .NET 11 and Entity Framework Core 11.
 
 ## Getting started
 
-Follow the [version 11 tutorial](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/getting-started/first-app.md).
+Follow the [tutorial](https://azabluda.github.io/InfoCarrier.Core/getting-started/first-app/).
 Use a matching InfoCarrier.Core version on the client.
 
 ## Additional documentation
 
-See [server setup](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/applications/configuration/server.md)
-and [security](https://github.com/azabluda/InfoCarrier.Core/blob/main/website/docs/operations/security.md).
-The [public documentation](https://azabluda.github.io/InfoCarrier.Core/) describes the published release.
+See [server setup](https://azabluda.github.io/InfoCarrier.Core/applications/configuration/server/)
+and [security](https://azabluda.github.io/InfoCarrier.Core/operations/security/).
 
 ## Feedback
 
