@@ -56,7 +56,15 @@ public interface IInfoCarrierClient
         QueryDataResult result = await QueryDataAsync(request, clientContext, cancellationToken).ConfigureAwait(false);
         yield return new QueryStartFrame(
             QueryStreamFrameCodec.Version, 0, result.IsEntityResult, result.ElementTypeName);
-        List<DynamicValueNode> rows = result.Rows.ToList();
+        List<DynamicValueNode> rows;
+        try
+        {
+            rows = result.Rows.ToList();
+        }
+        catch (Exception exception)
+        {
+            throw new BufferedResultMaterializationException(exception);
+        }
         foreach (DynamicValueNode row in rows)
         {
             yield return new QueryRowFrame(row);
@@ -145,22 +153,6 @@ public interface IInfoCarrierClient
     ///     to answer this rather than let the caller find out by failing.
     /// </summary>
     Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default);
-}
-
-internal static class BufferedQueryFrameAdapter
-{
-    internal static List<DynamicValueNode> DeserializeRows(byte[] payload)
-    {
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize(
-                payload, ExpressionJsonContext.Default.ListDynamicValueNode) ?? [];
-        }
-        catch (Exception exception)
-        {
-            throw new BufferedResultMaterializationException(exception);
-        }
-    }
 }
 
 internal sealed class BufferedResultMaterializationException(Exception innerException)

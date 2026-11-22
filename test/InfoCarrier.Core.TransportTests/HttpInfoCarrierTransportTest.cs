@@ -19,6 +19,31 @@ public class HttpInfoCarrierTransportTest
         };
 
     [Fact]
+    public void Synchronous_HTTP_failures_keep_diagnostics_and_dispose_the_response()
+    {
+        Check(HttpStatusCode.BadGateway, "upstream is down", failure =>
+        {
+            Assert.Contains("502", failure.Message);
+            Assert.Contains("upstream is down", failure.Message);
+        });
+        Check(HttpStatusCode.OK, "<html>not json</html>", failure => Assert.NotNull(failure.InnerException));
+
+        static void Check(HttpStatusCode status, string body, Action<InfoCarrierTransportException> inspect)
+        {
+            var content = new TrackingContent(System.Text.Encoding.UTF8.GetBytes(body));
+            var handler = new SyncOnlyHandler(_ => new HttpResponseMessage(status) { Content = content });
+            using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+            var transport = new HttpInfoCarrierTransport(http, Serializer);
+
+            inspect(Assert.Throws<InfoCarrierTransportException>(() => transport.Send(AnEnvelope())));
+
+            Assert.True(content.Disposed);
+            Assert.Equal(1, handler.SyncCalls);
+            Assert.Equal(0, handler.AsyncCalls);
+        }
+    }
+
+    [Fact]
     public void Synchronous_send_uses_only_the_synchronous_HTTP_pipeline()
     {
         InfoCarrierEnvelope expected = AnEnvelope() with { CorrelationId = "sync" };
@@ -195,8 +220,8 @@ public class HttpInfoCarrierTransportTest
 
     private sealed class TrackingContent : ByteArrayContent
     {
-        public TrackingContent()
-            : base([])
+        public TrackingContent(byte[]? bytes = null)
+            : base(bytes ?? [])
         {
         }
 

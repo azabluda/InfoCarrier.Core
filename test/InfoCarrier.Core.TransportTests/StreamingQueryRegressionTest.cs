@@ -104,6 +104,24 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
     }
 
     [Fact]
+    public async Task Paging_after_an_indexed_client_projection_preserves_indexes_and_streams()
+    {
+        var gate = new GatedClient(CreateInnerClient()) { RowsBeforeGate = 3 };
+        using NorthwindContext context = CreateContext(gate);
+        IQueryable<IndexedCustomerCard> query = context.Customers.AsNoTracking().OrderBy(customer => customer.Id)
+            .Select(customer => new CustomerCard(customer.Id))
+            .Select((card, index) => new IndexedCustomerCard(card.Id, index))
+            .Skip(1).Take(2);
+
+        List<IndexedCustomerCard> rows = await AssertFirstResultPrecedesCompletion(
+            query.AsAsyncEnumerable(), gate, card => Assert.Equal(1, card.Index));
+
+        Assert.Equal([1, 2], rows.Select(card => card.Index));
+        Assert.Equal(["ANATR", "AROUT"], rows.Select(card => card.Id));
+        Assert.Empty(context.ChangeTracker.Entries());
+    }
+
+    [Fact]
     public async Task Tracked_query_waits_for_buffered_materialization()
     {
         var gate = new GatedClient(CreateInnerClient());
@@ -169,9 +187,11 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
                 .Options);
 
     private sealed record CustomerCard(string Id);
+    private sealed record IndexedCustomerCard(string Id, int Index);
 
     private sealed class GatedClient(IInfoCarrierClient inner) : IInfoCarrierClient
     {
+        public int RowsBeforeGate { get; init; } = 1;
         public TaskCompletionSource FirstRowOffered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource BufferedCallStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -185,19 +205,19 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
             DbContext clientContext,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            bool rowSeen = false;
+            int rowsSeen = 0;
             await foreach (QueryStreamFrame frame in inner
                 .QueryDataStreamAsync(request, clientContext, cancellationToken)
                 .WithCancellation(cancellationToken))
             {
-                if (rowSeen)
+                if (rowsSeen >= RowsBeforeGate)
                 {
                     await Release.Task.WaitAsync(cancellationToken);
                 }
 
                 if (frame is QueryRowFrame)
                 {
-                    rowSeen = true;
+                    rowsSeen++;
                     FirstRowOffered.TrySetResult();
                 }
 

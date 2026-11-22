@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -57,6 +58,92 @@ public class ClientProcessingLoggingTest
             Assert.Single(fixture.Log.Entries, e => e.Id == id);
         }
         finally { foreach (IDisposable subscription in subscriptions) { subscription.Dispose(); } }
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_during_request_construction_has_one_debug_query_event()
+    {
+        using var fixture = new Fixture();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var messages = new List<string>();
+        using var context = fixture.CreateClient(configure: builder => builder
+            .ReplaceService<IExpressionSerializer, CancelingExpressionSerializer>()
+            .LogTo(messages.Add, (id, _) => id == InfoCarrierEventId.ClientQueryFailure));
+        context.PreparationCancellation = cancellation;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => context.Items.ToListAsync(cancellation.Token));
+
+        Logs.Entry failure = Assert.Single(fixture.Log.Entries, entry => entry.Id is 35100 or 35101 or 35102);
+        Assert.Equal(LogLevel.Debug, failure.Level);
+        Assert.Contains("CallerCancellation", failure.Message);
+        Assert.Contains("request construction", failure.Message);
+        Assert.Single(messages);
+    }
+
+    public sealed class CancelingExpressionSerializer(ExpressionToNodeTranslator forward, TypeNodeResolver resolver,
+        IDynamicValueMapper mapper, ICurrentDbContext current) : ExpressionSerializer(forward, resolver, mapper)
+    {
+        public override ExpressionNode ToNode(Expression expression, Metadata.IInfoCarrierRelationalQueryRoots? relationalRoots)
+        {
+            var cancellation = ((Context)current.Context).PreparationCancellation!;
+            cancellation.Cancel();
+            throw new OperationCanceledException(cancellation.Token);
+        }
+    }
+
+    [Fact]
+    public async Task Direct_server_conflicts_keep_the_client_entry_and_rollback_other_changes()
+    {
+        using var fixture = new Fixture();
+        using (var seed = fixture.CreateClient())
+        {
+            seed.Items.Add(new Item { Id = 2, Name = "two" });
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        IInfoCarrierClient direct = new BufferedOnlyClient(fixture.Client, result => result, fixture.Server);
+        using var client = fixture.CreateClient(client: direct);
+        Item first = await client.Items.SingleAsync(item => item.Id == 1, TestContext.Current.CancellationToken);
+        Item second = await client.Items.SingleAsync(item => item.Id == 2, TestContext.Current.CancellationToken);
+        using (var other = fixture.CreateClient())
+        {
+            other.Remove(await other.Items.SingleAsync(item => item.Id == 1, TestContext.Current.CancellationToken));
+            await other.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        first.Name = "stale";
+        second.Name = "must roll back";
+
+        DbUpdateConcurrencyException failure = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            client.SaveChangesAsync(TestContext.Current.CancellationToken));
+
+        Assert.Same(first, Assert.Single(failure.Entries).Entity);
+        using var verification = fixture.CreateClient();
+        Assert.Equal("two", (await verification.Items.SingleAsync(TestContext.Current.CancellationToken)).Name);
+    }
+
+    [Fact]
+    public async Task Buffered_only_client_replays_logs_and_classifies_encoded_row_failures()
+    {
+        using var fixture = new Fixture();
+        bool malformed = false;
+        IInfoCarrierClient client = new BufferedOnlyClient(fixture.Client, result => malformed
+            ? result with { SerializedResults = [255] }
+            : result with { ServerLog = [new ServerLogEvent
+            {
+                Category = "Test.BufferedClient", EventId = 39997, Level = (int)LogLevel.Warning,
+                Message = "buffered rows received",
+            }] });
+        using var context = fixture.CreateClient(client: client);
+        Assert.Equal("one", Assert.Single(await context.Items.AsNoTracking()
+            .ToListAsync(TestContext.Current.CancellationToken)).Name);
+        Assert.Equal("buffered rows received", Assert.Single(fixture.Log.Entries, entry => entry.Id == 39997).Message);
+
+        malformed = true;
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => context.Items.AsNoTracking()
+            .ToListAsync(TestContext.Current.CancellationToken));
+
+        Logs.Entry failure = Assert.Single(fixture.Log.Entries, entry => entry.Id is 35100 or 35101 or 35102);
+        Assert.Contains("result materialization", failure.Message);
+        Assert.Null(failure.Exception);
     }
 
     [Fact]
@@ -368,6 +455,7 @@ public class ClientProcessingLoggingTest
         private readonly ILoggerFactory _factory;
         public Logs Log { get; } = new();
         public IInfoCarrierClient Client { get; }
+        public IInfoCarrierServer Server => _server;
         public IInfoCarrierTransport Transport { get; }
         public Func<InfoCarrierEnvelope, InfoCarrierEnvelope> Transform { get; set; } = response => response;
         public Func<InfoCarrierEnvelope, InfoCarrierEnvelope> Prepare { get; set; } = request => request;
@@ -408,9 +496,10 @@ public class ClientProcessingLoggingTest
                 _factory.CreateLogger<TransportInfoCarrierClient>());
         }
 
-        public Context CreateClient(ILoggerFactory? factory = null, Action<DbContextOptionsBuilder<Context>>? configure = null)
+        public Context CreateClient(ILoggerFactory? factory = null, Action<DbContextOptionsBuilder<Context>>? configure = null,
+            IInfoCarrierClient? client = null)
         {
-            var builder = new DbContextOptionsBuilder<Context>().UseInfoCarrier(Client).UseLoggerFactory(factory ?? _factory);
+            var builder = new DbContextOptionsBuilder<Context>().UseInfoCarrier(client ?? Client).UseLoggerFactory(factory ?? _factory);
             configure?.Invoke(builder);
             return new(builder.Options);
         }
@@ -424,6 +513,34 @@ public class ClientProcessingLoggingTest
             _factory.Dispose();
             File.Delete(_path);
         }
+    }
+
+    // No QueryDataStreamAsync override: these cases must exercise the public default adapter.
+    private sealed class BufferedOnlyClient(IInfoCarrierClient inner, Func<QueryDataResult, QueryDataResult> transform,
+        IInfoCarrierServer? directSaves = null)
+        : IInfoCarrierClient
+    {
+        public QueryDataResult QueryData(QueryDataRequest request, DbContext context) => transform(inner.QueryData(request, context));
+        public async Task<QueryDataResult> QueryDataAsync(QueryDataRequest request, DbContext context, CancellationToken cancellationToken = default)
+            => transform(await inner.QueryDataAsync(request, context, cancellationToken));
+        public SaveChangesResult SaveChanges(SaveChangesRequest request, DbContext context)
+            => directSaves?.SaveChanges(request) ?? inner.SaveChanges(request, context);
+        public Task<SaveChangesResult> SaveChangesAsync(SaveChangesRequest request, DbContext context, CancellationToken cancellationToken = default)
+            => directSaves?.SaveChangesAsync(request, cancellationToken) ?? inner.SaveChangesAsync(request, context, cancellationToken);
+        public TransactionResult BeginTransaction() => inner.BeginTransaction();
+        public Task<TransactionResult> BeginTransactionAsync(CancellationToken cancellationToken = default) => inner.BeginTransactionAsync(cancellationToken);
+        public void CommitTransaction(string transactionId) => inner.CommitTransaction(transactionId);
+        public Task CommitTransactionAsync(string transactionId, CancellationToken cancellationToken = default) => inner.CommitTransactionAsync(transactionId, cancellationToken);
+        public void RollbackTransaction(string transactionId) => inner.RollbackTransaction(transactionId);
+        public Task RollbackTransactionAsync(string transactionId, CancellationToken cancellationToken = default) => inner.RollbackTransactionAsync(transactionId, cancellationToken);
+        public void CreateSavepoint(string transactionId, string name) => inner.CreateSavepoint(transactionId, name);
+        public Task CreateSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default) => inner.CreateSavepointAsync(transactionId, name, cancellationToken);
+        public void RollbackToSavepoint(string transactionId, string name) => inner.RollbackToSavepoint(transactionId, name);
+        public Task RollbackToSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default) => inner.RollbackToSavepointAsync(transactionId, name, cancellationToken);
+        public void ReleaseSavepoint(string transactionId, string name) => inner.ReleaseSavepoint(transactionId, name);
+        public Task ReleaseSavepointAsync(string transactionId, string name, CancellationToken cancellationToken = default) => inner.ReleaseSavepointAsync(transactionId, name, cancellationToken);
+        public bool SupportsSavepoints(string transactionId) => inner.SupportsSavepoints(transactionId);
+        public Task<bool> SupportsSavepointsAsync(string transactionId, CancellationToken cancellationToken = default) => inner.SupportsSavepointsAsync(transactionId, cancellationToken);
     }
 
     internal sealed class LocalTransport(InfoCarrierEnvelopeServer dispatcher, Func<InfoCarrierEnvelope, InfoCarrierEnvelope> transform,
@@ -444,6 +561,7 @@ public class ClientProcessingLoggingTest
 
     internal sealed class Context(DbContextOptions<Context> options) : DbContext(options)
     {
+        public CancellationTokenSource? PreparationCancellation { get; set; }
         public DbSet<Item> Items => Set<Item>();
     }
 

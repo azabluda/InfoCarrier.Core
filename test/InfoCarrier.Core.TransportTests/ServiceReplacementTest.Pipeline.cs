@@ -50,7 +50,7 @@ public partial class ServiceReplacementTest
             await foreach (QueryStreamFrame _ in ((IInfoCarrierStreamServer)limitedServer).QueryFramesAsync(request, TestContext.Current.CancellationToken)) { }
         });
         QueryDataResult result = await unlimitedServer.QueryDataAsync(request, TestContext.Current.CancellationToken);
-        DynamicValueNode row = Assert.Single(BufferedQueryFrameAdapter.DeserializeRows(result.SerializedResults));
+        DynamicValueNode row = Assert.Single(result.Rows);
         Assert.Equal("0", row.PrimitiveValue?.ToString());
     }
 

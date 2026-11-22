@@ -3,6 +3,7 @@
 using System.Linq.Expressions;
 using InfoCarrier.Core.Common;
 using InfoCarrier.Core.Expressions;
+using InfoCarrier.Core.Query;
 using InfoCarrier.Core.Wire;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -11,6 +12,36 @@ namespace InfoCarrier.Core.TransportTests;
 
 public class Protocol3ExpressionTest
 {
+    [Fact]
+    public void Historical_mapped_instance_function_binds_the_server_context_instead_of_the_client()
+    {
+        using var client = new FunctionContext(10);
+        using var server = new FunctionContext(20);
+        var mapper = new TypeNodeMapper();
+        var resolver = new TypeNodeResolver(allowlist: TypeAllowlist.ForModel(server.Model));
+        var values = new DynamicValueMapper(server.Model, mapper, resolver);
+        Expression call = Expression.Call(new ServerContextExpression(typeof(FunctionContext), client),
+            typeof(FunctionContext).GetMethod(nameof(FunctionContext.AddMarker))!, Expression.Constant(7));
+        var request = new QueryDataRequest
+        {
+            Query = new ExpressionToNodeTranslator(mapper, values).Translate(call),
+            TrackingBehavior = QueryTrackingBehavior.NoTracking, IsAsync = false, ReturnsSingleResult = true,
+        };
+        var protocols = new InfoCarrierWireProtocol([new CurrentWireProtocolCodec(), new Protocol3WireProtocolCodec()]);
+        var serializer = new SystemTextJsonInfoCarrierSerializer(InfoCarrierPayloadLimits.Default, protocols);
+        QueryDataRequest restored = protocols.Deserialize<QueryDataRequest>(serializer,
+            protocols.Serialize(serializer, request, 3), 3)!;
+        Assert.IsType<ServerContextStubNode>(Assert.IsType<MethodCallNode>(restored.Query).Instance);
+        var reverse = new NodeToExpressionTranslator(resolver, values,
+            (_, _) => throw new InvalidOperationException("This function has no query root."))
+        {
+            ServerContextFactory = declared => Expression.Constant(server, declared),
+        };
+
+        Assert.Equal(27, Expression.Lambda<Func<int>>(reverse.Translate(restored.Query)).Compile()());
+        Assert.Equal(17, client.AddMarker(7));
+    }
+
     [Fact]
     public void Nullable_arithmetic_and_checked_overflow_keep_historical_meanings()
     {
@@ -91,5 +122,13 @@ public class Protocol3ExpressionTest
         public int Field;
         public string Name { get; set; } = string.Empty;
         public List<int> Values { get; set; } = [];
+    }
+
+    public sealed class FunctionContext(int marker) : DbContext(
+        new DbContextOptionsBuilder<FunctionContext>().UseSqlite("Data Source=:memory:").Options)
+    {
+        public int AddMarker(int value) => marker + value;
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+            => modelBuilder.HasDbFunction(typeof(FunctionContext).GetMethod(nameof(AddMarker))!);
     }
 }

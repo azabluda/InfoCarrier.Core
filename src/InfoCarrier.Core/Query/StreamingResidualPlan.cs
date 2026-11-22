@@ -63,18 +63,16 @@ internal sealed class StreamingResidualPlan
             return false;
         }
 
+        // QuerySplitter rejects client-side Where and Distinct before creating a residual.
+        // Reassembly exemptions are Select calls, so they cannot restore either operator here.
         Step? step = call.Method.Name switch
         {
-            nameof(Queryable.Where) when call.Arguments.Count == 2
-                => new PredicateStep(CompileLambda(call.Arguments[1])),
             nameof(Queryable.Select) when call.Arguments.Count == 2
                 => new SelectorStep(CompileLambda(call.Arguments[1])),
             nameof(Queryable.Skip) when call.Arguments.Count == 2
                 => new SkipStep(EvaluateCount(call.Arguments[1])),
             nameof(Queryable.Take) when call.Arguments.Count == 2
                 => new TakeStep(EvaluateCount(call.Arguments[1])),
-            nameof(Queryable.Distinct) when call.Arguments.Count == 1
-                => new DistinctStep(),
             _ => null,
         };
 
@@ -106,21 +104,6 @@ internal sealed class StreamingResidualPlan
     private abstract class Step
     {
         internal abstract StreamingResidualResult Process(object? value);
-    }
-
-    private sealed class PredicateStep(Delegate predicate) : Step
-    {
-        private int _index;
-
-        internal override StreamingResidualResult Process(object? value)
-        {
-            object? accepted = predicate.GetType().GetMethod("Invoke")!.GetParameters().Length == 2
-                ? predicate.DynamicInvoke(value, _index++)
-                : predicate.DynamicInvoke(value);
-            return accepted is true
-                ? StreamingResidualResult.Yield(value)
-                : StreamingResidualResult.Skip;
-        }
     }
 
     private sealed class SelectorStep(Delegate selector) : Step
@@ -164,16 +147,6 @@ internal sealed class StreamingResidualPlan
             _remaining--;
             return StreamingResidualResult.Yield(value);
         }
-    }
-
-    private sealed class DistinctStep : Step
-    {
-        private readonly HashSet<object?> _seen = [];
-
-        internal override StreamingResidualResult Process(object? value)
-            => _seen.Add(value)
-                ? StreamingResidualResult.Yield(value)
-                : StreamingResidualResult.Skip;
     }
 }
 

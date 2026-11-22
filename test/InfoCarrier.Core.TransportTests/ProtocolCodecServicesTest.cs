@@ -6,8 +6,10 @@ using System.Text.Json.Serialization;
 using System.Reflection;
 using System.Net;
 using InfoCarrier.Core.Common;
+using InfoCarrier.Core.Expressions;
 using InfoCarrier.Core.Query;
 using InfoCarrier.Core.Wire;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -18,6 +20,77 @@ namespace InfoCarrier.Core.TransportTests;
 
 public class ProtocolCodecServicesTest(NorthwindServerFactory factory) : IClassFixture<NorthwindServerFactory>
 {
+    [Theory]
+    [InlineData("name", "length budget")]
+    [InlineData("depth", "depth budget")]
+    [InlineData("array", "array descriptor")]
+    [InlineData("members", "bounded anonymous-shape")]
+    public async Task Streamed_descriptor_admission_rejects_resource_and_shape_violations(string kind, string reason)
+    {
+        var primitive = new TypeNode { Name = typeof(int).FullName! };
+        TypeNode type = kind switch
+        {
+            "name" => new TypeNode { Name = new string('X', 16385) },
+            "array" => new TypeNode { Name = "InfoCarrier.ShapeArray.v1", ArrayElement = primitive, ArrayRank = 33 },
+            "members" => new TypeNode
+            {
+                Name = "InfoCarrier.AnonymousShape.v1/" + new string('A', 64),
+                ShapeMembers = Enumerable.Range(0, 33).Select(index => "Member" + index).ToArray(),
+                GenericArguments = Enumerable.Repeat(primitive, 33).ToArray(),
+            },
+            _ => primitive,
+        };
+        if (kind == "depth")
+        {
+            for (int index = 0; index < 18; index++)
+            {
+                type = new TypeNode { Name = typeof(List<>).FullName!, GenericArguments = [type] };
+            }
+        }
+        var serializer = new SystemTextJsonInfoCarrierSerializer();
+        var query = new QueryDataRequest
+        {
+            ProtocolVersion = 4,
+            Query = new ConstantNode { Type = type, PrimitiveValue = 1 },
+            TrackingBehavior = QueryTrackingBehavior.NoTracking, IsAsync = true, ReturnsSingleResult = true,
+        };
+        using HttpClient http = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "infocarrier")
+        {
+            Content = new ByteArrayContent(serializer.Serialize(query)),
+        };
+        request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
+        request.Headers.Add("InfoCarrier-Protocol-Version", "4");
+        using HttpResponseMessage response = await http.SendAsync(request, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        await using Stream source = await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
+        List<QueryStreamFrame> frames = await QueryStreamFrameCodec.ReadAsync(source, TestContext.Current.CancellationToken)
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Empty(frames.OfType<QueryRowFrame>());
+        Assert.Contains(reason, Assert.Single(frames.OfType<QueryFaultFrame>()).Fault.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(3, 4)]
+    [InlineData(4, 3)]
+    public async Task Stream_header_and_body_versions_must_agree_before_server_execution(int header, int body)
+    {
+        using HttpClient http = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "infocarrier")
+        {
+            Content = new StringContent($"{{\"protocolVersion\":{body}}}"),
+        };
+        request.Headers.Add("InfoCarrier-Stream-Operation", "Query");
+        request.Headers.Add("InfoCarrier-Protocol-Version", header.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        using HttpResponseMessage response = await http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(body.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            Assert.Single(response.Headers.GetValues("InfoCarrier-Client-Protocol-Version")));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

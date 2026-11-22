@@ -850,9 +850,13 @@ raw/merged report checks, file decisions, earlier decision rechecks and bounded 
       with a gated application test, stream independently projected result slots, and preserve
       buffering for residuals that need shared inputs. Explain why the original regression and
       inherited result assertions did not establish this timing contract.
-- [ ] **CVA4. Review hosted validation and remaining decisions.** Verify the changed revision,
-      then review the audit's ranked streaming, adapter, save/model and historical/admission work
-      with the owner. This audit does not authorize version 11 publication.
+- [x] **CVA4. Resolve remaining coverage candidates.** Remove unreachable predicate/distinct
+      streaming steps and the buffered decoder called only by a test. Retain paging after proving
+      its indexed-projection caller. Add adapter, diagnostic, stored-model, direct-conflict and
+      historical/admission controls. Record retained defensive boundaries and bounded future work.
+- [ ] **CVA5. Complete final hosted validation and owner review.** Reconcile the final complete
+      coverage report and review normal/slow checks. Record results in the pull request. Merging,
+      issue closure and version 11 publication remain separate owner decisions.
 
 ## Branches that outlive their pull request
 
