@@ -822,8 +822,7 @@ only `OnModelCreating`, though; the rest is the convention set, and that comes f
 and names no database. What the interface buys is that EF's relational model building can cast
 `ITypeMappingSource` to it, which is all that building a relational model here requires. **B4's rule
 is untouched, and it is what makes this sound**: the mapping is derived from the CLR type alone,
-through `InfoCarrierTypeMappingSource.FindInfoCarrierMapping`, which both sources call so the two
-cannot drift. The SAME INSTANCE answers both interfaces, so two sources cannot disagree about one
+through `InfoCarrierRelationalTypeMappingSource.FindInfoCarrierMapping`. The SAME INSTANCE answers both interfaces, so two sources cannot disagree about one
 property either.
 
 **The other half of that sentence stayed true, and it is why the wiring is by hand.**
@@ -836,6 +835,14 @@ or database creator comes with them.
 `10.0.0`.** `RelationalTypeMappingSource` does not derive from `TypeMappingSource`, so re-basing the
 published class is a `CP0002` the pack gate refuses, and a source break for anyone who subclassed
 it. The published class stays and the relational one is an additive sibling.
+
+**Amendment 2026-11-22, version 11 coverage audit.** The compatibility reason above applies to
+the version 10 line. Version 11 removes the unregistered `InfoCarrierTypeMappingSource` host.
+Roslyn finds no construction, subclass or registration for it in the complete solution; its only
+active consumer uses the static scalar-mapping rules. Those rules now belong to the registered
+`InfoCarrierRelationalTypeMappingSource`, unchanged. Both mapping interfaces still resolve the
+same instance. This removes a public version 10 compatibility type and requires rebuilding custom
+subclasses against the relational mapping source. It changes no wire contract or mapping decision.
 
 **What it cost.** `failed` 35 -> 34, `total` unchanged at 29514. Four more layers had to be found by
 probing, and each is recorded in V5: the relational model was built over the design-time model and
@@ -1148,7 +1155,7 @@ client's own business, and this is the list that did not exist.
 | `IModelCustomizer` | Nothing — `RelationalModelCustomizer` is an empty subclass | Nothing to lose. Verified by reading it. |
 | `IExecutionStrategyFactory` | Nothing by default — both return `NonRetryingExecutionStrategy`; the relational one only adds the hook for `RelationalOptionsExtension.ExecutionStrategyFactory` | Nothing to lose; the client has no relational options. Verified by reading both. |
 | `ICompiledQueryCacheKeyGenerator` | `UseRelationalNulls`, `QuerySplittingBehavior` and a buffering flag, all read off `RelationalOptionsExtension` | **Cannot apply**, and R82's rule says why: those three are the *server's* configuration. |
-| `ITypeMappingSource` | The store's type mappings | Deliberate. `InfoCarrierTypeMappingSource` answers from the CLR type alone, which is CLAUDE.md's "computed twice by two providers" rule. |
+| `ITypeMappingSource` | The store's type mappings | Deliberate. `InfoCarrierRelationalTypeMappingSource` answers from the CLR type alone, which is CLAUDE.md's "computed twice by two providers" rule. |
 | `IValueGeneratorSelector` | Store-generated key defaults | Deliberate; `InfoCarrierValueGeneratorSelector`, found neutral by D3's audit. |
 | `IQueryContextFactory` | The connection on the query context | Deliberate; `InfoCarrierQueryContextFactory`. |
 | `IModelValidator` | Store-mapping validation — shared tables, column clashes, TPT | Not wanted. The client replaces core's for the opposite reason: to *relax* a rule (a hierarchy needs no discriminator here). |

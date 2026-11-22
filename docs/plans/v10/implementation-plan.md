@@ -843,7 +843,14 @@ raw/merged report checks, file decisions, earlier decision rechecks and bounded 
       Remove the unused
       historical descriptor cache helper; test buffered-only server replacements and facade
       transaction completion/reset. Keep unresolved reachability and adapter scenarios explicit.
-- [ ] **CVA2. Review hosted validation and remaining decisions.** Verify the changed revision,
+- [x] **CVA2. Remove the obsolete mapping-source host.** Verify registrations and all source
+      consumers; move unchanged scalar rules into the active relational service. Record the public
+      major-version removal and replacement for custom subclasses. Run existing model/query controls.
+- [ ] **CVA3. Fix progressive concatenation of client projections.** Reproduce buffered execution
+      with a gated application test, stream independently projected result slots, and preserve
+      buffering for residuals that need shared inputs. Explain why the original regression and
+      inherited result assertions did not establish this timing contract.
+- [ ] **CVA4. Review hosted validation and remaining decisions.** Verify the changed revision,
       then review the audit's ranked streaming, adapter, save/model and historical/admission work
       with the owner. This audit does not authorize version 11 publication.
 
