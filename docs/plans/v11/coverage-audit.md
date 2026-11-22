@@ -92,7 +92,7 @@ These are bounded follow-up decisions under this issue, not new defect reports.
 
 | File | Lines | Classification | Source/runtime evidence and why existing tests miss it | Removal impact and action |
 |---|---:|---|---|---|
-| `Query/StreamingResidualPlan.cs` | 40/111 | Unresolved, with active projection processing | `QueryExecutor.ExecuteAsync` selects this after pass-through fails. `SelectorStep` executes; predicate, paging, distinct and concat implementations do not. The existing concat regression can ship concat to the server, so its name does not prove this plan executes. | Keep projection streaming. Establish which operators can survive version 11's client-evaluation guard before removing obsolete arms or adding application scenarios. See follow-up 1. |
+| `Query/StreamingResidualPlan.cs` | 40/111 | Supported concat gap / unresolved operator arms | `SelectorStep` executes. The existing concat regression ships one query. A new client-constructed concat produces two projected slots that the old plan cannot stream. Paging/distinct probes move those operations to the server; local filtering is refused. | Fixed projected-slot streaming with a regression observed failing first. Keep other arms until reachability is established beyond these examples. See the follow-up evidence below. |
 | `Query/QuerySplitter.cs` | 786/845 | Supported / unresolved branches | Query preparation executes broadly. Misses include paging reassembly at 604–640, correlated-fragment refusal at 1074–1078, navigation traversal, and alternative diagnostic construction. Successful inherited queries do not exercise every rejected or structurally rewritten tree. | Retain splitting and refusal guards. Review paging/reassembly with streaming reachability; use public query outcomes, not private visitor tests. |
 | `ServerSaveChangesExecutor.cs` | 394/448 | Supported / unresolved branches | Replay executes across stores. Misses include incomplete-document refusal at 947–984, property-bag coercion at 1535–1601, and generated-sentinel restoration at 1655–1665. Existing graphs do not cover each metadata/storage combination. | Removing replay or repair can lose stored fields or generated values. Add a property-bag collection round trip and a mixed-key conflict/repair control before narrowing code. Follow-up 3. |
 | `InfoCarrierDatabase.cs` | 267/297 | Supported / Boundary | Framework-dispatched compilation and saves execute. `CompileQueryExpression` explicitly refuses precompiled queries. Conflict entry matching at 792–832 is unexecuted: ordinary transport faults use correlation information instead of live server entries. | Keep the public refusal. Retain live-entry translation until an in-process conflict control establishes its contract; do not infer obsolescence from zero direct calls. Follow-up 3. |
@@ -127,7 +127,7 @@ These are bounded follow-up decisions under this issue, not new defect reports.
 | `Relational/InfoCarrierRelationalQueryRoots.cs` | 25/30 | Supported / unresolved callbacks | The constant-argument SQL root adapter's `UpdateEntityType`, printing and equality alternatives are absent. Ordinary root rebuilding does not invoke every framework callback. | Keep the adapter. Establish a real framework callback scenario before removing overrides or adding framework-shaped unit tests. |
 | `Relational/InfoCarrierRelationalConventionSetBuilder.cs` | 13/18 | Boundary | Remaining uncovered source is the `NoDatabase` error factory, called by the excluded command-only structural adapter. Outer model construction executes across the suite. | Keep the narrow exclusion and error. Removing the dependency object would break construction; no throw-only tests. |
 | `Query/ServerBoundaryAnalyzer.cs` | 200/205 | Supported / Boundary | Diagnostic property getters, extension/IQueryable alternatives and the `NodeFacts.IsShippable` convenience property are unexecuted. Other analyzer decisions execute extensively. | Retain admission logic. Check consumers before removing convenience properties; zero hits alone do not establish dead code. |
-| `InfoCarrierTypeMappingSource.cs` | 24/28 | Unresolved compatibility surface | Relational registration selects its companion mapping source. This public core source and alternative base mapping fallback are not selected by ordinary registered clients. | Do not delete a public type from coverage alone. Check replacement-service consumers and version 11 contract intent before deprecation or removal. |
+| `InfoCarrierTypeMappingSource.cs` | 24/28 | Obsolete compatibility host with active helper | The complete solution has no construction, subclass or registration site. `InfoCarrierRelationalTypeMappingSource` calls only its static helper. Its recorded retention reason is version 10 binary compatibility. | Removed the obsolete public host on the version 11 development line; moved unchanged scalar rules into the active service. Custom subclasses must move to the relational source. No wire change. |
 | `ValueMapping/ModelConverterValueMapper.cs` | 47/51 | Supported / Boundary | Boolean provider-value conversion and unsupported JSON kind refusal are missing. Existing conversions exercise other primitive representations. | Keep conversion and refusal. Add a model converter with a Boolean provider value and a malformed-wire control; follow-up 3. |
 | `Query/ClientPropertyReader.cs` | 19/22 | Supported / Boundary | Null instance, direct navigation getter and missing navigation alternatives are absent. Existing client reconstruction reads scalar/shadow metadata instead. | Keep model-based reads. Test a supported client projection needing navigation access before changing this fallback; follow-up 1. |
 | `Query/SplitQuery.cs` | 16/19 | Boundary | Wrong result-slot count guard and a compiler-only throw after exception rethrow are unexecuted. Executors supply the planned slot count. | Keep the invariant and rethrow behavior. No direct throw-only test. |
@@ -201,17 +201,108 @@ five existing Razor framework trimming warnings. The wire structural gate passed
 starting revision, with wire version 4 unchanged. Documentation checks found zero broken links in
 the two changed documents; file hygiene and whitespace checks passed.
 
+## Service necessity and test ownership follow-up, 2026-11-22
+
+The initial audit classified suspicious files. A second pass asks whether their production
+responsibility still exists before treating a missing line as a request for more tests.
+
+### Obsolete mapping service hidden by helper coverage
+
+`InfoCarrierTypeMappingSource.cs` illustrates the danger of a file-level total. Its 24/28 covered
+lines come from shared scalar-classification logic. Its constructor and service override are
+unexecuted. `AddEntityFrameworkInfoCarrier` registers `InfoCarrierRelationalTypeMappingSource`
+unconditionally, and the relational interface resolves that same instance. Roslyn finds no
+construction, subclass or registration of the older host anywhere in the complete solution.
+Its only external code reference calls the internal static helper.
+
+The active class's remarks and architecture section D3 record exactly why the old class survived:
+it shipped in version 10, so changing its base or removing it would break that release line.
+That compatibility requirement does not apply to the unpublished version 11 major. The helper
+has moved unchanged into the registered service; the obsolete public host has been removed.
+The upgrade guide explains the replacement for application-defined subclasses. This is a public
+major-version removal, not a claim of binary compatibility. No live registration was removed,
+and no serialized member, wire identifier or scalar mapping decision changed.
+
+Official specification tests should not construct an obsolete, unregistered service merely to
+cover its constructor. They reach the active mapping source through model construction and
+application queries. The existing SQL-query, mapping, compiled-model, complex-tracking and
+spatial controls passed after removal: **Passed: 537, Failed: 0, Total: 587**, with 50 skips
+reported by that run. No replacement test was added for the discarded host.
+
+### Projected concatenation exposes a real streaming gap
+
+The temporary application investigation compared plain Entity Framework and InfoCarrier and
+inspected the resulting split for six shapes: final construction, paging, indexed paging,
+concatenation, distinct and filtering. The investigation file was removed after diagnosis;
+the committed tests express the application contract.
+
+Simple paging and distinct over the projection moved to the server, leaving only a client
+`Select`. Indexed paging reached the backend and was refused by both clients. Filtering over
+the unregistered constructed result was refused on both paths. These observations explain why
+adding direct tests of every streaming operator would preserve implementations without first
+establishing a supported caller.
+
+Concatenating two client-constructed results exposed a different problem. The split contains
+two server parameters, each wrapped by its projection, rather than the bare parameters accepted
+by `StreamingConcatPlan`. The executor therefore buffered the queries. The existing concat
+regression used anonymous projections that ship as one server query, so it never exercised that
+plan. Its passing first-row assertion did not establish progressive delivery across result slots.
+
+The new regression blocks completion of the first source and requires its first projected result
+before release. Before the fix, the streaming class reported **Passed: 4, Failed: 1, Total: 5**:
+the new case selected buffered execution. After the fix, concat slots can retain an independent
+row-local residual plan. The executor streams and projects each slot in order, using the existing
+materialization, cancellation and failure-reporting paths. A leaf reading multiple result slots,
+or a residual requiring the same slot more than once, retains buffered execution.
+
+An additional application test preserves empty inputs, order, duplicate values and non-tracking
+behavior across nested concatenation. The focused streaming, framing, processing-diagnostic and
+replacement checks reported **Passed: 82, Failed: 0, Total: 82**. The baseline report's uncovered
+concat implementation was therefore a real delivery gap, not merely an untested private parser.
+
+Plain Entity Framework refuses concat after this client-only construction. InfoCarrier already
+accepts that row-preserving composition; its splitter does not classify concat as forbidden
+client row selection or equality, and the streaming guide promises progressive concatenation.
+This change preserves that existing query result and acceptance boundary while correcting its
+delivery behavior. It does not establish parity with plain Entity Framework for that query shape.
+
+### Why official bases miss these cases
+
+| Area | What official bases establish | Why additional coverage is absent | Correct action |
+|---|---|---|---|
+| Old mapping-source host | Model and query behavior through the registered source | They resolve the relational replacement, not a retained compatibility class | Remove the obsolete host; retain its mapping rules |
+| Streaming concat | Query results, including concat, under each base's tracking and execution choices | Answer assertions do not establish HTTP first-row timing; the old own test also used one shipped query | Add a gated application test and fix progressive projected-slot execution |
+| Buffered-only server replacement | General database behavior | Entity Framework does not own InfoCarrier's optional streaming interface or endpoint selection | Keep the replacement tests added by this audit |
+| Database-facade transaction completion | Store transactions through the applicable inherited bases | The relational transaction base requires a client connection; existing own tests completed returned transaction objects | Exercise the supported facade and manager routes with token/state assertions |
+| Historical wire and admission failures | Current-provider application behavior | Official Entity Framework bases cannot produce InfoCarrier's historical messages or enforce its decoder budgets | Use actual historical clients/codecs and serializer-boundary controls where supported |
+
+### Covered code called only by tests
+
+Reference counts were split by production and test projects for selected apparently test-heavy
+helpers. `WireTypeCollector.CollectOwn` is called by `QuerySplitter` and `ServerBoundaryAnalyzer`;
+`RewriteVerifier.Verify` is called by `QuerySplitter`; `BoundaryAnalysis.FactsFor` is called by
+the projection rewriter; and `ModelDbFunctions.ForModel` is called by type admission and parameter
+evaluation filtering. Their direct tests do not establish obsolescence because their production
+call paths are present too. Likewise, `InfoCarrierTypeMapping<T>.Default` has no ordinary caller
+but is the generated compiled-model entry point, while `ClientResultMaterializer.Materialize`
+is selected through reflection from `QueryExecutor`. These are false positives to avoid.
+
+This selected pass has not established that another fully covered production component exists
+only for tests. It is not an exhaustive proof of necessity for every covered method. The next
+pass should distinguish public compatibility surface, real framework/generated entry points and
+test-only helpers before proposing deletion.
+
 ## Ranked remaining decisions
 
 These bounded investigations stay under [issue #288](https://github.com/azabluda/InfoCarrier.Core/issues/288).
 The audit is not permission to publish version 11. Retain the issue for owner review of these
 remaining decisions; the starting report alone is not a release-candidate certificate.
 
-1. **Streaming reachability.** Trace `RejectClientEvaluation`, registered reassemblies and
-   `StreamingResidualPlan.TryCreate` together. Use a client-only final projection, paging after
-   projection, a wide join carrier, and concat as application controls. Observe which plan runs,
-   not just whether answers match. Remove internal operator arms only after proving the guard
-   or rewrites exclude every supported route. Preserve first-row delivery, cancellation and disposal.
+1. **Remaining streaming-operator reachability.** The projected-concat delivery gap is fixed.
+   Complete the source-invariant analysis for predicate, paging and distinct step implementations,
+   including exceptions generated by projection reassembly. The six application probes narrow
+   the question but do not prove that every supported route excludes those arms. Remove internal
+   operators only after that proof; do not add direct private-plan tests to preserve them.
 2. **Adapter and custom-hosting parity.** Extend the new buffered-only replacement cases with
    forwarded logs and cancellation. Exercise the default server facade directly, registered
    synchronous client savepoints, malformed synchronous HTTP success responses, and buffered-only

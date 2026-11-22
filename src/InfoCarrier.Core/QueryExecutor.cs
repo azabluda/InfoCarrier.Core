@@ -315,10 +315,12 @@ internal sealed class QueryExecutor<TElement>
             && _trackingBehavior != QueryTrackingBehavior.TrackAll
             && Query.StreamingConcatPlan.TryCreate(_split.Residual, out Query.StreamingConcatPlan? concat))
         {
-            foreach (int slot in concat!.Slots)
+            foreach (Query.StreamingConcatSlot slot in concat!.Slots)
             {
-                await foreach (TElement element in ExecutePassThroughAsync(
-                    _split.ServerQueries[slot], cancellationToken).ConfigureAwait(false))
+                IAsyncEnumerable<TElement> rows = slot.Residual is { } residual
+                    ? ExecuteStreamingResidualAsync(_split.ServerQueries[slot.Index], residual, cancellationToken)
+                    : ExecutePassThroughAsync(_split.ServerQueries[slot.Index], cancellationToken);
+                await foreach (TElement element in rows.ConfigureAwait(false))
                 {
                     yield return element;
                 }

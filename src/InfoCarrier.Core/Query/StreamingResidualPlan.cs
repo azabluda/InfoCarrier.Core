@@ -203,17 +203,17 @@ internal readonly record struct StreamingResidualResult(
 /// </summary>
 internal sealed class StreamingConcatPlan
 {
-    private StreamingConcatPlan(IReadOnlyList<int> slots)
+    private StreamingConcatPlan(IReadOnlyList<StreamingConcatSlot> slots)
         => Slots = slots;
 
-    internal IReadOnlyList<int> Slots { get; }
+    internal IReadOnlyList<StreamingConcatSlot> Slots { get; }
 
     internal static bool TryCreate(LambdaExpression residual, out StreamingConcatPlan? plan)
     {
-        var slots = new List<int>();
+        var slots = new List<StreamingConcatSlot>();
         if (!TryRead(residual.Body, residual.Parameters, slots)
             || slots.Count != residual.Parameters.Count
-            || slots.Distinct().Count() != slots.Count)
+            || slots.Select(slot => slot.Index).Distinct().Count() != slots.Count)
         {
             plan = null;
             return false;
@@ -226,31 +226,54 @@ internal sealed class StreamingConcatPlan
     private static bool TryRead(
         Expression expression,
         IReadOnlyList<ParameterExpression> parameters,
-        List<int> slots)
+        List<StreamingConcatSlot> slots)
     {
-        if (expression is ParameterExpression parameter)
-        {
-            int slot = parameters.IndexOf(parameter);
-            if (slot < 0)
-            {
-                return false;
-            }
-
-            slots.Add(slot);
-            return true;
-        }
-
-        return expression is MethodCallExpression
+        if (expression is MethodCallExpression
             {
                 Method.Name: nameof(Queryable.Concat),
                 Method.DeclaringType: { } declaring,
                 Arguments.Count: 2,
-            } call
-            && declaring == typeof(Queryable)
-            && TryRead(call.Arguments[0], parameters, slots)
-            && TryRead(call.Arguments[1], parameters, slots);
+            } call && declaring == typeof(Queryable))
+        {
+            return TryRead(call.Arguments[0], parameters, slots)
+                && TryRead(call.Arguments[1], parameters, slots);
+        }
+
+        // A client projection can wrap each source independently. It remains streamable,
+        // but a projection reading another result slot needs the buffered execution path.
+        var inputs = new InputFinder(parameters);
+        inputs.Visit(expression);
+        if (inputs.Slots.Count != 1)
+        {
+            return false;
+        }
+
+        int index = inputs.Slots.Single();
+        StreamingResidualPlan? residual = null;
+        if (expression != parameters[index]
+            && !StreamingResidualPlan.TryCreate(Expression.Lambda(expression, parameters[index]), out residual))
+        {
+            return false;
+        }
+
+        slots.Add(new StreamingConcatSlot(index, residual));
+        return true;
+    }
+
+    private sealed class InputFinder(IReadOnlyList<ParameterExpression> parameters) : ExpressionVisitor
+    {
+        internal HashSet<int> Slots { get; } = [];
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            int index = parameters.IndexOf(node);
+            if (index >= 0) { Slots.Add(index); }
+            return node;
+        }
     }
 }
+
+internal sealed record StreamingConcatSlot(int Index, StreamingResidualPlan? Residual);
 
 internal static class ParameterListExtensions
 {

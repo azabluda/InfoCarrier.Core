@@ -62,6 +62,48 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
     }
 
     [Fact]
+    public async Task Concatenated_client_projections_yield_before_the_first_source_completes()
+    {
+        var gate = new GatedClient(CreateInnerClient());
+        using NorthwindContext context = CreateContext(gate);
+        IQueryable<CustomerCard> first = context.Customers
+            .AsNoTracking()
+            .Where(customer => customer.Id == "ALFKI")
+            .Select(customer => new CustomerCard(customer.Id));
+        IQueryable<CustomerCard> second = context.Customers
+            .AsNoTracking()
+            .Where(customer => customer.Id == "BLAUS")
+            .Select(customer => new CustomerCard(customer.Id));
+
+        List<CustomerCard> rows = await AssertFirstResultPrecedesCompletion(
+            first.Concat(second).AsAsyncEnumerable(), gate,
+            customer => Assert.Equal("ALFKI", customer.Id));
+
+        Assert.Equal(["ALFKI", "BLAUS"], rows.Select(customer => customer.Id));
+    }
+
+    [Fact]
+    public async Task Concatenated_client_projections_keep_empty_sources_order_and_duplicates()
+    {
+        using NorthwindContext context = CreateContext(CreateInnerClient());
+        IQueryable<CustomerCard> empty = context.Customers.AsNoTracking()
+            .Where(customer => customer.Id == "missing")
+            .Select(customer => new CustomerCard(customer.Id));
+        IQueryable<CustomerCard> first = context.Customers.AsNoTracking()
+            .Where(customer => customer.Id == "ALFKI")
+            .Select(customer => new CustomerCard(customer.Id));
+        IQueryable<CustomerCard> second = context.Customers.AsNoTracking()
+            .Where(customer => customer.Id == "BLAUS")
+            .Select(customer => new CustomerCard(customer.Id));
+
+        List<CustomerCard> rows = await empty.Concat(first).Concat(empty).Concat(second).Concat(first).Concat(empty)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["ALFKI", "BLAUS", "ALFKI"], rows.Select(customer => customer.Id));
+        Assert.Empty(context.ChangeTracker.Entries());
+    }
+
+    [Fact]
     public async Task Tracked_query_waits_for_buffered_materialization()
     {
         var gate = new GatedClient(CreateInnerClient());
@@ -80,29 +122,37 @@ public class StreamingQueryRegressionTest(NorthwindServerFactory factory) : ICla
         Assert.Equal("ALFKI", rows.Current.Id);
     }
 
-    private async Task AssertFirstResultPrecedesCompletion<T>(
+    private async Task<List<T>> AssertFirstResultPrecedesCompletion<T>(
         IAsyncEnumerable<T> query,
         GatedClient gate,
         Action<T> assertFirst)
     {
         await using IAsyncEnumerator<T> rows = query.GetAsyncEnumerator();
         Task<bool> firstMove = rows.MoveNextAsync().AsTask();
-        await gate.FirstRowOffered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var values = new List<T>();
 
         try
         {
+            Task firstSignal = await Task.WhenAny(gate.FirstRowOffered.Task, gate.BufferedCallStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.NotSame(gate.BufferedCallStarted.Task, firstSignal);
             Assert.True(await firstMove.WaitAsync(TimeSpan.FromSeconds(5)));
             assertFirst(rows.Current);
+            values.Add(rows.Current);
             Assert.False(gate.StreamCompleted);
         }
         finally
         {
             gate.Release.TrySetResult();
+            await firstMove.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
         while (await rows.MoveNextAsync())
         {
+            values.Add(rows.Current);
         }
+
+        return values;
     }
 
     private IInfoCarrierClient CreateInnerClient()

@@ -846,7 +846,7 @@ raw/merged report checks, file decisions, earlier decision rechecks and bounded 
 - [x] **CVA2. Remove the obsolete mapping-source host.** Verify registrations and all source
       consumers; move unchanged scalar rules into the active relational service. Record the public
       major-version removal and replacement for custom subclasses. Run existing model/query controls.
-- [ ] **CVA3. Fix progressive concatenation of client projections.** Reproduce buffered execution
+- [x] **CVA3. Fix progressive concatenation of client projections.** Reproduce buffered execution
       with a gated application test, stream independently projected result slots, and preserve
       buffering for residuals that need shared inputs. Explain why the original regression and
       inherited result assertions did not establish this timing contract.
