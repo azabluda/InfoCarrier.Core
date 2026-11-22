@@ -42,15 +42,6 @@ Console.WriteLine(order.Id);   // the key the server's database issued
 The same applies to any store-generated property: computed columns, default values, concurrency
 tokens.
 
-Generation follows the server's model and database provider. A client-side temporary key does not
-enable generation for a server property that is not configured to generate values. The server lets
-its provider accept, generate, or reject the unset value. Returned keys also update dependent foreign keys.
-
-For document stores, changing only an owned member can return a new concurrency value for its owner.
-That value is applied to the tracked owner too. If you defer acceptance with `SaveChanges(false)`,
-call `ChangeTracker.AcceptAllChanges()` when your application accepts the save.
-See [document-store configuration](configuration/document-stores.md).
-
 !!! note "Before the save, read the key from the entry"
 
     Right after `Add`, `order.Id` is still `0`: EF holds the temporary value on the *entry*, not on

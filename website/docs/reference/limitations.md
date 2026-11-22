@@ -119,17 +119,6 @@ These are not defects. They follow from where the client sits.
 
 ## Check your application
 
-The version 11.0.0 specification run reported:
-
-```text
-Passed: 35777, Failed: 0, Total: 36654
-```
-
-Measured against `11.0.0`. The total includes skipped cases with documented provider or emulator reasons.
-The run covers InMemory, SQLite, Firebird, and Cosmos, with direct-provider controls.
-Cosmos validation uses the Linux emulator and its upstream exclusions. It does not establish every
-production Cosmos feature, MongoDB compatibility, or SQL Server-specific behavior.
-
 Run representative queries and writes against your actual server provider.
 Measure request sizes, response times, and behavior under the load your application expects.
 

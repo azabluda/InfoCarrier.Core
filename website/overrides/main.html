@@ -1,13 +1,5 @@
 {% extends "base.html" %}
 
-{% block announce %}
-  {% if config.extra.development_docs %}
-    Development documentation. See the
-    <a href="https://azabluda.github.io/InfoCarrier.Core/">published documentation</a>
-    for the current release.
-  {% endif %}
-{% endblock %}
-
 {% block content %}
   <div class="ic-docs">
     {{ super() }}

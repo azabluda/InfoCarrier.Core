@@ -234,11 +234,6 @@ server's own rights. The server's query filters are not in such a query.
 map yourself with `HasDbFunction`. A store's own family, such as `SqliteDbFunctionsExtensions`, is
 a type this package cannot name, so add it through `AddAllowedTypes(...)` in your shared method.
 
-Registered provider query methods returning `Task<T>` can execute on the server too.
-Register their declaring types and any result types the model does not already cover on both sides.
-The server awaits the operation before returning its result; the provider still decides which
-query shapes and execution modes it supports.
-
 ## Keys of your own types
 
 `GroupBy`, `Join`, `GroupJoin` and `DistinctBy` each take a key. Register named key types on both

@@ -22,7 +22,8 @@ copyright: MIT licensed. Copyright &copy; Alexander Zabluda.
 repo_url: https://github.com/azabluda/InfoCarrier.Core
 repo_name: azabluda/InfoCarrier.Core
 
-# Edit the source for the displayed release. Update this when the documentation changes release lines.
+# `main` is the trunk. An `edit_uri` naming the wrong branch produces a 404 on every page, which
+# is worse than no edit link — so it is worth re-checking whenever the branch layout moves.
 edit_uri: edit/release/11.0/website/docs/
 
 theme:
