@@ -185,12 +185,11 @@
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
     <!--
-      VERSION 11 RELEASE BLOCKER: main intentionally has no PackageValidationBaselineVersion while
-      approved version 11 breaks are removed. Keep package validation enabled for the checks within
-      each package. After version 11.0.0 is published and downloadable, restore this property with
-      value 11.0.0 immediately. The mandatory release checklist in docs/versioning.md repeats this
-      step. Do not publish a later package while the property is absent.
+      VERSION 11.0.0 IS PUBLISHED AND DOWNLOADABLE. Compare future packages with this stable
+      baseline. Keep package validation enabled and raise this value only after the next package
+      is published and downloadable.
     -->
+    <PackageValidationBaselineVersion>11.0.0</PackageValidationBaselineVersion>
 
     <!-- A separate .snupkg, which is what nuget.org's symbol server accepts. -->
     <IncludeSymbols>true</IncludeSymbols>
